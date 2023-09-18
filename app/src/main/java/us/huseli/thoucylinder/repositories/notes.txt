@@ -1,0 +1,87 @@
+c2.android.aac.decoder
+mediaextractor:
+    audio/mp4a-latm
+streamdict:
+    audio/mp4; codecs="mp4a.40.2"
+
+
+stream = mediaInformation.streams.first { it.type == "audio" }
+format =
+    if (stream.codec != null && mediaInformation.format.contains(",")) stream.codec
+    else mediaInforation.format
+
+
+
+wavData.mediaInformation
+    format = "wav"
+    duration = "8.829388"
+    bitrate = "1411239"  // 1_411_239
+    streams.size = 1
+    streams[0]
+        codec = "pcm_s16le"
+        format = null
+        type = "audio"
+        sampleFormat = "s16"
+        bitrate = "1411200"  // 1_411_200
+
+mp3Data.mediaInformation
+    format = "mp3"
+    duration "20.514600"
+    bitrate = "322674"  // 322_674
+    streams.size = 1
+    streams[0]
+        codec = "mp3"
+        format = null
+        type = "audio"
+        sampleFormat = "fltp"
+        bitrate = "320000"  // 320_000
+
+flacData.mediaInformation
+    format = "flac"
+    duration "22.709688"
+    bitrate = "548799"  // 548_799
+    streams.size = 1
+    streams[0]
+        codec = "flac"
+        format = null
+        type = "audio"
+        sampleFormat = "s16"
+        bitrate = null
+
+opus.mediaInformation
+    format = "matroska,webm"
+    duration = "217.361000"
+    bitrate = "37436"  // 37_436
+    streams.size = 1
+    streams[0]
+        codec = "opus"
+        format = null
+        type = "audio"
+        sampleFormat = "fltp"
+        bitrate = null
+
+m4a.mediaInformation
+    format = "mov,mp4,m4a,3gp,3g2,mj2"
+    duration = "563.400000"
+    bitrate = "129509"  // 129_509
+    streams.size = 1
+    streams[0]
+        codec = "aac"
+        format = null
+        type = "audio"
+        sampleFormat = "fltp"
+        bitrate = "2274"  // 2_274
+
+
+codec = "mp4a.40.2"
+trackData.mimeType = "audio/mp4a-latm"
+MimeTypes.getEncoding("audio/mp4a-latm", "mp4a.40.2") = 10
+streamDict.mimeType = "audio/mp4; codecs=\"mp4a.40.2\""
+MimeTypes.getCodecsCorrespondingToMimeType("mp4a.40.2", "audio/mp4") = null
+MimeTypes.getCodecsCorrespondingToMimeType("mp4a.40.2", "audio/mp4a-latm") = "mp4a.40.2"
+
+
+streamDict.mimeType = "audio/webm; codecs=\"opus\""
+MimeTypes.getCodecsCorrespondingToMimeType("opus", "audio/webm") = null
+trackData.mimeType = "audio/opus"
+MimeTypes.getCodecsCorrespondingToMimeType("opus", "audio/opus") = null = "opus"

@@ -1,6 +1,6 @@
 package us.huseli.thoucylinder.data.entities
 
-import android.webkit.MimeTypeMap
+import android.net.Uri
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import us.huseli.thoucylinder.sanitizeFilename
 import kotlin.time.Duration
@@ -10,23 +10,31 @@ data class YoutubeVideo(
     val title: String,
     val length: Duration? = null,
     val thumbnail: YoutubeThumbnail? = null,
+    var localUri: Uri? = null,
 ) {
-    private var _streamDict: YoutubeStreamDict? = null
+    private var _streamData: YoutubeStreamData? = null
 
-    val streamDict: YoutubeStreamDict?
-        get() = _streamDict ?: YoutubeRepository.getStreamDict(id).also { _streamDict = it }
+    fun generateBasename(trackNumber: Int? = null): String =
+        ((trackNumber?.let { String.format("%02d", it) + " - " } ?: "") + title).sanitizeFilename()
 
-    val streamUrl: String?
-        get() = streamDict?.url
+    fun getBestStreamDict(): YoutubeStreamDict? =
+        (_streamData ?: YoutubeRepository.getStreamData(id).also { _streamData = it })
+            .getBestStreamDict(MIMETYPE_FILTER, MIMETYPE_EXCLUDE)
 
-    fun generateFilename(): String {
-        return streamDict?.mimeType?.split(";")?.first()?.let { mimeType ->
-            val extension =
-                MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?:
-                mimeType.split("/").last().lowercase()
-            sanitizeFilename("$title.$extension")
-        } ?: sanitizeFilename(title)
-    }
+    fun toTrack(artist: String? = null): Track = Track(
+        title = title,
+        artist = artist,
+        youtubeVideo = this,
+        localUri = localUri,
+        length = length,
+        youtubeThumbnail = thumbnail,
+    )
 
     override fun toString(): String = if (length != null) "$title ($length)" else title
+
+    companion object {
+        val MIMETYPE_FILTER = Regex("^audio/.*$")
+        val MIMETYPE_EXCLUDE = null
+        // val MIMETYPE_EXCLUDE = Regex("^audio/mp4; codecs=\"mp4a\\.40.*")
+    }
 }

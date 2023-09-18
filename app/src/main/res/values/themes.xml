@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <style name="Theme.ThouCylinder" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.ThouCylinder.Starting" parent="Theme.SplashScreen">
+        <item name="postSplashScreenTheme">@style/Theme.ThouCylinder</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splashscreen_icon</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <!--<item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>-->
+    </style>
 </resources>

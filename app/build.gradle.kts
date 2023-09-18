@@ -10,6 +10,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.kapt")
+    id("kotlin-parcelize")
 }
 
 kotlin {
@@ -113,5 +114,13 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme:
-    implementation("com.github.Eboreg:RetainTheme:1.1.3")
+    implementation("com.github.Eboreg:RetainTheme:1.2.3")
+
+    // FFMPEG:
+    implementation(files("ffmpeg-kit.aar"))
+    // implementation("com.arthenica:ffmpeg-kit-audio:6.0-1")
+    implementation("com.arthenica:smart-exception-java:0.2.1")
+
+    // Splashscreen:
+    implementation("androidx.core:core-splashscreen:1.0.1")
 }

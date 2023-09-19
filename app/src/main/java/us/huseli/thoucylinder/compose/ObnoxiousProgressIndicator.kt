@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -21,12 +22,13 @@ import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.delay
 import us.huseli.retaintheme.ui.theme.RetainColorDark
 import us.huseli.retaintheme.ui.theme.RetainColorLight
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.circular
 
 @Composable
 fun ObnoxiousProgressIndicator(
     modifier: Modifier = Modifier,
-    text: String = "LOADING!!!",
+    text: String = stringResource(R.string.loading_scream),
     textStyle: TextStyle = LocalTextStyle.current,
     wigglePx: Int = 20,
 ) {

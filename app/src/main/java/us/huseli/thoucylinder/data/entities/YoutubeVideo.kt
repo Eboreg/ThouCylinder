@@ -1,40 +1,51 @@
 package us.huseli.thoucylinder.data.entities
 
-import android.net.Uri
-import us.huseli.thoucylinder.repositories.YoutubeRepository
+import androidx.room.Ignore
+import androidx.room.TypeConverters
+import us.huseli.thoucylinder.data.Converters
 import us.huseli.thoucylinder.sanitizeFilename
+import us.huseli.thoucylinder.toDuration
+import java.util.UUID
 import kotlin.time.Duration
 
+@TypeConverters(Converters::class)
 data class YoutubeVideo(
     val id: String,
     val title: String,
-    val length: Duration? = null,
-    val thumbnail: YoutubeThumbnail? = null,
-    var localUri: Uri? = null,
+    val length: String? = null,
+    @Ignore val thumbnail: Image? = null,
 ) {
-    private var _streamData: YoutubeStreamData? = null
+    constructor(
+        id: String,
+        title: String,
+        duration: Duration? = null,
+        thumbnail: Image? = null,
+    ) : this(id, title, duration?.toString(), thumbnail)
+
+    constructor(id: String, title: String, length: String) :
+        this(id, title, length, null)
+
+    @Ignore
+    val duration: Duration? = length?.toDuration()
 
     fun generateBasename(trackNumber: Int? = null): String =
         ((trackNumber?.let { String.format("%02d", it) + " - " } ?: "") + title).sanitizeFilename()
 
-    fun getBestStreamDict(): YoutubeStreamDict? =
-        (_streamData ?: YoutubeRepository.getStreamData(id).also { _streamData = it })
-            .getBestStreamDict(MIMETYPE_FILTER, MIMETYPE_EXCLUDE)
-
-    fun toTrack(artist: String? = null): Track = Track(
+    fun toTrack(
+        localPath: String,
+        artist: String? = null,
+        albumId: UUID? = null,
+        albumPosition: Int? = null,
+    ): Track = Track(
         title = title,
         artist = artist,
         youtubeVideo = this,
-        localUri = localUri,
+        localPath = localPath,
         length = length,
-        youtubeThumbnail = thumbnail,
+        image = thumbnail,
+        albumId = albumId,
+        albumPosition = albumPosition,
     )
 
-    override fun toString(): String = if (length != null) "$title ($length)" else title
-
-    companion object {
-        val MIMETYPE_FILTER = Regex("^audio/.*$")
-        val MIMETYPE_EXCLUDE = null
-        // val MIMETYPE_EXCLUDE = Regex("^audio/mp4; codecs=\"mp4a\\.40.*")
-    }
+    override fun toString(): String = if (duration != null) "$title ($duration)" else title
 }

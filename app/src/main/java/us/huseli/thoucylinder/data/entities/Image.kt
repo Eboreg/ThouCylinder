@@ -1,14 +1,25 @@
 package us.huseli.thoucylinder.data.entities
 
+import us.huseli.thoucylinder.urlRequest
 import java.io.File
-import java.net.URL
 
 data class Image(
     val width: Int,
     val height: Int,
-    val url: URL? = null,
-    val localPath: File? = null,
+    val localFile: File,
+    val url: String? = null,
 ) {
     val size: Int
         get() = width * height
+
+    suspend fun getFile(): File? {
+        if (!localFile.isFile) {
+            url?.let { url ->
+                val conn = urlRequest(url)
+                val body = conn.getInputStream().use { it.readBytes() }
+                localFile.outputStream().use { it.write(body) }
+            }
+        }
+        return localFile.takeIf { it.isFile }
+    }
 }

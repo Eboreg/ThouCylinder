@@ -2,6 +2,13 @@ package us.huseli.thoucylinder
 
 import android.icu.text.DecimalFormat
 import android.icu.text.DecimalFormatSymbols
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
+import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
+import java.net.URL
+import java.net.URLConnection
 import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -13,10 +20,16 @@ fun String.sanitizeFilename(): String =
     replace(Regex("[/\\\\?%*:|\"<>\\x7F\\x00-\\x1F]"), "-")
 
 
-fun String.lengthToDuration(): Duration {
+fun String.toDuration(): Duration {
+    try {
+        return Duration.parseIsoString(this)
+    } catch (_: IllegalArgumentException) {
+    }
+
     val regex = Regex("(?:(?<hours>\\d+):)?(?<minutes>\\d+):(?<seconds>\\d+)$")
     val groups = regex.find(this)?.groups
     var duration = Duration.ZERO
+
     groups?.get("hours")?.value?.toInt()?.hours?.let { duration += it }
     groups?.get("minutes")?.value?.toInt()?.minutes?.let { duration += it }
     groups?.get("seconds")?.value?.toInt()?.seconds?.let { duration += it }
@@ -97,4 +110,27 @@ fun Double.formattedString(maxDecimals: Int, locale: Locale = Locale.getDefault(
     val decimalFormat = DecimalFormat(pattern, symbols)
     decimalFormat.isDecimalSeparatorAlwaysShown = false
     return decimalFormat.format(this).trimEnd('0').trimEnd(symbols.decimalSeparator)
+}
+
+
+suspend fun urlRequest(
+    urlString: String,
+    headers: Map<String, String> = emptyMap(),
+    body: ByteArray? = null,
+): URLConnection = withContext(Dispatchers.IO) {
+    return@withContext URL(urlString).openConnection().apply {
+        connectTimeout = URL_CONNECT_TIMEOUT
+        readTimeout = URL_READ_TIMEOUT
+        Log.i("Utils", "urlRequest: $urlString")
+        headers.forEach { (key, value) -> setRequestProperty(key, value) }
+        if (body != null) {
+            doOutput = true
+            getOutputStream().write(body, 0, body.size)
+        }
+    }
+}
+
+
+class DownloadStatus(val item: String? = null, val status: Status = Status.IDLE) {
+    enum class Status { IDLE, DOWNLOADING, CONVERTING, MOVING }
 }

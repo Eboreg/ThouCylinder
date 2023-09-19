@@ -18,20 +18,18 @@ import androidx.compose.material3.ShapeDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.LoadStatus
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.data.entities.YoutubePlaylist
-import us.huseli.thoucylinder.repositories.YoutubeRepository
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
 
 @Composable
@@ -39,9 +37,11 @@ fun PlaylistSection(playlist: YoutubePlaylist, modifier: Modifier = Modifier) {
     val viewModel = ViewModelProvider(
         owner = checkNotNull(LocalViewModelStoreOwner.current),
     )[playlist.id, PlaylistViewModel::class.java]
-    val context = LocalContext.current
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
-    var isExpanded by rememberSaveable { mutableStateOf(false) }
+    val isDownloaded by viewModel.isDownloaded.collectAsStateWithLifecycle(initialValue = false)
+    val showVideos by viewModel.showVideos.collectAsStateWithLifecycle()
+
+    viewModel.setPlaylist(playlist)
 
     Card(modifier = modifier, shape = ShapeDefaults.ExtraSmall) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -50,27 +50,34 @@ fun PlaylistSection(playlist: YoutubePlaylist, modifier: Modifier = Modifier) {
                     text = playlist.toString(),
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { isExpanded = !isExpanded },
+                        .clickable { viewModel.toggleShowVideos() },
                 )
-                IconButton(
-                    onClick = { viewModel.download(playlist, context) },
-                    content = { Icon(imageVector = Icons.Sharp.Download, contentDescription = "Download") },
-                )
+                if (!isDownloaded) {
+                    IconButton(
+                        onClick = { viewModel.download(playlist) },
+                        content = {
+                            Icon(
+                                imageVector = Icons.Sharp.Download,
+                                contentDescription = stringResource(R.string.download),
+                            )
+                        },
+                    )
+                }
             }
 
-            if (downloadStatus.status != YoutubeRepository.DownloadStatus.Status.IDLE) {
+            if (downloadStatus.status != DownloadStatus.Status.IDLE) {
                 val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
 
                 @Suppress("KotlinConstantConditions")
                 val statusText = when (downloadStatus.status) {
-                    YoutubeRepository.DownloadStatus.Status.IDLE -> ""
-                    YoutubeRepository.DownloadStatus.Status.DOWNLOADING -> "Downloading"
-                    YoutubeRepository.DownloadStatus.Status.CONVERTING -> "Converting"
-                    YoutubeRepository.DownloadStatus.Status.MOVING -> "Moving"
+                    DownloadStatus.Status.IDLE -> ""
+                    DownloadStatus.Status.DOWNLOADING -> stringResource(R.string.downloading)
+                    DownloadStatus.Status.CONVERTING -> stringResource(R.string.converting)
+                    DownloadStatus.Status.MOVING -> stringResource(R.string.moving)
                 }
 
                 Text(
-                    text = "$statusText ${downloadStatus.video?.title ?: ""} ...",
+                    text = "$statusText ${downloadStatus.item ?: ""} ...",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 LinearProgressIndicator(
@@ -79,17 +86,14 @@ fun PlaylistSection(playlist: YoutubePlaylist, modifier: Modifier = Modifier) {
                 )
             }
 
-            if (isExpanded) {
-                val thumbnail by viewModel.thumbnail.collectAsStateWithLifecycle()
-                val thumbnailLoadStatus by viewModel.thumbnailLoadStatus.collectAsStateWithLifecycle()
+            if (showVideos) {
+                val thumbnail by viewModel.albumArt.collectAsStateWithLifecycle()
+                val thumbnailLoadStatus by viewModel.albumArtLoadStatus.collectAsStateWithLifecycle()
                 val videos by viewModel.videos.collectAsStateWithLifecycle()
                 val videosLoadStatus by viewModel.videosLoadStatus.collectAsStateWithLifecycle()
 
-                viewModel.loadThumbnail(playlist, context)
-                viewModel.loadVideos(playlist)
-
                 if (thumbnailLoadStatus == LoadStatus.LOADING) {
-                    ObnoxiousProgressIndicator(text = "LOADING ALBUM ART!!!")
+                    ObnoxiousProgressIndicator(text = stringResource(R.string.loading_album_art_scream))
                 }
                 thumbnail?.let {
                     Image(
@@ -101,7 +105,7 @@ fun PlaylistSection(playlist: YoutubePlaylist, modifier: Modifier = Modifier) {
                 }
 
                 if (videosLoadStatus == LoadStatus.LOADING) {
-                    ObnoxiousProgressIndicator(text = "LOADING VIDEOS!!!")
+                    ObnoxiousProgressIndicator(text = stringResource(R.string.loading_videos_scream))
                 }
                 videos.forEach { video ->
                     VideoSection(video = video.video, position = video.position + 1)

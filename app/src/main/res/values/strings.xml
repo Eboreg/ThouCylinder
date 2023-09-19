@@ -1,3 +1,18 @@
 <resources>
+    <string name="albums">Albums</string>
     <string name="app_name">ThouCylinder</string>
+    <string name="converting">Converting</string>
+    <string name="download">Download</string>
+    <string name="downloading">Downloading</string>
+    <string name="loading_album_art_scream">LOADING ALBUM ART!!!</string>
+    <string name="loading_scream">LOADING!!!</string>
+    <string name="loading_videos_scream">LOADING VIDEOS!!!</string>
+    <string name="moving">Moving</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="playlists">Playlists</string>
+    <string name="search_query">Search query</string>
+    <string name="single_tracks">Single tracks</string>
+    <string name="submit">Submit</string>
+    <string name="videos">Videos</string>
 </resources>

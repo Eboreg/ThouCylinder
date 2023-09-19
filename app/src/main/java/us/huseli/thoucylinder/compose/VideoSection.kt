@@ -20,16 +20,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import us.huseli.retaintheme.sensibleFormat
+import us.huseli.thoucylinder.DownloadStatus
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.data.entities.YoutubeVideo
 import us.huseli.thoucylinder.formattedString
-import us.huseli.thoucylinder.repositories.YoutubeRepository
 import us.huseli.thoucylinder.viewmodels.VideoViewModel
 
 @Composable
@@ -41,13 +42,13 @@ fun VideoSection(
     val viewModel = ViewModelProvider(
         owner = checkNotNull(LocalViewModelStoreOwner.current),
     )[video.id, VideoViewModel::class.java]
-    val context = LocalContext.current
 
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
-    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val streamDict by viewModel.streamDict.collectAsStateWithLifecycle()
+    val isDownloaded by viewModel.isDownloaded.collectAsStateWithLifecycle(initialValue = false)
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(initialValue = false)
+    val streamDict by viewModel.streamDict.collectAsStateWithLifecycle(initialValue = null)
 
-    viewModel.loadStreamDict(video)
+    viewModel.setVideo(video)
 
     Card(shape = ShapeDefaults.ExtraSmall) {
         ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
@@ -65,29 +66,45 @@ fun VideoSection(
                             Text(text = "${it.type} / $sampleRate KHz / $bitrate Kbps")
                         }
                     }
-                    video.length?.let { Text(text = it.sensibleFormat()) }
+                    video.duration?.let { Text(text = it.sensibleFormat()) }
                     IconButton(
-                        onClick = { viewModel.play(video, context) },
+                        onClick = { viewModel.play() },
                         content = {
-                            if (isPlaying) Icon(imageVector = Icons.Sharp.Pause, contentDescription = "Pause")
-                            else Icon(imageVector = Icons.Sharp.PlayArrow, contentDescription = "Play")
+                            if (isPlaying) {
+                                Icon(
+                                    imageVector = Icons.Sharp.Pause,
+                                    contentDescription = stringResource(R.string.pause),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Sharp.PlayArrow,
+                                    contentDescription = stringResource(R.string.play),
+                                )
+                            }
                         }
                     )
-                    IconButton(
-                        onClick = { viewModel.download(video, context) },
-                        content = { Icon(imageVector = Icons.Sharp.Download, contentDescription = "Download") },
-                    )
+                    if (!isDownloaded) {
+                        IconButton(
+                            onClick = { viewModel.download() },
+                            content = {
+                                Icon(
+                                    imageVector = Icons.Sharp.Download,
+                                    contentDescription = stringResource(R.string.download),
+                                )
+                            },
+                        )
+                    }
                 }
 
-                if (downloadStatus.status != YoutubeRepository.DownloadStatus.Status.IDLE) {
+                if (downloadStatus.status != DownloadStatus.Status.IDLE) {
                     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
 
                     @Suppress("KotlinConstantConditions")
                     val statusText = when (downloadStatus.status) {
-                        YoutubeRepository.DownloadStatus.Status.IDLE -> ""
-                        YoutubeRepository.DownloadStatus.Status.DOWNLOADING -> "Downloading"
-                        YoutubeRepository.DownloadStatus.Status.CONVERTING -> "Converting"
-                        YoutubeRepository.DownloadStatus.Status.MOVING -> "Moving"
+                        DownloadStatus.Status.IDLE -> ""
+                        DownloadStatus.Status.DOWNLOADING -> stringResource(R.string.downloading)
+                        DownloadStatus.Status.CONVERTING -> stringResource(R.string.converting)
+                        DownloadStatus.Status.MOVING -> stringResource(R.string.moving)
                     }
 
                     Column(modifier = Modifier.padding(bottom = 5.dp)) {

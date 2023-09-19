@@ -9,19 +9,19 @@ data class YoutubeStreamDict(
     val channels: Int? = null,
     val loudnessDb: Double? = null,
 ) {
-    val quality: Long
-        get() = bitrate.toLong() * sampleRate.toLong()
-
-    val mimeType: String
-        get() = _mimeType.split(";").first()
-
-    val codecs: List<String>
+    private val codecs: List<String>
         get() = Regex("^.*codecs=\"?([^\"]*)\"?$")
             .find(_mimeType)
             ?.groupValues
             ?.getOrNull(1)
             ?.split(",")
             ?: emptyList()
+
+    val quality: Long
+        get() = bitrate.toLong() * sampleRate.toLong()
+
+    val mimeType: String
+        get() = _mimeType.split(";").first()
 
     val type: String
         get() = codecs.getOrNull(0) ?: mimeType

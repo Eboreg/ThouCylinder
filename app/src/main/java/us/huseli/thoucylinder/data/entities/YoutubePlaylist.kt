@@ -1,26 +1,32 @@
 package us.huseli.thoucylinder.data.entities
 
+import androidx.room.Ignore
 import us.huseli.thoucylinder.sanitizeFilename
+import java.util.UUID
 
 data class YoutubePlaylist(
-    val title: String,
     val id: String,
-    val artist: String? = null,
-    val videos: List<YoutubePlaylistVideo> = emptyList(),
-    val thumbnail: YoutubeThumbnail? = null,
-    val videoCount: Int = videos.size,
+    val title: String,
+    @Ignore val artist: String? = null,
+    @Ignore val thumbnail: Image? = null,
+    @Ignore val videoCount: Int = 0,
 ) {
-    fun generateDirName(): String =
+    constructor(id: String, title: String) : this(id, title, null, null, 0)
+
+    fun generateSubdirName(): String =
         "${artist?.let { "$it - " } ?: ""}$title".sanitizeFilename()
 
-    fun toAlbum(): Album = Album(
-        title = title,
-        artist = artist,
-        localPath = generateDirName(),
-        youtubePlaylist = this,
-        youtubeThumbnail = thumbnail,
-        tracks = videos.map { it.video.toTrack(artist = artist) },
-    )
+    fun toAlbum(albumId: UUID = UUID.randomUUID(), tracks: List<Track> = emptyList()): Album {
+        return Album(
+            id = albumId,
+            title = title,
+            artist = artist,
+            localPath = generateSubdirName(),
+            youtubePlaylist = this,
+            tracks = tracks,
+            albumArt = thumbnail,
+        )
+    }
 
     override fun toString(): String {
         return "${artist?.let { "$it - $title" } ?: title} ($videoCount videos)"

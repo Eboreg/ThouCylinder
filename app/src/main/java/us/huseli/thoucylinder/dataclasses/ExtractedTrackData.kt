@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 data class ExtractedTrackData(
     val mimeType: String,

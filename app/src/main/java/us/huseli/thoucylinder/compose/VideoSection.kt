@@ -29,7 +29,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.data.entities.YoutubeVideo
+import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.formattedString
 import us.huseli.thoucylinder.viewmodels.VideoViewModel
 

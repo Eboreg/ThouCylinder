@@ -2,10 +2,10 @@ package us.huseli.thoucylinder.repositories
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import us.huseli.thoucylinder.data.dao.AlbumDao
-import us.huseli.thoucylinder.data.dao.TrackDao
-import us.huseli.thoucylinder.data.entities.Album
-import us.huseli.thoucylinder.data.entities.Track
+import us.huseli.thoucylinder.database.dao.AlbumDao
+import us.huseli.thoucylinder.database.dao.TrackDao
+import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.Track
 import javax.inject.Inject
 import javax.inject.Singleton
 

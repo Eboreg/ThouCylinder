@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data.dao
+package us.huseli.thoucylinder.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -6,8 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.data.entities.Album
-import us.huseli.thoucylinder.data.entities.Track
+import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.Track
 
 @Dao
 interface AlbumDao {

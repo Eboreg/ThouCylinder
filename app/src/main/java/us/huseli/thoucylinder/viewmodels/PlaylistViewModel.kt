@@ -17,9 +17,9 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.LoadStatus
-import us.huseli.thoucylinder.data.entities.Album
-import us.huseli.thoucylinder.data.entities.YoutubePlaylist
-import us.huseli.thoucylinder.data.entities.YoutubePlaylistVideo
+import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylistVideo
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import javax.inject.Inject

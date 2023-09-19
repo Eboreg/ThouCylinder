@@ -7,8 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.data.entities.YoutubePlaylist
-import us.huseli.thoucylinder.data.entities.YoutubeVideo
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import javax.inject.Inject

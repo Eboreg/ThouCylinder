@@ -31,17 +31,17 @@ import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.ExtractTrackDataException
 import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.TrackDownloadException
-import us.huseli.thoucylinder.data.entities.Album
-import us.huseli.thoucylinder.data.entities.ExtractedTrackData
-import us.huseli.thoucylinder.data.entities.Image
-import us.huseli.thoucylinder.data.entities.Track
-import us.huseli.thoucylinder.data.entities.YoutubePlaylist
-import us.huseli.thoucylinder.data.entities.YoutubePlaylistItem
-import us.huseli.thoucylinder.data.entities.YoutubePlaylistVideo
-import us.huseli.thoucylinder.data.entities.YoutubeStreamData
-import us.huseli.thoucylinder.data.entities.YoutubeStreamDict
-import us.huseli.thoucylinder.data.entities.YoutubeVideo
-import us.huseli.thoucylinder.data.entities.parseContentRange
+import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.ExtractedTrackData
+import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylistItem
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylistVideo
+import us.huseli.thoucylinder.dataclasses.YoutubeStreamData
+import us.huseli.thoucylinder.dataclasses.YoutubeStreamDict
+import us.huseli.thoucylinder.dataclasses.YoutubeVideo
+import us.huseli.thoucylinder.dataclasses.parseContentRange
 import us.huseli.thoucylinder.urlRequest
 import us.huseli.thoucylinder.yquery
 import us.huseli.thoucylinder.zipBy
@@ -229,7 +229,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
         val basename = video.generateBasename(trackNumber)
         val tempFile = File(context.cacheDir, video.id)
 
-        if (streamUrl == null) throw TrackDownloadException(video, TrackDownloadException.ErrorType.NO_STREAM_URL)
+        if (streamUrl == null) throw TrackDownloadException(TrackDownloadException.ErrorType.NO_STREAM_URL)
         statusCallback(DownloadStatus.Status.DOWNLOADING)
 
         try {
@@ -239,7 +239,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 progressCallback = progressCallback,
             )
         } catch (e: Exception) {
-            throw TrackDownloadException(video, TrackDownloadException.ErrorType.DOWNLOAD, cause = e)
+            throw TrackDownloadException(TrackDownloadException.ErrorType.DOWNLOAD, cause = e)
         }
 
         return try {
@@ -255,7 +255,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
             val session = FFmpegKit.execute("-i ${tempFile.path} -vn ${tempFile.path}.opus")
             tempFile.delete()
             if (!session.returnCode.isValueSuccess)
-                throw TrackDownloadException(video, TrackDownloadException.ErrorType.FFMPEG_CONVERT)
+                throw TrackDownloadException(TrackDownloadException.ErrorType.FFMPEG_CONVERT)
             statusCallback(DownloadStatus.Status.MOVING)
             moveFileToMediaStore(
                 file = File(tempFile.path + ".opus"),
@@ -264,8 +264,8 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 extraContentValues = extraContentValues,
             )
         } catch (e: ExtractTrackDataException) {
-            throw TrackDownloadException(video, TrackDownloadException.ErrorType.EXTRACT_TRACK_DATA, cause = e)
-        } ?: throw TrackDownloadException(video, TrackDownloadException.ErrorType.MEDIA_STORE)
+            throw TrackDownloadException(TrackDownloadException.ErrorType.EXTRACT_TRACK_DATA, cause = e)
+        } ?: throw TrackDownloadException(TrackDownloadException.ErrorType.MEDIA_STORE)
     }
 
     /**
@@ -583,7 +583,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
             context.contentResolver.insert(audioCollection, trackDetails)
         } catch (e: IllegalArgumentException) {
             Log.e("downloadTrack", e.toString(), e)
-            throw MediaStoreFormatException(filename, trackDetails)
+            throw MediaStoreFormatException(filename)
         }
 
         if (trackUri != null) {

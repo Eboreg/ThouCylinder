@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 import androidx.room.Embedded
 import androidx.room.Entity

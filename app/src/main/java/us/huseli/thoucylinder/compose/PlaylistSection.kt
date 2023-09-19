@@ -29,7 +29,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.LoadStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.data.entities.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
 
 @Composable

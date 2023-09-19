@@ -1,8 +1,8 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 import androidx.room.Ignore
 import androidx.room.TypeConverters
-import us.huseli.thoucylinder.data.Converters
+import us.huseli.thoucylinder.database.Converters
 import us.huseli.thoucylinder.sanitizeFilename
 import us.huseli.thoucylinder.toDuration
 import java.util.UUID
@@ -15,13 +15,6 @@ data class YoutubeVideo(
     val length: String? = null,
     @Ignore val thumbnail: Image? = null,
 ) {
-    constructor(
-        id: String,
-        title: String,
-        duration: Duration? = null,
-        thumbnail: Image? = null,
-    ) : this(id, title, duration?.toString(), thumbnail)
-
     constructor(id: String, title: String, length: String) :
         this(id, title, length, null)
 

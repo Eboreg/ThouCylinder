@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 import android.os.Environment
 import androidx.room.Embedded
@@ -9,7 +9,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import us.huseli.retaintheme.sensibleFormat
-import us.huseli.thoucylinder.data.Converters
+import us.huseli.thoucylinder.database.Converters
 import us.huseli.thoucylinder.toDuration
 import java.io.File
 import java.util.UUID

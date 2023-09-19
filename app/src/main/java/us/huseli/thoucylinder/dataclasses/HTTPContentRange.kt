@@ -1,16 +1,16 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 /** Ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range */
-data class ContentRange(
+data class HTTPContentRange(
     val unit: String,
     val rangeStart: Int,
     val rangeEnd: Int,
     val size: Int? = null,
 )
 
-fun String.parseContentRange(): ContentRange? =
+fun String.parseContentRange(): HTTPContentRange? =
     Regex("(\\w+) (\\d+)-(\\d+)/(\\d+|\\*)").find(this)?.groupValues?.let {
-        ContentRange(
+        HTTPContentRange(
             unit = it[1],
             rangeStart = it[2].toInt(),
             rangeEnd = it[3].toInt(),

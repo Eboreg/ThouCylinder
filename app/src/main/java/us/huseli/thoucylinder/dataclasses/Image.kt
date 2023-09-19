@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data.entities
+package us.huseli.thoucylinder.dataclasses
 
 import us.huseli.thoucylinder.urlRequest
 import java.io.File

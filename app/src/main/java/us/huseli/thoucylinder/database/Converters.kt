@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.data
+package us.huseli.thoucylinder.database
 
 import androidx.room.TypeConverter
 import java.io.File

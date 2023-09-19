@@ -6,9 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import us.huseli.thoucylinder.data.Database
-import us.huseli.thoucylinder.data.dao.AlbumDao
-import us.huseli.thoucylinder.data.dao.TrackDao
+import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.database.dao.AlbumDao
+import us.huseli.thoucylinder.database.dao.TrackDao
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)

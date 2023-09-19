@@ -15,9 +15,9 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.DownloadStatus
-import us.huseli.thoucylinder.data.entities.Track
-import us.huseli.thoucylinder.data.entities.YoutubeStreamDict
-import us.huseli.thoucylinder.data.entities.YoutubeVideo
+import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.YoutubeStreamDict
+import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository

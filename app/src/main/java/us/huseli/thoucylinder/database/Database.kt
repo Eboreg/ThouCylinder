@@ -12,7 +12,7 @@ import us.huseli.thoucylinder.dataclasses.Track
 @androidx.room.Database(
     entities = [Track::class, Album::class],
     exportSchema = false,
-    version = 4,
+    version = 9,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

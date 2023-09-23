@@ -24,6 +24,8 @@ android {
 
     defaultConfig {
         val youtubeApiKey = secretsProperties["youtubeApiKey"] as String
+        val discogsApiKey = secretsProperties["discogsApiKey"] as String
+        val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
 
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
@@ -38,6 +40,8 @@ android {
 
         setProperty("archivesBaseName", "thoucylinder_$versionName")
         buildConfigField("String", "youtubeApiKey", "\"$youtubeApiKey\"")
+        buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
+        buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
     }
 
     buildTypes {
@@ -82,19 +86,25 @@ android {
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.5.2"
 val daggerVersion = "2.48"
+val composeVersion = "1.5.1"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    implementation("androidx.activity:activity-compose:1.7.2")
 
-    implementation(platform("androidx.compose:compose-bom:2023.03.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    // Compose:
+    implementation("androidx.compose.ui:ui:$composeVersion")
+    implementation("androidx.compose.ui:ui-graphics:$composeVersion")
+    implementation("androidx.activity:activity-compose:1.7.2")
+    implementation("androidx.navigation:navigation-compose:2.7.2")
+
+    // implementation(platform("androidx.compose:compose-bom:2023.03.00"))
+
+    // Material:
+    implementation("androidx.compose.material3:material3:1.1.1")
+    implementation("androidx.compose.material:material-icons-extended:$composeVersion")
 
     // Lifecycle:
+    // implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
@@ -116,7 +126,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme:
-    implementation("com.github.Eboreg:RetainTheme:1.2.3")
+    implementation("com.github.Eboreg:RetainTheme:1.3.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

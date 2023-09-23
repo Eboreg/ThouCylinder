@@ -15,4 +15,18 @@
     <string name="single_tracks">Single tracks</string>
     <string name="submit">Submit</string>
     <string name="videos">Videos</string>
+    <string name="list">List</string>
+    <string name="grid">Grid</string>
+    <string name="search">Search</string>
+    <string name="library">Library</string>
+    <string name="go_back">Go back</string>
+    <string name="youtube_playlist">Youtube playlist</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="album_title">Album title</string>
+    <string name="album_artist">Album artist</string>
+    <string name="artist">Artist</string>
+    <string name="title">Title</string>
+    <string name="track_number">Track #%1$s</string>
+    <string name="select_discogs_com_master">Select discogs.com master</string>
 </resources>

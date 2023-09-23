@@ -11,7 +11,6 @@ data class Album(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val title: String,
     val artist: String? = null,
-    val localPath: String? = null,
     @Embedded("youtubePlaylist") val youtubePlaylist: YoutubePlaylist? = null,
     @Embedded("albumArt") val albumArt: Image? = null,
     @Ignore val tracks: List<Track> = emptyList(),
@@ -20,10 +19,9 @@ data class Album(
         id: UUID,
         title: String,
         artist: String? = null,
-        localPath: String? = null,
         youtubePlaylist: YoutubePlaylist? = null,
         albumArt: Image? = null,
-    ) : this(id, title, artist, localPath, youtubePlaylist, albumArt, emptyList())
+    ) : this(id, title, artist, youtubePlaylist, albumArt, emptyList())
 
     override fun toString(): String = artist?.let { "$it - $title" } ?: title
 }

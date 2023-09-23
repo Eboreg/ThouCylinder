@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,7 +33,7 @@ fun ObnoxiousProgressIndicator(
     textStyle: TextStyle = LocalTextStyle.current,
     wigglePx: Int = 20,
 ) {
-    var rowWidth by remember { mutableStateOf(0) }
+    var rowWidth by remember { mutableIntStateOf(0) }
     val colors = listOf(RetainColorDark, RetainColorLight).map {
         listOf(
             it.Brown,
@@ -57,7 +58,7 @@ fun ObnoxiousProgressIndicator(
                 if (rowWidth != size.width) rowWidth = size.width
             },
     ) {
-        var textWidth by remember { mutableStateOf(0) }
+        var textWidth by remember { mutableIntStateOf(0) }
         var textOffset by remember { mutableStateOf(IntOffset(0, 0)) }
         var annotatedText by remember { mutableStateOf(AnnotatedString(text = text)) }
 

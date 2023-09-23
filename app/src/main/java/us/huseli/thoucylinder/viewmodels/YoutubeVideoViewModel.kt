@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.viewmodels
 import android.net.Uri
 import android.util.Log
 import androidx.core.net.toUri
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -14,9 +15,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.DownloadStatus
+import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Track
-import us.huseli.thoucylinder.dataclasses.YoutubeStreamDict
+import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
@@ -24,29 +25,29 @@ import us.huseli.thoucylinder.repositories.YoutubeRepository
 import javax.inject.Inject
 
 @HiltViewModel
-class VideoViewModel @Inject constructor(
+class YoutubeVideoViewModel @Inject constructor(
     private val repo: LocalRepository,
     private val youtubeRepo: YoutubeRepository,
     private val playerRepo: PlayerRepository,
-) : BaseDownloadViewModel() {
-    private val _streamDict = MutableStateFlow<YoutubeStreamDict?>(null)
+) : ViewModel() {
+    private val _downloadProgress = MutableStateFlow<DownloadProgress?>(null)
+    private val _metadata = MutableStateFlow<YoutubeMetadata?>(null)
     private val _track = MutableStateFlow<Track?>(null)
     private val _uri = MutableStateFlow<Uri?>(null)
     private val _video = MutableStateFlow<YoutubeVideo?>(null)
 
-    val isDownloaded: Flow<Boolean> = _track.map {
-        it?.absolutePath?.isFile == true
-    }
+    val downloadProgress = _downloadProgress.asStateFlow()
+    val isDownloaded: Flow<Boolean> = _track.map { it?.localFile != null }
     val isPlaying: Flow<Boolean> =
         combine(playerRepo.currentUri.filterNotNull(), playerRepo.isPlaying) { uri, isPlaying ->
             isPlaying && uri == _uri.value
         }
-    val streamDict = _streamDict.asStateFlow()
+    val metadata = _metadata.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             _video.filterNotNull().distinctUntilChanged().collect { video ->
-                _streamDict.value = youtubeRepo.getBestStreamDict(video.id)
+                _metadata.value = youtubeRepo.getBestMetadata(video.id)
             }
         }
 
@@ -59,11 +60,9 @@ class VideoViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            combine(_streamDict, _track) { streamDict, track ->
-                track?.absolutePath?.takeIf { it.isFile }?.toUri() ?: streamDict?.url?.toUri()
-            }.distinctUntilChanged().collect { uri ->
-                _uri.value = uri
-            }
+            combine(_metadata, _track) { metadata, track -> repo.getLocalTrackUri(track) ?: metadata?.url?.toUri() }
+                .distinctUntilChanged()
+                .collect { uri -> _uri.value = uri }
         }
     }
 
@@ -72,23 +71,21 @@ class VideoViewModel @Inject constructor(
             try {
                 val track = youtubeRepo.downloadTrack(
                     video = video,
-                    progressCallback = { _downloadProgress.value = it },
-                    statusCallback = { _downloadStatus.value = it },
+                    statusCallback = { _downloadProgress.value = it.copy(progress = it.progress * 0.8) },
                 )
-                repo.insertTrack(track)
+                repo.moveAndInsertTrack(track) {
+                    _downloadProgress.value = it.copy(progress = 0.8 + (it.progress * 0.2))
+                }
             } catch (e: Exception) {
                 Log.e("downloadTrack", e.toString(), e)
             } finally {
-                _downloadProgress.value = 0.0
-                _downloadStatus.value = DownloadStatus()
+                _downloadProgress.value = null
             }
         }
     }
 
-    fun play() = viewModelScope.launch {
-        _uri.value?.let { uri ->
-            playerRepo.playOrPause(uri)
-        }
+    fun playOrPause() = viewModelScope.launch {
+        _uri.value?.let { uri -> playerRepo.playOrPause(uri) }
     }
 
     fun setVideo(value: YoutubeVideo) {

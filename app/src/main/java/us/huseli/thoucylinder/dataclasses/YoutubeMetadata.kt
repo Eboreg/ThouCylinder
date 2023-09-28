@@ -1,5 +1,11 @@
 package us.huseli.thoucylinder.dataclasses
 
+import android.net.Uri
+import android.os.Parcelable
+import androidx.core.net.toUri
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 data class YoutubeMetadata(
     val mimeType: String,
     val codecs: List<String>,
@@ -9,7 +15,8 @@ data class YoutubeMetadata(
     val size: Int? = null,
     val channels: Int? = null,
     val loudnessDb: Double? = null,
-) {
+    val durationMs: Long? = null,
+) : Parcelable {
     constructor(
         mimeType: String,
         bitrate: Int,
@@ -18,6 +25,7 @@ data class YoutubeMetadata(
         size: Int? = null,
         channels: Int? = null,
         loudnessDb: Double? = null,
+        durationMs: Long? = null,
     ) : this(
         mimeType = mimeType.split(";").first(),
         codecs = extractCodecs(mimeType),
@@ -27,6 +35,7 @@ data class YoutubeMetadata(
         size = size,
         channels = channels,
         loudnessDb = loudnessDb,
+        durationMs = durationMs,
     )
 
     val quality: Long
@@ -34,6 +43,20 @@ data class YoutubeMetadata(
 
     val type: String
         get() = codecs.getOrNull(0) ?: mimeType
+
+    val uri: Uri
+        get() = url.toUri()
+
+    fun toTrackMetadata() = TrackMetadata(
+        durationMs = durationMs ?: 0L,
+        extension = type,
+        mimeType = mimeType,
+        bitrate = bitrate,
+        channels = channels,
+        loudnessDb = loudnessDb,
+        sampleRate = sampleRate,
+        size = size?.toLong(),
+    )
 
     companion object {
         private fun extractCodecs(mimeType: String): List<String> = Regex("^.*codecs=\"?([^\"]*)\"?$")

@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,12 +22,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import us.huseli.retaintheme.circular
 import us.huseli.retaintheme.ui.theme.RetainColorDark
 import us.huseli.retaintheme.ui.theme.RetainColorLight
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.circular
 
 @Composable
 fun ObnoxiousProgressIndicator(
@@ -32,6 +37,7 @@ fun ObnoxiousProgressIndicator(
     text: String = stringResource(R.string.loading_scream),
     textStyle: TextStyle = LocalTextStyle.current,
     wigglePx: Int = 20,
+    tonalElevation: Dp = 0.dp,
 ) {
     var rowWidth by remember { mutableIntStateOf(0) }
     val colors = listOf(RetainColorDark, RetainColorLight).map {
@@ -58,14 +64,13 @@ fun ObnoxiousProgressIndicator(
                 if (rowWidth != size.width) rowWidth = size.width
             },
     ) {
-        var textWidth by remember { mutableIntStateOf(0) }
-        var textOffset by remember { mutableStateOf(IntOffset(0, 0)) }
+        var offset by remember { mutableStateOf(IntOffset(0, 0)) }
         var annotatedText by remember { mutableStateOf(AnnotatedString(text = text)) }
 
         LaunchedEffect(Unit) {
             var colorOffset = 0
             while (true) {
-                textOffset = IntOffset((-wigglePx..wigglePx).random(), (-wigglePx..wigglePx).random())
+                offset = IntOffset((-wigglePx..wigglePx).random(), (-wigglePx..wigglePx).random())
                 annotatedText = AnnotatedString(
                     text = text,
                     spanStyles = colors.circular(colorOffset, text.length).mapIndexed { index, color ->
@@ -77,14 +82,16 @@ fun ObnoxiousProgressIndicator(
             }
         }
 
-        Text(
-            text = annotatedText,
-            style = textStyle,
-            modifier = Modifier
-                .onSizeChanged { size ->
-                    if (textWidth == 0) textWidth = size.width
-                }
-                .absoluteOffset { textOffset },
-        )
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            tonalElevation = tonalElevation,
+            modifier = Modifier.absoluteOffset { offset },
+        ) {
+            Text(
+                text = annotatedText,
+                style = textStyle,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+        }
     }
 }

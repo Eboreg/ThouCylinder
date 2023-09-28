@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.ViewList
 import androidx.compose.material.icons.sharp.GridView
-import androidx.compose.material.icons.sharp.ViewList
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
@@ -31,12 +31,14 @@ fun DisplayTypeSelection(
         horizontalArrangement = Arrangement.SpaceAround,
     ) {
         InputChip(
+            modifier = Modifier.padding(horizontal = 10.dp),
             selected = displayType == DisplayType.LIST,
             onClick = { onDisplayTypeChange(DisplayType.LIST) },
             label = { Text(text = stringResource(R.string.list)) },
-            leadingIcon = { Icon(imageVector = Icons.Sharp.ViewList, contentDescription = null) },
+            leadingIcon = { Icon(imageVector = Icons.AutoMirrored.Sharp.ViewList, contentDescription = null) },
         )
         InputChip(
+            modifier = Modifier.padding(horizontal = 10.dp),
             selected = displayType == DisplayType.GRID,
             onClick = { onDisplayTypeChange(DisplayType.GRID) },
             label = { Text(text = stringResource(R.string.grid)) },

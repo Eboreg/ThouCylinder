@@ -1,7 +1,9 @@
 package us.huseli.thoucylinder.compose.screens
 
+import androidx.annotation.MainThread
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,8 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -50,18 +50,23 @@ import us.huseli.thoucylinder.compose.VideoSection
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
+import java.util.UUID
 
 @Composable
 fun YoutubeSearchScreen(
     modifier: Modifier = Modifier,
     viewModel: YoutubeSearchViewModel = hiltViewModel(),
-    onPlaylistClick: (YoutubePlaylist) -> Unit,
+    @MainThread onGotoAlbum: (UUID) -> Unit,
 ) {
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val videos by viewModel.videos.collectAsStateWithLifecycle()
 
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
+
+    val onPlaylistClick: (YoutubePlaylist) -> Unit = { playlist ->
+        viewModel.addYoutubePlaylistAsTempAlbum(playlist) { onGotoAlbum(it.albumId) }
+    }
 
     Column(modifier = modifier) {
         YoutubeSearchForm(
@@ -71,33 +76,35 @@ fun YoutubeSearchScreen(
         )
 
         if (isSearching) {
-            ObnoxiousProgressIndicator(modifier = Modifier.padding(10.dp))
-        } else if (playlists.isNotEmpty()) {
+            ObnoxiousProgressIndicator(modifier = Modifier.padding(10.dp), tonalElevation = 5.dp)
+        }
+        if (playlists.isNotEmpty() && !isSearching) {
             DisplayTypeSelection(
                 displayType = displayType,
                 onDisplayTypeChange = { displayType = it },
             )
         }
 
-        when (displayType) {
-            DisplayType.LIST -> YoutubeSearchResultsList(
-                playlists = playlists,
-                videos = videos,
-                viewModel = viewModel,
-                onPlaylistClick = onPlaylistClick,
-            )
-            DisplayType.GRID -> YoutubeSearchResultsGrid(
-                playlists = playlists,
-                videos = videos,
-                viewModel = viewModel,
-                onPlaylistClick = onPlaylistClick,
-            )
+        if (!isSearching) {
+            when (displayType) {
+                DisplayType.LIST -> YoutubeSearchResultsList(
+                    playlists = playlists,
+                    videos = videos,
+                    viewModel = viewModel,
+                    onPlaylistClick = onPlaylistClick,
+                )
+                DisplayType.GRID -> YoutubeSearchResultsGrid(
+                    playlists = playlists,
+                    videos = videos,
+                    viewModel = viewModel,
+                    onPlaylistClick = onPlaylistClick,
+                )
+            }
         }
     }
 }
 
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun YoutubeSearchForm(
     modifier: Modifier = Modifier,
@@ -105,20 +112,16 @@ fun YoutubeSearchForm(
     onSearch: (String) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    var query by rememberSaveable { mutableStateOf("frank zappa hot rats") }
+    var query by rememberSaveable { mutableStateOf("roxy music for your pleasure") }
 
-    Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    Box(modifier = modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = query,
             enabled = !isSearching,
             onValueChange = { query = it },
             singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
             label = { OutlinedTextFieldLabel(text = stringResource(R.string.search_query)) },
-            modifier = Modifier.weight(1f),
             keyboardOptions = KeyboardOptions.Default.copy(
                 imeAction = ImeAction.Search,
             ),
@@ -157,7 +160,7 @@ fun YoutubeSearchResultsList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(playlists) { playlist ->
-            val thumbnail by viewModel.getThumbnail(playlist).collectAsStateWithLifecycle()
+            val thumbnail by viewModel.getPlaylistThumbnail(playlist).collectAsStateWithLifecycle()
 
             OutlinedCard(
                 shape = MaterialTheme.shapes.extraSmall,
@@ -173,8 +176,10 @@ fun YoutubeSearchResultsList(
             }
         }
         items(videos) { video ->
+            val metadata by viewModel.getVideoMetadata(video).collectAsStateWithLifecycle()
+
             OutlinedCard(shape = ShapeDefaults.ExtraSmall) {
-                VideoSection(video = video)
+                VideoSection(video = video, metadata = metadata)
             }
         }
     }
@@ -195,7 +200,7 @@ fun YoutubeSearchResultsGrid(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(playlists) { playlist ->
-            val thumbnail by viewModel.getThumbnail(playlist).collectAsStateWithLifecycle()
+            val thumbnail by viewModel.getPlaylistThumbnail(playlist).collectAsStateWithLifecycle()
 
             OutlinedCard(
                 shape = MaterialTheme.shapes.extraSmall,
@@ -210,8 +215,10 @@ fun YoutubeSearchResultsGrid(
             }
         }
         items(videos, span = { GridItemSpan(maxLineSpan) }) { video ->
+            val metadata by viewModel.getVideoMetadata(video).collectAsStateWithLifecycle()
+
             OutlinedCard(shape = ShapeDefaults.ExtraSmall) {
-                VideoSection(video = video)
+                VideoSection(video = video, metadata = metadata)
             }
         }
     }

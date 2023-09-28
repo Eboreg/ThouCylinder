@@ -10,8 +10,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +27,9 @@ class PlayerRepository @Inject constructor(@ApplicationContext private val conte
 
     val currentUri = _currentUri.asStateFlow()
     val isPlaying = _isPlaying.asStateFlow()
+    val playingUri: Flow<Uri?> = combine(_currentUri, _isPlaying) { currentUri, isPlaying ->
+        if (isPlaying) currentUri else null
+    }
 
     init {
         exoPlayer.addListener(object : Player.Listener {

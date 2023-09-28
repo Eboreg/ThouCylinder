@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
@@ -23,6 +24,7 @@ fun AlbumArt(
     modifier: Modifier = Modifier,
     loadStatus: LoadStatus? = null,
     topContent: (@Composable ColumnScope.() -> Unit)? = null,
+    bottomContent: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     Box(modifier = modifier.aspectRatio(1f)) {
         image?.let {
@@ -30,13 +32,13 @@ fun AlbumArt(
                 bitmap = it,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = modifier.aspectRatio(1f),
+                modifier = Modifier.fillMaxSize().aspectRatio(1f),
             )
         } ?: kotlin.run {
             Image(
                 imageVector = Icons.Sharp.Album,
                 contentDescription = null,
-                modifier = modifier.aspectRatio(1f),
+                modifier = Modifier.fillMaxSize().aspectRatio(1f),
             )
         }
         if (loadStatus == LoadStatus.LOADING) {
@@ -47,6 +49,9 @@ fun AlbumArt(
         }
         topContent?.let { content ->
             Column(modifier = Modifier.fillMaxWidth().align(Alignment.TopStart), content = content)
+        }
+        bottomContent?.let { content ->
+            Column(modifier = Modifier.fillMaxWidth().align(Alignment.BottomStart), content = content)
         }
     }
 }

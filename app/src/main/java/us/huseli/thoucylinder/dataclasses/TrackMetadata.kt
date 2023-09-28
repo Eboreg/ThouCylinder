@@ -1,10 +1,10 @@
 package us.huseli.thoucylinder.dataclasses
 
 import android.os.Parcelable
-import androidx.room.Ignore
-import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
+import us.huseli.thoucylinder.bytesToString
 import us.huseli.thoucylinder.formattedString
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 @Parcelize
@@ -18,13 +18,23 @@ data class TrackMetadata(
     val sampleRate: Int? = null,
     val size: Long? = null,
 ) : Parcelable {
-    @Ignore
-    @IgnoredOnParcel
-    val duration = durationMs.milliseconds
+    val bitrateString: String?
+        get() = bitrate?.div(1000)?.let { "$it Kbps" }
 
-    @Ignore
-    @IgnoredOnParcel
-    val audioFormat: String = mimeType.split("/").last() +
-        (sampleRate?.toDouble()?.formattedString(1)?.let { " / $it KHz" } ?: "") +
-        (bitrate?.div(1000)?.let { " / $it Kbs" } ?: "")
+    val duration: Duration
+        get() = durationMs.milliseconds
+
+    val loudnessDbString: String?
+        get() = loudnessDb?.formattedString(2)?.let { "$it dB" }
+
+    val sampleRateString: String?
+        get() = sampleRate?.toDouble()?.div(1000)?.formattedString(1)?.let { "$it KHz" }
+
+    val sizeString: String?
+        get() = size?.bytesToString()
+
+    val audioFormat: String
+        get() = mimeType.split("/").last() +
+            (sampleRateString?.let { " / $it" } ?: "") +
+            (bitrateString?.let { " / $it" } ?: "")
 }

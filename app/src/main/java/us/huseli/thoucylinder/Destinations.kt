@@ -2,27 +2,18 @@ package us.huseli.thoucylinder
 
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import us.huseli.retaintheme.navigation.AbstractDestination
+import us.huseli.retaintheme.navigation.AbstractSimpleDestination
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
-import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
-import us.huseli.thoucylinder.dataclasses.Album
-import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
+import java.util.UUID
 
-open class Destination(val route: String)
+object SearchDestination : AbstractSimpleDestination("search")
 
-object SearchDestination : Destination("search")
+object LibraryDestination : AbstractSimpleDestination("library")
 
-object LibraryDestination : Destination("library")
+object AlbumDestination : AbstractDestination() {
+    override val routeTemplate = "album/{$NAV_ARG_ALBUM}"
+    override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
 
-object YoutubePlaylistDestination {
-    const val routeTemplate = "playlist/{$NAV_ARG_PLAYLIST}"
-    val arguments = listOf(navArgument(NAV_ARG_PLAYLIST) { type = NavType.StringType })
-
-    fun route(playlist: YoutubePlaylist) = "playlist/${playlist.id}"
-}
-
-object AlbumDestination {
-    const val routeTemplate = "album/{$NAV_ARG_ALBUM}"
-    val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
-
-    fun route(album: Album) = "album/${album.id}"
+    fun route(albumId: UUID) = "album/$albumId"
 }

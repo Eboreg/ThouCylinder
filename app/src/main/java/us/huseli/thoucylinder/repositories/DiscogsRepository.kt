@@ -15,6 +15,12 @@ import javax.inject.Singleton
 
 @Singleton
 class DiscogsRepository @Inject constructor() {
+    /**
+     * Possible DiscogsMasterTrack.position formats:
+     *  - "<discno>-<trackno>" (e.g. "2-12")
+     *  - "<LP side><trackno>" (e.g. "B4")
+     *  - "<trackno>" (e.g. "12")
+     */
     private val apiKey = BuildConfig.discogsApiKey
     private val apiSecret = BuildConfig.discogsApiSecret
     private val gson: Gson = GsonBuilder().create()

@@ -29,12 +29,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.formattedString
 import us.huseli.thoucylinder.viewmodels.YoutubeVideoViewModel
 
 @Composable
-fun VideoSection(video: YoutubeVideo, modifier: Modifier = Modifier, position: Int? = null) {
+fun VideoSection(
+    video: YoutubeVideo,
+    metadata: YoutubeMetadata?,
+    modifier: Modifier = Modifier,
+    position: Int? = null,
+) {
     val owner = checkNotNull(LocalViewModelStoreOwner.current)
     val factory = (owner as? NavBackStackEntry)?.let {
         HiltViewModelFactory(context = LocalContext.current, navBackStackEntry = it)
@@ -44,7 +50,6 @@ fun VideoSection(video: YoutubeVideo, modifier: Modifier = Modifier, position: I
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val isDownloaded by viewModel.isDownloaded.collectAsStateWithLifecycle(initialValue = false)
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(initialValue = false)
-    val metadata by viewModel.metadata.collectAsStateWithLifecycle(initialValue = null)
 
     viewModel.setVideo(video)
 
@@ -57,10 +62,10 @@ fun VideoSection(video: YoutubeVideo, modifier: Modifier = Modifier, position: I
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    metadata?.let {
-                        val sampleRate = (it.sampleRate.toDouble() / 1000).formattedString(1)
-                        val bitrate = it.bitrate / 1000
-                        Text(text = "${it.type} / $sampleRate KHz / $bitrate Kbps")
+                    metadata?.let { metadata ->
+                        val sampleRate = (metadata.sampleRate.toDouble() / 1000).formattedString(1)
+                        val bitrate = metadata.bitrate / 1000
+                        Text(text = "${metadata.type} / $sampleRate kHz / $bitrate kbps")
                     }
                 }
                 video.duration?.let { Text(text = it.sensibleFormat()) }
@@ -97,7 +102,7 @@ fun VideoSection(video: YoutubeVideo, modifier: Modifier = Modifier, position: I
                 val statusText = stringResource(progress.status.stringId)
 
                 Column(modifier = Modifier.padding(bottom = 5.dp)) {
-                    Text(text = "$statusText ...")
+                    Text(text = "$statusText …")
                     LinearProgressIndicator(
                         progress = progress.progress.toFloat(),
                         modifier = Modifier.fillMaxWidth(),

@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.net.Uri
 import android.util.Log
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Track
-import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
@@ -31,26 +29,18 @@ class YoutubeVideoViewModel @Inject constructor(
     private val playerRepo: PlayerRepository,
 ) : ViewModel() {
     private val _downloadProgress = MutableStateFlow<DownloadProgress?>(null)
-    private val _metadata = MutableStateFlow<YoutubeMetadata?>(null)
     private val _track = MutableStateFlow<Track?>(null)
     private val _uri = MutableStateFlow<Uri?>(null)
     private val _video = MutableStateFlow<YoutubeVideo?>(null)
 
     val downloadProgress = _downloadProgress.asStateFlow()
-    val isDownloaded: Flow<Boolean> = _track.map { it?.localFile != null }
+    val isDownloaded: Flow<Boolean> = _track.map { it?.mediaStoreFile != null }
     val isPlaying: Flow<Boolean> =
-        combine(playerRepo.currentUri.filterNotNull(), playerRepo.isPlaying) { uri, isPlaying ->
-            isPlaying && uri == _uri.value
+        combine(_uri, playerRepo.currentUri.filterNotNull(), playerRepo.isPlaying) { uri, playingUri, isPlaying ->
+            isPlaying && playingUri == uri
         }
-    val metadata = _metadata.asStateFlow()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            _video.filterNotNull().distinctUntilChanged().collect { video ->
-                _metadata.value = youtubeRepo.getBestMetadata(video.id)
-            }
-        }
-
         viewModelScope.launch {
             combine(_video, repo.tracks) { video, tracks ->
                 video?.let { tracks.find { track -> track.youtubeVideo?.id == it.id } }
@@ -60,9 +50,9 @@ class YoutubeVideoViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            combine(_metadata, _track) { metadata, track -> repo.getLocalTrackUri(track) ?: metadata?.url?.toUri() }
+            combine(_video, _track) { video, track -> track?.mediaStoreUri ?: video?.metadata?.uri }
                 .distinctUntilChanged()
-                .collect { uri -> _uri.value = uri }
+                .collect { _uri.value = it }
         }
     }
 

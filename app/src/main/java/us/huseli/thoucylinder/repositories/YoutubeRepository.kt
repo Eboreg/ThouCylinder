@@ -5,10 +5,12 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.zipBy
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.DOWNLOAD_CHUNK_SIZE
 import us.huseli.thoucylinder.Constants.HEADER_ANDROID_SDK_VERSION
@@ -20,23 +22,21 @@ import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_FILTER
 import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.TempAlbum
-import us.huseli.thoucylinder.dataclasses.TempTrack
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.TempTrackData
+import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylistItem
-import us.huseli.thoucylinder.dataclasses.YoutubePlaylistVideo
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.parseContentRange
-import us.huseli.thoucylinder.extrackTrackMetadata
+import us.huseli.thoucylinder.thumbnailDir
 import us.huseli.thoucylinder.urlRequest
 import us.huseli.thoucylinder.yquery
-import us.huseli.thoucylinder.zipBy
 import java.io.File
 import java.io.OutputStream
 import java.net.URLEncoder
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -46,56 +46,60 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
     // Written over for every new search:
     private val _playlistSearchResults = MutableStateFlow<List<YoutubePlaylist>>(emptyList())
     private val _videoSearchResults = MutableStateFlow<List<YoutubeVideo>>(emptyList())
-    private val _playlistVideos = mutableMapOf<String, List<YoutubePlaylistVideo>>()
+    private val _playlistVideos = mutableMapOf<String, List<YoutubeVideo>>()
 
     private val gson: Gson = GsonBuilder().create()
     private val responseType = object : TypeToken<Map<String, *>>() {}
     private val metadataMap = mutableMapOf<String, YoutubeMetadataList>()
-    private val thumbnailDir = File(context.filesDir, "thumbnails").apply { mkdirs() }
 
     val playlistSearchResults = _playlistSearchResults.asStateFlow()
     val videoSearchResults = _videoSearchResults.asStateFlow()
 
-    suspend fun downloadPlaylist(
-        playlist: YoutubePlaylist,
-        videos: List<YoutubePlaylistVideo>,
-        progressCallback: (DownloadProgress) -> Unit,
-    ): TempAlbum {
-        val tracks = mutableListOf<TempTrack>()
+    /**
+     * @throws TrackDownloadException if downloadTrack() fails
+     */
+    suspend fun downloadTracks(videos: List<YoutubeVideo>, progressCallback: (DownloadProgress) -> Unit): List<Track> {
+        val tracks = mutableListOf<Track>()
 
-        videos.forEachIndexed { itemIdx, item ->
-            val (file, metadata) = downloadVideo(video = item.video) {
-                progressCallback(it.copy(progress = (itemIdx + it.progress) / videos.size))
+        try {
+            videos.forEachIndexed { itemIdx, video ->
+                tracks.add(
+                    downloadTrack(video = video) {
+                        progressCallback(it.copy(progress = (itemIdx + it.progress) / videos.size))
+                    }
+                )
             }
-            tracks.add(item.toTempTrack(localFile = file, metadata = metadata))
+        } catch (e: CancellationException) {
+            tracks.mapNotNull { it.tempTrackData?.localFile }.forEach { it.delete() }
+            throw e
         }
 
-        return playlist.toTempAlbum(tracks = tracks)
+        return tracks
     }
 
-    suspend fun downloadTrack(video: YoutubeVideo, statusCallback: (DownloadProgress) -> Unit): TempTrack {
-        val (file, metadata) = downloadVideo(video = video, statusCallback = statusCallback)
-        return video.toTempTrack(localFile = file, metadata = metadata)
-    }
+    /**
+     * @throws TrackDownloadException if downloadVideo() fails
+     */
+    suspend fun downloadTrack(video: YoutubeVideo, statusCallback: (DownloadProgress) -> Unit): Track =
+        video.toTrack(
+            isInLibrary = false,
+            tempTrackData = TempTrackData(
+                localFile = downloadVideo(video = video, statusCallback = statusCallback),
+            ),
+        )
 
-    suspend fun getBestMetadata(videoId: String): YoutubeMetadata? =
-        getMetadataList(videoId).getBest(VIDEO_MIMETYPE_FILTER, VIDEO_MIMETYPE_EXCLUDE)
-
-    suspend fun getPlaylist(playlistId: String): YoutubePlaylist? =
-        _playlistSearchResults.value.find { it.id == playlistId } ?: getPlaylistDetails(playlistId)
-
-    suspend fun listPlaylistVideos(playlist: YoutubePlaylist): List<YoutubePlaylistVideo> {
+    suspend fun listPlaylistVideos(playlist: YoutubePlaylist, withMetadata: Boolean): List<YoutubeVideo> {
         _playlistVideos[playlist.id]?.let { return it }
 
         val items = listPlaylistItems(playlist.id)
-        val videos = listVideoDetails(items.map { it.videoId })
+        val videos = listVideoDetails(videoIds = items.map { it.videoId }, withMetadata = withMetadata)
 
         return videos
             .zipBy(items) { video, item -> video.id == item.videoId }
             .map { (video, item) ->
-                YoutubePlaylistVideo(id = item.id, playlistId = playlist.id, video = video, position = item.position)
+                video.copy(playlistItemId = item.id, playlistPosition = item.position)
             }
-            .sortedBy { it.position }
+            .sortedBy { it.playlistPosition }
             .also { _playlistVideos[playlist.id] = it }
     }
 
@@ -160,8 +164,9 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                                 ?.firstOrNull()?.get("text") as? String
                         val length = section.yquery<String>("videoRenderer.lengthText.simpleText")
 
-                        if (videoId != null && title != null)
+                        if (videoId != null && title != null) {
                             videos.add(YoutubeVideo(title = title, id = videoId, length = length))
+                        }
                     }
                 }
             }
@@ -183,12 +188,12 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
 
     /**
      * Used both for downloading individual tracks/videos and albums/playlists.
-     * @throws TrackDownloadException
+     * @throws TrackDownloadException if download fails or no stream URL could be found
      */
     private suspend fun downloadVideo(
         video: YoutubeVideo,
         statusCallback: (DownloadProgress) -> Unit,
-    ): Pair<File, TrackMetadata> {
+    ): File {
         val streamUrl = getBestMetadata(video.id)?.url
         val tempFile = File(context.cacheDir, video.id)
         val downloadProgress = DownloadProgress(
@@ -209,11 +214,18 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 },
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw TrackDownloadException(TrackDownloadException.ErrorType.DOWNLOAD, cause = e)
         }
 
-        return Pair(tempFile, tempFile.extrackTrackMetadata())
+        return tempFile
     }
+
+    suspend fun getBestMetadata(videoId: String): YoutubeMetadata? =
+        getMetadataList(videoId).getBest(
+            mimeTypeFilter = VIDEO_MIMETYPE_FILTER,
+            mimeTypeExclude = VIDEO_MIMETYPE_EXCLUDE,
+        )
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun getMetadataList(videoId: String): YoutubeMetadataList {
@@ -266,18 +278,19 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
             val mimeType = fmt["mimeType"] as? String
             val bitrate = fmt["bitrate"] as? Double
             val sampleRate = fmt["audioSampleRate"] as? String
-            val fmtUrl = fmt["url"] as? String
+            val url = fmt["url"] as? String
 
-            if (mimeType != null && bitrate != null && sampleRate != null && fmtUrl != null) {
+            if (mimeType != null && bitrate != null && sampleRate != null && url != null) {
                 metadataList.metadata.add(
                     YoutubeMetadata(
                         mimeType = mimeType,
                         bitrate = bitrate.toInt(),
                         sampleRate = sampleRate.toInt(),
-                        url = fmtUrl,
+                        url = url,
                         size = (fmt["contentLength"] as? String)?.toInt(),
                         channels = (fmt["audioChannels"] as? Double)?.toInt(),
                         loudnessDb = fmt["loudnessDb"] as? Double,
+                        durationMs = (fmt["approxDurationMs"] as? String)?.toLong(),
                     )
                 )
             }
@@ -291,7 +304,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
      * Does not fetch the actual image.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun getThumbnail(section: Any?, filename: String): Image? {
+    private fun getThumbnail(section: Any?): Image? {
         var best: Image? = null
 
         ((section as? Map<*, *>)?.values?.toList() as? Collection<Map<*, *>>)?.forEach {
@@ -303,16 +316,13 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                     url = tnUrl,
                     width = tnWidth.toInt(),
                     height = tnHeight.toInt(),
-                    localFile = File(thumbnailDir, filename)
+                    localFile = File(context.thumbnailDir, UUID.randomUUID().toString())
                 )
                 if (best == null || best!!.size < tn.size) best = tn
             }
         }
         return best
     }
-
-    private suspend fun getPlaylistDetails(playlistId: String): YoutubePlaylist? =
-        listPlaylistDetails(listOf(playlistId)).find { it.id == playlistId }
 
     /**
      * Fetches playlist details (including video counts but _not_ video details) from API.
@@ -345,7 +355,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                     val videoCount = item.yquery<Double>("contentDetails.itemCount")
 
                     if (playlistId != null && title != null && videoCount != null && videoCount > 0) {
-                        val thumbnail = getThumbnail(snippet["thumbnails"], playlistId)
+                        val thumbnail = getThumbnail(snippet["thumbnails"])
 
                         playlists.add(
                             YoutubePlaylist(
@@ -393,8 +403,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                         YoutubePlaylistItem(
                             id = playlistItemId,
                             videoId = videoId,
-                            playlistId = playlistId,
-                            position = position.toInt(),
+                            position = position.toInt() + 1,
                         )
                     )
                 }
@@ -408,7 +417,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
      * Batch get details for videos with the given IDs.
      */
     @Suppress("UNCHECKED_CAST")
-    private suspend fun listVideoDetails(videoIds: Collection<String>): List<YoutubeVideo> {
+    private suspend fun listVideoDetails(videoIds: Collection<String>, withMetadata: Boolean): List<YoutubeVideo> {
         val videos = mutableListOf<YoutubeVideo>()
 
         if (videoIds.isEmpty()) return videos
@@ -430,13 +439,15 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 val lengthString = contentDetails?.get("duration") as? String
 
                 if (videoId != null && title != null) {
-                    videos.add(
-                        YoutubeVideo(
-                            id = videoId,
-                            title = title,
-                            length = lengthString,
-                        )
-                    )
+                    if (withMetadata) {
+                        getBestMetadata(videoId)?.let {
+                            videos.add(
+                                YoutubeVideo(id = videoId, title = title, length = lengthString, metadata = it)
+                            )
+                        }
+                    } else {
+                        videos.add(YoutubeVideo(id = videoId, title = title, length = lengthString))
+                    }
                 }
             }
         }

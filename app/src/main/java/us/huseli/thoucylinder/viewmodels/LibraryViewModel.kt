@@ -13,25 +13,25 @@ import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(
-    repo: LocalRepository,
-) : ViewModel() {
+class LibraryViewModel @Inject constructor(private val repo: LocalRepository) : ViewModel() {
     private val _fetchedAlbumArt = mutableListOf<UUID>()
     private val _albumArt = MutableStateFlow<Map<UUID, ImageBitmap>>(emptyMap())
 
-    val albums = repo.albums
+    val albums = repo.libraryAlbums
     val singleTracks = repo.singleTracks
 
+    fun deleteAll() = viewModelScope.launch { repo.deleteAll() }
+
     fun getAlbumArt(album: Album) = MutableStateFlow<ImageBitmap?>(null).apply {
-        val albumArt = _albumArt.value[album.id]
+        val albumArt = _albumArt.value[album.albumId]
 
         if (albumArt != null) value = albumArt
         else viewModelScope.launch {
-            if (!_fetchedAlbumArt.contains(album.id)) {
-                _fetchedAlbumArt.add(album.id)
+            if (!_fetchedAlbumArt.contains(album.albumId)) {
+                _fetchedAlbumArt.add(album.albumId)
                 album.albumArt?.getImageBitmap()?.also {
                     value = it
-                    _albumArt.value += album.id to it
+                    _albumArt.value += album.albumId to it
                 }
             }
         }

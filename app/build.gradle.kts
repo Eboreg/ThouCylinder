@@ -73,7 +73,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.4"
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
 
     packaging {
@@ -86,7 +86,7 @@ android {
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.5.2"
 val daggerVersion = "2.48"
-val composeVersion = "1.5.1"
+val composeVersion = "1.5.2"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
@@ -95,13 +95,14 @@ dependencies {
     implementation("androidx.compose.ui:ui:$composeVersion")
     implementation("androidx.compose.ui:ui-graphics:$composeVersion")
     implementation("androidx.activity:activity-compose:1.7.2")
-    implementation("androidx.navigation:navigation-compose:2.7.2")
+    implementation("androidx.navigation:navigation-compose:2.7.3")
 
     // implementation(platform("androidx.compose:compose-bom:2023.03.00"))
 
     // Material:
-    implementation("androidx.compose.material3:material3:1.1.1")
-    implementation("androidx.compose.material:material-icons-extended:$composeVersion")
+    implementation("androidx.compose.material3:material3:1.1.2")
+    implementation("androidx.compose.material:material-icons-extended:1.6.0-alpha06")
+    // implementation("androidx.compose.material:material-icons-extended:$composeVersion")
 
     // Lifecycle:
     // implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
@@ -126,7 +127,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme:
-    implementation("com.github.Eboreg:RetainTheme:1.3.1")
+    implementation("com.github.Eboreg:RetainTheme:1.4.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

@@ -1,11 +1,12 @@
 package us.huseli.thoucylinder.dataclasses
 
 import android.os.Parcelable
+import androidx.room.Embedded
 import androidx.room.Ignore
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
-import us.huseli.thoucylinder.toDuration
-import java.io.File
+import us.huseli.retaintheme.toDuration
+import java.util.UUID
 import kotlin.time.Duration
 
 @Parcelize
@@ -13,22 +14,34 @@ data class YoutubeVideo(
     val id: String,
     val title: String,
     val length: String? = null,
+    val playlistItemId: String? = null,
+    val playlistPosition: Int? = null,
+    @Embedded("metadata") val metadata: YoutubeMetadata? = null,
     @Ignore val thumbnail: Image? = null,
 ) : Parcelable {
-    constructor(id: String, title: String, length: String) :
-        this(id, title, length, null)
+    constructor(
+        id: String,
+        title: String,
+        length: String?,
+        playlistItemId: String?,
+        playlistPosition: Int?,
+        metadata: YoutubeMetadata?,
+    ) : this(id, title, length, playlistItemId, playlistPosition, metadata, null)
 
-    @Ignore
     @IgnoredOnParcel
-    val duration: Duration? = length?.toDuration()
+    val duration: Duration?
+        get() = length?.toDuration()
 
     override fun toString(): String = if (duration != null) "$title ($duration)" else title
 
-    fun toTempTrack(localFile: File, metadata: TrackMetadata) = TempTrack(
+    fun toTrack(isInLibrary: Boolean, albumId: UUID? = null, tempTrackData: TempTrackData? = null) = Track(
         title = title,
-        metadata = metadata,
-        localFile = localFile,
+        isInLibrary = isInLibrary,
         youtubeVideo = this,
         image = thumbnail,
+        albumPosition = playlistPosition,
+        albumId = albumId,
+        tempTrackData = tempTrackData,
+        metadata = metadata?.toTrackMetadata(),
     )
 }

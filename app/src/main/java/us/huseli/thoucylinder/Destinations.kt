@@ -5,6 +5,7 @@ import androidx.navigation.navArgument
 import us.huseli.retaintheme.navigation.AbstractDestination
 import us.huseli.retaintheme.navigation.AbstractSimpleDestination
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
+import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import java.util.UUID
 
 object SearchDestination : AbstractSimpleDestination("search")
@@ -16,4 +17,11 @@ object AlbumDestination : AbstractDestination() {
     override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
 
     fun route(albumId: UUID) = "album/$albumId"
+}
+
+object ArtistDestination : AbstractDestination() {
+    override val arguments = listOf(navArgument(NAV_ARG_ARTIST) { type = NavType.StringType })
+    override val routeTemplate = "artist/{$NAV_ARG_ARTIST}"
+
+    fun route(artist: String) = "artist/$artist"
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -33,13 +35,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.Album
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.viewmodels.DiscogsViewModel
+import us.huseli.thoucylinder.viewmodels.AddAlbumViewModel
 
 @Composable
-fun AddAlbumDialog(
+fun EditAlbumDialog(
     initialAlbum: Album,
     modifier: Modifier = Modifier,
-    viewModel: DiscogsViewModel = hiltViewModel(),
+    viewModel: AddAlbumViewModel = hiltViewModel(),
     onCancel: () -> Unit,
     onSave: (Album) -> Unit,
 ) {
@@ -52,23 +54,22 @@ fun AddAlbumDialog(
     }
 
     if (!step2) {
-        AddAlbumDialogStep1(
+        EditAlbumDialogStep1(
             modifier = modifier,
             viewModel = viewModel,
-            onConfirm = { step2 = true },
-            onCancel = onCancel,
+            onNextClick = { step2 = true },
+            onCancelClick = onCancel,
         )
     } else {
-        if (imagePairs.size > 1) {
-            AddAlbumDialogStep2(
+        if (imagePairs.isNotEmpty()) {
+            EditAlbumDialogStep2(
                 modifier = modifier,
                 imagePairs = imagePairs,
                 onSelect = {
                     album?.copy(albumArt = it)?.let(onSave) ?: run(onCancel)
                 },
-                onCancel = {
-                    onCancel()
-                },
+                onCancel = onCancel,
+                onPreviousClick = { step2 = false },
             )
         } else {
             album?.let(onSave) ?: run(onCancel)
@@ -78,11 +79,11 @@ fun AddAlbumDialog(
 
 
 @Composable
-fun AddAlbumDialogStep1(
+fun EditAlbumDialogStep1(
     modifier: Modifier = Modifier,
-    viewModel: DiscogsViewModel,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
+    viewModel: AddAlbumViewModel,
+    onNextClick: () -> Unit,
+    onCancelClick: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -98,15 +99,15 @@ fun AddAlbumDialogStep1(
         title = { Text(text = stringResource(R.string.add_album_to_library)) },
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = ShapeDefaults.ExtraSmall,
-        onDismissRequest = onCancel,
+        onDismissRequest = onCancelClick,
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
-                content = { Text(text = stringResource(R.string.save)) },
+                onClick = onNextClick,
+                content = { Text(text = stringResource(R.string.next)) },
                 enabled = !loading,
             )
         },
-        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = onCancelClick) { Text(stringResource(R.string.cancel)) } },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -154,11 +155,12 @@ fun AddAlbumDialogStep1(
 
 
 @Composable
-fun AddAlbumDialogStep2(
+fun EditAlbumDialogStep2(
     modifier: Modifier = Modifier,
     imagePairs: List<Pair<Image, ImageBitmap>>,
     onSelect: (Image?) -> Unit,
     onCancel: () -> Unit,
+    onPreviousClick: () -> Unit,
 ) {
     AlertDialog(
         modifier = modifier.padding(10.dp),
@@ -166,12 +168,17 @@ fun AddAlbumDialogStep2(
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = ShapeDefaults.ExtraSmall,
         onDismissRequest = onCancel,
-        confirmButton = {
+        dismissButton = {
             TextButton(
-                onClick = { onSelect(null) },
-                content = { Text(text = stringResource(R.string.none_of_them)) },
+                onClick = onPreviousClick,
+                content = { Text(text = stringResource(R.string.previous)) }
+            )
+            TextButton(
+                onClick = onCancel,
+                content = { Text(text = stringResource(R.string.cancel)) },
             )
         },
+        confirmButton = {},
         text = {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 100.dp),
@@ -180,7 +187,25 @@ fun AddAlbumDialogStep2(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(imagePairs) { (image, imageBitmap) ->
-                    AlbumArt(image = imageBitmap, modifier = Modifier.clickable { onSelect(image) })
+                    Column(
+                        modifier = Modifier.clickable { onSelect(image) }.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        AlbumArt(image = imageBitmap)
+                        Text(text = "${imageBitmap.width}x${imageBitmap.height}")
+                    }
+                }
+                item {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        TextButton(
+                            onClick = { onSelect(null) },
+                            content = { Text(text = stringResource(R.string.none)) },
+                        )
+                    }
                 }
             }
         },

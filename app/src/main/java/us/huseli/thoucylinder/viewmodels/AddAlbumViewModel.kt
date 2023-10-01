@@ -21,7 +21,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class DiscogsViewModel @Inject constructor(private val repo: DiscogsRepository) : ViewModel() {
+class AddAlbumViewModel @Inject constructor(private val repo: DiscogsRepository) : ViewModel() {
     private val _album = MutableStateFlow<Album?>(null)
     private val _images = MutableStateFlow<List<Pair<Image, ImageBitmap>>>(emptyList())
     private val _initialTracks = MutableStateFlow<List<Track>>(emptyList())
@@ -38,6 +38,13 @@ class DiscogsViewModel @Inject constructor(private val repo: DiscogsRepository) 
     val loadingSearchResults = _loadingSearchResults.asStateFlow()
     val searchResults = _searchResults.asStateFlow()
     val selectedMasterId = _selectedMasterId.asStateFlow()
+
+    fun loadSearchResults(album: Album) = viewModelScope.launch(Dispatchers.IO) {
+        _loadingSearchResults.value = true
+        _searchResults.value =
+            repo.searchMasters(query = album.title, artist = album.artist)?.data?.results ?: emptyList()
+        _loadingSearchResults.value = false
+    }
 
     fun selectMasterId(masterId: Int, context: Context) = viewModelScope.launch(Dispatchers.IO) {
         val master =
@@ -61,10 +68,11 @@ class DiscogsViewModel @Inject constructor(private val repo: DiscogsRepository) 
         _album.value = album
         _initialTracks.value = album.tracks
         loadSearchResults(album)
-        viewModelScope.launch(Dispatchers.IO) {
-            val imageBitmap = album.albumArt?.getImageBitmap()
-            if (album.albumArt != null && imageBitmap != null)
-                _images.value = listOf(Pair(album.albumArt, imageBitmap))
+        if (album.albumArt != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val imageBitmap = album.albumArt.getImageBitmap()
+                if (imageBitmap != null) _images.value = listOf(Pair(album.albumArt, imageBitmap))
+            }
         }
     }
 
@@ -74,20 +82,6 @@ class DiscogsViewModel @Inject constructor(private val repo: DiscogsRepository) 
 
     fun setTitle(value: String) {
         _album.value = _album.value?.copy(title = value)
-    }
-
-    fun updateTrack(index: Int, track: Track) {
-        _album.value = _album.value?.let { album ->
-            val tracks = album.tracks.toMutableList().apply { this[index] = track }
-            album.copy(tracks = tracks)
-        }
-    }
-
-    fun loadSearchResults(album: Album) = viewModelScope.launch(Dispatchers.IO) {
-        _loadingSearchResults.value = true
-        _searchResults.value =
-            repo.searchMasters(query = album.title, artist = album.artist)?.data?.results ?: emptyList()
-        _loadingSearchResults.value = false
     }
 
     private fun updateImages(master: DiscogsMasterData, context: Context) = viewModelScope.launch(Dispatchers.IO) {
@@ -106,6 +100,13 @@ class DiscogsViewModel @Inject constructor(private val repo: DiscogsRepository) 
             image.getImageBitmap()?.let { pairs.add(Pair(image, it)) }
         }
         _images.value = pairs
+    }
+
+    fun updateTrack(index: Int, track: Track) {
+        _album.value = _album.value?.let { album ->
+            val tracks = album.tracks.toMutableList().apply { this[index] = track }
+            album.copy(tracks = tracks)
+        }
     }
 
     private fun updateTracksFromMaster(master: DiscogsMasterData) {

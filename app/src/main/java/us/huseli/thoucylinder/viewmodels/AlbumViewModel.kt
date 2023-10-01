@@ -3,10 +3,8 @@ package us.huseli.thoucylinder.viewmodels
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +19,7 @@ import us.huseli.thoucylinder.dataclasses.Album
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.YoutubeVideo
+import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
@@ -31,26 +29,22 @@ import javax.inject.Inject
 @HiltViewModel
 class AlbumViewModel @Inject constructor(
     private val repo: LocalRepository,
-    private val playerRepo: PlayerRepository,
+    playerRepo: PlayerRepository,
     private val youtubeRepo: YoutubeRepository,
     savedStateHandle: SavedStateHandle,
-) : ViewModel() {
+) : BaseViewModel(playerRepo, repo, youtubeRepo) {
     private val _albumId: UUID? = savedStateHandle.get<String>(NAV_ARG_ALBUM)?.let { UUID.fromString(it) }
 
     private val _album = MutableStateFlow<Album?>(null)
     private val _albumArt = MutableStateFlow<ImageBitmap?>(null)
     private val _albumArtLoadStatus = MutableStateFlow(LoadStatus.LOADING)
     private val _downloadProgress = MutableStateFlow<DownloadProgress?>(null)
-    private val _downloadedAlbum = MutableStateFlow<Album?>(null)
     private val _trackDownloadProgress = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
-    private val _videos = MutableStateFlow<List<YoutubeVideo>>(emptyList())
 
     val album = _album.asStateFlow()
     val albumArt = _albumArt.asStateFlow()
     val albumArtLoadStatus = _albumArtLoadStatus.asStateFlow()
     val downloadProgress = _downloadProgress.asStateFlow()
-    val downloadedAlbum = _downloadedAlbum.asStateFlow()
-    val playingUri = playerRepo.playingUri
     val trackDownloadProgress = _trackDownloadProgress.asStateFlow()
 
     private var downloadJob: Job? = null
@@ -59,8 +53,10 @@ class AlbumViewModel @Inject constructor(
         _albumId?.let { albumId ->
             viewModelScope.launch {
                 combine(repo.libraryAlbums, repo.tempAlbums) { libraryAlbums, tempAlbums ->
-                    libraryAlbums.plus(tempAlbums).find { it.albumId == albumId }
-                }.filterNotNull().distinctUntilChanged().collect { _album.value = it }
+                    libraryAlbums.plus(tempAlbums.values).find { it.albumId == albumId }
+                }.filterNotNull().distinctUntilChanged().collect {
+                    _album.value = it
+                }
             }
         }
 
@@ -75,7 +71,7 @@ class AlbumViewModel @Inject constructor(
     fun addToLibrary(album: Album) {
         _album.value = album
         viewModelScope.launch {
-            repo.addAlbumToLibrary(
+            repo.saveAlbum(
                 album.copy(
                     tracks = album.tracks.map { track ->
                         track.copy(metadata = getTrackMetadata(track))
@@ -87,64 +83,31 @@ class AlbumViewModel @Inject constructor(
 
     fun cancelDownload() = downloadJob?.cancel()
 
-    fun deleteDownloadedAlbum() {
-        _downloadedAlbum.value?.let { album ->
-            viewModelScope.launch(Dispatchers.IO) {
-                album.tracks.forEach { track ->
-                    track.tempTrackData?.localFile?.delete()
-                }
-            }
-        }
-        _downloadedAlbum.value = null
-    }
-
-    fun deleteLocalFiles() = viewModelScope.launch {
-        _album.value?.let { repo.deleteLocalFiles(it) }
-    }
-
-    fun downloadAndAddToLibrary(album: Album) {
+    fun downloadAndSaveAlbum(album: Album) {
         _album.value = album
+
         downloadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                fetchVideos()
-                try {
-                    val tracks = youtubeRepo.downloadTracks(
-                        videos = _videos.value,
-                        progressCallback = { _downloadProgress.value = it },
-                    )
-                    album.copy(tracks = tracks).also {
-                        _album.value = it
-                        saveDownloadedAlbum(it)
-                    }
-                } catch (e: Exception) {
-                    Log.e("download", e.toString(), e)
-                } finally {
-                    _downloadProgress.value = null
-                }
-            } catch (_: CancellationException) {
-                deleteDownloadedAlbum()
-            } finally {
-                downloadJob = null
-            }
-        }
-    }
-
-    fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
-        track.youtubeVideo?.let { video ->
-            try {
-                val newTrack = youtubeRepo.downloadTrack(
-                    video = video,
-                    statusCallback = {
-                        _trackDownloadProgress.value += track.id to it.copy(progress = it.progress * 0.8)
-                    },
+                val videos = album.youtubePlaylist?.let {
+                    youtubeRepo.listPlaylistVideos(playlist = it, withMetadata = true)
+                } ?: emptyList()
+                val tracks = youtubeRepo.downloadTracks(
+                    videos = videos,
+                    progressCallback = { _downloadProgress.value = it },
                 )
-                repo.moveAndInsertTrack(newTrack) {
-                    _trackDownloadProgress.value += track.id to it.copy(progress = 0.8 + (it.progress * 0.2))
-                }
+
+                val newAlbum = repo.moveTaggedAlbumToMediaStore(
+                    album = album.copy(tracks = tracks, isLocal = true),
+                    progressCallback = { _downloadProgress.value = it },
+                )
+                _downloadProgress.value = null
+                repo.saveAlbum(newAlbum)
+                _album.value = newAlbum
             } catch (e: Exception) {
-                Log.e("downloadTrack", e.toString(), e)
+                Log.e("download", e.toString(), e)
             } finally {
-                _trackDownloadProgress.value -= track.id
+                _downloadProgress.value = null
+                downloadJob = null
             }
         }
     }
@@ -153,48 +116,49 @@ class AlbumViewModel @Inject constructor(
         if (track.metadata == null) viewModelScope.launch(Dispatchers.IO) { getTrackMetadata(track) }
     }
 
-    fun playOrPause(track: Track) = viewModelScope.launch {
-        track.playUri?.let { playerRepo.playOrPause(it) }
-    }
-
     fun removeFromLibrary() = viewModelScope.launch {
         _album.value?.let { repo.deleteAlbumWithTracks(it) }
     }
 
-    fun saveDownloadedAlbum(album: Album) {
+    fun update(album: Album) {
+        _album.value = album
         viewModelScope.launch {
-            repo.moveAndSaveAlbum(album) { _downloadProgress.value = it }
-            _downloadProgress.value = null
+            repo.tagAndUpdateAlbumWithTracks(ensureTrackMetadata(album))
         }
     }
 
-    private suspend fun fetchVideos() {
-        if (_videos.value.isEmpty()) {
-            _album.value?.youtubePlaylist?.let { playlist ->
-                _videos.value = youtubeRepo.listPlaylistVideos(playlist = playlist, withMetadata = true)
-            }
+    private suspend fun ensureTrackMetadata(album: Album): Album = album.copy(
+        tracks = album.tracks.map { track ->
+            val (metadata, youtubeMetadata) = getTrackAndYoutubeMetadata(track)
+            track.copy(
+                metadata = metadata,
+                youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
+            )
         }
-    }
+    )
 
-    private suspend fun getTrackMetadata(track: Track): TrackMetadata? {
-        if (track.metadata != null) return track.metadata
-        else {
-            val youtubeMetadata =
-                track.youtubeVideo?.metadata ?: track.youtubeVideo?.id?.let { youtubeRepo.getBestMetadata(it) }
-            val metadata = youtubeMetadata?.toTrackMetadata()
+    private suspend fun getTrackAndYoutubeMetadata(track: Track): Pair<TrackMetadata?, YoutubeMetadata?> {
+        if (track.metadata != null && track.youtubeVideo?.metadata != null)
+            return Pair(track.metadata, track.youtubeVideo.metadata)
+        val youtubeMetadata =
+            track.youtubeVideo?.metadata ?: track.youtubeVideo?.id?.let { youtubeRepo.getBestMetadata(it) }
+        val metadata = youtubeMetadata?.toTrackMetadata()
 
-            if (youtubeMetadata != null) {
-                updateTrack(
-                    track.copy(
-                        metadata = metadata,
-                        youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
-                    )
+        if (youtubeMetadata != null) {
+            updateTrack(
+                track.copy(
+                    metadata = metadata,
+                    youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
                 )
-            }
-            return metadata
+            )
         }
+        return Pair(metadata, youtubeMetadata)
     }
 
+    private suspend fun getTrackMetadata(track: Track): TrackMetadata? =
+        track.metadata ?: getTrackAndYoutubeMetadata(track).first
+
+    /** Does not save to database. */
     private fun updateTrack(track: Track) {
         _album.value?.let { album ->
             _album.value = album.copy(
@@ -202,5 +166,4 @@ class AlbumViewModel @Inject constructor(
             )
         }
     }
-
 }

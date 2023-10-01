@@ -12,16 +12,16 @@ import java.io.File
 
 @Parcelize
 data class Image(
-    val width: Int,
-    val height: Int,
     val localFile: File,
-    val url: String,
+    val width: Int? = null,
+    val height: Int? = null,
+    val url: String? = null,
 ) : Parcelable {
     val size: Int
-        get() = width * height
+        get() = (width ?: 0) * (height ?: 0)
 
     private suspend fun getFile(): File? {
-        if (!localFile.isFile) {
+        if (!localFile.isFile && url != null) {
             withContext(Dispatchers.IO) {
                 val conn = urlRequest(url)
                 val body = conn.getInputStream().use { it.readBytes() }

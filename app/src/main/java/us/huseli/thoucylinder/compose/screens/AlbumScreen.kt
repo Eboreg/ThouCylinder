@@ -13,10 +13,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.Bookmark
+import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Cancel
-import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
-import androidx.compose.material.icons.sharp.LibraryAdd
+import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -26,7 +27,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,9 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.EditAlbumDialog
 import us.huseli.thoucylinder.compose.AlbumArt
-import us.huseli.thoucylinder.compose.DeleteAlbumDialog
-import us.huseli.thoucylinder.compose.AddAlbumDialog
 import us.huseli.thoucylinder.compose.RoundedIconBlock
 import us.huseli.thoucylinder.compose.TrackSection
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
@@ -52,55 +51,31 @@ fun AlbumScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumViewModel = hiltViewModel(),
     onBackClick: () -> Unit,
+    onArtistClick: (String) -> Unit,
 ) {
     val albumArt by viewModel.albumArt.collectAsStateWithLifecycle()
     val albumArtLoadStatus by viewModel.albumArtLoadStatus.collectAsStateWithLifecycle()
     val albumNullable by viewModel.album.collectAsStateWithLifecycle()
-    val downloadedAlbum by viewModel.downloadedAlbum.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val playingUri by viewModel.playingUri.collectAsStateWithLifecycle(initialValue = null)
+    val playerPlayingUri by viewModel.playerPlayingUri.collectAsStateWithLifecycle(initialValue = null)
     val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
 
-    var deleteDialogOpen by rememberSaveable { mutableStateOf(false) }
     var addDownloadedAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
     var addAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var editAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(downloadedAlbum) {
-        if (downloadedAlbum != null) addDownloadedAlbumDialogOpen = true
-    }
-
-    downloadedAlbum?.let { album ->
+    albumNullable?.let { album ->
         if (addDownloadedAlbumDialogOpen) {
-            AddAlbumDialog(
+            EditAlbumDialog(
                 initialAlbum = album,
-                onSave = {
-                    addDownloadedAlbumDialogOpen = false
-                    viewModel.saveDownloadedAlbum(it)
-                },
-                onCancel = {
-                    addDownloadedAlbumDialogOpen = false
-                    viewModel.deleteDownloadedAlbum()
-                },
-            )
-        }
-    }
-
-    if (addDownloadedAlbumDialogOpen) {
-        albumNullable?.let { album ->
-            AddAlbumDialog(
-                initialAlbum = album,
-                onSave = {
-                    addDownloadedAlbumDialogOpen = false
-                    viewModel.downloadAndAddToLibrary(it)
-                },
                 onCancel = { addDownloadedAlbumDialogOpen = false },
+                onSave = {
+                    addDownloadedAlbumDialogOpen = false
+                    viewModel.downloadAndSaveAlbum(it)
+                },
             )
-        }
-    }
-
-    if (addAlbumDialogOpen) {
-        albumNullable?.let { album ->
-            AddAlbumDialog(
+        } else if (addAlbumDialogOpen) {
+            EditAlbumDialog(
                 initialAlbum = album,
                 onCancel = { addAlbumDialogOpen = false },
                 onSave = {
@@ -108,21 +83,16 @@ fun AlbumScreen(
                     viewModel.addToLibrary(it)
                 }
             )
-        }
-    }
-
-    if (deleteDialogOpen) {
-        DeleteAlbumDialog(
-            onCancel = { deleteDialogOpen = false },
-            onConfirm = { removeFromLibrary, deleteFiles ->
-                deleteDialogOpen = false
-                if (deleteFiles) viewModel.deleteLocalFiles()
-                if (removeFromLibrary) {
-                    viewModel.removeFromLibrary()
-                    onBackClick()
+        } else if (editAlbumDialogOpen) {
+            EditAlbumDialog(
+                initialAlbum = album,
+                onCancel = { editAlbumDialogOpen = false },
+                onSave = {
+                    editAlbumDialogOpen = false
+                    viewModel.update(it)
                 }
-            }
-        )
+            )
+        }
     }
 
     LazyColumn(modifier = modifier) {
@@ -134,7 +104,7 @@ fun AlbumScreen(
                 topContent = {
                     Row(
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(5.dp),
                     ) {
                         FilledTonalIconButton(onClick = onBackClick) {
                             Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back))
@@ -162,38 +132,40 @@ fun AlbumScreen(
                     }
                 },
                 bottomContent = {
-                    albumNullable?.genres?.takeIf { it.isNotEmpty() }?.let { genres ->
-                        FlowRow(
-                            modifier = Modifier
-                                .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
-                                .align(Alignment.CenterHorizontally),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            genres.forEach { genre ->
-                                Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
-                                    Badge(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        content = { Text(text = genre) },
-                                    )
+                    Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
+                        albumNullable?.genres?.takeIf { it.isNotEmpty() }?.let { genres ->
+                            FlowRow(
+                                modifier = Modifier
+                                    .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
+                                    .align(Alignment.CenterHorizontally),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                genres.forEach { genre ->
+                                    Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
+                                        Badge(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            content = { Text(text = genre) },
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    albumNullable?.styles?.takeIf { it.isNotEmpty() }?.let { styles ->
-                        FlowRow(
-                            modifier = Modifier
-                                .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
-                                .align(Alignment.CenterHorizontally),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            styles.forEach { style ->
-                                Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
-                                    Badge(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        content = { Text(text = style) },
-                                    )
+                        albumNullable?.styles?.takeIf { it.isNotEmpty() }?.let { styles ->
+                            FlowRow(
+                                modifier = Modifier
+                                    .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
+                                    .align(Alignment.CenterHorizontally),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                styles.forEach { style ->
+                                    Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
+                                        Badge(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            content = { Text(text = style) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -211,23 +183,6 @@ fun AlbumScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(text = album.toString(), modifier = Modifier.weight(1f))
-                    if (album.isInLibrary) {
-                        IconButton(
-                            onClick = {
-                                if (album.isLocal) deleteDialogOpen = true
-                                else {
-                                    viewModel.removeFromLibrary()
-                                    onBackClick()
-                                }
-                            },
-                            content = { Icon(Icons.Sharp.Delete, stringResource(R.string.delete_album)) },
-                        )
-                    } else {
-                        IconButton(
-                            onClick = { addAlbumDialogOpen = true },
-                            content = { Icon(Icons.Sharp.LibraryAdd, stringResource(R.string.add_to_library)) },
-                        )
-                    }
 
                     if (!album.isLocal) {
                         if (downloadProgress != null) {
@@ -236,11 +191,35 @@ fun AlbumScreen(
                                 content = { Icon(Icons.Sharp.Cancel, stringResource(R.string.cancel_download)) },
                             )
                         } else {
+                            if (album.isInLibrary) {
+                                IconButton(
+                                    onClick = {
+                                        viewModel.removeFromLibrary()
+                                        onBackClick()
+                                    },
+                                    content = {
+                                        Icon(Icons.Sharp.Bookmark, stringResource(R.string.remove_from_library))
+                                    },
+                                )
+                            } else {
+                                IconButton(
+                                    onClick = { addAlbumDialogOpen = true },
+                                    content = {
+                                        Icon(Icons.Sharp.BookmarkBorder, stringResource(R.string.add_to_library))
+                                    },
+                                )
+                            }
                             IconButton(
                                 onClick = { addDownloadedAlbumDialogOpen = true },
                                 content = { Icon(Icons.Sharp.Download, stringResource(R.string.download)) },
                             )
                         }
+                    }
+                    if (album.isInLibrary) {
+                        IconButton(
+                            onClick = { editAlbumDialogOpen = true },
+                            content = { Icon(Icons.Sharp.Edit, stringResource(R.string.edit)) },
+                        )
                     }
                 }
             }
@@ -267,10 +246,12 @@ fun AlbumScreen(
 
                 TrackSection(
                     track = track,
-                    playingUri = playingUri,
+                    playerPlayingUri = playerPlayingUri,
                     downloadProgress = trackDownloadProgress[track.id],
                     onDownloadClick = { viewModel.downloadTrack(track) },
                     onPlayOrPauseClick = { viewModel.playOrPause(track) },
+                    showArtist = track.artist != album.artist,
+                    onArtistClick = onArtistClick,
                 )
             }
         }

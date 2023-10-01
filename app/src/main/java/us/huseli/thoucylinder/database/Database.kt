@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
 @androidx.room.Database(
     entities = [Track::class, Album::class, Genre::class, Style::class, AlbumGenre::class, AlbumStyle::class],
     exportSchema = false,
-    version = 19,
+    version = 22,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

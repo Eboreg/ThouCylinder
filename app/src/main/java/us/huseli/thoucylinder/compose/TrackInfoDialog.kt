@@ -29,6 +29,7 @@ fun TrackInfoDialog(
 ) {
     AlertDialog(
         modifier = modifier,
+        shape = MaterialTheme.shapes.extraSmall,
         onDismissRequest = onClose,
         dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
         confirmButton = {},
@@ -60,10 +61,6 @@ fun TrackInfoDialog(
                 }
                 TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = track.isDownloaded)
                 TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = track.isOnYoutube)
-                track.mediaStoreFile?.path?.let { path ->
-                    Text(text = stringResource(R.string.local_path))
-                    Text(text = path, style = MaterialTheme.typography.bodySmall)
-                }
             }
         }
     )

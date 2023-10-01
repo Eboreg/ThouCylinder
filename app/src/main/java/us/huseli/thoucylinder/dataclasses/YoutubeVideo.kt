@@ -34,11 +34,16 @@ data class YoutubeVideo(
 
     override fun toString(): String = if (duration != null) "$title ($duration)" else title
 
-    fun toTrack(isInLibrary: Boolean, albumId: UUID? = null, tempTrackData: TempTrackData? = null) = Track(
+    fun toTrack(
+        isInLibrary: Boolean,
+        albumId: UUID? = null,
+        tempTrackData: TempTrackData? = null,
+        image: Image? = null,
+    ) = Track(
         title = title,
         isInLibrary = isInLibrary,
         youtubeVideo = this,
-        image = thumbnail,
+        image = image,
         albumPosition = playlistPosition,
         albumId = albumId,
         tempTrackData = tempTrackData,

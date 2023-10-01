@@ -33,11 +33,8 @@ interface MusicDao {
     @Query("DELETE FROM Track")
     suspend fun _clearTracks()
 
-    @Delete
-    suspend fun _deleteAlbums(vararg albums: Album)
-
-    @Delete
-    suspend fun _deleteTracks(vararg tracks: Track)
+    @Query("DELETE FROM Track WHERE albumId = :albumId")
+    suspend fun _deleteTracksByAlbumId(albumId: UUID)
 
     @Insert
     suspend fun _insertAlbums(vararg albums: Album)
@@ -64,10 +61,13 @@ interface MusicDao {
     @Query("SELECT EXISTS(SELECT albumId FROM Album WHERE albumId = :albumId)")
     suspend fun albumExists(albumId: UUID): Boolean
 
+    @Delete
+    suspend fun deleteAlbums(vararg albums: Album)
+
     @Transaction
     suspend fun deleteAlbumWithTracks(album: Album) {
-        _deleteTracks(*album.tracks.toTypedArray())
-        _deleteAlbums(album)
+        deleteTracks(*album.tracks.toTypedArray())
+        deleteAlbums(album)
     }
 
     @Transaction
@@ -76,10 +76,12 @@ interface MusicDao {
         _clearAlbums()
     }
 
-    @Query("DELETE FROM Track WHERE albumId = :albumId")
-    suspend fun deleteTracksByAlbumId(albumId: UUID)
+    @Delete
+    suspend fun deleteTracks(vararg tracks: Track)
 
-    suspend fun insertTrack(track: Track) = _insertTracks(track.copy(isInLibrary = true))
+    suspend fun insertTrack(track: Track) {
+        _insertTracks(track.copy(isInLibrary = true))
+    }
 
     @Query("SELECT * FROM AlbumGenre")
     fun listAbumGenres(): Flow<List<AlbumGenre>>
@@ -90,9 +92,6 @@ interface MusicDao {
     @Query("SELECT * FROM Album LEFT JOIN Track ON Album.albumId = Track.albumId")
     fun listAlbumsWithTracks(): Flow<Map<Album, List<Track>>>
 
-    @Query("SELECT * FROM Track WHERE albumId IS NULL")
-    fun listSingleTracks(): Flow<List<Track>>
-
     @Query("SELECT * FROM Track")
     fun listTracks(): Flow<List<Track>>
 
@@ -101,15 +100,23 @@ interface MusicDao {
         val genres = album.genres.map { Genre(genreId = it) }
         val styles = album.styles.map { Style(styleId = it) }
 
-        deleteTracksByAlbumId(album.albumId)
-        if (albumExists(album.albumId)) _updateAlbums(album.copy(isInLibrary = true))
-        else _insertAlbums(album.copy(isInLibrary = true))
-        _insertTracks(*album.tracks.map { it.copy(isInLibrary = true, albumId = album.albumId) }.toTypedArray())
+        if (albumExists(album.albumId)) {
+            _updateAlbums(album.copy(isInLibrary = true))
+            _deleteTracksByAlbumId(album.albumId)
+        } else _insertAlbums(album.copy(isInLibrary = true))
+
         _clearAlbumGenres(album.albumId)
         _clearAlbumStyles(album.albumId)
-        _insertGenres(*genres.toTypedArray())
-        _insertStyles(*styles.toTypedArray())
-        _insertAlbumGenres(*genres.map { AlbumGenre(albumId = album.albumId, genreId = it.genreId) }.toTypedArray())
-        _insertAlbumStyles(*styles.map { AlbumStyle(albumId = album.albumId, styleId = it.styleId) }.toTypedArray())
+
+        if (album.tracks.isNotEmpty())
+            _insertTracks(*album.tracks.map { it.copy(isInLibrary = true, albumId = album.albumId) }.toTypedArray())
+        if (genres.isNotEmpty()) {
+            _insertGenres(*genres.toTypedArray())
+            _insertAlbumGenres(*genres.map { AlbumGenre(albumId = album.albumId, genreId = it.genreId) }.toTypedArray())
+        }
+        if (styles.isNotEmpty()) {
+            _insertStyles(*styles.toTypedArray())
+            _insertAlbumStyles(*styles.map { AlbumStyle(albumId = album.albumId, styleId = it.styleId) }.toTypedArray())
+        }
     }
 }

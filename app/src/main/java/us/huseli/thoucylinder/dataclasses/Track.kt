@@ -1,8 +1,9 @@
 package us.huseli.thoucylinder.dataclasses
 
+import android.content.ContentValues
+import android.content.Context
 import android.net.Uri
-import android.os.Environment
-import androidx.core.net.toUri
+import android.provider.MediaStore
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -10,6 +11,7 @@ import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
+import us.huseli.thoucylinder.getMediaStoreFile
 import java.io.File
 import java.util.UUID
 
@@ -33,10 +35,11 @@ data class Track(
     val albumId: UUID? = null,
     val albumPosition: Int? = null,
     val year: Int? = null,
-    @Embedded("local") val local: LocalTrackData? = null,
     @Embedded("metadata") val metadata: TrackMetadata? = null,
     @Embedded("youtubeVideo") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("image") val image: Image? = null,
+    @Embedded("mediaStoreData") val mediaStoreData: MediaStoreData? = null,
+    @Ignore val album: Album? = null,
     @Ignore val tempTrackData: TempTrackData? = null,
 ) {
     constructor(
@@ -47,68 +50,60 @@ data class Track(
         albumId: UUID?,
         albumPosition: Int?,
         year: Int?,
-        local: LocalTrackData?,
         metadata: TrackMetadata?,
         youtubeVideo: YoutubeVideo?,
         image: Image?,
-    ) : this(id, title, isInLibrary, artist, albumId, albumPosition, year, local, metadata, youtubeVideo, image, null)
+        mediaStoreData: MediaStoreData?,
+    ) : this(
+        id = id,
+        title = title,
+        isInLibrary = isInLibrary,
+        artist = artist,
+        albumId = albumId,
+        albumPosition = albumPosition,
+        year = year,
+        metadata = metadata,
+        youtubeVideo = youtubeVideo,
+        image = image,
+        mediaStoreData = mediaStoreData,
+        album = null,
+        tempTrackData = null,
+    )
 
     val isDownloaded: Boolean
-        get() = mediaStoreFile != null
+        get() = mediaStoreData != null || tempTrackData != null
 
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
-    /** Local filename without path or extension. */
-    val localBasename: String
-        get() {
-            var name = ""
-            if (albumPosition != null) name += "${String.format("%02d", albumPosition)} - "
-            if (artist != null) name += "$artist - "
-            name += title
-
-            return name.sanitizeFilename()
-        }
-
-    /** Local filename without path but with extension. */
-    private val localFilename: String?
-        get() = metadata?.let { "$localBasename.${it.extension}".sanitizeFilename() }
-
-    /** Relative local path without filename. */
-    private val localSubdir: String?
-        get() = local?.subdir?.sanitizeFilename()
-
-    val localSubdirAndFilename: Pair<String, String>?
-        get() {
-            val subdir = localSubdir
-            val filename = localFilename
-            if (subdir != null && filename != null) return Pair(subdir, filename)
-            return null
-        }
-
-    /** Relative local path with filename and extension. */
-    private val localPath: String?
-        get() = localSubdir?.let { "$it/$localFilename" }
-
-    val mediaStoreFile: File?
-        get() = localPath?.let { path ->
-            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), path).takeIf { it.isFile }
-        }
-
-    val mediaStoreUri: Uri?
-        get() = mediaStoreFile?.toUri()
-
     val playUri: Uri?
-        get() = mediaStoreUri ?: youtubeVideo?.metadata?.uri
+        get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
 
-    override fun toString(): String {
+    fun generateBasename(): String {
+        var name = ""
+        if (albumPosition != null) name += "${String.format("%02d", albumPosition)} - "
+        if (artist != null) name += "$artist - "
+        name += title
+
+        return name.sanitizeFilename()
+    }
+
+    fun getContentValues() = ContentValues().apply {
+        put(MediaStore.Audio.Media.TITLE, title)
+        albumPosition?.also { put(MediaStore.Audio.Media.TRACK, it.toString()) }
+        artist?.also { put(MediaStore.Audio.Media.ARTIST, it) }
+    }
+
+    fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""
-        if (albumPosition != null) string += "$albumPosition. "
-        if (artist != null) string += "$artist - "
+        if (albumPosition != null && showAlbumPosition) string += "$albumPosition. "
+        if (artist != null && showArtist) string += "$artist - "
         string += title
 
         return string
     }
+
+    override fun toString(): String = toString(showAlbumPosition = true, showArtist = true)
 }
 
 
@@ -117,6 +112,8 @@ data class TempTrackData(
 )
 
 
-data class LocalTrackData(
-    val subdir: String? = null,
-)
+data class MediaStoreData(
+    val uri: Uri,
+) {
+    fun getFile(context: Context): File = context.getMediaStoreFile(uri)
+}

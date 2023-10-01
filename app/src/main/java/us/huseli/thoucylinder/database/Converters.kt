@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.database
 
+import android.net.Uri
 import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -34,4 +35,12 @@ object Converters {
     @TypeConverter
     @JvmStatic
     fun stringToFile(value: String?): File? = value?.let { File(it) }
+
+    @TypeConverter
+    @JvmStatic
+    fun uriToString(value: Uri?): String? = value?.toString()
+
+    @TypeConverter
+    @JvmStatic
+    fun stringToUri(value: String?): Uri? = value?.let { Uri.parse(it) }
 }

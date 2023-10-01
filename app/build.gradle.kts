@@ -31,7 +31,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -97,15 +97,12 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.7.2")
     implementation("androidx.navigation:navigation-compose:2.7.3")
 
-    // implementation(platform("androidx.compose:compose-bom:2023.03.00"))
-
     // Material:
     implementation("androidx.compose.material3:material3:1.1.2")
     implementation("androidx.compose.material:material-icons-extended:1.6.0-alpha06")
     // implementation("androidx.compose.material:material-icons-extended:$composeVersion")
 
     // Lifecycle:
-    // implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
@@ -127,13 +124,15 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme:
-    implementation("com.github.Eboreg:RetainTheme:1.4.0")
+    implementation("com.github.Eboreg:RetainTheme:1.5.2")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
-    // implementation("com.arthenica:ffmpeg-kit-audio:6.0-1")
     implementation("com.arthenica:smart-exception-java:0.2.1")
 
     // Splashscreen:
     implementation("androidx.core:core-splashscreen:1.0.1")
+
+    // For reading document tree:
+    implementation("androidx.documentfile:documentfile:1.0.1")
 }

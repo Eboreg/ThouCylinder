@@ -1,37 +1,45 @@
 package us.huseli.thoucylinder
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.icu.text.DecimalFormat
 import android.icu.text.DecimalFormatSymbols
-import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
+import android.os.CancellationSignal
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import android.webkit.MimeTypeMap
+import android.util.Size
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
-import com.arthenica.ffmpegkit.FFprobeKit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import us.huseli.retaintheme.ui.theme.RetainColorDark
 import us.huseli.retaintheme.ui.theme.RetainColorLight
 import us.huseli.retaintheme.ui.theme.RetainColorScheme
 import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
 import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import java.io.File
+import java.io.FileNotFoundException
 import java.net.URL
 import java.net.URLConnection
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
+
+
+fun List<Duration>.sum(): Duration = this.plus(ZERO).reduce { d1, d2 -> d1 + d2 }
+
+fun File.toBitmap(): Bitmap? = takeIf { it.isFile }?.inputStream().use { BitmapFactory.decodeStream(it) }
+
+fun String.escapeQuotes() = replace("\"", "\\\"")
 
 
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
@@ -98,19 +106,34 @@ suspend fun urlRequest(
 }
 
 
-fun File.toBitmap(): Bitmap? = takeIf { it.isFile }?.inputStream().use { BitmapFactory.decodeStream(it) }
+fun getReadOnlyAudioCollection(): Uri =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    else MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
 
 
-fun getAudioCollection(): Uri =
+fun getReadWriteAudioCollection(): Uri =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
         MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     else MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
 
 
-fun deleteExistingMediaFile(context: Context, filename: String, mediaStorePath: String?) {
+fun getReadOnlyImageCollection(): Uri =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+
+
+fun getReadWriteImageCollection(): Uri =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+
+
+fun Context.deleteExistingMediaFile(filename: String, mediaStorePath: String?) {
     val localMusicDir: File =
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC).apply { mkdirs() }
-    val audioCollection = getAudioCollection()
+    val audioCollection = getReadWriteAudioCollection()
     val subdir = mediaStorePath?.takeIf { it.isNotEmpty() }?.let { File(localMusicDir, it) } ?: localMusicDir
     val dirName =
         "${Environment.DIRECTORY_MUSIC}/" + if (mediaStorePath?.isNotEmpty() == true) "$mediaStorePath/" else ""
@@ -122,68 +145,16 @@ fun deleteExistingMediaFile(context: Context, filename: String, mediaStorePath: 
     if (mediaStorePath?.isNotEmpty() == true && subdir.list()?.isEmpty() == true)
         subdir.delete()
 
-    context.contentResolver.query(audioCollection, projection, selection, selectionArgs, null)?.use { cursor ->
+    contentResolver.query(audioCollection, projection, selection, selectionArgs, null)?.use { cursor ->
         if (cursor.moveToNext()) {
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)),
             )
-            context.contentResolver.delete(uri, null, null)
+            contentResolver.delete(uri, null, null)
         }
     }
 }
-
-
-/**
- * Extract metadata from audio file with MediaExtractor and ffmpeg.
- * @throws ExtractTrackDataException
- */
-fun File.extractTrackMetadata(): TrackMetadata {
-    val extractor = MediaExtractor()
-    extractor.setDataSource(path)
-
-    for (trackIdx in 0 until extractor.trackCount) {
-        val format = extractor.getTrackFormat(trackIdx)
-        val mimeType = format.getString(MediaFormat.KEY_MIME)
-
-        if (mimeType?.startsWith("audio/") == true) {
-            val ff = FFprobeKit.getMediaInformation(path)?.mediaInformation
-            val ffStream = ff?.streams?.getOrNull(trackIdx)
-            val extension =
-                when {
-                    ffStream?.codec != null && ff.format?.contains(",") == true -> ffStream.codec
-                    ff?.format != null -> ff.format
-                    else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-                        ?: mimeType.split("/").last().lowercase()
-                }
-            val bitrate =
-                if (format.containsKey(MediaFormat.KEY_BIT_RATE)) format.getInteger(MediaFormat.KEY_BIT_RATE)
-                else ff?.bitrate?.toInt()
-            val channels =
-                if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
-                    format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-                else ffStream?.getNumberProperty("channels")?.toInt()
-            val sampleRate =
-                if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                else ffStream?.sampleRate?.toInt()
-
-            return TrackMetadata(
-                bitrate = bitrate,
-                durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000,
-                extension = extension,
-                mimeType = mimeType,
-                sampleRate = sampleRate,
-                channels = channels,
-                size = length(),
-            ).also { extractor.release() }
-        }
-    }
-    extractor.release()
-    throw ExtractTrackDataException(this, extractor)
-}
-
-
-fun List<Duration>.sum(): Duration = this.plus(ZERO).reduce { d1, d2 -> d1 + d2 }
 
 
 val Context.thumbnailDir: File
@@ -203,4 +174,38 @@ fun Long.bytesToString(): String {
 fun themeColors(): RetainColorScheme = if (isSystemInDarkTheme()) RetainColorDark else RetainColorLight
 
 
-fun String.escapeQuotes() = replace("\"", "\\\"")
+fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
+    getInteger(name)
+} catch (_: NullPointerException) {
+    null
+} catch (_: ClassCastException) {
+    null
+}
+
+fun MediaFormat.getIntegerOrDefault(name: String, default: Int?): Int? = getIntegerOrNull(name) ?: default
+
+
+fun ContentResolver.loadThumbnailOrNull(uri: Uri, size: Size, signal: CancellationSignal?): Bitmap? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) try {
+        loadThumbnail(uri, size, signal)
+    } catch (_: FileNotFoundException) {
+        null
+    } else null
+
+
+fun Context.getMediaStoreFile(uri: Uri): File {
+    contentResolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null)?.use { cursor ->
+        if (cursor.moveToNext()) {
+            val filename = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+            return File(filename)
+        }
+    }
+    throw FileNotFoundException(uri.path)
+}
+
+
+fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString(name) else null
+
+
+fun JSONObject.getIntOrNull(name: String): Int? =
+    if (has(name)) getStringOrNull(name)?.takeWhile { it.isDigit() }?.takeIf { it.isNotEmpty() }?.toInt() else null

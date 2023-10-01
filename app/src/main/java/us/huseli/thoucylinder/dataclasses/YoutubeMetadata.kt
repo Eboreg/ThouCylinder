@@ -41,15 +41,15 @@ data class YoutubeMetadata(
     val quality: Long
         get() = bitrate.toLong() * sampleRate.toLong()
 
-    val type: String
-        get() = codecs.getOrNull(0) ?: mimeType
+    val fileExtension: String
+        get() = (codecs.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
 
     val uri: Uri
         get() = url.toUri()
 
     fun toTrackMetadata() = TrackMetadata(
         durationMs = durationMs ?: 0L,
-        extension = type,
+        extension = fileExtension,
         mimeType = mimeType,
         bitrate = bitrate,
         channels = channels,

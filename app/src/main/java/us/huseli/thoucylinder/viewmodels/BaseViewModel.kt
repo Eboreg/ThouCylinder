@@ -23,9 +23,11 @@ abstract class BaseViewModel(
 ) : ViewModel() {
     private val _trackDownloadProgressMap = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
 
-    val playerCurrentUri = playerRepo.currentUri
     val playerPlaybackState = playerRepo.playbackState
-    val playerPlayingUri = playerRepo.playingUri
+    val playerPlayingTrack = playerRepo.playingTrack
+    val playerCurrentPositionMs = playerRepo.currentPositionMs
+    val playerCurrentTrack = playerRepo.currentTrack
+
     val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
 
     fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
@@ -52,6 +54,6 @@ abstract class BaseViewModel(
     suspend fun getImageBitmap(image: Image): ImageBitmap? = repo.getImageBitmap(image)
 
     fun playOrPause(track: Track) = viewModelScope.launch {
-        track.playUri?.let { playerRepo.playOrPause(it) }
+        playerRepo.playOrPause(track)
     }
 }

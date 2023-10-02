@@ -34,6 +34,7 @@ fun LibraryScreen(
     val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
+    val artistTrackMap by viewModel.artistsWithTracks.collectAsStateWithLifecycle(emptyMap())
 
     Column(modifier = modifier) {
         ListSettings(
@@ -61,6 +62,7 @@ fun LibraryScreen(
                     )
                     ListType.ARTISTS -> ArtistList(
                         viewModel = viewModel,
+                        artistTrackMap = artistTrackMap,
                         images = artistImages,
                         albums = albums,
                         onArtistClick = onArtistClick,
@@ -84,6 +86,7 @@ fun LibraryScreen(
                     )
                     ListType.ARTISTS -> ArtistGrid(
                         viewModel = viewModel,
+                        artistTrackMap = artistTrackMap,
                         images = artistImages,
                         albums = albums,
                         onArtistClick = onArtistClick,

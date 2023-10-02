@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,7 +30,7 @@ import java.util.UUID
 fun TrackSection(
     track: Track,
     downloadProgress: DownloadProgress?,
-    playerPlayingUri: Uri?,
+    playerPlayingTrack: Track?,
     modifier: Modifier = Modifier,
     onDownloadClick: () -> Unit,
     onPlayOrPauseClick: () -> Unit,
@@ -63,8 +62,7 @@ fun TrackSection(
                 IconButton(
                     onClick = onPlayOrPauseClick,
                     content = {
-                        if (track.playUri != null && playerPlayingUri == track.playUri)
-                            Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
+                        if (playerPlayingTrack == track) Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
                         else Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play))
                     },
                 )

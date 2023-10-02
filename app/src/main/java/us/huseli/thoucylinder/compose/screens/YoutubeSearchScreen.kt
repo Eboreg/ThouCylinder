@@ -30,7 +30,7 @@ import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettings
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.compose.ObnoxiousProgressIndicator
+import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList

@@ -9,13 +9,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,7 +43,15 @@ fun App(
     navController: NavHostController = rememberNavController(),
     libraryViewModel: LibraryViewModel = hiltViewModel(),
 ) {
+    val playerCurrentPositionMs by libraryViewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
+    val playerPlaybackState by libraryViewModel.playerPlaybackState.collectAsStateWithLifecycle()
+    val playerCurrentTrack by libraryViewModel.playerCurrentTrack.collectAsStateWithLifecycle()
     var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
+    val currentTrackImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(playerCurrentTrack) {
+        playerCurrentTrack?.image?.also { currentTrackImageBitmap.value = libraryViewModel.getImageBitmap(it) }
+    }
 
     val mainMenuItems = listOf(
         MainMenuItem("search", Icons.Sharp.Search),
@@ -70,6 +82,18 @@ fun App(
         activeScreen = activeScreen,
         mainMenuItems = mainMenuItems,
         onMenuItemClick = onMenuItemClick,
+        bottomBar = {
+            playerCurrentTrack?.also { track ->
+                BottomBar(
+                    currentTrack = track,
+                    playbackState = playerPlaybackState,
+                    currentPositionMs = playerCurrentPositionMs,
+                    imageBitmap = currentTrackImageBitmap.value,
+                    onPlayOrPauseClick = { playerCurrentTrack?.also { libraryViewModel.playOrPause(it) } },
+                    onNextClick = { },
+                )
+            }
+        },
         landscapeMenu = { innerPadding ->
             NavigationRail(modifier = Modifier.padding(innerPadding)) {
                 mainMenuItems.forEach { item ->

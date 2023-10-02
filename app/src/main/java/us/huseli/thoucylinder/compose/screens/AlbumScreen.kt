@@ -41,7 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.EditAlbumDialog
 import us.huseli.thoucylinder.compose.AlbumArt
-import us.huseli.thoucylinder.compose.RoundedIconBlock
+import us.huseli.thoucylinder.compose.utils.RoundedIconBlock
 import us.huseli.thoucylinder.compose.TrackSection
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
@@ -57,7 +57,7 @@ fun AlbumScreen(
     val albumArtLoadStatus by viewModel.albumArtLoadStatus.collectAsStateWithLifecycle()
     val albumNullable by viewModel.album.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val playerPlayingUri by viewModel.playerPlayingUri.collectAsStateWithLifecycle(initialValue = null)
+    val playerPlayingTrack by viewModel.playerPlayingTrack.collectAsStateWithLifecycle(null)
     val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
 
     var addDownloadedAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -246,7 +246,7 @@ fun AlbumScreen(
 
                 TrackSection(
                     track = track,
-                    playerPlayingUri = playerPlayingUri,
+                    playerPlayingTrack = playerPlayingTrack,
                     downloadProgress = trackDownloadProgress[track.id],
                     onDownloadClick = { viewModel.downloadTrack(track) },
                     onPlayOrPauseClick = { viewModel.playOrPause(track) },

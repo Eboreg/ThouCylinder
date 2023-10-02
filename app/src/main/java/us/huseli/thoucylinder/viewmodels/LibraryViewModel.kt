@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.compose.DisplayType
@@ -29,8 +30,9 @@ class LibraryViewModel @Inject constructor(
 
     val albums = repo.libraryAlbums
     val artistImages = _artistImages.asStateFlow()
-    val artistsWithTracks: Flow<Map<String, List<Track>>> =
-        repo.tracks.map { tracks -> tracks.groupBy { it.artist ?: "Unknown artist" } }
+    val artistsWithTracks: Flow<Map<String, List<Track>>> = repo.tracks
+        .map { tracks -> tracks.groupBy { it.artist ?: "Unknown artist" }.toSortedMap() }
+        .distinctUntilChanged()
     val tracks = repo.tracks
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()

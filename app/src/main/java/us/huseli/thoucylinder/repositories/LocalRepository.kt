@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,15 +98,15 @@ class LocalRepository @Inject constructor(
                 genres = albumGenres.filter { it.albumId == album.albumId }.map { it.genreId },
                 styles = albumStyles.filter { it.albumId == album.albumId }.map { it.styleId },
             )
-        }
-    }
+        }.sortedBy { album -> (album.artist?.let { it + album.title } ?: album.title).lowercase() }
+    }.distinctUntilChanged()
     val tempAlbums = _tempAlbums.asStateFlow()
     val tracks: Flow<List<Track>> = combine(musicDao.listTracks(), libraryAlbums) { tracks, albums ->
         tracks.map { track ->
             val album = albums.find { it.albumId == track.albumId }
             track.copy(album = album, artist = track.artist ?: album?.artist)
-        }
-    }
+        }.sortedBy { it.title.lowercase() }
+    }.distinctUntilChanged()
 
     fun addOrUpdateTempAlbum(album: Album) {
         _tempAlbums.value += album.albumId to album

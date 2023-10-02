@@ -17,6 +17,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import us.huseli.thoucylinder.LoadStatus
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 
 @Composable
 fun AlbumArt(

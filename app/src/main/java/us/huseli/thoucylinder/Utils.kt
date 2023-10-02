@@ -209,3 +209,9 @@ fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString
 
 fun JSONObject.getIntOrNull(name: String): Int? =
     if (has(name)) getStringOrNull(name)?.takeWhile { it.isDigit() }?.takeIf { it.isNotEmpty() }?.toInt() else null
+
+
+fun List<String>.leadingChars(): List<Char> =
+    mapNotNull { string ->
+        string.replace(Regex("[^\\w&&[^0-9]]"), "#").getOrNull(0)?.uppercaseChar()
+    }.distinct().sorted()

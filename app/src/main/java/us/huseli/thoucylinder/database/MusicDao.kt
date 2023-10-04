@@ -2,6 +2,7 @@
 
 package us.huseli.thoucylinder.database
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -12,7 +13,10 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.Album
 import us.huseli.thoucylinder.dataclasses.AlbumGenre
+import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.AlbumStyle
+import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Genre
 import us.huseli.thoucylinder.dataclasses.Style
 import us.huseli.thoucylinder.dataclasses.Track
@@ -65,9 +69,9 @@ interface MusicDao {
     suspend fun deleteAlbums(vararg albums: Album)
 
     @Transaction
-    suspend fun deleteAlbumWithTracks(album: Album) {
-        deleteTracks(*album.tracks.toTypedArray())
-        deleteAlbums(album)
+    suspend fun deleteAlbumWithTracks(pojo: AlbumWithTracksPojo) {
+        deleteTracks(*pojo.tracks.toTypedArray())
+        deleteAlbums(pojo.album)
     }
 
     @Transaction
@@ -83,40 +87,80 @@ interface MusicDao {
         _insertTracks(track.copy(isInLibrary = true))
     }
 
-    @Query("SELECT * FROM AlbumGenre")
-    fun listAbumGenres(): Flow<List<AlbumGenre>>
+    @Query("SELECT * FROM Album WHERE albumId = :albumId")
+    @Transaction
+    fun flowAlbumWithSongs(albumId: UUID): Flow<AlbumWithTracksPojo?>
 
-    @Query("SELECT * FROM AlbumStyle")
-    fun listAlbumStyles(): Flow<List<AlbumStyle>>
+    @Query(
+        """
+        SELECT a.*, SUM(t.metadatadurationMs) AS durationMs, MIN(t.year) AS minYear, MAX(t.year) AS maxYear,
+            COUNT(t.id) AS trackCount
+        FROM Album a LEFT JOIN Track t ON a.albumId = t.albumId
+        GROUP BY a.albumId
+        ORDER BY LOWER(a.artist), LOWER(a.title)
+        """
+    )
+    @Transaction
+    fun flowAlbumPojos(): Flow<List<AlbumPojo>>
 
-    @Query("SELECT * FROM Album LEFT JOIN Track ON Album.albumId = Track.albumId")
-    fun listAlbumsWithTracks(): Flow<Map<Album, List<Track>>>
+    @Query(
+        """
+        SELECT
+            COALESCE(t.artist, a.artist) AS name,
+            COUNT(DISTINCT t.id) AS trackCount,
+            (SELECT COUNT(*) FROM Album a2 WHERE a2.artist = COALESCE(t.artist, a.artist)) AS albumCount,
+            a3.albumArtlocalFile AS firstAlbumArt,
+            COALESCE(SUM(t.metadatadurationMs), 0) AS totalDurationMs
+        FROM Track t
+            LEFT JOIN Album a ON t.albumId = a.albumId
+            LEFT JOIN Album a3 ON a3.albumId = t.albumId AND a3.albumArtlocalFile IS NOT NULL
+        WHERE name IS NOT NULL
+        GROUP BY name
+        ORDER BY LOWER(name)
+        """
+    )
+    fun flowArtistPojos(): Flow<List<ArtistPojo>>
+
+    @Query("SELECT * FROM Album")
+    suspend fun listAlbums(): List<Album>
 
     @Query("SELECT * FROM Track")
-    fun listTracks(): Flow<List<Track>>
+    suspend fun listTracks(): List<Track>
+
+    @Query("SELECT * FROM Track ORDER BY LOWER(title)")
+    fun pageTracks(): PagingSource<Int, Track>
+
+    @Query(
+        """
+        SELECT t.* FROM Track t LEFT JOIN Album a ON t.albumId = a.albumId
+        WHERE t.artist = :artist OR (t.artist IS NULL AND a.artist = :artist)
+        ORDER BY LOWER(t.title)
+        """
+    )
+    fun pageTracksByArtist(artist: String): PagingSource<Int, Track>
 
     @Transaction
-    suspend fun upsertAlbumWithTracks(album: Album) {
-        val genres = album.genres.map { Genre(genreId = it) }
-        val styles = album.styles.map { Style(styleId = it) }
+    suspend fun upsertAlbumWithTracks(pojo: AlbumWithTracksPojo) {
+        if (albumExists(pojo.album.albumId)) {
+            _updateAlbums(pojo.album.copy(isInLibrary = true))
+            _deleteTracksByAlbumId(pojo.album.albumId)
+            _clearAlbumGenres(pojo.album.albumId)
+            _clearAlbumStyles(pojo.album.albumId)
+        } else _insertAlbums(pojo.album.copy(isInLibrary = true))
 
-        if (albumExists(album.albumId)) {
-            _updateAlbums(album.copy(isInLibrary = true))
-            _deleteTracksByAlbumId(album.albumId)
-        } else _insertAlbums(album.copy(isInLibrary = true))
-
-        _clearAlbumGenres(album.albumId)
-        _clearAlbumStyles(album.albumId)
-
-        if (album.tracks.isNotEmpty())
-            _insertTracks(*album.tracks.map { it.copy(isInLibrary = true, albumId = album.albumId) }.toTypedArray())
-        if (genres.isNotEmpty()) {
-            _insertGenres(*genres.toTypedArray())
-            _insertAlbumGenres(*genres.map { AlbumGenre(albumId = album.albumId, genreId = it.genreId) }.toTypedArray())
+        if (pojo.tracks.isNotEmpty())
+            _insertTracks(*pojo.tracks.map { it.copy(isInLibrary = true, albumId = pojo.album.albumId) }.toTypedArray())
+        if (pojo.genres.isNotEmpty()) {
+            _insertGenres(*pojo.genres.toTypedArray())
+            _insertAlbumGenres(*pojo.genres.map {
+                AlbumGenre(albumId = pojo.album.albumId, genreId = it.genreId)
+            }.toTypedArray())
         }
-        if (styles.isNotEmpty()) {
-            _insertStyles(*styles.toTypedArray())
-            _insertAlbumStyles(*styles.map { AlbumStyle(albumId = album.albumId, styleId = it.styleId) }.toTypedArray())
+        if (pojo.styles.isNotEmpty()) {
+            _insertStyles(*pojo.styles.toTypedArray())
+            _insertAlbumStyles(*pojo.styles.map {
+                AlbumStyle(albumId = pojo.album.albumId, styleId = it.styleId)
+            }.toTypedArray())
         }
     }
 }

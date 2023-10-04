@@ -1,10 +1,15 @@
 package us.huseli.thoucylinder.viewmodels
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
+import us.huseli.thoucylinder.compose.DisplayType
+import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
@@ -17,8 +22,21 @@ class ArtistViewModel @Inject constructor(
     playerRepo: PlayerRepository,
     youtubeRepo: YoutubeRepository,
 ) : BaseViewModel(playerRepo, repo, youtubeRepo) {
+    private val _displayType = MutableStateFlow(DisplayType.LIST)
+    private val _listType = MutableStateFlow(ListType.ALBUMS)
+
     val artist: String = savedStateHandle.get<String>(NAV_ARG_ARTIST)!!
-    val tracks = repo.tracks
-        .map { tracks -> tracks.filter { it.artist == artist || (it.album?.artist == artist && it.artist == null) } }
-        .distinctUntilChanged()
+
+    val tracks = repo.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
+    val displayType = _displayType.asStateFlow()
+    val listType = _listType.asStateFlow()
+    val albumPojos = repo.albumPojos.map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
+
+    fun setDisplayType(value: DisplayType) {
+        _displayType.value = value
+    }
+
+    fun setListType(value: ListType) {
+        _listType.value = value
+    }
 }

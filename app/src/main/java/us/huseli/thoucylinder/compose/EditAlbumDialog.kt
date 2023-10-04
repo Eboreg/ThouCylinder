@@ -33,24 +33,24 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.viewmodels.AddAlbumViewModel
+import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 
 @Composable
 fun EditAlbumDialog(
-    initialAlbum: Album,
+    initialAlbumPojo: AlbumWithTracksPojo,
     modifier: Modifier = Modifier,
-    viewModel: AddAlbumViewModel = hiltViewModel(),
+    viewModel: EditAlbumViewModel = hiltViewModel(),
     onCancel: () -> Unit,
-    onSave: (Album) -> Unit,
+    onSave: (AlbumWithTracksPojo) -> Unit,
 ) {
-    val album by viewModel.album.collectAsStateWithLifecycle()
+    val pojo by viewModel.albumPojo.collectAsStateWithLifecycle()
     val imagePairs by viewModel.images.collectAsStateWithLifecycle()
     var step2 by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(initialAlbum) {
-        viewModel.setAlbum(initialAlbum)
+    LaunchedEffect(initialAlbumPojo) {
+        viewModel.setAlbum(initialAlbumPojo)
     }
 
     if (!step2) {
@@ -65,14 +65,19 @@ fun EditAlbumDialog(
             EditAlbumDialogStep2(
                 modifier = modifier,
                 imagePairs = imagePairs,
-                onSelect = {
-                    album?.copy(albumArt = it)?.let(onSave) ?: run(onCancel)
+                onSelect = { image ->
+                    pojo?.let {
+                        it.copy(
+                            album = it.album.copy(albumArt = image),
+                            tracks = it.tracks.map { track -> track.copy(image = image) },
+                        )
+                    }?.let(onSave) ?: run(onCancel)
                 },
                 onCancel = onCancel,
                 onPreviousClick = { step2 = false },
             )
         } else {
-            album?.let(onSave) ?: run(onCancel)
+            pojo?.let(onSave) ?: run(onCancel)
         }
     }
 }
@@ -81,13 +86,13 @@ fun EditAlbumDialog(
 @Composable
 fun EditAlbumDialogStep1(
     modifier: Modifier = Modifier,
-    viewModel: AddAlbumViewModel,
+    viewModel: EditAlbumViewModel,
     onNextClick: () -> Unit,
     onCancelClick: () -> Unit,
 ) {
     val context = LocalContext.current
 
-    val album by viewModel.album.collectAsStateWithLifecycle()
+    val pojo by viewModel.albumPojo.collectAsStateWithLifecycle()
     val initialTracks by viewModel.initialTracks.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val loadingSearchResults by viewModel.loadingSearchResults.collectAsStateWithLifecycle()
@@ -119,12 +124,12 @@ fun EditAlbumDialogStep1(
                     selectedItemId = selectedMasterId,
                     onSelect = { viewModel.selectMasterId(it.id, context) },
                     onExpandedChange = { expanded ->
-                        if (expanded) album?.let { viewModel.loadSearchResults(it) }
+                        if (expanded) pojo?.album?.let { viewModel.loadSearchResults(it) }
                     },
                 )
 
                 OutlinedTextField(
-                    value = album?.title ?: "",
+                    value = pojo?.album?.title ?: "",
                     onValueChange = { viewModel.setTitle(it) },
                     label = { OutlinedTextFieldLabel(text = stringResource(R.string.album_title)) },
                     singleLine = true,
@@ -132,7 +137,7 @@ fun EditAlbumDialogStep1(
                     enabled = !loading,
                 )
                 OutlinedTextField(
-                    value = album?.artist ?: "",
+                    value = pojo?.album?.artist ?: "",
                     onValueChange = { viewModel.setArtist(it) },
                     label = { OutlinedTextFieldLabel(text = stringResource(R.string.album_artist)) },
                     singleLine = true,
@@ -140,7 +145,7 @@ fun EditAlbumDialogStep1(
                     enabled = !loading,
                 )
 
-                album?.tracks?.forEachIndexed { index, track ->
+                pojo?.tracks?.forEachIndexed { index, track ->
                     EditAlbumTrackSection(
                         track = track,
                         enabled = !loading,

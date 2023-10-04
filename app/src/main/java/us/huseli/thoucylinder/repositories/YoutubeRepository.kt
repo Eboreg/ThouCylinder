@@ -56,36 +56,52 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
     val albumSearchResults = _albumSearchResults.asStateFlow()
     val trackSearchResults = _trackSearchResults.asStateFlow()
 
-    /**
-     * @throws TrackDownloadException if downloadTrack() fails
-     */
-    suspend fun downloadTracks(videos: List<YoutubeVideo>, progressCallback: (DownloadProgress) -> Unit): List<Track> {
-        val tracks = mutableListOf<Track>()
+    fun updateSearchResultTrack(track: Track) {
+        _trackSearchResults.value = _trackSearchResults.value.toMutableList().apply {
+            indexOfFirst { it.id == track.id }.takeIf { it > -1 }?.also { index ->
+                this[index] = track
+            }
+        }
+    }
+
+    suspend fun downloadTracks(tracks: List<Track>, progressCallback: (DownloadProgress) -> Unit): List<Track> {
+        val updatedTracks = mutableListOf<Track>()
 
         try {
-            videos.forEachIndexed { itemIdx, video ->
-                tracks.add(
-                    downloadTrack(video = video) {
-                        progressCallback(it.copy(progress = (itemIdx + it.progress) / videos.size))
+            // downloadVideo() also gets metadata if missing, but doesn't save it on the YoutubeVideo object, which
+            // ensureVideoMetadata() does:
+            ensureVideoMetadata(tracks).forEachIndexed { index, track ->
+                if (track.youtubeVideo != null) {
+                    val file = downloadVideo(video = track.youtubeVideo) {
+                        progressCallback(it.copy(progress = (index + it.progress) / tracks.size))
                     }
-                )
+                    updatedTracks.add(track.copy(tempTrackData = TempTrackData(localFile = file)))
+                } else updatedTracks.add(track)
             }
         } catch (e: CancellationException) {
-            tracks.mapNotNull { it.tempTrackData?.localFile }.forEach { it.delete() }
+            updatedTracks.mapNotNull { it.tempTrackData?.localFile }.forEach { it.delete() }
             throw e
         }
+        return updatedTracks
+    }
 
-        return tracks
+    /** Gets & sets youtubeVideo.metadata for those tracks that have youtubeVideo but not metadata. */
+    private suspend fun ensureVideoMetadata(tracks: List<Track>): List<Track> {
+        return tracks.map { track ->
+            if (track.youtubeVideo != null && track.youtubeVideo.metadata == null)
+                track.copy(youtubeVideo = track.youtubeVideo.copy(metadata = getBestMetadata(track.youtubeVideo.id)))
+            else track
+        }
     }
 
     /**
      * @throws TrackDownloadException if downloadVideo() fails
      */
-    suspend fun downloadTrack(video: YoutubeVideo, statusCallback: (DownloadProgress) -> Unit): Track =
+    suspend fun downloadTrack(video: YoutubeVideo, progressCallback: (DownloadProgress) -> Unit): Track =
         video.toTrack(
             isInLibrary = false,
             tempTrackData = TempTrackData(
-                localFile = downloadVideo(video = video, statusCallback = statusCallback),
+                localFile = downloadVideo(video = video, progressCallback = progressCallback),
             ),
         )
 
@@ -151,7 +167,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                                         title = title,
                                         id = playlistId,
                                     ),
-                                )
+                                ),
                             )
                         }
                     }
@@ -178,8 +194,8 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                                     youtubePlaylist = YoutubePlaylist(
                                         title = listTitle,
                                         id = playlistId,
-                                    )
-                                )
+                                    ),
+                                ),
                             )
                         }
                     } else if (section.containsKey("videoRenderer")) {
@@ -188,12 +204,16 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                             section.yquery<Collection<Map<*, *>>>("videoRenderer.title.runs")
                                 ?.firstOrNull()?.get("text") as? String
                         val length = section.yquery<String>("videoRenderer.lengthText.simpleText")
+                        val thumbnailSections =
+                            section.yquery<Collection<Map<*, *>>>("videoRenderer.thumbnail.thumbnails")
+                        val thumbnail = thumbnailSections?.let { getThumbnail(it) }
 
                         if (videoId != null && title != null) {
                             tracks.add(
                                 Track(
                                     title = title,
                                     isInLibrary = false,
+                                    image = thumbnail,
                                     youtubeVideo = YoutubeVideo(
                                         id = videoId,
                                         title = title,
@@ -228,10 +248,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
      * Used both for downloading individual tracks/videos and albums/playlists.
      * @throws TrackDownloadException if download fails or no stream URL could be found
      */
-    private suspend fun downloadVideo(
-        video: YoutubeVideo,
-        statusCallback: (DownloadProgress) -> Unit,
-    ): File {
+    private suspend fun downloadVideo(video: YoutubeVideo, progressCallback: (DownloadProgress) -> Unit): File {
         val metadata =
             getBestMetadata(video.id) ?: throw TrackDownloadException(TrackDownloadException.ErrorType.NO_METADATA)
         val tempFile = File(context.cacheDir, "${video.id}.${metadata.fileExtension}")
@@ -241,14 +258,14 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
             progress = 0.0,
         )
 
-        statusCallback(downloadProgress)
+        progressCallback(downloadProgress)
 
         try {
             reallyDownloadTrack(
                 url = metadata.url,
                 outputStream = tempFile.outputStream(),
                 progressCallback = {
-                    statusCallback(downloadProgress.copy(progress = it))
+                    progressCallback(downloadProgress.copy(progress = it))
                 },
             )
         } catch (e: Exception) {
@@ -341,14 +358,13 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
      * Extracts thumbnail URL from API response, works for both playlists and videos.
      * Does not fetch the actual image.
      */
-    @Suppress("UNCHECKED_CAST")
-    private fun getThumbnail(section: Any?): Image? {
+    private fun getThumbnail(thumbnailSections: Collection<Map<*, *>>): Image? {
         var best: Image? = null
 
-        ((section as? Map<*, *>)?.values?.toList() as? Collection<Map<*, *>>)?.forEach {
-            val tnUrl = it["url"] as? String
-            val tnWidth = it["width"] as? Double
-            val tnHeight = it["height"] as? Double
+        thumbnailSections.forEach { section ->
+            val tnUrl = section["url"] as? String
+            val tnWidth = section["width"] as? Double
+            val tnHeight = section["height"] as? Double
             if (tnUrl != null && tnWidth != null && tnHeight != null) {
                 val tn = Image(
                     url = tnUrl,
@@ -391,9 +407,11 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                     val snippet = item["snippet"] as? Map<*, *>
                     val title = snippet?.get("title") as? String
                     val videoCount = item.yquery<Double>("contentDetails.itemCount")
+                    val thumbnails = snippet?.get("thumbnails") as? Map<*, *>
+                    val thumbnailSections = thumbnails?.values as? Collection<Map<*, *>>
 
                     if (playlistId != null && title != null && videoCount != null && videoCount > 0) {
-                        val thumbnail = getThumbnail(snippet["thumbnails"])
+                        val thumbnail = thumbnailSections?.let { getThumbnail(it) }
 
                         albums.add(
                             Album(

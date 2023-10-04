@@ -60,16 +60,24 @@ fun DiscogsMasterDropdown(
                     onClick = {},
                     enabled = false,
                 )
-            } else items.forEach { item ->
+            } else if (items.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text(text = item.toString()) },
-                    onClick = {
-                        onSelect(item)
-                        isExpanded = false
-                        onExpandedChange?.invoke(false)
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                    text = { Text(text = stringResource(R.string.no_discogs_masters_found)) },
+                    onClick = {},
+                    enabled = false,
                 )
+            } else {
+                items.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(text = item.toString()) },
+                        onClick = {
+                            onSelect(item)
+                            isExpanded = false
+                            onExpandedChange?.invoke(false)
+                        },
+                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                    )
+                }
             }
         }
     }

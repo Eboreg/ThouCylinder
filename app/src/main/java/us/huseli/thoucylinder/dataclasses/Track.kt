@@ -11,7 +11,7 @@ import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
-import us.huseli.thoucylinder.getMediaStoreFile
+import us.huseli.thoucylinder.getMediaStoreFileNullable
 import java.io.File
 import java.util.UUID
 
@@ -25,7 +25,7 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("albumId")],
+    indices = [Index("albumId"), Index("title")],
 )
 data class Track(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
@@ -39,7 +39,6 @@ data class Track(
     @Embedded("youtubeVideo") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("image") val image: Image? = null,
     @Embedded("mediaStoreData") val mediaStoreData: MediaStoreData? = null,
-    @Ignore val album: Album? = null,
     @Ignore val tempTrackData: TempTrackData? = null,
 ) {
     constructor(
@@ -66,12 +65,8 @@ data class Track(
         youtubeVideo = youtubeVideo,
         image = image,
         mediaStoreData = mediaStoreData,
-        album = null,
         tempTrackData = null,
     )
-
-    val isDownloaded: Boolean
-        get() = mediaStoreData != null || tempTrackData != null
 
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
@@ -87,6 +82,9 @@ data class Track(
 
         return name.sanitizeFilename()
     }
+
+    val isDownloaded: Boolean
+        get() = mediaStoreData != null || tempTrackData != null
 
     fun getContentValues() = ContentValues().apply {
         put(MediaStore.Audio.Media.TITLE, title)
@@ -115,5 +113,5 @@ data class TempTrackData(
 data class MediaStoreData(
     val uri: Uri,
 ) {
-    fun getFile(context: Context): File = context.getMediaStoreFile(uri)
+    fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
 }

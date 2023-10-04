@@ -134,5 +134,11 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // For reading document tree:
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    // implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Paging:
+    // https://developer.android.com/topic/libraries/architecture/paging/v3-overview
+    implementation("androidx.paging:paging-common-ktx:3.3.0-alpha02")
+    implementation("androidx.paging:paging-compose-android:3.3.0-alpha02")
+    implementation("androidx.room:room-paging:2.5.2")
 }

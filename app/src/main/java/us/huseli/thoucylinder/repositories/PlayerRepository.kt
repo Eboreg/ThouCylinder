@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -71,6 +72,7 @@ class PlayerRepository @Inject constructor(@ApplicationContext private val conte
 
     fun playOrPause(track: Track) = scope.launch {
         track.playUri?.also { uri ->
+            Log.i("PlayerRepository", "playOrPause: uri=$uri")
             if (track == _currentTrack.value) {
                 if (_playbackState.value == PlaybackState.PLAYING) exoPlayer.pause()
                 else exoPlayer.play()

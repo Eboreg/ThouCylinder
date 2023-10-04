@@ -46,14 +46,14 @@ fun BottomBar(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f).padding(vertical = 10.dp).padding(start = 10.dp),
+                modifier = Modifier.weight(1f).padding(vertical = 5.dp).padding(start = 5.dp),
             ) {
                 AlbumArt(image = imageBitmap)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = currentTrack.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (currentTrack.artist != null) {
+                    currentTrack.artist?.also { artist ->
                         Text(
-                            text = currentTrack.artist,
+                            text = artist,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall,
@@ -61,22 +61,23 @@ fun BottomBar(
                     }
                 }
 
-                if (playbackState == PlayerRepository.PlaybackState.PLAYING) {
+                Row {
+                    if (playbackState == PlayerRepository.PlaybackState.PLAYING) {
+                        IconButton(
+                            onClick = onPlayOrPauseClick,
+                            content = { Icon(Icons.Sharp.Pause, stringResource(R.string.pause)) },
+                        )
+                    } else {
+                        IconButton(
+                            onClick = onPlayOrPauseClick,
+                            content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
+                        )
+                    }
                     IconButton(
-                        onClick = onPlayOrPauseClick,
-                        content = { Icon(Icons.Sharp.Pause, stringResource(R.string.pause)) },
-                    )
-                } else {
-                    IconButton(
-                        onClick = onPlayOrPauseClick,
-                        content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
+                        onClick = onNextClick,
+                        content = { Icon(Icons.Sharp.SkipNext, stringResource(R.string.next)) },
                     )
                 }
-
-                IconButton(
-                    onClick = onNextClick,
-                    content = { Icon(Icons.Sharp.SkipNext, stringResource(R.string.next)) },
-                )
             }
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),

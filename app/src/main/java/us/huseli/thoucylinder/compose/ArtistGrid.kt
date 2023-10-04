@@ -15,38 +15,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemGrid
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.toBitmap
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable
 fun ArtistGrid(
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
-    artistTrackMap: Map<String, List<Track>>,
+    artists: List<ArtistPojo>,
     images: Map<String, Image?>,
-    albums: List<Album>,
     onArtistClick: (String) -> Unit,
 ) {
     ItemGrid(
-        things = artistTrackMap.toList(),
+        things = artists,
         modifier = modifier,
-        onCardClick = { onArtistClick(it.first) },
-    ) { (artist, tracks) ->
-        val trackCount = tracks.size
+        onCardClick = { onArtistClick(it.name) },
+    ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            images[artist]?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
-            if (imageBitmap.value == null) imageBitmap.value = albums
-                .filter { it.artist == artist }
-                .firstNotNullOfOrNull { it.albumArt?.getImageBitmap() }
+            images[artist.name.lowercase()]?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+            if (imageBitmap.value == null) imageBitmap.value = artist.firstAlbumArt?.toBitmap()?.asImageBitmap()
         }
 
         Box(modifier = Modifier.aspectRatio(1f)) {
@@ -54,10 +51,10 @@ fun ArtistGrid(
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.padding(5.dp).weight(1f)) {
-                Text(text = artist, maxLines = 2)
+                Text(text = artist.name, maxLines = 2)
                 Text(
                     style = MaterialTheme.typography.bodySmall,
-                    text = pluralStringResource(R.plurals.x_tracks, trackCount, trackCount),
+                    text = pluralStringResource(R.plurals.x_tracks, artist.trackCount, artist.trackCount),
                 )
             }
         }

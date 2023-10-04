@@ -13,14 +13,13 @@ import android.util.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.core.database.getIntOrNull
 import androidx.core.database.getStringOrNull
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import com.arthenica.ffmpegkit.FFmpegKit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.ExtractTrackDataException
@@ -29,6 +28,8 @@ import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.database.MusicDao
 import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.MediaStoreData
@@ -36,10 +37,11 @@ import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
-import us.huseli.thoucylinder.deleteExistingMediaFile
+import us.huseli.thoucylinder.dataclasses.getMediaStoreEntries
+import us.huseli.thoucylinder.deleteMediaStoreUriAndFile
 import us.huseli.thoucylinder.escapeQuotes
 import us.huseli.thoucylinder.getMediaStoreFile
-import us.huseli.thoucylinder.getReadOnlyAudioCollection
+import us.huseli.thoucylinder.getMediaStoreFileNullable
 import us.huseli.thoucylinder.getReadOnlyImageCollection
 import us.huseli.thoucylinder.getReadWriteAudioCollection
 import us.huseli.thoucylinder.getReadWriteImageCollection
@@ -52,25 +54,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 
-data class MediaStoreEntry(val uri: Uri, val file: File, val track: Track)
-
 data class ImportedImage(
     val bitmap: Bitmap,
-    val file: File? = null,
-    val relativePath: String? = null,
-    val width: Int = bitmap.width,
-    val height: Int = bitmap.height,
+    val file: File,
+    val relativePath: String,
 ) {
-    val size: Int
-        get() = width * height
-
-    /**
-     * True if `paths` contains this.relativePath or at least one descendant of it.
-     */
-    fun matchesPaths(paths: Collection<String>): Boolean {
-        if (relativePath == null) return false
-        return paths.any { it.startsWith(relativePath) }
-    }
+    /** True if `paths` contains this.relativePath or at least one descendant of it. */
+    fun matchesPaths(paths: Collection<String>): Boolean = paths.any { it.startsWith(relativePath) }
 }
 
 @Singleton
@@ -78,38 +68,24 @@ class LocalRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicDao: MusicDao,
 ) {
+    data class TrackMediaStoreEntry(val uri: Uri, val file: File, val track: Track)
+
     private val _albumArtAbsoluteDir = File(
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
         "ThouCylinder/albumArt",
     )
     private val _albumArtRelativePath = "${Environment.DIRECTORY_PICTURES}/ThouCylinder/albumArt"
-    private val _tempAlbums = MutableStateFlow<Map<UUID, Album>>(emptyMap())
+    private val _tempAlbumPojos = MutableStateFlow<Map<UUID, AlbumWithTracksPojo>>(emptyMap())
     private val _imageCache = mutableMapOf<Image, ImageBitmap?>()
     private val _imageCacheMutex = Mutex()
 
-    val libraryAlbums: Flow<List<Album>> = combine(
-        musicDao.listAlbumsWithTracks(),
-        musicDao.listAbumGenres(),
-        musicDao.listAlbumStyles()
-    ) { multimap, albumGenres, albumStyles ->
-        multimap.map { (album, tracks) ->
-            album.copy(
-                tracks = tracks,
-                genres = albumGenres.filter { it.albumId == album.albumId }.map { it.genreId },
-                styles = albumStyles.filter { it.albumId == album.albumId }.map { it.styleId },
-            )
-        }.sortedBy { album -> (album.artist?.let { it + album.title } ?: album.title).lowercase() }
-    }.distinctUntilChanged()
-    val tempAlbums = _tempAlbums.asStateFlow()
-    val tracks: Flow<List<Track>> = combine(musicDao.listTracks(), libraryAlbums) { tracks, albums ->
-        tracks.map { track ->
-            val album = albums.find { it.albumId == track.albumId }
-            track.copy(album = album, artist = track.artist ?: album?.artist)
-        }.sortedBy { it.title.lowercase() }
-    }.distinctUntilChanged()
+    val albumPojos: Flow<List<AlbumPojo>> = musicDao.flowAlbumPojos()
+    val artistPojos = musicDao.flowArtistPojos()
+    val tempAlbumPojos = _tempAlbumPojos.asStateFlow()
+    val trackPager = Pager(config = PagingConfig(pageSize = 100)) { musicDao.pageTracks() }
 
-    fun addOrUpdateTempAlbum(album: Album) {
-        _tempAlbums.value += album.albumId to album
+    fun addOrUpdateTempAlbum(pojo: AlbumWithTracksPojo) {
+        _tempAlbumPojos.value += pojo.album.albumId to pojo
     }
 
     fun collectArtistImages(): Map<String, Image> {
@@ -117,40 +93,72 @@ class LocalRepository @Inject constructor(
         val selectionArgs = arrayOf("artist.%")
 
         return collectImages(selection, selectionArgs).associate { image ->
-            image.relativePath!!.trim('/').split('/').last() to
-                Image(localFile = image.file!!, width = image.width, height = image.height)
+            image.relativePath.trim('/').split('/').last().lowercase() to
+                Image(localFile = image.file, width = image.bitmap.width, height = image.bitmap.height)
         }
     }
 
-    suspend fun deleteAlbumWithTracks(album: Album) = musicDao.deleteAlbumWithTracks(album)
+    suspend fun deleteAlbumWithTracks(album: AlbumWithTracksPojo) = musicDao.deleteAlbumWithTracks(album)
 
     suspend fun deleteAll() = musicDao.deleteAll()
 
-    suspend fun deleteOrphanTracksAndAlbums() {
-        tracks.transformWhile { tracks ->
-            emit(tracks.filter { !it.isOnYoutube })
-            false
-        }.collect { tracks ->
-            // Collect tracks that have no Youtube connection and no existing media files:
-            val orphanTracks = tracks.filterNot { track ->
-                track.mediaStoreData?.uri?.let { uri ->
-                    try {
-                        context.contentResolver.openInputStream(uri)?.close()
-                        true
-                    } catch (_: FileNotFoundException) {
-                        false
-                    }
-                } ?: false
-            }
-            // And albums that _only_ have orphan tracks in them:
-            val orphanAlbums = orphanTracks
-                .mapNotNull { it.album }
-                .toSet()
-                .filter { album -> orphanTracks.map { it.id }.containsAll(album.tracks.map { it.id }) }
-            musicDao.deleteTracks(*orphanTracks.toTypedArray())
-            musicDao.deleteAlbums(*orphanAlbums.toTypedArray())
+    suspend fun deleteOrphanTracksAndAlbums(allTracks: List<Track>) {
+        val albums = musicDao.listAlbums()
+        val albumMultimap = albums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
+
+        // Collect tracks that have no Youtube connection and no existing media files:
+        val orphanTracks = allTracks.filterNot { track ->
+            track.mediaStoreData?.uri?.let { uri ->
+                try {
+                    context.contentResolver.openInputStream(uri)?.close()
+                    true
+                } catch (_: FileNotFoundException) {
+                    false
+                }
+            } ?: false
         }
+
+        // And albums that _only_ have orphan tracks in them:
+        val orphanAlbums = albumMultimap
+            .filter { (_, tracks) -> orphanTracks.map { it.id }.containsAll(tracks.map { it.id }) }
+            .map { it.key }
+
+        musicDao.deleteTracks(*orphanTracks.toTypedArray())
+        musicDao.deleteAlbums(*orphanAlbums.toTypedArray())
     }
+
+    fun getAlbumArtFromAlbumFolder(pojo: AlbumWithTracksPojo): List<ImportedImage> {
+        val projection = arrayOf(MediaStore.Audio.Media.RELATIVE_PATH)
+        val mediaStoreUris = pojo.tracks.mapNotNull { it.mediaStoreData?.uri }
+        val tempDirs = pojo.tracks.mapNotNull { track ->
+            track.tempTrackData?.localFile?.parent?.let { dirname -> File(dirname).takeIf { it.isDirectory } }
+        }
+        val mediaStoreSubdirs = mutableSetOf<String>()
+        val images = mutableListOf<ImportedImage>()
+
+        mediaStoreUris.forEach { uri ->
+            context.contentResolver.query(uri, projection, null, null)?.use { cursor ->
+                val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
+                if (cursor.moveToNext())
+                    cursor.getStringOrNull(relativePathIdx)?.also { mediaStoreSubdirs.add(it) }
+            }
+        }
+        if (mediaStoreSubdirs.isNotEmpty()) {
+            images.addAll(collectAlbumArt(mediaStoreSubdirs))
+        }
+        tempDirs.forEach { dir ->
+            val files = dir.listFiles { file, name -> file.isFile && name.startsWith("cover.") }
+            files?.forEach { file ->
+                file.toBitmap()?.also { bitmap ->
+                    images.add(ImportedImage(bitmap = bitmap, file = file, relativePath = ""))
+                }
+            }
+        }
+
+        return images
+    }
+
+    fun getAlbumWithSongs(albumId: UUID) = musicDao.flowAlbumWithSongs(albumId)
 
     suspend fun getImageBitmap(image: Image): ImageBitmap? {
         return _imageCacheMutex.withLock {
@@ -161,8 +169,9 @@ class LocalRepository @Inject constructor(
         }
     }
 
-    suspend fun importNewMediaStoreAlbums() {
-        val audioCollection = getReadOnlyAudioCollection()
+    suspend fun importNewMediaStoreAlbums(existingTracks: List<Track>) {
+        // val audioCollection = getReadOnlyAudioCollection()
+        val audioCollection = getReadWriteAudioCollection()
         val projection = arrayOf(
             MediaStore.Audio.Media.RELATIVE_PATH,
             MediaStore.Audio.Media.MIME_TYPE,
@@ -177,155 +186,167 @@ class LocalRepository @Inject constructor(
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media._ID,
         )
+        val mediaStoreUris = existingTracks.mapNotNull { it.mediaStoreData?.uri }
+        val albums = mutableListOf<Album>()
+        val tracks = mutableListOf<Pair<String, Track>>()
 
-        tracks.transformWhile { tracks ->
-            emit(tracks)
-            false
-        }.collect { existingTracks ->
-            val mediaStoreUris = existingTracks.mapNotNull { it.mediaStoreData?.uri }
-            val albums = mutableListOf<Album>()
-            val tracks = mutableListOf<Pair<String, Track>>()
+        context.contentResolver.query(audioCollection, projection, null, null)?.use { cursor ->
+            val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            val mimeTypeIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
+            val durationIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+            val titleIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+            val trackIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
+            val artistIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+            val albumIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+            val albumArtistIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ARTIST)
+            val yearIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
+            val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
+            val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
 
-            context.contentResolver.query(audioCollection, projection, null, null)?.use { cursor ->
-                val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                val mimeTypeIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
-                val durationIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                val titleIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                val trackIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
-                val artistIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                val albumIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-                val albumArtistIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ARTIST)
-                val yearIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
-                val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
-                val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-
-                while (cursor.moveToNext()) {
-                    cursor.getStringOrNull(dataIdx)?.let { filename ->
-                        val file = File(filename)
-                        val mimeType = cursor.getStringOrNull(mimeTypeIdx)
-                        val relativePath = cursor.getStringOrNull(relativePathIdx)
-                        val contentUri = ContentUris.withAppendedId(
-                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            while (cursor.moveToNext()) {
+                cursor.getStringOrNull(dataIdx)?.let { filename ->
+                    val file = File(filename)
+                    val mimeType = cursor.getStringOrNull(mimeTypeIdx)
+                    val mediaStoreSubdir = cursor.getStringOrNull(relativePathIdx)
+                    val id3 = file.extractID3Data()
+                    val contentUri = ContentUris.withAppendedId(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        cursor.getLong(idIdx),
+                    )
+                    val contentUriAlt =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContentUris.withAppendedId(
+                            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
                             cursor.getLong(idIdx),
                         )
-                        val id3 = file.extractID3Data()
+                        else null
 
-                        if (
-                            mimeType != null &&
-                            relativePath != null &&
-                            mimeType.startsWith("audio/") &&
-                            file.isFile &&
-                            !mediaStoreUris.contains(contentUri)
-                        ) {
-                            val lastPathSegments = relativePath
-                                .replace(Regex("^${Environment.DIRECTORY_MUSIC}/(.*?)/?$"), "$1")
-                                .trim('/').split("/").last().split(" - ", limit = 2)
-                            val pathArtist = lastPathSegments.takeIf { it.size > 1 }?.get(0)
-                            val pathTitle = lastPathSegments.last().takeIf { it.isNotBlank() }
-                            val trackArtist =
-                                cursor.getStringOrNull(artistIdx)?.takeIf { it != "<unknown>" } ?: id3.artist
-                            val albumArtist =
-                                cursor.getStringOrNull(albumArtistIdx)?.takeIf { it != "<unknown>" } ?: id3.albumArtist
-                            val albumTitle = cursor.getStringOrNull(albumIdx) ?: id3.album ?: pathTitle
-                            val finalAlbumArtist = albumArtist ?: pathArtist ?: trackArtist
-                            val finalAlbumTitle = albumTitle ?: "Unknown album"
+                    if (
+                        mimeType != null &&
+                        mediaStoreSubdir != null &&
+                        mimeType.startsWith("audio/") &&
+                        file.isFile &&
+                        !mediaStoreUris.contains(contentUri) &&
+                        (contentUriAlt == null || !mediaStoreUris.contains(contentUriAlt))
+                    ) {
+                        val lastPathSegments = mediaStoreSubdir
+                            .replace(Regex("^${Environment.DIRECTORY_MUSIC}/(.*?)/?$"), "$1")
+                            .trim('/').split("/").last().split(" - ", limit = 2)
+                        val pathArtist = lastPathSegments.takeIf { it.size > 1 }?.get(0)
+                        val pathTitle = lastPathSegments.last().takeIf { it.isNotBlank() }
+                        val trackArtist =
+                            cursor.getStringOrNull(artistIdx)?.takeIf { it != "<unknown>" } ?: id3.artist
+                        val albumArtist =
+                            cursor.getStringOrNull(albumArtistIdx)?.takeIf { it != "<unknown>" } ?: id3.albumArtist
+                        val albumTitle = cursor.getStringOrNull(albumIdx) ?: id3.album ?: pathTitle
+                        val finalAlbumArtist = albumArtist ?: pathArtist ?: trackArtist
+                        val finalAlbumTitle = albumTitle ?: "Unknown album"
 
-                            val album =
-                                albums.find { it.artist == finalAlbumArtist && it.title == finalAlbumTitle } ?: Album(
-                                    title = finalAlbumTitle,
-                                    artist = finalAlbumArtist,
+                        val album =
+                            albums.find { it.artist == finalAlbumArtist && it.title == finalAlbumTitle } ?: Album(
+                                title = finalAlbumTitle,
+                                artist = finalAlbumArtist,
+                                isInLibrary = false,
+                                isLocal = true,
+                            ).also { albums.add(it) }
+
+                        tracks.add(
+                            Pair(
+                                mediaStoreSubdir,
+                                Track(
+                                    title = cursor.getStringOrNull(titleIdx) ?: id3.title ?: "Unknown title",
                                     isInLibrary = false,
-                                    isLocal = true,
-                                ).also { albums.add(it) }
-
-                            tracks.add(
-                                Pair(
-                                    relativePath,
-                                    Track(
-                                        title = cursor.getStringOrNull(titleIdx) ?: id3.title ?: "Unknown title",
-                                        isInLibrary = false,
-                                        artist = trackArtist ?: finalAlbumArtist,
-                                        albumPosition = cursor.getIntOrNull(trackIdx) ?: id3.trackNumber,
-                                        year = cursor.getIntOrNull(yearIdx) ?: id3.year,
-                                        albumId = album.albumId,
-                                        metadata = file.extractTrackMetadata().copy(
-                                            durationMs = cursor.getIntOrNull(durationIdx)?.toLong() ?: 0L,
-                                            extension = filename.split(".").last(),
-                                            mimeType = mimeType,
-                                            size = file.length(),
-                                        ),
-                                        mediaStoreData = MediaStoreData(uri = contentUri),
-                                    )
+                                    artist = trackArtist ?: finalAlbumArtist,
+                                    albumPosition = cursor.getIntOrNull(trackIdx) ?: id3.trackNumber,
+                                    year = cursor.getIntOrNull(yearIdx) ?: id3.year,
+                                    albumId = album.albumId,
+                                    metadata = file.extractTrackMetadata().copy(
+                                        durationMs = cursor.getIntOrNull(durationIdx)?.toLong() ?: 0L,
+                                        extension = filename.split(".").last(),
+                                        mimeType = mimeType,
+                                        size = file.length(),
+                                    ),
+                                    mediaStoreData = MediaStoreData(uri = contentUri),
                                 )
                             )
-                        }
+                        )
                     }
                 }
             }
+        }
 
-            val relativePaths = tracks.map { it.first }.toSet()
-            val images = collectAlbumArt(relativePaths)
+        val mediaStoreSubdirs = tracks.map { it.first }.toSet()
+        val images = collectAlbumArt(mediaStoreSubdirs)
 
-            albums.forEach { album ->
-                val (albumRelativePaths, albumTracks) = tracks
-                    .filter { it.second.albumId == album.albumId }
-                    .sortedBy { it.second.albumPosition }
-                    .unzip()
-                val albumImages = images
-                    .filter { it.matchesPaths(albumRelativePaths) }
-                    .toMutableList()
-                val thumbnail = albumTracks.firstNotNullOfOrNull { track ->
-                    track.mediaStoreData?.uri?.let { uri ->
-                        context.contentResolver.loadThumbnailOrNull(uri, Size(1000, 1000), null)
-                    }
+        albums.forEach { album ->
+            val (albumRelativePaths, albumTracks) = tracks
+                .filter { it.second.albumId == album.albumId }
+                .sortedBy { it.second.albumPosition }
+                .unzip()
+            val albumImages = images
+                .filter { it.matchesPaths(albumRelativePaths) }
+                .map { it.bitmap }
+                .toMutableList()
+            val thumbnail = albumTracks.firstNotNullOfOrNull { track ->
+                track.mediaStoreData?.uri?.let { uri ->
+                    context.contentResolver.loadThumbnailOrNull(uri, Size(1000, 1000), null)
                 }
-                if (thumbnail != null) albumImages.add(ImportedImage(bitmap = thumbnail))
-                val albumArt = albumImages.maxByOrNull { it.size }?.let {
-                    Image(
-                        localFile = saveAlbumArtToDisk(it.bitmap, album),
-                        width = it.width,
-                        height = it.height,
-                    )
-                }
-
-                saveAlbum(
-                    album.copy(
-                        tracks = albumTracks.map { it.copy(image = albumArt) },
-                        albumArt = albumArt,
-                    )
+            }
+            if (thumbnail != null) albumImages.add(thumbnail)
+            val albumArt = albumImages.maxByOrNull { it.width * it.height }?.let {
+                Image(
+                    localFile = saveAlbumArtToDisk(it, album),
+                    width = it.width,
+                    height = it.height,
                 )
             }
+
+            saveAlbum(
+                AlbumWithTracksPojo(
+                    album = album.copy(albumArt = albumArt),
+                    tracks = albumTracks.map { it.copy(image = albumArt) },
+                )
+            )
         }
     }
 
     suspend fun insertTrack(track: Track) = musicDao.insertTrack(track = track)
 
+    suspend fun listTracks(): List<Track> = musicDao.listTracks()
+
     /**
      * album.tracks should have tempTrackData set (done by e.g. YoutubeVideo.toTempTrack()), or exception is thrown.
      */
-    fun moveTaggedAlbumToMediaStore(album: Album, progressCallback: (DownloadProgress) -> Unit): Album {
-        val tracks = album.tracks.mapIndexed { index, track ->
+    fun moveTaggedAlbumToMediaStore(
+        pojo: AlbumWithTracksPojo,
+        progressCallback: (DownloadProgress) -> Unit,
+    ): AlbumWithTracksPojo {
+        val tracks = pojo.tracks.mapIndexed { index, track ->
             val entry = moveTrackToMediaStore(
                 track = track,
-                subdir = album.getMediaStoreSubdir(),
+                subdir = pojo.album.getMediaStoreSubdir(),
                 progressCallback = {
-                    progressCallback(it.copy(progress = (index + it.progress) / album.tracks.size))
+                    progressCallback(it.copy(progress = (index + it.progress) / pojo.tracks.size))
                 },
             )
             val metadata = entry.file.extractTrackMetadata()
 
-            context.contentResolver.update(entry.uri, getTrackContentValues(entry.track, metadata, album), null, null)
-            tagTrack(track = entry.track, localFile = entry.file, album = album)
+            context.contentResolver.update(
+                entry.uri,
+                getTrackContentValues(entry.track, metadata, pojo.album),
+                null,
+                null,
+            )
+            tagTrack(track = entry.track, localFile = entry.file, album = pojo.album)
             track.copy(
                 metadata = metadata,
                 mediaStoreData = MediaStoreData(uri = entry.uri),
                 isInLibrary = true,
                 tempTrackData = null,
-                albumId = album.albumId,
+                albumId = pojo.album.albumId,
             )
         }
 
-        return album.copy(tracks = tracks, isLocal = true)
+        return pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true))
     }
 
     fun moveTaggedTrackToMediaStore(track: Track, progressCallback: (DownloadProgress) -> Unit): Track {
@@ -343,25 +364,36 @@ class LocalRepository @Inject constructor(
         )
     }
 
-    suspend fun saveAlbum(album: Album) = musicDao.upsertAlbumWithTracks(album)
+    fun pageTracksByArtist(artist: String): Pager<Int, Track> =
+        Pager(config = PagingConfig(pageSize = 100)) { musicDao.pageTracksByArtist(artist) }
 
-    suspend fun tagAndUpdateAlbumWithTracks(album: Album) {
-        saveAlbum(album)
-        album.tracks.forEach { track ->
+    suspend fun saveAlbum(pojo: AlbumWithTracksPojo) = musicDao.upsertAlbumWithTracks(pojo)
+
+    suspend fun tagAndUpdateAlbumWithTracks(pojo: AlbumWithTracksPojo) {
+        saveAlbum(pojo)
+        pojo.tracks.forEach { track ->
             val trackFile = getFileFromTrack(track)
 
-            if (trackFile != null && track.metadata != null) {
-                tagTrack(track = track, localFile = trackFile, album = album)
+            if (trackFile != null) {
+                if (!trackFile.canWrite())
+                    Log.e(this::class.simpleName, "tagAndUpdateAlbumWithTracks: Cannot write to $trackFile")
+                else
+                    tagTrack(track = track, localFile = trackFile, album = pojo.album)
             }
             track.mediaStoreData?.uri?.also { uri ->
-                val contentValues = getTrackContentValues(track, track.metadata, album)
-                context.contentResolver.update(uri, contentValues, null, null)
+                val contentValues = getTrackContentValues(track, track.metadata, pojo.album)
+                try {
+                    context.contentResolver.update(uri, contentValues, null, null)
+                } catch (_: SecurityException) {
+                    Log.e(this::class.simpleName, "tagAndUpdateAlbumWithTracks: Cannot update media store for $uri")
+                }
             }
         }
     }
 
     /** PRIVATE METHODS ******************************************************/
 
+    /** Collect any cover.* images from an album directory in the media store. */
     private fun collectAlbumArt(mediaStoreSubdirs: Collection<String>): List<ImportedImage> {
         val relativePathSet = mediaStoreSubdirs.map { "$it%" }.toSet()
         val pathSelectors = relativePathSet.map { "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?" }
@@ -373,40 +405,16 @@ class LocalRepository @Inject constructor(
         return collectImages(selection, selectionArgs)
     }
 
-    private fun collectImages(selection: String, selectionArgs: Array<String>): List<ImportedImage> {
-        val imageCollection = getReadOnlyImageCollection()
-        val projection = arrayOf(
-            MediaStore.Images.Media.RELATIVE_PATH,
-            MediaStore.Images.Media.DATA,
-            MediaStore.Images.Media.DISPLAY_NAME,
-        )
-        val images = mutableListOf<ImportedImage>()
-
-        try {
-            context.contentResolver.query(imageCollection, projection, selection, selectionArgs, null)?.use { cursor ->
-                val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
-                val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-
-                while (cursor.moveToNext()) {
-                    cursor.getStringOrNull(dataIdx)?.let { filename ->
-                        val file = File(filename)
-                        val relativePath = cursor.getStringOrNull(relativePathIdx)
-                        val bitmap = file.toBitmap()
-
-                        if (relativePath != null && bitmap != null) {
-                            images.add(ImportedImage(file = file, relativePath = relativePath, bitmap = bitmap))
-                        }
-                    }
-                }
+    private fun collectImages(selection: String, selectionArgs: Array<String>): List<ImportedImage> =
+        context.getMediaStoreEntries(
+            queryUri = getReadOnlyImageCollection(),
+            selection = selection,
+            selectionArgs = selectionArgs,
+        ).mapNotNull { entry ->
+            entry.file.toBitmap()?.let { bitmap ->
+                ImportedImage(file = entry.file, relativePath = entry.relativePath, bitmap = bitmap)
             }
-        } catch (e: Exception) {
-            Log.e("LocalRepository", "collectImages: $e", e)
         }
-        return images
-    }
-
-    private fun deleteExistingMediaFile(filename: String, mediaStorePath: String?) =
-        context.deleteExistingMediaFile(filename, mediaStorePath)
 
     private fun getTrackContentValues(track: Track, metadata: TrackMetadata? = null, album: Album? = null) =
         ContentValues().apply {
@@ -424,7 +432,7 @@ class LocalRepository @Inject constructor(
      */
     private fun moveMusicFileToMediaStore(localFile: File, filename: String, subdir: String = ""): Uri {
         // If file already exists, just delete it first.
-        deleteExistingMediaFile(filename, subdir)
+        context.deleteMediaStoreUriAndFile(filename, subdir)
 
         val relativePath = "${Environment.DIRECTORY_MUSIC}/$subdir"
         val contentValues = ContentValues().apply {
@@ -440,16 +448,24 @@ class LocalRepository @Inject constructor(
         }
 
         if (trackUri != null) {
-            context.contentResolver.openOutputStream(trackUri, "w")?.use { outputStream ->
-                localFile.inputStream().use { inputStream ->
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                        inputStream.transferTo(outputStream)
-                    else outputStream.write(inputStream.readBytes())
+            try {
+                context.contentResolver.openOutputStream(trackUri, "w")?.use { outputStream ->
+                    localFile.inputStream().use { inputStream ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                            inputStream.transferTo(outputStream)
+                        else outputStream.write(inputStream.readBytes())
+                    }
                 }
+                contentValues.clear()
+                contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                context.contentResolver.update(trackUri, contentValues, null, null)
+            } catch (e: Exception) {
+                // Roll back:
+                context.contentResolver.delete(trackUri, null, null)
+                localFile.delete()
+                context.getMediaStoreFileNullable(trackUri)?.delete()
+                throw e
             }
-            contentValues.clear()
-            contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
-            context.contentResolver.update(trackUri, contentValues, null, null)
         } else throw MediaStoreException()
 
         localFile.delete()
@@ -460,7 +476,7 @@ class LocalRepository @Inject constructor(
         track: Track,
         subdir: String = "",
         progressCallback: (DownloadProgress) -> Unit,
-    ): MediaStoreEntry {
+    ): TrackMediaStoreEntry {
         val getFilename = { extension: String -> "${track.generateBasename()}.$extension" }
         val progress = DownloadProgress(status = DownloadProgress.Status.MOVING, progress = 0.0, item = track.title)
         val localFile = getFileFromTrack(track)
@@ -475,7 +491,7 @@ class LocalRepository @Inject constructor(
                 filename = getFilename(localFile.extension),
             )
             progressCallback(progress.copy(progress = 1.0))
-            MediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
+            TrackMediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
         } catch (e: MediaStoreFormatException) {
             progressCallback(progress.copy(status = DownloadProgress.Status.CONVERTING))
 
@@ -483,8 +499,10 @@ class LocalRepository @Inject constructor(
             val session = FFmpegKit.execute("-i ${localFile.path} -vn ${convertedFile.path}")
 
             localFile.delete()
-            if (!session.returnCode.isValueSuccess)
+            if (!session.returnCode.isValueSuccess) {
+                convertedFile.delete()
                 throw TrackDownloadException(TrackDownloadException.ErrorType.FFMPEG_CONVERT)
+            }
             progressCallback(progress.copy(progress = 0.5))
             val uri = moveMusicFileToMediaStore(
                 localFile = convertedFile,
@@ -492,7 +510,7 @@ class LocalRepository @Inject constructor(
                 filename = getFilename("opus"),
             )
             progressCallback(progress.copy(progress = 1.0))
-            MediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
+            TrackMediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
         } catch (e: MediaStoreException) {
             throw TrackDownloadException(TrackDownloadException.ErrorType.MEDIA_STORE, cause = e)
         } catch (e: ExtractTrackDataException) {

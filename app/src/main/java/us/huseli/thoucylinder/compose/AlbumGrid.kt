@@ -17,21 +17,21 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import us.huseli.thoucylinder.compose.utils.ItemGrid
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
 
 @Composable
 fun AlbumGrid(
-    albums: List<Album>,
+    albums: List<AlbumPojo>,
     viewModel: BaseViewModel,
     modifier: Modifier = Modifier,
-    onAlbumClick: (Album) -> Unit,
+    onAlbumClick: (AlbumPojo) -> Unit,
 ) {
-    ItemGrid(things = albums, modifier = modifier, onCardClick = onAlbumClick) { album ->
+    ItemGrid(things = albums, modifier = modifier, onCardClick = onAlbumClick) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+            pojo.album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
         }
 
         Box(modifier = Modifier.aspectRatio(1f)) {
@@ -44,14 +44,14 @@ fun AlbumGrid(
                 )
             } ?: kotlin.run {
                 Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    album.artist?.let {
+                    pojo.album.artist?.let {
                         Text(
                             text = it,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    Text(text = album.title, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(text = pojo.album.title, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
             }
         }

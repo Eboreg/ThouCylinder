@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder
 
 import android.content.ContentResolver
-import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -13,6 +12,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.MediaStore.MediaColumns
 import android.util.Log
 import android.util.Size
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -25,6 +25,7 @@ import us.huseli.retaintheme.ui.theme.RetainColorLight
 import us.huseli.retaintheme.ui.theme.RetainColorScheme
 import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
 import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
+import us.huseli.thoucylinder.dataclasses.getMediaStoreEntry
 import java.io.File
 import java.io.FileNotFoundException
 import java.net.URL
@@ -130,29 +131,41 @@ fun getReadWriteImageCollection(): Uri =
     else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
 
-fun Context.deleteExistingMediaFile(filename: String, mediaStorePath: String?) {
-    val localMusicDir: File =
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC).apply { mkdirs() }
+fun File.deleteWithEmptyParentDirs(parentDirNames: List<String>) {
+    if (isFile && canWrite()) {
+        delete()
+        var parentDir = parentFile
+
+        for (dirName in parentDirNames) {
+            if (
+                parentDir?.isDirectory == true &&
+                parentDir.name == dirName &&
+                parentDir.list()?.isEmpty() == true &&
+                parentDir.canWrite()
+            ) {
+                parentDir.delete()
+                parentDir = parentDir.parentFile
+            } else break
+        }
+    }
+}
+
+
+fun Context.deleteMediaStoreUriAndFile(filename: String, mediaStorePath: String?) {
     val audioCollection = getReadWriteAudioCollection()
-    val subdir = mediaStorePath?.takeIf { it.isNotEmpty() }?.let { File(localMusicDir, it) } ?: localMusicDir
     val dirName =
         "${Environment.DIRECTORY_MUSIC}/" + if (mediaStorePath?.isNotEmpty() == true) "$mediaStorePath/" else ""
-    val projection = arrayOf(MediaStore.Audio.Media._ID)
     val selection = "${MediaStore.Audio.Media.DISPLAY_NAME} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} = ?"
     val selectionArgs = arrayOf(filename, dirName)
 
-    File(subdir, filename).delete()
-    if (mediaStorePath?.isNotEmpty() == true && subdir.list()?.isEmpty() == true)
-        subdir.delete()
-
-    contentResolver.query(audioCollection, projection, selection, selectionArgs, null)?.use { cursor ->
-        if (cursor.moveToNext()) {
-            val uri = ContentUris.withAppendedId(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)),
-            )
-            contentResolver.delete(uri, null, null)
-        }
+    getMediaStoreEntry(
+        queryUri = audioCollection,
+        selection = selection,
+        selectionArgs = selectionArgs,
+    )?.also { entry ->
+        val contentUri = entry.getContentUri(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI)
+        contentResolver.delete(contentUri, null, null)
+        entry.file.deleteWithEmptyParentDirs(entry.parentDirNames)
     }
 }
 
@@ -193,14 +206,24 @@ fun ContentResolver.loadThumbnailOrNull(uri: Uri, size: Size, signal: Cancellati
     } else null
 
 
+/**
+ * @throws FileNotFoundException
+ */
 fun Context.getMediaStoreFile(uri: Uri): File {
-    contentResolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null)?.use { cursor ->
+    contentResolver.query(uri, arrayOf(MediaColumns.DATA), null, null)?.use { cursor ->
         if (cursor.moveToNext()) {
-            val filename = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+            val filename = cursor.getString(cursor.getColumnIndexOrThrow(MediaColumns.DATA))
             return File(filename)
         }
     }
     throw FileNotFoundException(uri.path)
+}
+
+
+fun Context.getMediaStoreFileNullable(uri: Uri): File? = try {
+    getMediaStoreFile(uri)
+} catch (_: FileNotFoundException) {
+    null
 }
 
 

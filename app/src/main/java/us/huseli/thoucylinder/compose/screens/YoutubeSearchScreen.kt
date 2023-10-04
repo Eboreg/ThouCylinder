@@ -30,11 +30,11 @@ import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettings
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
+import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
 import java.util.UUID
 
@@ -45,15 +45,15 @@ fun YoutubeSearchScreen(
     @MainThread onGotoAlbum: (UUID) -> Unit,
 ) {
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
-    val albums by viewModel.albums.collectAsStateWithLifecycle()
-    val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle(emptyList())
+    val tracks by viewModel.tracks.collectAsStateWithLifecycle(emptyList())
 
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
 
-    val onAlbumClick: (Album) -> Unit = { album ->
-        viewModel.populateTempAlbum(album)
-        onGotoAlbum(album.albumId)
+    val onAlbumClick: (AlbumPojo) -> Unit = { pojo ->
+        viewModel.populateTempAlbum(pojo)
+        onGotoAlbum(pojo.album.albumId)
     }
 
     Column(modifier = modifier) {
@@ -92,6 +92,9 @@ fun YoutubeSearchScreen(
                             viewModel = viewModel,
                             onDownloadClick = { viewModel.downloadTrack(it) },
                             onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                            onLaunch = { track ->
+                                viewModel.loadTrackMetadata(track)
+                            }
                         )
                     }
                 }
@@ -108,6 +111,9 @@ fun YoutubeSearchScreen(
                             viewModel = viewModel,
                             onDownloadClick = { viewModel.downloadTrack(it) },
                             onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                            onLaunch = { track ->
+                                viewModel.loadTrackMetadata(track)
+                            }
                         )
                     }
                 }

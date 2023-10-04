@@ -8,9 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
@@ -25,9 +25,7 @@ abstract class BaseViewModel(
 
     val playerPlaybackState = playerRepo.playbackState
     val playerPlayingTrack = playerRepo.playingTrack
-    val playerCurrentPositionMs = playerRepo.currentPositionMs
     val playerCurrentTrack = playerRepo.currentTrack
-
     val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
 
     fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
@@ -35,7 +33,7 @@ abstract class BaseViewModel(
             try {
                 var newTrack = youtubeRepo.downloadTrack(
                     video = video,
-                    statusCallback = {
+                    progressCallback = {
                         _trackDownloadProgressMap.value += track.id to it.copy(progress = it.progress * 0.8)
                     },
                 )
@@ -53,7 +51,5 @@ abstract class BaseViewModel(
 
     suspend fun getImageBitmap(image: Image): ImageBitmap? = repo.getImageBitmap(image)
 
-    fun playOrPause(track: Track) = viewModelScope.launch {
-        playerRepo.playOrPause(track)
-    }
+    fun playOrPause(track: Track) = playerRepo.playOrPause(track)
 }

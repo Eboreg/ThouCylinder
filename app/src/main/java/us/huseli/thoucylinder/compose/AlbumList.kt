@@ -19,20 +19,33 @@ import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
 
 @Composable
-fun AlbumList(albums: List<Album>, viewModel: BaseViewModel, onAlbumClick: (Album) -> Unit) {
+fun AlbumList(
+    albums: List<AlbumPojo>,
+    viewModel: BaseViewModel,
+    onAlbumClick: (AlbumPojo) -> Unit,
+    showArtist: Boolean = true,
+) {
     ItemList(
         things = albums,
         onCardClick = onAlbumClick,
-        selector = { album -> album.title },
-    ) { album ->
+        selector = { pojo -> pojo.album.title },
+    ) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+        val firstRow =
+            if (showArtist && pojo.album.artist != null) "${pojo.album.artist} - ${pojo.album.title}"
+            else pojo.album.title
+        val secondRow = listOfNotNull(
+            pojo.trackCount?.let { pluralStringResource(R.plurals.x_tracks, it, it) },
+            pojo.yearString,
+            pojo.duration?.sensibleFormat(),
+        ).joinToString(" • ").takeIf { it.isNotBlank() }
 
         LaunchedEffect(Unit) {
-            album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+            pojo.album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
         }
 
         Row {
@@ -41,15 +54,10 @@ fun AlbumList(albums: List<Album>, viewModel: BaseViewModel, onAlbumClick: (Albu
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceEvenly,
             ) {
-                Text(text = album.toString(), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    style = MaterialTheme.typography.bodySmall,
-                    text = listOfNotNull(
-                        pluralStringResource(R.plurals.x_tracks, album.trackCount, album.trackCount),
-                        album.yearString,
-                        album.duration?.sensibleFormat(),
-                    ).joinToString(" • ")
-                )
+                Text(text = firstRow, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                secondRow?.also {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

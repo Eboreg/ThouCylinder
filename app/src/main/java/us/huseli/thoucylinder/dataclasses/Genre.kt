@@ -8,12 +8,12 @@ import java.util.UUID
 
 @Entity
 data class Genre(
-    @PrimaryKey val genreId: String,
+    @PrimaryKey val genreName: String,
 )
 
 @Entity(
-    primaryKeys = ["albumId", "genreId"],
-    indices = [Index("genreId")],
+    primaryKeys = ["albumId", "genreName"],
+    indices = [Index("genreName")],
     foreignKeys = [
         ForeignKey(
             entity = Album::class,
@@ -24,8 +24,8 @@ data class Genre(
         ),
         ForeignKey(
             entity = Genre::class,
-            parentColumns = ["genreId"],
-            childColumns = ["genreId"],
+            parentColumns = ["genreName"],
+            childColumns = ["genreName"],
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.RESTRICT,
         )
@@ -33,5 +33,5 @@ data class Genre(
 )
 data class AlbumGenre(
     val albumId: UUID,
-    val genreId: String,
+    val genreName: String,
 )

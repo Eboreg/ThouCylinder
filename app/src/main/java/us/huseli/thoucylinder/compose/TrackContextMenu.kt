@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.compose
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Info
@@ -28,11 +29,12 @@ import java.util.UUID
 @Composable
 fun TrackContextMenu(
     track: Track,
-    onDownloadClick: () -> Unit,
-    modifier: Modifier = Modifier,
     isShown: Boolean,
-    offset: DpOffset = DpOffset(0.dp, 0.dp),
+    onDownloadClick: () -> Unit,
     onDismissRequest: () -> Unit,
+    onAddToPlaylistClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    offset: DpOffset = DpOffset(0.dp, 0.dp),
     onGotoArtistClick: ((String) -> Unit)? = null,
     onGotoAlbumClick: ((UUID) -> Unit)? = null,
 ) {
@@ -58,6 +60,14 @@ fun TrackContextMenu(
                 },
             )
         }
+        DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.add_to_playlist)) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
+            onClick = {
+                onAddToPlaylistClick()
+                onDismissRequest()
+            }
+        )
         if (onGotoArtistClick != null) {
             track.artist?.also { artist ->
                 DropdownMenuItem(
@@ -98,6 +108,7 @@ fun TrackContextMenu(
 fun TrackContextMenuWithButton(
     track: Track,
     onDownloadClick: () -> Unit,
+    onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     onGotoArtistClick: ((String) -> Unit)? = null,
@@ -118,6 +129,7 @@ fun TrackContextMenuWithButton(
                 onGotoArtistClick = onGotoArtistClick,
                 onGotoAlbumClick = onGotoAlbumClick,
                 offset = offset,
+                onAddToPlaylistClick = onAddToPlaylistClick,
             )
         }
     )

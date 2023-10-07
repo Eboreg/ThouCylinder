@@ -33,6 +33,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
@@ -196,7 +197,7 @@ fun EditAlbumDialogStep2(
                         modifier = Modifier.clickable { onSelect(image) }.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        AlbumArt(image = imageBitmap)
+                        Thumbnail(image = imageBitmap)
                         Text(text = "${imageBitmap.width}x${imageBitmap.height}")
                     }
                 }

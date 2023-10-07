@@ -1,14 +1,17 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.MusicNote
 import androidx.compose.material.icons.sharp.Pause
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material.icons.sharp.SkipNext
@@ -48,7 +51,16 @@ fun BottomBar(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f).padding(vertical = 5.dp).padding(start = 5.dp),
             ) {
-                AlbumArt(image = imageBitmap)
+                Thumbnail(
+                    image = imageBitmap,
+                    placeholder = {
+                        Image(
+                            imageVector = Icons.Sharp.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().aspectRatio(1f),
+                        )
+                    },
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = currentTrack.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     currentTrack.artist?.also { artist ->

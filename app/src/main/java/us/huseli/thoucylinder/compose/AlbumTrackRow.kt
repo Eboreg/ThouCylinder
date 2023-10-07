@@ -1,5 +1,8 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Pause
 import androidx.compose.material.icons.sharp.PlayArrow
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -26,21 +30,35 @@ import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import java.util.UUID
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackSection(
+fun AlbumTrackRow(
     track: Track,
     downloadProgress: DownloadProgress?,
-    playerPlayingTrack: Track?,
-    modifier: Modifier = Modifier,
+    isPlaying: Boolean,
+    onToggleSelected: () -> Unit,
     onDownloadClick: () -> Unit,
     onPlayOrPauseClick: () -> Unit,
+    onAddToPlaylistClick: () -> Unit,
+    modifier: Modifier = Modifier,
     onAlbumClick: ((UUID) -> Unit)? = null,
     onArtistClick: ((String) -> Unit)? = null,
     showArtist: Boolean = true,
+    isSelected: Boolean = false,
+    selectOnShortClick: Boolean = false,
 ) {
     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-        Column(modifier = modifier.padding(start = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = modifier.combinedClickable(
+                onClick = { if (selectOnShortClick) onToggleSelected() },
+                onLongClick = onToggleSelected,
+            ).let { modifier ->
+                if (isSelected) {
+                    modifier.border(CardDefaults.outlinedCardBorder().let { it.copy(width = it.width + 2.dp) })
+                } else modifier
+            }
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 10.dp)) {
                 Text(
                     modifier = Modifier.weight(1f),
                     text = track.toString(showArtist = showArtist, showAlbumPosition = true),
@@ -57,12 +75,13 @@ fun TrackSection(
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
                     onGotoArtistClick = onArtistClick,
                     onGotoAlbumClick = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
 
                 IconButton(
                     onClick = onPlayOrPauseClick,
                     content = {
-                        if (playerPlayingTrack == track) Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
+                        if (isPlaying) Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
                         else Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play))
                     },
                 )

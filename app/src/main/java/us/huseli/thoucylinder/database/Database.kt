@@ -10,14 +10,25 @@ import us.huseli.thoucylinder.dataclasses.Album
 import us.huseli.thoucylinder.dataclasses.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.Genre
+import us.huseli.thoucylinder.dataclasses.Playlist
+import us.huseli.thoucylinder.dataclasses.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.Style
 import us.huseli.thoucylinder.dataclasses.Track
 import java.util.concurrent.Executors
 
 @androidx.room.Database(
-    entities = [Track::class, Album::class, Genre::class, Style::class, AlbumGenre::class, AlbumStyle::class],
+    entities = [
+        Track::class,
+        Album::class,
+        Genre::class,
+        Style::class,
+        AlbumGenre::class,
+        AlbumStyle::class,
+        Playlist::class,
+        PlaylistTrack::class,
+    ],
     exportSchema = false,
-    version = 24,
+    version = 29,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

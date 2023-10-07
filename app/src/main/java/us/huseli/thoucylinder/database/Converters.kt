@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import java.time.Instant
 import java.util.UUID
 
 object Converters {
@@ -43,4 +44,12 @@ object Converters {
     @TypeConverter
     @JvmStatic
     fun stringToUri(value: String?): Uri? = value?.let { Uri.parse(it) }
+
+    @TypeConverter
+    @JvmStatic
+    fun instantToLong(value: Instant): Long = value.epochSecond
+
+    @TypeConverter
+    @JvmStatic
+    fun longToInstant(value: Long): Instant = Instant.ofEpochSecond(value)
 }

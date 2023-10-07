@@ -29,10 +29,13 @@ import us.huseli.retaintheme.compose.ResponsiveScaffold
 import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.LibraryDestination
+import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.SearchDestination
+import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
+import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 import java.util.UUID
@@ -48,6 +51,8 @@ fun App(
     val playerCurrentTrack by libraryViewModel.playerCurrentTrack.collectAsStateWithLifecycle()
     var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
     val currentTrackImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+    var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
+    val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle(emptyList())
 
     LaunchedEffect(playerCurrentTrack) {
         playerCurrentTrack?.image?.also { currentTrackImageBitmap.value = libraryViewModel.getImageBitmap(it) }
@@ -73,8 +78,27 @@ fun App(
         navController.navigate(ArtistDestination.route(artist))
     }
 
+    val onPlaylistClick = { playlistId: UUID ->
+        navController.navigate(PlaylistDestination.route(playlistId))
+    }
+
+    val onAddToPlaylistClick = { selection: Selection ->
+        addToPlaylistSelection = selection
+    }
+
     val onBackClick: () -> Unit = {
         navController.popBackStack()
+    }
+
+    addToPlaylistSelection?.also { selection ->
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onSelect = { playlist ->
+                libraryViewModel.addSelectionToPlaylist(selection, playlist)
+                addToPlaylistSelection = null
+            },
+            onCancel = { addToPlaylistSelection = null }
+        )
     }
 
     ResponsiveScaffold(
@@ -113,7 +137,10 @@ fun App(
         ) {
             composable(route = SearchDestination.route) {
                 activeScreen = "search"
-                YoutubeSearchScreen(onGotoAlbum = onAlbumClick)
+                YoutubeSearchScreen(
+                    onGotoAlbum = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
+                )
             }
 
             composable(route = LibraryDestination.route) {
@@ -121,7 +148,9 @@ fun App(
                 LibraryScreen(
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
+                    onPlaylistClick = onPlaylistClick,
                     viewModel = libraryViewModel,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }
 
@@ -130,7 +159,11 @@ fun App(
                 arguments = AlbumDestination.arguments,
             ) {
                 activeScreen = null
-                AlbumScreen(onBackClick = onBackClick, onArtistClick = onArtistClick)
+                AlbumScreen(
+                    onBackClick = onBackClick,
+                    onArtistClick = onArtistClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
+                )
             }
 
             composable(
@@ -138,7 +171,24 @@ fun App(
                 arguments = ArtistDestination.arguments,
             ) {
                 activeScreen = null
-                ArtistScreen(onBackClick = onBackClick, onAlbumClick = onAlbumClick)
+                ArtistScreen(
+                    onBackClick = onBackClick,
+                    onAlbumClick = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
+                )
+            }
+
+            composable(
+                route = PlaylistDestination.routeTemplate,
+                arguments = PlaylistDestination.arguments,
+            ) {
+                activeScreen = null
+                PlaylistScreen(
+                    onAlbumClick = onAlbumClick,
+                    onArtistClick = onArtistClick,
+                    onBackClick = onBackClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
+                )
             }
         }
     }

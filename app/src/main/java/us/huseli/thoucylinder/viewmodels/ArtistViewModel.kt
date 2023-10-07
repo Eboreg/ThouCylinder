@@ -27,10 +27,10 @@ class ArtistViewModel @Inject constructor(
 
     val artist: String = savedStateHandle.get<String>(NAV_ARG_ARTIST)!!
 
-    val tracks = repo.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
+    val albumPojos = repo.albumPojos.map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val albumPojos = repo.albumPojos.map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
+    val tracks = repo.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
 
     fun setDisplayType(value: DisplayType) {
         _displayType.value = value

@@ -48,7 +48,7 @@ data class AlbumWithTracksPojo(
     @Relation(parentColumn = "albumId", entityColumn = "albumId", entity = AlbumStyle::class)
     val styles: List<Style> = emptyList(),
     @Relation(parentColumn = "albumId", entityColumn = "albumId")
-    val tracks: List<Track>,
+    val tracks: List<Track> = emptyList(),
 ) {
     override fun toString() = album.toString()
 }

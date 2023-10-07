@@ -8,12 +8,12 @@ import java.util.UUID
 
 @Entity
 data class Style(
-    @PrimaryKey val styleId: String,
+    @PrimaryKey val styleName: String,
 )
 
 @Entity(
-    primaryKeys = ["albumId", "styleId"],
-    indices = [Index("styleId")],
+    primaryKeys = ["albumId", "styleName"],
+    indices = [Index("styleName")],
     foreignKeys = [
         ForeignKey(
             entity = Album::class,
@@ -24,8 +24,8 @@ data class Style(
         ),
         ForeignKey(
             entity = Style::class,
-            parentColumns = ["styleId"],
-            childColumns = ["styleId"],
+            parentColumns = ["styleName"],
+            childColumns = ["styleName"],
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.RESTRICT,
         )
@@ -33,5 +33,5 @@ data class Style(
 )
 data class AlbumStyle(
     val albumId: UUID,
-    val styleId: String,
+    val styleName: String,
 )

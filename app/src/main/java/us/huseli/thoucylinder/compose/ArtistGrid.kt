@@ -1,11 +1,14 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,9 +49,17 @@ fun ArtistGrid(
             if (imageBitmap.value == null) imageBitmap.value = artist.firstAlbumArt?.toBitmap()?.asImageBitmap()
         }
 
-        Box(modifier = Modifier.aspectRatio(1f)) {
-            AlbumArt(image = imageBitmap.value, modifier = Modifier.fillMaxWidth())
-        }
+        Thumbnail(
+            image = imageBitmap.value,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Image(
+                    imageVector = Icons.Sharp.InterpreterMode,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().aspectRatio(1f),
+                )
+            },
+        )
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.padding(5.dp).weight(1f)) {
                 Text(text = artist.name, maxLines = 2)

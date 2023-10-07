@@ -1,10 +1,15 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,11 +34,7 @@ fun AlbumList(
     onAlbumClick: (AlbumPojo) -> Unit,
     showArtist: Boolean = true,
 ) {
-    ItemList(
-        things = albums,
-        onCardClick = onAlbumClick,
-        selector = { pojo -> pojo.album.title },
-    ) { pojo ->
+    ItemList(things = albums, onCardClick = onAlbumClick) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
         val firstRow =
             if (showArtist && pojo.album.artist != null) "${pojo.album.artist} - ${pojo.album.title}"
@@ -44,12 +45,24 @@ fun AlbumList(
             pojo.duration?.sensibleFormat(),
         ).joinToString(" • ").takeIf { it.isNotBlank() }
 
-        LaunchedEffect(Unit) {
-            pojo.album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+        LaunchedEffect(pojo.album.albumId) {
+            pojo.album.albumArt?.let {
+                imageBitmap.value = viewModel.getImageBitmap(it)
+            }
         }
 
         Row {
-            AlbumArt(image = imageBitmap.value, modifier = Modifier.fillMaxHeight())
+            Thumbnail(
+                image = imageBitmap.value,
+                modifier = Modifier.fillMaxHeight(),
+                placeholder = {
+                    Image(
+                        imageVector = Icons.Sharp.Album,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().aspectRatio(1f),
+                    )
+                }
+            )
             Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceEvenly,

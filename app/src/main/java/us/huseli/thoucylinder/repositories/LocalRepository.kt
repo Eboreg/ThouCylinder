@@ -25,14 +25,17 @@ import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.ExtractTrackDataException
 import us.huseli.thoucylinder.MediaStoreException
 import us.huseli.thoucylinder.MediaStoreFormatException
+import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.database.MusicDao
+import us.huseli.thoucylinder.dataclasses.AbstractPlaylist
 import us.huseli.thoucylinder.dataclasses.Album
 import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.MediaStoreData
+import us.huseli.thoucylinder.dataclasses.Playlist
 import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.extractID3Data
@@ -54,21 +57,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 
-data class ImportedImage(
-    val bitmap: Bitmap,
-    val file: File,
-    val relativePath: String,
-) {
-    /** True if `paths` contains this.relativePath or at least one descendant of it. */
-    fun matchesPaths(paths: Collection<String>): Boolean = paths.any { it.startsWith(relativePath) }
-}
-
 @Singleton
 class LocalRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicDao: MusicDao,
 ) {
     data class TrackMediaStoreEntry(val uri: Uri, val file: File, val track: Track)
+
+    data class ImportedImage(
+        val bitmap: Bitmap,
+        val file: File,
+        val relativePath: String,
+    ) {
+        /** True if `paths` contains this.relativePath or at least one descendant of it. */
+        fun matchesPaths(paths: Collection<String>): Boolean = paths.any { it.startsWith(relativePath) }
+    }
 
     private val _albumArtAbsoluteDir = File(
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
@@ -81,12 +84,16 @@ class LocalRepository @Inject constructor(
 
     val albumPojos: Flow<List<AlbumPojo>> = musicDao.flowAlbumPojos()
     val artistPojos = musicDao.flowArtistPojos()
+    val playlists = musicDao.flowPlaylists()
     val tempAlbumPojos = _tempAlbumPojos.asStateFlow()
     val trackPager = Pager(config = PagingConfig(pageSize = 100)) { musicDao.pageTracks() }
 
     fun addOrUpdateTempAlbum(pojo: AlbumWithTracksPojo) {
         _tempAlbumPojos.value += pojo.album.albumId to pojo
     }
+
+    suspend fun addSelectionToPlaylist(selection: Selection, playlist: AbstractPlaylist) =
+        musicDao.addSelectionToPlaylist(selection, playlist)
 
     fun collectArtistImages(): Map<String, Image> {
         val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
@@ -120,7 +127,7 @@ class LocalRepository @Inject constructor(
 
         // And albums that _only_ have orphan tracks in them:
         val orphanAlbums = albumMultimap
-            .filter { (_, tracks) -> orphanTracks.map { it.id }.containsAll(tracks.map { it.id }) }
+            .filter { (_, tracks) -> orphanTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
             .map { it.key }
 
         musicDao.deleteTracks(*orphanTracks.toTypedArray())
@@ -158,7 +165,7 @@ class LocalRepository @Inject constructor(
         return images
     }
 
-    fun getAlbumWithSongs(albumId: UUID) = musicDao.flowAlbumWithSongs(albumId)
+    fun getAlbumWithTracks(albumId: UUID) = musicDao.flowAlbumWithTracks(albumId)
 
     suspend fun getImageBitmap(image: Image): ImageBitmap? {
         return _imageCacheMutex.withLock {
@@ -309,6 +316,9 @@ class LocalRepository @Inject constructor(
         }
     }
 
+    suspend fun insertPlaylist(playlist: Playlist, trackIds: List<UUID>) =
+        musicDao.upsertPlaylistWithTracks(playlist, trackIds)
+
     suspend fun insertTrack(track: Track) = musicDao.insertTrack(track = track)
 
     suspend fun listTracks(): List<Track> = musicDao.listTracks()
@@ -366,6 +376,9 @@ class LocalRepository @Inject constructor(
 
     fun pageTracksByArtist(artist: String): Pager<Int, Track> =
         Pager(config = PagingConfig(pageSize = 100)) { musicDao.pageTracksByArtist(artist) }
+
+    fun pageTracksByPlaylistId(playlistId: UUID): Pager<Int, Track> =
+        Pager(config = PagingConfig(pageSize = 100)) { musicDao.pageTracksByPlaylistId(playlistId) }
 
     suspend fun saveAlbum(pojo: AlbumWithTracksPojo) = musicDao.upsertAlbumWithTracks(pojo)
 

@@ -66,8 +66,8 @@ class EditAlbumViewModel @Inject constructor(
                         artist = master.artist,
                         year = master.year,
                     ),
-                    genres = master.genres.map { Genre(genreId = it) },
-                    styles = master.styles.map { Style(styleId = it) },
+                    genres = master.genres.map { Genre(genreName = it) },
+                    styles = master.styles.map { Style(styleName = it) },
                 )
             }
             updateTracksFromMaster(master)

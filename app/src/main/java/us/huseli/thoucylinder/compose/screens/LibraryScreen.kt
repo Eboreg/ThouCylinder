@@ -15,6 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.BuildConfig
+import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.AlbumGrid
 import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.ArtistGrid
@@ -22,6 +23,7 @@ import us.huseli.thoucylinder.compose.ArtistList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettings
 import us.huseli.thoucylinder.compose.ListType
+import us.huseli.thoucylinder.compose.PlaylistList
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
@@ -35,13 +37,19 @@ fun LibraryScreen(
     trackGridState: LazyGridState = rememberLazyGridState(),
     onAlbumClick: (UUID) -> Unit,
     onArtistClick: (String) -> Unit,
+    onPlaylistClick: (UUID) -> Unit,
+    onAddToPlaylistClick: (Selection) -> Unit,
 ) {
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
     val tracks = viewModel.pagingTracks.collectAsLazyPagingItems()
     val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
     val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
     val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
+    val availableDisplayTypes =
+        if (listType == ListType.PLAYLISTS) listOf(DisplayType.LIST)
+        else listOf(DisplayType.LIST, DisplayType.GRID)
 
     Column(modifier = modifier) {
         ListSettings(
@@ -49,6 +57,7 @@ fun LibraryScreen(
             listType = listType,
             onDisplayTypeChange = { viewModel.setDisplayType(it) },
             onListTypeChange = { viewModel.setListType(it) },
+            availableDisplayTypes = availableDisplayTypes,
         )
 
         when (listType) {
@@ -73,15 +82,15 @@ fun LibraryScreen(
                     onPlayOrPauseClick = { viewModel.playOrPause(it) },
                     onGotoArtistClick = onArtistClick,
                     onGotoAlbumClick = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
                 DisplayType.GRID -> TrackGrid(
                     tracks = tracks,
                     viewModel = viewModel,
                     gridState = trackGridState,
-                    onDownloadClick = { viewModel.downloadTrack(it) },
-                    onPlayOrPauseClick = { viewModel.playOrPause(it) },
                     onGotoArtistClick = onArtistClick,
                     onGotoAlbumClick = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }
             ListType.ARTISTS -> when (displayType) {
@@ -96,6 +105,15 @@ fun LibraryScreen(
                     artists = artistPojos,
                     images = artistImages,
                     onArtistClick = onArtistClick,
+                )
+            }
+            ListType.PLAYLISTS -> {
+                PlaylistList(
+                    playlists = playlists,
+                    onPlaylistClick = { onPlaylistClick(it.playlistId) },
+                    // TODO: Add a callback
+                    onPlaylistPlayClick = { },
+                    onAddPlaylist = { viewModel.addPlaylist(it) },
                 )
             }
         }

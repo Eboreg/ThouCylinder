@@ -25,10 +25,10 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("albumId"), Index("title")],
+    indices = [Index("albumId"), Index("title"), Index("artist")],
 )
 data class Track(
-    @PrimaryKey val id: UUID = UUID.randomUUID(),
+    @PrimaryKey val trackId: UUID = UUID.randomUUID(),
     val title: String,
     val isInLibrary: Boolean,
     val artist: String? = null,
@@ -42,7 +42,7 @@ data class Track(
     @Ignore val tempTrackData: TempTrackData? = null,
 ) {
     constructor(
-        id: UUID,
+        trackId: UUID,
         title: String,
         isInLibrary: Boolean,
         artist: String?,
@@ -54,7 +54,7 @@ data class Track(
         image: Image?,
         mediaStoreData: MediaStoreData?,
     ) : this(
-        id = id,
+        trackId = trackId,
         title = title,
         isInLibrary = isInLibrary,
         artist = artist,

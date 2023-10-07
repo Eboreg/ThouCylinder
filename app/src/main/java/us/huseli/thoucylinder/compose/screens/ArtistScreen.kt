@@ -18,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.AlbumGrid
 import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
@@ -34,6 +35,7 @@ fun ArtistScreen(
     viewModel: ArtistViewModel = hiltViewModel(),
     onBackClick: () -> Unit,
     onAlbumClick: (UUID) -> Unit,
+    onAddToPlaylistClick: (Selection) -> Unit,
 ) {
     val artist = viewModel.artist
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
@@ -55,7 +57,7 @@ fun ArtistScreen(
             listType = listType,
             onDisplayTypeChange = { viewModel.setDisplayType(it) },
             onListTypeChange = { viewModel.setListType(it) },
-            excludeListTypes = listOf(ListType.ARTISTS),
+            excludeListTypes = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
         )
 
         when (listType) {
@@ -80,17 +82,18 @@ fun ArtistScreen(
                     onPlayOrPauseClick = { viewModel.playOrPause(it) },
                     onGotoAlbumClick = onAlbumClick,
                     showArtist = false,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
                 DisplayType.GRID -> TrackGrid(
                     tracks = tracks,
                     viewModel = viewModel,
-                    onDownloadClick = { viewModel.downloadTrack(it) },
-                    onPlayOrPauseClick = { viewModel.playOrPause(it) },
                     onGotoAlbumClick = onAlbumClick,
                     showArtist = false,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }
             ListType.ARTISTS -> {}
+            ListType.PLAYLISTS -> {}
         }
     }
 }

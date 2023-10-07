@@ -25,12 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.AlbumGrid
 import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettings
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.compose.OutlinedTextFieldLabel
+import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
@@ -43,6 +44,7 @@ fun YoutubeSearchScreen(
     modifier: Modifier = Modifier,
     viewModel: YoutubeSearchViewModel = hiltViewModel(),
     @MainThread onGotoAlbum: (UUID) -> Unit,
+    onAddToPlaylistClick: (Selection) -> Unit,
 ) {
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle(emptyList())
@@ -94,7 +96,8 @@ fun YoutubeSearchScreen(
                             onPlayOrPauseClick = { viewModel.playOrPause(it) },
                             onLaunch = { track ->
                                 viewModel.loadTrackMetadata(track)
-                            }
+                            },
+                            onAddToPlaylistClick = onAddToPlaylistClick,
                         )
                     }
                 }
@@ -109,11 +112,10 @@ fun YoutubeSearchScreen(
                         TrackGrid(
                             tracks = tracks,
                             viewModel = viewModel,
-                            onDownloadClick = { viewModel.downloadTrack(it) },
-                            onPlayOrPauseClick = { viewModel.playOrPause(it) },
                             onLaunch = { track ->
                                 viewModel.loadTrackMetadata(track)
-                            }
+                            },
+                            onAddToPlaylistClick = onAddToPlaylistClick,
                         )
                     }
                 }

@@ -30,6 +30,9 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.net.URL
 import java.net.URLConnection
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.time.Duration
@@ -238,3 +241,9 @@ fun List<String>.leadingChars(): List<Char> =
     mapNotNull { string ->
         string.replace(Regex("[^\\w&&[^0-9]]"), "#").getOrNull(0)?.uppercaseChar()
     }.distinct().sorted()
+
+
+fun Instant.isoDate(): String {
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
+    return formatter.format(this)
+}

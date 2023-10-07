@@ -58,7 +58,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
 
     fun updateSearchResultTrack(track: Track) {
         _trackSearchResults.value = _trackSearchResults.value.toMutableList().apply {
-            indexOfFirst { it.id == track.id }.takeIf { it > -1 }?.also { index ->
+            indexOfFirst { it.trackId == track.trackId }.takeIf { it > -1 }?.also { index ->
                 this[index] = track
             }
         }

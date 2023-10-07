@@ -14,25 +14,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.compose.ListWithAlphabetBar
-import us.huseli.thoucylinder.leadingChars
+import us.huseli.retaintheme.compose.ListWithNumericBar
 
 @Composable
 fun <T> ItemList(
     things: List<T>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    cardHeight: Dp? = 80.dp,
     onCardClick: ((T) -> Unit)? = null,
-    selector: (T) -> String,
+    cardModifier: Modifier = Modifier,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
-    ListWithAlphabetBar(
-        modifier = modifier,
-        characters = things.map(selector).leadingChars(),
+    ListWithNumericBar(
         listState = listState,
-        items = things,
-        selector = selector,
+        listSize = things.size,
+        modifier = modifier,
         minItems = 20,
     ) {
         val paddingValues =
@@ -46,13 +45,11 @@ fun <T> ItemList(
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             items(things) { thing ->
-                val cardModifier =
-                    if (onCardClick != null) Modifier.clickable { onCardClick(thing) }
-                    else Modifier
-
                 OutlinedCard(
                     shape = MaterialTheme.shapes.extraSmall,
-                    modifier = cardModifier.fillMaxWidth().height(80.dp),
+                    modifier = cardModifier.fillMaxWidth()
+                        .let { if (cardHeight != null) it.height(cardHeight) else it }
+                        .let { if (onCardClick != null) it.clickable { onCardClick(thing) } else it },
                     content = { cardContent(thing) },
                 )
             }

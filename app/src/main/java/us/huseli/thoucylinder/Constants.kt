@@ -8,6 +8,7 @@ object Constants {
     const val HEADER_ANDROID_SDK_VERSION = 30
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
+    const val NAV_ARG_PLAYLIST = "playlist"
     const val URL_CONNECT_TIMEOUT = 4_050
     const val URL_READ_TIMEOUT = 10_000
     val VIDEO_MIMETYPE_FILTER = Regex("^audio/.*$")

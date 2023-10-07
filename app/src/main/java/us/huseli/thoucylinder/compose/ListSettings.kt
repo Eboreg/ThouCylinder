@@ -16,11 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.circular
 import us.huseli.thoucylinder.R
 
 enum class DisplayType { LIST, GRID }
 
-enum class ListType { ALBUMS, TRACKS, ARTISTS }
+enum class ListType { ALBUMS, TRACKS, ARTISTS, PLAYLISTS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,8 +31,16 @@ fun ListSettings(
     onDisplayTypeChange: (DisplayType) -> Unit,
     onListTypeChange: (ListType) -> Unit,
     modifier: Modifier = Modifier,
+    availableDisplayTypes: List<DisplayType> = DisplayType.values().toList(),
     excludeListTypes: List<ListType> = emptyList(),
 ) {
+    val nextDisplayType = { dt: DisplayType ->
+        availableDisplayTypes.indexOf(dt).let { index ->
+            if (index == availableDisplayTypes.lastIndex) availableDisplayTypes[0]
+            else availableDisplayTypes[index + 1]
+        }
+    }
+
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.SpaceAround,
@@ -61,14 +70,18 @@ fun ListSettings(
                     label = { Text(text = stringResource(R.string.artists)) },
                 )
             }
+            if (!excludeListTypes.contains(ListType.PLAYLISTS)) {
+                InputChip(
+                    selected = listType == ListType.PLAYLISTS,
+                    onClick = { onListTypeChange(ListType.PLAYLISTS) },
+                    label = { Text(text = stringResource(R.string.playlists)) },
+                )
+            }
         }
+
         IconButton(
-            onClick = {
-                when (displayType) {
-                    DisplayType.LIST -> onDisplayTypeChange(DisplayType.GRID)
-                    DisplayType.GRID -> onDisplayTypeChange(DisplayType.LIST)
-                }
-            },
+            onClick = { onDisplayTypeChange(nextDisplayType(displayType)) },
+            enabled = availableDisplayTypes.size > 1,
             content = {
                 when (displayType) {
                     DisplayType.LIST -> Icon(Icons.Sharp.GridView, null)

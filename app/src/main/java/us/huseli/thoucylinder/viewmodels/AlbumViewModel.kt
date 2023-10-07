@@ -52,7 +52,7 @@ class AlbumViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            combine(repo.getAlbumWithSongs(_albumId), repo.tempAlbumPojos) { pojo, tempPojos ->
+            combine(repo.getAlbumWithTracks(_albumId), repo.tempAlbumPojos) { pojo, tempPojos ->
                 pojo ?: tempPojos[_albumId]
             }.filterNotNull().distinctUntilChanged().collect { pojo ->
                 _albumPojo.value = pojo
@@ -82,7 +82,7 @@ class AlbumViewModel @Inject constructor(
 
     fun cancelDownload() = downloadJob?.cancel()
 
-    fun delete() = viewModelScope.launch(Dispatchers.IO) {
+    fun deleteAlbumWithTracks() = viewModelScope.launch(Dispatchers.IO) {
         if (BuildConfig.DEBUG) {
             _albumPojo.value?.also { repo.deleteAlbumWithTracks(it) }
         }
@@ -117,11 +117,11 @@ class AlbumViewModel @Inject constructor(
         if (track.metadata == null) viewModelScope.launch(Dispatchers.IO) { getTrackMetadata(track) }
     }
 
-    fun removeFromLibrary() = viewModelScope.launch(Dispatchers.IO) {
+    fun removeAlbumFromLibrary() = viewModelScope.launch(Dispatchers.IO) {
         _albumPojo.value?.let { repo.deleteAlbumWithTracks(it) }
     }
 
-    fun update(pojo: AlbumWithTracksPojo) {
+    fun updateAlbumWithTracks(pojo: AlbumWithTracksPojo) {
         _albumPojo.value = pojo
         viewModelScope.launch(Dispatchers.IO) {
             repo.tagAndUpdateAlbumWithTracks(ensureTrackMetadata(pojo))
@@ -159,7 +159,7 @@ class AlbumViewModel @Inject constructor(
     private fun updateTrack(track: Track) {
         _albumPojo.value = _albumPojo.value?.let { pojo ->
             pojo.copy(
-                tracks = pojo.tracks.map { if (it.id == track.id) track else it },
+                tracks = pojo.tracks.map { if (it.trackId == track.trackId) track else it },
             )
         }
     }

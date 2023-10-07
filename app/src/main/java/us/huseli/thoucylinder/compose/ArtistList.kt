@@ -1,10 +1,15 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +43,6 @@ fun ArtistList(
         things = artists,
         modifier = modifier,
         onCardClick = onArtistClick?.let { { onArtistClick(it.name) } },
-        selector = { it.name },
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -48,7 +52,17 @@ fun ArtistList(
         }
 
         Row {
-            AlbumArt(image = imageBitmap.value, modifier = Modifier.fillMaxHeight())
+            Thumbnail(
+                image = imageBitmap.value,
+                modifier = Modifier.fillMaxHeight(),
+                placeholder = {
+                    Image(
+                        imageVector = Icons.Sharp.InterpreterMode,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().aspectRatio(1f),
+                    )
+                },
+            )
             Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceEvenly,

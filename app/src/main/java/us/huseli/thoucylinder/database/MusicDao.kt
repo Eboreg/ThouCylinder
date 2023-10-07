@@ -10,7 +10,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.AbstractPlaylist
@@ -205,6 +204,9 @@ interface MusicDao {
 
     @Query("SELECT t.* FROM Track t JOIN PlaylistTrack pt ON t.trackId = pt.trackId AND pt.playlistId = :playlistId")
     fun pageTracksByPlaylistId(playlistId: UUID): PagingSource<Int, Track>
+
+    @Update
+    suspend fun updateTracks(vararg tracks: Track)
 
     @Transaction
     suspend fun upsertAlbumWithTracks(pojo: AlbumWithTracksPojo) {

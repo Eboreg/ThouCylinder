@@ -13,14 +13,16 @@ import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.repositories.LocalRepository
+import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import java.util.UUID
 
 abstract class BaseViewModel(
-    private val playerRepo: PlayerRepository,
     private val repo: LocalRepository,
+    private val playerRepo: PlayerRepository,
     private val youtubeRepo: YoutubeRepository,
+    private val mediaStoreRepo: MediaStoreRepository,
 ) : ViewModel() {
     private val _selection = MutableStateFlow(Selection())
     private val _trackDownloadProgressMap = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
@@ -40,7 +42,7 @@ abstract class BaseViewModel(
                         _trackDownloadProgressMap.value += track.trackId to it.copy(progress = it.progress * 0.8)
                     },
                 )
-                newTrack = repo.moveTaggedTrackToMediaStore(newTrack) {
+                newTrack = mediaStoreRepo.moveTaggedTrackToMediaStore(newTrack) {
                     _trackDownloadProgressMap.value += track.trackId to it.copy(progress = 0.8 + (it.progress * 0.2))
                 }
                 repo.insertTrack(newTrack)
@@ -62,5 +64,19 @@ abstract class BaseViewModel(
 
     fun unselectAllTracks() {
         _selection.value = _selection.value.copy(tracks = emptyList())
+    }
+
+    protected suspend fun ensureTrackMetadata(track: Track): Track {
+        var metadata = track.metadata
+        var youtubeMetadata = track.youtubeVideo?.metadata
+
+        if (track.youtubeVideo != null) {
+            if (youtubeMetadata == null) youtubeMetadata = youtubeRepo.getBestMetadata(track.youtubeVideo.id)
+            if (metadata == null) metadata = youtubeMetadata?.toTrackMetadata()
+        }
+        return track.copy(
+            metadata = metadata,
+            youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
+        )
     }
 }

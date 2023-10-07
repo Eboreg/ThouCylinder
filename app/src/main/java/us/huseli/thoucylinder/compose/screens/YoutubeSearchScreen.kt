@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose.screens
 
-import androidx.annotation.MainThread
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,24 +30,24 @@ import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettings
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
+import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
+import us.huseli.thoucylinder.viewmodels.SearchViewModel
 import java.util.UUID
 
 @Composable
 fun YoutubeSearchScreen(
     modifier: Modifier = Modifier,
-    viewModel: YoutubeSearchViewModel = hiltViewModel(),
-    @MainThread onGotoAlbum: (UUID) -> Unit,
+    viewModel: SearchViewModel = hiltViewModel(),
+    onGotoAlbum: (UUID) -> Unit,
     onAddToPlaylistClick: (Selection) -> Unit,
 ) {
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
-    val albums by viewModel.albums.collectAsStateWithLifecycle(emptyList())
-    val tracks by viewModel.tracks.collectAsStateWithLifecycle(emptyList())
+    val albums by viewModel.youtubeAlbums.collectAsStateWithLifecycle(emptyList())
+    val tracks by viewModel.youtubeTracks.collectAsStateWithLifecycle(emptyList())
 
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
@@ -95,7 +94,7 @@ fun YoutubeSearchScreen(
                             onDownloadClick = { viewModel.downloadTrack(it) },
                             onPlayOrPauseClick = { viewModel.playOrPause(it) },
                             onLaunch = { track ->
-                                viewModel.loadTrackMetadata(track)
+                                viewModel.refreshTrackMetadata(track)
                             },
                             onAddToPlaylistClick = onAddToPlaylistClick,
                         )
@@ -113,7 +112,7 @@ fun YoutubeSearchScreen(
                             tracks = tracks,
                             viewModel = viewModel,
                             onLaunch = { track ->
-                                viewModel.loadTrackMetadata(track)
+                                viewModel.refreshTrackMetadata(track)
                             },
                             onAddToPlaylistClick = onAddToPlaylistClick,
                         )

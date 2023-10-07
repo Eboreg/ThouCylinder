@@ -37,25 +37,30 @@ import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
-import us.huseli.thoucylinder.viewmodels.LibraryViewModel
+import us.huseli.thoucylinder.viewmodels.AppViewModel
 import java.util.UUID
 
 @Composable
 fun App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    libraryViewModel: LibraryViewModel = hiltViewModel(),
+    viewModel: AppViewModel = hiltViewModel(),
 ) {
-    val playerCurrentPositionMs by libraryViewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
-    val playerPlaybackState by libraryViewModel.playerPlaybackState.collectAsStateWithLifecycle()
-    val playerCurrentTrack by libraryViewModel.playerCurrentTrack.collectAsStateWithLifecycle()
+    val playerCurrentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
+    val playerPlaybackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
+    val playerCurrentTrack by viewModel.playerCurrentTrack.collectAsStateWithLifecycle()
     var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
     val currentTrackImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
-    val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle(emptyList())
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+
+    LaunchedEffect(Unit) {
+        viewModel.deleteOrphanTracksAndAlbums()
+        viewModel.importNewMediaStoreAlbums()
+    }
 
     LaunchedEffect(playerCurrentTrack) {
-        playerCurrentTrack?.image?.also { currentTrackImageBitmap.value = libraryViewModel.getImageBitmap(it) }
+        playerCurrentTrack?.image?.also { currentTrackImageBitmap.value = viewModel.getImageBitmap(it) }
     }
 
     val mainMenuItems = listOf(
@@ -94,7 +99,7 @@ fun App(
         AddToPlaylistDialog(
             playlists = playlists,
             onSelect = { playlist ->
-                libraryViewModel.addSelectionToPlaylist(selection, playlist)
+                viewModel.addSelectionToPlaylist(selection, playlist)
                 addToPlaylistSelection = null
             },
             onCancel = { addToPlaylistSelection = null }
@@ -113,7 +118,7 @@ fun App(
                     playbackState = playerPlaybackState,
                     currentPositionMs = playerCurrentPositionMs,
                     imageBitmap = currentTrackImageBitmap.value,
-                    onPlayOrPauseClick = { playerCurrentTrack?.also { libraryViewModel.playOrPause(it) } },
+                    onPlayOrPauseClick = { playerCurrentTrack?.also { viewModel.playOrPause(it) } },
                     onNextClick = { },
                 )
             }
@@ -149,7 +154,6 @@ fun App(
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
                     onPlaylistClick = onPlaylistClick,
-                    viewModel = libraryViewModel,
                     onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }

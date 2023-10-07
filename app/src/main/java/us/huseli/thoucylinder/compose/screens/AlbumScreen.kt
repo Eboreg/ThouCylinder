@@ -86,7 +86,8 @@ fun AlbumScreen(
                 onCancel = { addAlbumDialogOpen = false },
                 onSave = {
                     addAlbumDialogOpen = false
-                    viewModel.addToLibrary(it)
+                    viewModel.saveAlbumWithTracks(it)
+                    viewModel.tagAlbumTracks(it)
                 }
             )
         } else if (editAlbumDialogOpen) {
@@ -95,7 +96,8 @@ fun AlbumScreen(
                 onCancel = { editAlbumDialogOpen = false },
                 onSave = {
                     editAlbumDialogOpen = false
-                    viewModel.updateAlbumWithTracks(it)
+                    viewModel.saveAlbumWithTracks(it)
+                    viewModel.tagAlbumTracks(it)
                 }
             )
         }

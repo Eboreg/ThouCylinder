@@ -9,6 +9,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.zipBy
 import us.huseli.thoucylinder.BuildConfig
@@ -47,19 +49,25 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
     // Written over for every new search:
     private val _albumSearchResults = MutableStateFlow<List<Album>>(emptyList())
     private val _trackSearchResults = MutableStateFlow<List<Track>>(emptyList())
-    private val _playlistVideos = mutableMapOf<String, List<YoutubeVideo>>()
 
     private val gson: Gson = GsonBuilder().create()
+    private val metadataCache = mutableMapOf<String, YoutubeMetadataList>()
+    private val playlistVideoCache = mutableMapOf<String, List<YoutubeVideo>>()
     private val responseType = object : TypeToken<Map<String, *>>() {}
-    private val metadataMap = mutableMapOf<String, YoutubeMetadataList>()
+    private val trackSearchResultsMutex = Mutex()
 
     val albumSearchResults = _albumSearchResults.asStateFlow()
     val trackSearchResults = _trackSearchResults.asStateFlow()
 
-    fun updateSearchResultTrack(track: Track) {
-        _trackSearchResults.value = _trackSearchResults.value.toMutableList().apply {
-            indexOfFirst { it.trackId == track.trackId }.takeIf { it > -1 }?.also { index ->
-                this[index] = track
+    /** If any of the tracks are present in _trackSearchResults, update them. */
+    suspend fun updateTracks(vararg tracks: Track) {
+        trackSearchResultsMutex.withLock {
+            _trackSearchResults.value = _trackSearchResults.value.toMutableList().apply {
+                tracks.forEach { track ->
+                    indexOfFirst { it.trackId == track.trackId }.takeIf { it > -1 }?.also { index ->
+                        this[index] = track
+                    }
+                }
             }
         }
     }
@@ -106,7 +114,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
         )
 
     suspend fun listPlaylistVideos(playlist: YoutubePlaylist, withMetadata: Boolean): List<YoutubeVideo> {
-        _playlistVideos[playlist.id]?.let { return it }
+        playlistVideoCache[playlist.id]?.let { return it }
 
         val items = listPlaylistItems(playlist.id)
         val videos = listVideoDetails(videoIds = items.map { it.videoId }, withMetadata = withMetadata)
@@ -117,7 +125,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 video.copy(playlistItemId = item.id, playlistPosition = item.position)
             }
             .sortedBy { it.playlistPosition }
-            .also { _playlistVideos[playlist.id] = it }
+            .also { playlistVideoCache[playlist.id] = it }
     }
 
     suspend fun search(query: String) {
@@ -241,7 +249,9 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
             }
 
         _albumSearchResults.value = albums
-        _trackSearchResults.value = tracks
+        trackSearchResultsMutex.withLock {
+            _trackSearchResults.value = tracks
+        }
     }
 
     /**
@@ -284,7 +294,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun getMetadataList(videoId: String): YoutubeMetadataList {
-        metadataMap[videoId]?.let { return it }
+        metadataCache[videoId]?.let { return it }
 
         val gson: Gson = GsonBuilder().create()
         val data: Map<String, *> = mapOf(
@@ -350,7 +360,7 @@ class YoutubeRepository @Inject constructor(@ApplicationContext private val cont
                 )
             }
         }
-        metadataMap[videoId] = metadataList
+        metadataCache[videoId] = metadataList
         return metadataList
     }
 

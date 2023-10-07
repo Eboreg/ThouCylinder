@@ -11,34 +11,23 @@ import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.repositories.LocalRepository
+import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import javax.inject.Inject
 
 @HiltViewModel
-class YoutubeSearchViewModel @Inject constructor(
+class SearchViewModel @Inject constructor(
     private val youtubeRepo: YoutubeRepository,
     playerRepo: PlayerRepository,
     private val repo: LocalRepository,
-) : BaseViewModel(playerRepo, repo, youtubeRepo) {
+    mediaStoreRepo: MediaStoreRepository,
+) : BaseViewModel(repo, playerRepo, youtubeRepo, mediaStoreRepo) {
     private val _isSearching = MutableStateFlow(false)
 
     val isSearching = _isSearching.asStateFlow()
-    val albums = youtubeRepo.albumSearchResults.map { albums -> albums.map { AlbumPojo(album = it) } }
-    val tracks = youtubeRepo.trackSearchResults
-
-    suspend fun loadTrackMetadata(track: Track) {
-        var metadata = track.metadata
-        var youtubeMetadata = track.youtubeVideo?.metadata
-
-        if (track.youtubeVideo != null) {
-            if (youtubeMetadata == null) youtubeMetadata = youtubeRepo.getBestMetadata(track.youtubeVideo.id)
-            if (metadata == null) metadata = youtubeMetadata?.toTrackMetadata()
-            youtubeRepo.updateSearchResultTrack(
-                track.copy(metadata = metadata, youtubeVideo = track.youtubeVideo.copy(metadata = youtubeMetadata))
-            )
-        }
-    }
+    val youtubeAlbums = youtubeRepo.albumSearchResults.map { albums -> albums.map { AlbumPojo(album = it) } }
+    val youtubeTracks = youtubeRepo.trackSearchResults
 
     fun populateTempAlbum(pojo: AlbumPojo) {
         repo.addOrUpdateTempAlbum(AlbumWithTracksPojo(album = pojo.album, tracks = emptyList()))
@@ -55,6 +44,18 @@ class YoutubeSearchViewModel @Inject constructor(
 
                 repo.addOrUpdateTempAlbum(AlbumWithTracksPojo(album = pojo.album, tracks = tracks))
             }
+        }
+    }
+
+    fun refreshTrackMetadata(track: Track) = viewModelScope.launch(Dispatchers.IO) {
+        val newTrack = ensureTrackMetadata(track)
+
+        if (
+            (track.metadata == null && newTrack.metadata != null) ||
+            (track.youtubeVideo?.metadata == null && newTrack.youtubeVideo?.metadata != null)
+        ) {
+            youtubeRepo.updateTracks(newTrack)
+            repo.updateTracks(newTrack)
         }
     }
 

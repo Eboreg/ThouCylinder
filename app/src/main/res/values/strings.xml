@@ -15,7 +15,6 @@
     <string name="channels">Channels</string>
     <string name="close">Close</string>
     <string name="converting">Converting</string>
-    <string name="created_date">Created %1$s</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading</string>
     <string name="edit">Edit</string>
@@ -53,7 +52,6 @@
     <string name="track_information">Track information</string>
     <string name="tracks">Tracks</string>
     <string name="unselect_all">Unselect all</string>
-    <string name="updated_date">Updated %1$s</string>
     <string name="year">Year</string>
     <string name="youtube_playlist">Youtube playlist</string>
     <plurals name="x_selected_tracks">

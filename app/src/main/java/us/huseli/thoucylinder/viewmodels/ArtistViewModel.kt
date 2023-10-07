@@ -11,6 +11,7 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.repositories.LocalRepository
+import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 import javax.inject.Inject
@@ -21,7 +22,8 @@ class ArtistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     playerRepo: PlayerRepository,
     youtubeRepo: YoutubeRepository,
-) : BaseViewModel(playerRepo, repo, youtubeRepo) {
+    mediaStoreRepo: MediaStoreRepository,
+) : BaseViewModel(repo, playerRepo, youtubeRepo, mediaStoreRepo) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
 

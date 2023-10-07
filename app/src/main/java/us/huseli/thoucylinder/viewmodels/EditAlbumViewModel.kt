@@ -19,7 +19,7 @@ import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.Style
 import us.huseli.thoucylinder.dataclasses.Track
 import us.huseli.thoucylinder.repositories.DiscogsRepository
-import us.huseli.thoucylinder.repositories.LocalRepository
+import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -27,7 +27,7 @@ import javax.inject.Inject
 @HiltViewModel
 class EditAlbumViewModel @Inject constructor(
     private val discogsRepo: DiscogsRepository,
-    private val repo: LocalRepository,
+    private val mediaStoreRepo: MediaStoreRepository,
 ) : ViewModel() {
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
     private val _images = MutableStateFlow<List<Pair<Image, ImageBitmap>>>(emptyList())
@@ -107,7 +107,7 @@ class EditAlbumViewModel @Inject constructor(
             image.getImageBitmap()?.also { pairs.add(Pair(image, it)) }
         }
         _albumPojo.value?.also { pojo ->
-            repo.getAlbumArtFromAlbumFolder(pojo).forEach { importedImage ->
+            mediaStoreRepo.getAlbumArtFromAlbumFolder(pojo).forEach { importedImage ->
                 val image = Image(
                     width = importedImage.bitmap.width,
                     height = importedImage.bitmap.height,

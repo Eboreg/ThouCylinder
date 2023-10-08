@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.ContentValues
 import android.content.Context
@@ -11,6 +11,9 @@ import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
+import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.getMediaStoreFileNullable
 import java.io.File
 import java.util.UUID
@@ -25,7 +28,7 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("albumId"), Index("title"), Index("artist")],
+    indices = [Index("albumId"), Index("title"), Index("artist"), Index("isInLibrary")],
 )
 data class Track(
     @PrimaryKey val trackId: UUID = UUID.randomUUID(),

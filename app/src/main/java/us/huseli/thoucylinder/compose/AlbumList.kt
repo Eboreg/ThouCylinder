@@ -32,9 +32,10 @@ fun AlbumList(
     albums: List<AlbumPojo>,
     viewModel: BaseViewModel,
     onAlbumClick: (AlbumPojo) -> Unit,
+    modifier: Modifier = Modifier,
     showArtist: Boolean = true,
 ) {
-    ItemList(things = albums, onCardClick = onAlbumClick) { pojo ->
+    ItemList(modifier = modifier, things = albums, onCardClick = onAlbumClick) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
         val firstRow =
             if (showArtist && pojo.album.artist != null) "${pojo.album.artist} - ${pojo.album.title}"

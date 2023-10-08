@@ -41,6 +41,7 @@ import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 @Composable
 fun EditAlbumDialog(
     initialAlbumPojo: AlbumWithTracksPojo,
+    title: String,
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
     onCancel: () -> Unit,
@@ -60,6 +61,7 @@ fun EditAlbumDialog(
             viewModel = viewModel,
             onNextClick = { step2 = true },
             onCancelClick = onCancel,
+            title = title,
         )
     } else {
         if (imagePairs.isNotEmpty()) {
@@ -88,6 +90,7 @@ fun EditAlbumDialog(
 fun EditAlbumDialogStep1(
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel,
+    title: String,
     onNextClick: () -> Unit,
     onCancelClick: () -> Unit,
 ) {
@@ -102,7 +105,7 @@ fun EditAlbumDialogStep1(
 
     AlertDialog(
         modifier = modifier.padding(10.dp),
-        title = { Text(text = stringResource(R.string.add_album_to_library)) },
+        title = { Text(title) },
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = ShapeDefaults.ExtraSmall,
         onDismissRequest = onCancelClick,

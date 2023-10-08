@@ -5,7 +5,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +17,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridItemScope
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,7 +56,7 @@ import androidx.paging.compose.itemKey
 import kotlinx.coroutines.CoroutineScope
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.themeColors
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
@@ -68,6 +66,7 @@ import java.util.UUID
 fun TrackGrid(
     tracks: LazyPagingItems<Track>,
     viewModel: BaseViewModel,
+    modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     onAddToPlaylistClick: (Selection) -> Unit,
@@ -76,6 +75,7 @@ fun TrackGrid(
     onLaunch: (suspend CoroutineScope.(Track) -> Unit)? = null,
 ) {
     TrackGrid(
+        modifier = modifier,
         viewModel = viewModel,
         gridState = gridState,
         onGotoAlbumClick = onGotoAlbumClick,
@@ -84,32 +84,6 @@ fun TrackGrid(
             items(count = tracks.itemCount, key = tracks.itemKey { it.trackId }) { index ->
                 tracks[index]?.also { track -> action(this, track) }
             }
-        },
-        onLaunch = onLaunch,
-        showArtist = showArtist,
-        onAddToPlaylistClick = onAddToPlaylistClick,
-    )
-}
-
-
-@Composable
-fun TrackGrid(
-    tracks: List<Track>,
-    viewModel: BaseViewModel,
-    gridState: LazyGridState = rememberLazyGridState(),
-    showArtist: Boolean = true,
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onGotoArtistClick: ((String) -> Unit)? = null,
-    onGotoAlbumClick: ((UUID) -> Unit)? = null,
-    onLaunch: (suspend CoroutineScope.(Track) -> Unit)? = null,
-) {
-    TrackGrid(
-        viewModel = viewModel,
-        gridState = gridState,
-        onGotoArtistClick = onGotoArtistClick,
-        onGotoAlbumClick = onGotoAlbumClick,
-        trackIterator = { action ->
-            items(tracks) { track -> action(this, track) }
         },
         onLaunch = onLaunch,
         showArtist = showArtist,
@@ -129,13 +103,14 @@ fun TrackGrid(
     onGotoArtistClick: ((String) -> Unit)?,
     onGotoAlbumClick: ((UUID) -> Unit)?,
     onLaunch: (suspend CoroutineScope.(Track) -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
     val playerCurrentTrack by viewModel.playerCurrentTrack.collectAsStateWithLifecycle()
     val playerPlaybackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
         SelectedTracksButtons(
             selection = selection,
             onAddToPlaylistClick = { onAddToPlaylistClick(selection) },
@@ -145,7 +120,7 @@ fun TrackGrid(
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
+            // contentPadding = PaddingValues(horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
@@ -155,6 +130,7 @@ fun TrackGrid(
                 val isPlaying = playerCurrentTrack?.trackId == track.trackId &&
                     playerPlaybackState == PlayerRepository.PlaybackState.PLAYING
                 val isSelected = selection.isTrackSelected(track)
+                var metadata by rememberSaveable { mutableStateOf(track.metadata) }
 
                 if (onLaunch != null) LaunchedEffect(Unit) {
                     onLaunch(track)
@@ -162,6 +138,7 @@ fun TrackGrid(
 
                 LaunchedEffect(Unit) {
                     track.image?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+                    if (metadata == null) metadata = viewModel.getTrackMetadata(track)
                 }
 
                 OutlinedCard(
@@ -180,7 +157,7 @@ fun TrackGrid(
                             topContent = {
                                 Row {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        track.metadata?.duration?.let { duration ->
+                                        metadata?.duration?.let { duration ->
                                             Surface(
                                                 shape = CutCornerShape(bottomEndPercent = 100),
                                                 color = MaterialTheme.colorScheme.error,
@@ -216,6 +193,7 @@ fun TrackGrid(
                                         )
                                         TrackContextMenu(
                                             track = track,
+                                            metadata = metadata,
                                             onDownloadClick = { viewModel.downloadTrack(track) },
                                             onDismissRequest = { isContextMenuShown = false },
                                             isShown = isContextMenuShown,

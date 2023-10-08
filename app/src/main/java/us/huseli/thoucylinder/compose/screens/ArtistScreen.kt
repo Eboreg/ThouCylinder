@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.Icon
@@ -14,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -22,7 +24,7 @@ import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.AlbumGrid
 import us.huseli.thoucylinder.compose.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
-import us.huseli.thoucylinder.compose.ListSettings
+import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
@@ -52,7 +54,7 @@ fun ArtistScreen(
             Text(text = artist, style = MaterialTheme.typography.headlineSmall)
         }
 
-        ListSettings(
+        ListSettingsRow(
             displayType = displayType,
             listType = listType,
             onDisplayTypeChange = { viewModel.setDisplayType(it) },
@@ -60,40 +62,42 @@ fun ArtistScreen(
             excludeListTypes = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
         )
 
-        when (listType) {
-            ListType.ALBUMS -> when (displayType) {
-                DisplayType.LIST -> AlbumList(
-                    albums = albumPojos,
-                    viewModel = viewModel,
-                    showArtist = false,
-                    onAlbumClick = { onAlbumClick(it.album.albumId) },
-                )
-                DisplayType.GRID -> AlbumGrid(
-                    albums = albumPojos,
-                    viewModel = viewModel,
-                    onAlbumClick = { onAlbumClick(it.album.albumId) },
-                )
+        Column(modifier = Modifier.padding(horizontal = 10.dp)) {
+            when (listType) {
+                ListType.ALBUMS -> when (displayType) {
+                    DisplayType.LIST -> AlbumList(
+                        albums = albumPojos,
+                        viewModel = viewModel,
+                        showArtist = false,
+                        onAlbumClick = { onAlbumClick(it.album.albumId) },
+                    )
+                    DisplayType.GRID -> AlbumGrid(
+                        albums = albumPojos,
+                        viewModel = viewModel,
+                        onAlbumClick = { onAlbumClick(it.album.albumId) },
+                    )
+                }
+                ListType.TRACKS -> when (displayType) {
+                    DisplayType.LIST -> TrackList(
+                        tracks = tracks,
+                        viewModel = viewModel,
+                        onDownloadClick = { viewModel.downloadTrack(it) },
+                        onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                        onGotoAlbumClick = onAlbumClick,
+                        showArtist = false,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                    DisplayType.GRID -> TrackGrid(
+                        tracks = tracks,
+                        viewModel = viewModel,
+                        onGotoAlbumClick = onAlbumClick,
+                        showArtist = false,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
+                ListType.ARTISTS -> {}
+                ListType.PLAYLISTS -> {}
             }
-            ListType.TRACKS -> when (displayType) {
-                DisplayType.LIST -> TrackList(
-                    tracks = tracks,
-                    viewModel = viewModel,
-                    onDownloadClick = { viewModel.downloadTrack(it) },
-                    onPlayOrPauseClick = { viewModel.playOrPause(it) },
-                    onGotoAlbumClick = onAlbumClick,
-                    showArtist = false,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-                DisplayType.GRID -> TrackGrid(
-                    tracks = tracks,
-                    viewModel = viewModel,
-                    onGotoAlbumClick = onAlbumClick,
-                    showArtist = false,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-            }
-            ListType.ARTISTS -> {}
-            ListType.PLAYLISTS -> {}
         }
     }
 }

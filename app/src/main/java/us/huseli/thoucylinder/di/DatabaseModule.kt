@@ -6,8 +6,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import us.huseli.thoucylinder.database.AlbumDao
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.database.MusicDao
+import us.huseli.thoucylinder.database.ArtistDao
+import us.huseli.thoucylinder.database.PlaylistDao
+import us.huseli.thoucylinder.database.TrackDao
+import us.huseli.thoucylinder.database.YoutubeSearchDao
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
@@ -18,5 +22,17 @@ class DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): Database = Database.build(context)
 
     @Provides
-    fun provideMusicDao(database: Database): MusicDao = database.musicDao()
+    fun provideArtistDao(database: Database): ArtistDao = database.artistDao()
+
+    @Provides
+    fun provideTrackDao(database: Database): TrackDao = database.trackDao()
+
+    @Provides
+    fun provideAlbumDao(database: Database): AlbumDao = database.albumDao()
+
+    @Provides
+    fun providePlaylistDao(database: Database): PlaylistDao = database.playlistDao()
+
+    @Provides
+    fun provideYoutubeSearchDao(database: Database): YoutubeSearchDao = database.youtubeSearchDao()
 }

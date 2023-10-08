@@ -18,7 +18,9 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.LoadStatus
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
@@ -132,4 +134,20 @@ class AlbumViewModel @Inject constructor(
     private suspend fun ensureTrackMetadata(pojo: AlbumWithTracksPojo): AlbumWithTracksPojo = pojo.copy(
         tracks = pojo.tracks.map { track -> ensureTrackMetadata(track) }
     )
+
+    private suspend fun ensureTrackMetadata(track: Track): Track {
+        val (metadata, youtubeMetadata) = getTrackAndYoutubeMetadata(track)
+
+        return track.copy(
+            metadata = metadata,
+            youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
+        )
+    }
+
+    private suspend fun getTrackAndYoutubeMetadata(track: Track): Pair<TrackMetadata?, YoutubeMetadata?> {
+        val youtubeMetadata = track.youtubeVideo?.metadata ?: youtubeRepo.getBestMetadata(track)
+        val metadata = track.metadata ?: youtubeMetadata?.toTrackMetadata()
+
+        return Pair(metadata, youtubeMetadata)
+    }
 }

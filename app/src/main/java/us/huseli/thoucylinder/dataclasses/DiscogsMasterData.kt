@@ -9,7 +9,7 @@ data class DiscogsMasterTrack(
     val year: Int? = null,
 ) {
     val artist: String?
-        get() = artists?.joinToString("/") { it.name }
+        get() = artists?.join()
 }
 
 
@@ -32,8 +32,13 @@ data class DiscogsMasterData(
     val images: List<DiscogsMasterImage> = emptyList(),
 ) {
     val artist: String
-        get() = artists.joinToString("/") { it.name }
+        get() = artists.join()
 }
 
 
 data class DiscogsMaster(val data: DiscogsMasterData)
+
+
+/** Get rid of the pesky "(2)" etc. appended to artists with duplicate names. */
+fun List<DiscogsArtist>.join(): String =
+    joinToString("/") { it.name.replace(Regex(" \\(\\d+\\)$"), "") }

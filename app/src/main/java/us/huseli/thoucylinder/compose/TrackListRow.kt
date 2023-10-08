@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.themeColors
 import java.util.UUID
 
@@ -44,6 +45,7 @@ import java.util.UUID
 @Composable
 fun TrackListRow(
     track: Track,
+    metadata: TrackMetadata?,
     showArtist: Boolean,
     isPlaying: Boolean,
     onDownloadClick: () -> Unit,
@@ -102,12 +104,13 @@ fun TrackListRow(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                track.metadata?.let {
+                metadata?.let {
                     Text(text = it.duration.sensibleFormat(), modifier = Modifier.padding(start = 5.dp))
                 }
 
                 TrackContextMenuWithButton(
                     track = track,
+                    metadata = metadata,
                     onDownloadClick = onDownloadClick,
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
                     onGotoAlbumClick = onGotoAlbumClick,

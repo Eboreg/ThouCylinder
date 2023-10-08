@@ -53,12 +53,13 @@ fun PlaylistScreen(
         }
 
         if (tracks.itemCount == 0) {
-            Text(text = stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(5.dp))
+            Text(text = stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp))
         }
 
         TrackList(
             tracks = tracks,
             viewModel = viewModel,
+            modifier = Modifier.padding(horizontal = 10.dp),
             onDownloadClick = { viewModel.downloadTrack(it) },
             onPlayOrPauseClick = { viewModel.playOrPause(it) },
             onAddToPlaylistClick = { onAddToPlaylistClick(it) },

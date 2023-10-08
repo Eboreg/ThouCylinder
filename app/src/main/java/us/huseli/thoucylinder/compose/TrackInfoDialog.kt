@@ -18,12 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.themeColors
 
 @Composable
 fun TrackInfoDialog(
     track: Track,
+    metadata: TrackMetadata?,
     modifier: Modifier = Modifier,
     onClose: () -> Unit,
 ) {
@@ -36,7 +38,7 @@ fun TrackInfoDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 TrackInfoTextRow(label = stringResource(R.string.year), value = track.year?.toString() ?: "-")
-                track.metadata?.let { metadata ->
+                metadata?.let { metadata ->
                     TrackInfoTextRow(label = stringResource(R.string.mime_type), value = metadata.mimeType)
                     TrackInfoTextRow(
                         label = stringResource(R.string.file_size),

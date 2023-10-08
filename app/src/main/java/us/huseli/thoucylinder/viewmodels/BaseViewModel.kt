@@ -8,10 +8,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
@@ -34,27 +36,32 @@ abstract class BaseViewModel(
     val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
 
     fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
-        track.youtubeVideo?.let { video ->
-            try {
-                var newTrack = youtubeRepo.downloadTrack(
-                    video = video,
-                    progressCallback = {
-                        _trackDownloadProgressMap.value += track.trackId to it.copy(progress = it.progress * 0.8)
-                    },
-                )
-                newTrack = mediaStoreRepo.moveTaggedTrackToMediaStore(newTrack) {
-                    _trackDownloadProgressMap.value += track.trackId to it.copy(progress = 0.8 + (it.progress * 0.2))
+        try {
+            var newTrack = youtubeRepo.downloadTrack(
+                track = track,
+                progressCallback = {
+                    _trackDownloadProgressMap.value += track.trackId to it.copy(progress = it.progress * 0.8)
                 }
-                repo.insertTrack(newTrack)
-            } catch (e: Exception) {
-                Log.e("downloadTrack", e.toString(), e)
-            } finally {
-                _trackDownloadProgressMap.value -= track.trackId
+            )
+            newTrack = mediaStoreRepo.moveTaggedTrackToMediaStore(newTrack) {
+                _trackDownloadProgressMap.value += track.trackId to it.copy(progress = 0.8 + (it.progress * 0.2))
             }
+            repo.insertTrack(newTrack)
+        } catch (e: Exception) {
+            Log.e("downloadTrack", e.toString(), e)
+        } finally {
+            _trackDownloadProgressMap.value -= track.trackId
         }
     }
 
     suspend fun getImageBitmap(image: Image): ImageBitmap? = repo.getImageBitmap(image)
+
+    suspend fun getTrackMetadata(track: Track): TrackMetadata? {
+        if (track.metadata != null) return track.metadata
+        val youtubeMetadata =
+            track.youtubeVideo?.metadata ?: withContext(Dispatchers.IO) { youtubeRepo.getBestMetadata(track) }
+        return youtubeMetadata?.toTrackMetadata()
+    }
 
     fun playOrPause(track: Track) = playerRepo.playOrPause(track)
 
@@ -64,19 +71,5 @@ abstract class BaseViewModel(
 
     fun unselectAllTracks() {
         _selection.value = _selection.value.copy(tracks = emptyList())
-    }
-
-    protected suspend fun ensureTrackMetadata(track: Track): Track {
-        var metadata = track.metadata
-        var youtubeMetadata = track.youtubeVideo?.metadata
-
-        if (track.youtubeVideo != null) {
-            if (youtubeMetadata == null) youtubeMetadata = youtubeRepo.getBestMetadata(track.youtubeVideo.id)
-            if (metadata == null) metadata = youtubeMetadata?.toTrackMetadata()
-        }
-        return track.copy(
-            metadata = metadata,
-            youtubeVideo = track.youtubeVideo?.copy(metadata = youtubeMetadata),
-        )
     }
 }

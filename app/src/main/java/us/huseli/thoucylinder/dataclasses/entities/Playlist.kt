@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.entities
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -6,8 +6,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 import java.util.UUID
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 abstract class AbstractPlaylist {
     abstract val playlistId: UUID
@@ -53,18 +51,3 @@ data class PlaylistTrack(
     val trackId: UUID,
     val position: Int,
 )
-
-
-data class PlaylistPojo(
-    override val playlistId: UUID = UUID.randomUUID(),
-    override val name: String = "",
-    override val created: Instant? = null,
-    override val updated: Instant? = null,
-    val trackCount: Int = 0,
-    val totalDurationMs: Long = 0L,
-) : AbstractPlaylist() {
-    val totalDuration: Duration
-        get() = totalDurationMs.milliseconds
-
-    override fun toString() = name
-}

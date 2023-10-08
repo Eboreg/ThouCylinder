@@ -13,8 +13,8 @@ import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.dataclasses.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.Playlist
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository

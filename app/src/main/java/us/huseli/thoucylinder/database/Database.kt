@@ -6,14 +6,16 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.dataclasses.Album
-import us.huseli.thoucylinder.dataclasses.AlbumGenre
-import us.huseli.thoucylinder.dataclasses.AlbumStyle
-import us.huseli.thoucylinder.dataclasses.Genre
-import us.huseli.thoucylinder.dataclasses.Playlist
-import us.huseli.thoucylinder.dataclasses.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.Style
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
+import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
+import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
+import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
 import java.util.concurrent.Executors
 
 @androidx.room.Database(
@@ -26,13 +28,19 @@ import java.util.concurrent.Executors
         AlbumStyle::class,
         Playlist::class,
         PlaylistTrack::class,
+        YoutubeSearchToken::class,
+        YoutubeQueryTrack::class,
     ],
     exportSchema = false,
-    version = 29,
+    version = 37,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
-    abstract fun musicDao(): MusicDao
+    abstract fun artistDao(): ArtistDao
+    abstract fun trackDao(): TrackDao
+    abstract fun albumDao(): AlbumDao
+    abstract fun playlistDao(): PlaylistDao
+    abstract fun youtubeSearchDao(): YoutubeSearchDao
 
     companion object {
         fun build(context: Context): Database {

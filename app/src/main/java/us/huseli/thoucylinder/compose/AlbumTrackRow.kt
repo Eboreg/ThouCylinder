@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import java.util.UUID
 
@@ -71,6 +71,7 @@ fun AlbumTrackRow(
 
                 TrackContextMenuWithButton(
                     track = track,
+                    metadata = track.metadata,
                     onDownloadClick = onDownloadClick,
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
                     onGotoArtistClick = onArtistClick,

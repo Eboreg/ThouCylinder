@@ -31,17 +31,14 @@ fun <T> ItemList(
     ListWithNumericBar(
         listState = listState,
         listSize = things.size,
-        modifier = modifier,
         minItems = 20,
     ) {
-        val paddingValues =
-            if (things.size >= 20) PaddingValues(start = 10.dp)
-            else PaddingValues(horizontal = 10.dp)
+        if (things.size >= 20) PaddingValues(start = 10.dp)
+        else PaddingValues(horizontal = 10.dp)
 
         LazyColumn(
             modifier = modifier,
             state = listState,
-            contentPadding = paddingValues,
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             items(things) { thing ->

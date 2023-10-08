@@ -18,12 +18,12 @@ import us.huseli.thoucylinder.ExtractTrackDataException
 import us.huseli.thoucylinder.MediaStoreException
 import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.TrackDownloadException
-import us.huseli.thoucylinder.dataclasses.Album
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.MediaStoreData
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.MediaStoreData
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata

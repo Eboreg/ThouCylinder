@@ -36,8 +36,9 @@ import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
-import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
+import us.huseli.thoucylinder.compose.screens.SearchScreen
 import us.huseli.thoucylinder.viewmodels.AppViewModel
+import us.huseli.thoucylinder.viewmodels.SearchViewModel
 import java.util.UUID
 
 @Composable
@@ -45,6 +46,7 @@ fun App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     viewModel: AppViewModel = hiltViewModel(),
+    searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
     val playerCurrentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
     val playerPlaybackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
@@ -142,8 +144,9 @@ fun App(
         ) {
             composable(route = SearchDestination.route) {
                 activeScreen = "search"
-                YoutubeSearchScreen(
-                    onGotoAlbum = onAlbumClick,
+                SearchScreen(
+                    viewModel = searchViewModel,
+                    onAlbumClick = onAlbumClick,
                     onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }

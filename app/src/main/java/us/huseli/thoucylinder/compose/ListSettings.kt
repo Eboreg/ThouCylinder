@@ -16,16 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.circular
 import us.huseli.thoucylinder.R
 
 enum class DisplayType { LIST, GRID }
 
 enum class ListType { ALBUMS, TRACKS, ARTISTS, PLAYLISTS }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListSettings(
+fun ListSettingsRow(
     displayType: DisplayType,
     listType: ListType,
     onDisplayTypeChange: (DisplayType) -> Unit,
@@ -34,60 +32,86 @@ fun ListSettings(
     availableDisplayTypes: List<DisplayType> = DisplayType.values().toList(),
     excludeListTypes: List<ListType> = emptyList(),
 ) {
-    val nextDisplayType = { dt: DisplayType ->
-        availableDisplayTypes.indexOf(dt).let { index ->
-            if (index == availableDisplayTypes.lastIndex) availableDisplayTypes[0]
-            else availableDisplayTypes[index + 1]
-        }
-    }
-
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp),
+        modifier = modifier.fillMaxWidth().padding(start = 10.dp),
         horizontalArrangement = Arrangement.SpaceAround,
     ) {
         Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (!excludeListTypes.contains(ListType.ALBUMS)) {
-                InputChip(
-                    selected = listType == ListType.ALBUMS,
-                    onClick = { onListTypeChange(ListType.ALBUMS) },
-                    label = { Text(text = stringResource(R.string.albums)) },
-                )
-            }
-            if (!excludeListTypes.contains(ListType.TRACKS)) {
-                InputChip(
-                    selected = listType == ListType.TRACKS,
-                    onClick = { onListTypeChange(ListType.TRACKS) },
-                    label = { Text(text = stringResource(R.string.tracks)) },
-                )
-            }
-            if (!excludeListTypes.contains(ListType.ARTISTS)) {
-                InputChip(
-                    selected = listType == ListType.ARTISTS,
-                    onClick = { onListTypeChange(ListType.ARTISTS) },
-                    label = { Text(text = stringResource(R.string.artists)) },
-                )
-            }
-            if (!excludeListTypes.contains(ListType.PLAYLISTS)) {
-                InputChip(
-                    selected = listType == ListType.PLAYLISTS,
-                    onClick = { onListTypeChange(ListType.PLAYLISTS) },
-                    label = { Text(text = stringResource(R.string.playlists)) },
-                )
-            }
-        }
+            content = { ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes) },
+        )
+        ListDisplayTypeButton(current = displayType, onChange = onDisplayTypeChange, available = availableDisplayTypes)
+    }
+}
 
-        IconButton(
-            onClick = { onDisplayTypeChange(nextDisplayType(displayType)) },
-            enabled = availableDisplayTypes.size > 1,
-            content = {
-                when (displayType) {
-                    DisplayType.LIST -> Icon(Icons.Sharp.GridView, null)
-                    DisplayType.GRID -> Icon(Icons.AutoMirrored.Sharp.ViewList, null)
-                }
-            }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ListTypeChips(
+    current: ListType,
+    onChange: (ListType) -> Unit,
+    modifier: Modifier = Modifier,
+    exclude: List<ListType> = emptyList(),
+) {
+    if (!exclude.contains(ListType.ALBUMS)) {
+        InputChip(
+            modifier = modifier,
+            selected = current == ListType.ALBUMS,
+            onClick = { onChange(ListType.ALBUMS) },
+            label = { Text(text = stringResource(R.string.albums)) },
         )
     }
+    if (!exclude.contains(ListType.TRACKS)) {
+        InputChip(
+            modifier = modifier,
+            selected = current == ListType.TRACKS,
+            onClick = { onChange(ListType.TRACKS) },
+            label = { Text(text = stringResource(R.string.tracks)) },
+        )
+    }
+    if (!exclude.contains(ListType.ARTISTS)) {
+        InputChip(
+            modifier = modifier,
+            selected = current == ListType.ARTISTS,
+            onClick = { onChange(ListType.ARTISTS) },
+            label = { Text(text = stringResource(R.string.artists)) },
+        )
+    }
+    if (!exclude.contains(ListType.PLAYLISTS)) {
+        InputChip(
+            modifier = modifier,
+            selected = current == ListType.PLAYLISTS,
+            onClick = { onChange(ListType.PLAYLISTS) },
+            label = { Text(text = stringResource(R.string.playlists)) },
+        )
+    }
+}
+
+
+@Composable
+fun ListDisplayTypeButton(
+    current: DisplayType,
+    onChange: (DisplayType) -> Unit,
+    modifier: Modifier = Modifier,
+    available: List<DisplayType> = DisplayType.values().toList(),
+) {
+    val nextDisplayType = { dt: DisplayType ->
+        available.indexOf(dt).let { index ->
+            if (index == available.lastIndex) available[0]
+            else available[index + 1]
+        }
+    }
+
+    IconButton(
+        modifier = modifier,
+        onClick = { onChange(nextDisplayType(current)) },
+        enabled = available.size > 1,
+        content = {
+            when (current) {
+                DisplayType.LIST -> Icon(Icons.Sharp.GridView, null)
+                DisplayType.GRID -> Icon(Icons.AutoMirrored.Sharp.ViewList, null)
+            }
+        }
+    )
 }

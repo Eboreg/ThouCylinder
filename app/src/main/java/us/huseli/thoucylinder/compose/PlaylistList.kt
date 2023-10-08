@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
-import us.huseli.thoucylinder.dataclasses.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.PlaylistPojo
 
 @Composable

@@ -5,7 +5,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
 import us.huseli.thoucylinder.repositories.LocalRepository
 import us.huseli.thoucylinder.repositories.MediaStoreRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository

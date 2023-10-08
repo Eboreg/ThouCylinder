@@ -74,6 +74,7 @@ fun AlbumScreen(
         if (addDownloadedAlbumDialogOpen) {
             EditAlbumDialog(
                 initialAlbumPojo = pojo,
+                title = stringResource(R.string.add_album_to_library),
                 onCancel = { addDownloadedAlbumDialogOpen = false },
                 onSave = {
                     addDownloadedAlbumDialogOpen = false
@@ -83,6 +84,7 @@ fun AlbumScreen(
         } else if (addAlbumDialogOpen) {
             EditAlbumDialog(
                 initialAlbumPojo = pojo,
+                title = stringResource(R.string.add_album_to_library),
                 onCancel = { addAlbumDialogOpen = false },
                 onSave = {
                     addAlbumDialogOpen = false
@@ -93,6 +95,7 @@ fun AlbumScreen(
         } else if (editAlbumDialogOpen) {
             EditAlbumDialog(
                 initialAlbumPojo = pojo,
+                title = stringResource(R.string.update_album),
                 onCancel = { editAlbumDialogOpen = false },
                 onSave = {
                     editAlbumDialogOpen = false

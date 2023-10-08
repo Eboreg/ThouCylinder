@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder
 
-import us.huseli.thoucylinder.dataclasses.Album
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Track
 
 data class Selection(
     val tracks: List<Track> = emptyList(),

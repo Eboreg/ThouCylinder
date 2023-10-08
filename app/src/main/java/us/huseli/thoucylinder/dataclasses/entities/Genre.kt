@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.entities
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -7,13 +7,13 @@ import androidx.room.PrimaryKey
 import java.util.UUID
 
 @Entity
-data class Style(
-    @PrimaryKey val styleName: String,
+data class Genre(
+    @PrimaryKey val genreName: String,
 )
 
 @Entity(
-    primaryKeys = ["albumId", "styleName"],
-    indices = [Index("styleName")],
+    primaryKeys = ["albumId", "genreName"],
+    indices = [Index("genreName")],
     foreignKeys = [
         ForeignKey(
             entity = Album::class,
@@ -23,15 +23,15 @@ data class Style(
             onUpdate = ForeignKey.CASCADE,
         ),
         ForeignKey(
-            entity = Style::class,
-            parentColumns = ["styleName"],
-            childColumns = ["styleName"],
+            entity = Genre::class,
+            parentColumns = ["genreName"],
+            childColumns = ["genreName"],
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.RESTRICT,
         )
     ],
 )
-data class AlbumStyle(
+data class AlbumGenre(
     val albumId: UUID,
-    val styleName: String,
+    val genreName: String,
 )

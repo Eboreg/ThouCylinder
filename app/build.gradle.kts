@@ -85,7 +85,7 @@ android {
 
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.5.2"
-val daggerVersion = "2.48"
+val daggerVersion = "2.48.1"
 val composeVersion = "1.5.3"
 
 dependencies {

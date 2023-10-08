@@ -98,8 +98,13 @@ suspend fun urlRequest(
     body: ByteArray? = null,
 ): URLConnection = withContext(Dispatchers.IO) {
     return@withContext URL(urlString).openConnection().apply {
-        connectTimeout = URL_CONNECT_TIMEOUT
-        readTimeout = URL_READ_TIMEOUT
+        if (BuildConfig.DEBUG) {
+            connectTimeout = 0
+            readTimeout = 0
+        } else {
+            connectTimeout = URL_CONNECT_TIMEOUT
+            readTimeout = URL_READ_TIMEOUT
+        }
         Log.i("Utils", "urlRequest: $urlString")
         headers.forEach { (key, value) -> setRequestProperty(key, value) }
         if (body != null) {

@@ -1,14 +1,19 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.ContentValues
 import android.provider.MediaStore
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
+import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
 import java.util.UUID
 
-@Entity
+@Entity(
+    indices = [Index("isInLibrary")],
+)
 data class Album(
     @PrimaryKey val albumId: UUID = UUID.randomUUID(),
     val title: String,

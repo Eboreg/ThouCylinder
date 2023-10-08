@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

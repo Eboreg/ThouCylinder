@@ -22,13 +22,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Track
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import java.util.UUID
 
 
 @Composable
 fun TrackContextMenu(
     track: Track,
+    metadata: TrackMetadata?,
     isShown: Boolean,
     onDownloadClick: () -> Unit,
     onDismissRequest: () -> Unit,
@@ -41,7 +43,7 @@ fun TrackContextMenu(
     var isInfoDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     if (isInfoDialogOpen) {
-        TrackInfoDialog(track = track, onClose = { isInfoDialogOpen = false })
+        TrackInfoDialog(track = track, metadata = metadata, onClose = { isInfoDialogOpen = false })
     }
 
     DropdownMenu(
@@ -107,6 +109,7 @@ fun TrackContextMenu(
 @Composable
 fun TrackContextMenuWithButton(
     track: Track,
+    metadata: TrackMetadata?,
     onDownloadClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -123,6 +126,7 @@ fun TrackContextMenuWithButton(
             Icon(Icons.Sharp.MoreVert, null)
             TrackContextMenu(
                 track = track,
+                metadata = metadata,
                 onDownloadClick = onDownloadClick,
                 onDismissRequest = { isMenuShown = false },
                 isShown = isMenuShown,

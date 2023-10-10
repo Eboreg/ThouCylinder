@@ -10,6 +10,7 @@ import us.huseli.thoucylinder.database.AlbumDao
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.database.ArtistDao
 import us.huseli.thoucylinder.database.PlaylistDao
+import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.database.TrackDao
 import us.huseli.thoucylinder.database.YoutubeSearchDao
 import javax.inject.Singleton
@@ -35,4 +36,7 @@ class DatabaseModule {
 
     @Provides
     fun provideYoutubeSearchDao(database: Database): YoutubeSearchDao = database.youtubeSearchDao()
+
+    @Provides
+    fun provideQueueDao(database: Database): QueueDao = database.queueDao()
 }

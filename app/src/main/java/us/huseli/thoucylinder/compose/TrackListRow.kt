@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material.icons.sharp.MusicNote
-import androidx.compose.material.icons.sharp.Pause
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,9 +46,8 @@ fun TrackListRow(
     track: Track,
     metadata: TrackMetadata?,
     showArtist: Boolean,
-    isPlaying: Boolean,
     onDownloadClick: () -> Unit,
-    onPlayOrPauseClick: () -> Unit,
+    onPlayClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     onToggleSelected: () -> Unit,
     thumbnail: ImageBitmap?,
@@ -63,7 +61,7 @@ fun TrackListRow(
     Card(
         colors = CardDefaults.outlinedCardColors(),
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = modifier.fillMaxWidth().height(60.dp).combinedClickable(
+        modifier = modifier.fillMaxWidth().height(50.dp).combinedClickable(
             onClick = { if (selectOnShortClick) onToggleSelected() },
             onLongClick = onToggleSelected,
         ),
@@ -82,6 +80,7 @@ fun TrackListRow(
             } else {
                 Thumbnail(
                     image = thumbnail,
+                    shape = MaterialTheme.shapes.extraSmall,
                     modifier = Modifier.fillMaxHeight().padding(end = 10.dp),
                     placeholder = {
                         Image(
@@ -119,11 +118,8 @@ fun TrackListRow(
                 )
 
                 IconButton(
-                    onClick = onPlayOrPauseClick,
-                    content = {
-                        if (isPlaying) Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
-                        else Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play))
-                    },
+                    onClick = onPlayClick,
+                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                 )
             }
         }

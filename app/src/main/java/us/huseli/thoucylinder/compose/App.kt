@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.LibraryMusic
 import androidx.compose.material.icons.sharp.Search
 import androidx.compose.material3.Icon
@@ -12,11 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,13 +30,17 @@ import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.LibraryDestination
 import us.huseli.thoucylinder.PlaylistDestination
+import us.huseli.thoucylinder.QueueDestination
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchDestination
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
+import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
 import java.util.UUID
@@ -48,32 +52,26 @@ fun App(
     viewModel: AppViewModel = hiltViewModel(),
     searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
-    val playerCurrentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
-    val playerPlaybackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
-    val playerCurrentTrack by viewModel.playerCurrentTrack.collectAsStateWithLifecycle()
     var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
-    val currentTrackImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
 
     LaunchedEffect(Unit) {
-        viewModel.deleteOrphanTracksAndAlbums()
         viewModel.importNewMediaStoreAlbums()
-    }
-
-    LaunchedEffect(playerCurrentTrack) {
-        playerCurrentTrack?.image?.also { currentTrackImageBitmap.value = viewModel.getImageBitmap(it) }
+        viewModel.deleteOrphanTracksAndAlbums()
     }
 
     val mainMenuItems = listOf(
-        MainMenuItem("search", Icons.Sharp.Search),
-        MainMenuItem("library", Icons.Sharp.LibraryMusic),
+        MainMenuItem("search", Icons.Sharp.Search, stringResource(R.string.search)),
+        MainMenuItem("library", Icons.Sharp.LibraryMusic, stringResource(R.string.library)),
+        MainMenuItem("queue", Icons.AutoMirrored.Sharp.QueueMusic, stringResource(R.string.queue)),
     )
 
     val onMenuItemClick = { screen: String ->
         when (screen) {
             "search" -> navController.navigate(SearchDestination.route)
             "library" -> navController.navigate(LibraryDestination.route)
+            "queue" -> navController.navigate(QueueDestination.route)
         }
     }
 
@@ -104,27 +102,21 @@ fun App(
                 viewModel.addSelectionToPlaylist(selection, playlist)
                 addToPlaylistSelection = null
             },
+            onCreateNew = { name ->
+                val playlist = Playlist(name = name)
+                viewModel.addPlaylist(playlist, selection)
+                addToPlaylistSelection = null
+            },
             onCancel = { addToPlaylistSelection = null }
         )
     }
 
     ResponsiveScaffold(
-        portraitMenuModifier = Modifier.height(50.dp),
+        portraitMenuModifier = Modifier.height(80.dp),
         activeScreen = activeScreen,
         mainMenuItems = mainMenuItems,
         onMenuItemClick = onMenuItemClick,
-        bottomBar = {
-            playerCurrentTrack?.also { track ->
-                BottomBar(
-                    currentTrack = track,
-                    playbackState = playerPlaybackState,
-                    currentPositionMs = playerCurrentPositionMs,
-                    imageBitmap = currentTrackImageBitmap.value,
-                    onPlayOrPauseClick = { playerCurrentTrack?.also { viewModel.playOrPause(it) } },
-                    onNextClick = { },
-                )
-            }
-        },
+        bottomBar = { BottomBar() },
         landscapeMenu = { innerPadding ->
             NavigationRail(modifier = Modifier.padding(innerPadding)) {
                 mainMenuItems.forEach { item ->
@@ -158,6 +150,15 @@ fun App(
                     onArtistClick = onArtistClick,
                     onPlaylistClick = onPlaylistClick,
                     onAddToPlaylistClick = onAddToPlaylistClick,
+                )
+            }
+
+            composable(route = QueueDestination.route) {
+                activeScreen = "queue"
+                QueueScreen(
+                    onAddToPlaylistClick = onAddToPlaylistClick,
+                    onAlbumClick = onAlbumClick,
+                    onArtistClick = onArtistClick,
                 )
             }
 

@@ -18,24 +18,18 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.LoadStatus
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
-import us.huseli.thoucylinder.repositories.LocalRepository
-import us.huseli.thoucylinder.repositories.MediaStoreRepository
-import us.huseli.thoucylinder.repositories.PlayerRepository
-import us.huseli.thoucylinder.repositories.YoutubeRepository
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.repositories.Repositories
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class AlbumViewModel @Inject constructor(
-    private val repo: LocalRepository,
-    playerRepo: PlayerRepository,
-    private val youtubeRepo: YoutubeRepository,
+    private val repos: Repositories,
     savedStateHandle: SavedStateHandle,
-    private val mediaStoreRepo: MediaStoreRepository,
-) : BaseViewModel(repo, playerRepo, youtubeRepo, mediaStoreRepo) {
+) : BaseViewModel(repos) {
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
 
     private val _albumArt = MutableStateFlow<ImageBitmap?>(null)
@@ -54,7 +48,7 @@ class AlbumViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            combine(repo.getAlbumWithTracks(_albumId), repo.tempAlbumPojos) { pojo, tempPojos ->
+            combine(repos.local.getAlbumWithTracks(_albumId), repos.local.tempAlbumPojos) { pojo, tempPojos ->
                 pojo ?: tempPojos[_albumId]
             }.filterNotNull().distinctUntilChanged().collect { pojo ->
                 _albumPojo.value = pojo
@@ -73,7 +67,7 @@ class AlbumViewModel @Inject constructor(
 
     fun deleteAlbumWithTracks() = viewModelScope.launch(Dispatchers.IO) {
         if (BuildConfig.DEBUG) {
-            _albumPojo.value?.also { repo.deleteAlbumWithTracks(it) }
+            _albumPojo.value?.also { repos.local.deleteAlbumWithTracks(it) }
         }
     }
 
@@ -82,16 +76,16 @@ class AlbumViewModel @Inject constructor(
 
         downloadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val tracks = youtubeRepo.downloadTracks(
+                val tracks = repos.youtube.downloadTracks(
                     tracks = pojo.tracks,
                     progressCallback = { _downloadProgress.value = it },
                 )
-                val newPojo = mediaStoreRepo.moveTaggedAlbumToMediaStore(
+                val newPojo = repos.mediaStore.moveTaggedAlbumToMediaStore(
                     pojo = pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true)),
                     progressCallback = { _downloadProgress.value = it },
                 )
                 _downloadProgress.value = null
-                repo.saveAlbumWithTracks(newPojo)
+                repos.local.saveAlbumWithTracks(newPojo)
                 _albumPojo.value = newPojo
             } catch (e: Exception) {
                 Log.e("download", e.toString(), e)
@@ -116,19 +110,23 @@ class AlbumViewModel @Inject constructor(
         }
     }
 
+    fun playAlbum() {
+        _albumPojo.value?.also { repos.player.playAlbum(it) }
+    }
+
     fun removeAlbumFromLibrary() = viewModelScope.launch(Dispatchers.IO) {
-        _albumPojo.value?.let { repo.deleteAlbumWithTracks(it) }
+        _albumPojo.value?.let { repos.local.deleteAlbumWithTracks(it) }
     }
 
     fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) {
         _albumPojo.value = pojo
         viewModelScope.launch(Dispatchers.IO) {
-            repo.saveAlbumWithTracks(ensureTrackMetadata(pojo))
+            repos.local.saveAlbumWithTracks(ensureTrackMetadata(pojo))
         }
     }
 
     fun tagAlbumTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch(Dispatchers.IO) {
-        mediaStoreRepo.tagAlbumTracks(ensureTrackMetadata(pojo))
+        repos.mediaStore.tagAlbumTracks(ensureTrackMetadata(pojo))
     }
 
     private suspend fun ensureTrackMetadata(pojo: AlbumWithTracksPojo): AlbumWithTracksPojo = pojo.copy(
@@ -145,7 +143,7 @@ class AlbumViewModel @Inject constructor(
     }
 
     private suspend fun getTrackAndYoutubeMetadata(track: Track): Pair<TrackMetadata?, YoutubeMetadata?> {
-        val youtubeMetadata = track.youtubeVideo?.metadata ?: youtubeRepo.getBestMetadata(track)
+        val youtubeMetadata = track.youtubeVideo?.metadata ?: repos.youtube.getBestMetadata(track)
         val metadata = track.metadata ?: youtubeMetadata?.toTrackMetadata()
 
         return Pair(metadata, youtubeMetadata)

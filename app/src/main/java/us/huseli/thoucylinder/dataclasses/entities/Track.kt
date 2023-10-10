@@ -12,6 +12,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.getMediaStoreFileNullable
@@ -74,7 +75,7 @@ data class Track(
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
-    val playUri: Uri?
+    private val playUri: Uri?
         get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
 
     fun generateBasename(): String {
@@ -94,6 +95,9 @@ data class Track(
         albumPosition?.also { put(MediaStore.Audio.Media.TRACK, it.toString()) }
         artist?.also { put(MediaStore.Audio.Media.ARTIST, it) }
     }
+
+    fun toQueueTrackPojo(index: Int): QueueTrackPojo? =
+        playUri?.let { uri -> QueueTrackPojo(track = this, uri = uri, position = index) }
 
     fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""
@@ -117,4 +121,10 @@ data class MediaStoreData(
     val uri: Uri,
 ) {
     fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
+}
+
+
+fun List<Track>.toQueueTrackPojos(startIndex: Int = 0): List<QueueTrackPojo> {
+    var offset = 0
+    return mapNotNull { track -> track.toQueueTrackPojo(startIndex + offset)?.also { offset++ } }
 }

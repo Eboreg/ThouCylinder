@@ -10,29 +10,23 @@ import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.repositories.LocalRepository
-import us.huseli.thoucylinder.repositories.MediaStoreRepository
-import us.huseli.thoucylinder.repositories.PlayerRepository
-import us.huseli.thoucylinder.repositories.YoutubeRepository
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
 class ArtistViewModel @Inject constructor(
-    repo: LocalRepository,
+    repos: Repositories,
     savedStateHandle: SavedStateHandle,
-    playerRepo: PlayerRepository,
-    youtubeRepo: YoutubeRepository,
-    mediaStoreRepo: MediaStoreRepository,
-) : BaseViewModel(repo, playerRepo, youtubeRepo, mediaStoreRepo) {
+) : BaseViewModel(repos) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
 
     val artist: String = savedStateHandle.get<String>(NAV_ARG_ARTIST)!!
 
-    val albumPojos = repo.albumPojos.map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
+    val albumPojos = repos.local.albumPojos.map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val tracks = repo.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
+    val tracks = repos.local.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
 
     fun setDisplayType(value: DisplayType) {
         _displayType.value = value

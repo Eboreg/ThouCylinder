@@ -1,12 +1,9 @@
 package us.huseli.thoucylinder.compose
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
-import kotlinx.coroutines.CoroutineScope
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -36,56 +32,16 @@ fun TrackList(
     tracks: LazyPagingItems<Track>,
     viewModel: BaseViewModel,
     onDownloadClick: (Track) -> Unit,
-    onPlayOrPauseClick: (Track) -> Unit,
+    onPlayClick: (Track) -> Unit,
     onAddToPlaylistClick: (Selection) -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     onGotoArtistClick: ((String) -> Unit)? = null,
     onGotoAlbumClick: ((UUID) -> Unit)? = null,
-    onLaunch: (suspend CoroutineScope.(Track) -> Unit)? = null,
     showArtist: Boolean = true,
 ) {
-    TrackList(
-        modifier = modifier,
-        viewModel = viewModel,
-        trackCount = tracks.itemCount,
-        trackIterator = { action ->
-            items(count = tracks.itemCount, key = tracks.itemKey { it.trackId }) { index ->
-                tracks[index]?.let { track -> action(this, track) }
-            }
-        },
-        onDownloadClick = onDownloadClick,
-        onPlayOrPauseClick = onPlayOrPauseClick,
-        listState = listState,
-        onGotoAlbumClick = onGotoAlbumClick,
-        onGotoArtistClick = onGotoArtistClick,
-        showArtist = showArtist,
-        onLaunch = onLaunch,
-        cardModifier = cardModifier,
-        onAddToPlaylistClick = onAddToPlaylistClick,
-    )
-}
-
-
-@Composable
-fun TrackList(
-    viewModel: BaseViewModel,
-    trackCount: Int,
-    trackIterator: LazyListScope.(@Composable LazyItemScope.(Track) -> Unit) -> Unit,
-    listState: LazyListState,
-    @SuppressLint("ModifierParameter") cardModifier: Modifier,
-    onDownloadClick: (Track) -> Unit,
-    onPlayOrPauseClick: (Track) -> Unit,
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onGotoArtistClick: ((String) -> Unit)?,
-    onGotoAlbumClick: ((UUID) -> Unit)?,
-    onLaunch: (suspend CoroutineScope.(Track) -> Unit)?,
-    showArtist: Boolean,
-    modifier: Modifier = Modifier,
-) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-    val playerPlayingTrack by viewModel.playerPlayingTrack.collectAsStateWithLifecycle(null)
     val selection by viewModel.selection.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -95,43 +51,36 @@ fun TrackList(
             onUnselectAllClick = { viewModel.unselectAllTracks() },
         )
 
-        ListWithNumericBar(listState = listState, listSize = trackCount) {
-            LazyColumn(
-                state = listState,
-                // contentPadding = PaddingValues(horizontal = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                trackIterator { track ->
-                    val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
-                    var metadata by rememberSaveable { mutableStateOf(track.metadata) }
+        ListWithNumericBar(listState = listState, listSize = tracks.itemCount) {
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                items(count = tracks.itemCount, key = tracks.itemKey { it.trackId }) { index ->
+                    tracks[index]?.let { track ->
+                        val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+                        var metadata by rememberSaveable { mutableStateOf(track.metadata) }
 
-                    LaunchedEffect(track.trackId) {
-                        track.image?.let { thumbnail.value = viewModel.getImageBitmap(it) }
-                        if (metadata == null) metadata = viewModel.getTrackMetadata(track)
-                    }
+                        LaunchedEffect(track.trackId) {
+                            track.image?.let { thumbnail.value = viewModel.getImageBitmap(it) }
+                            if (metadata == null) metadata = viewModel.getTrackMetadata(track)
+                        }
 
-                    if (onLaunch != null) LaunchedEffect(track.trackId) {
-                        onLaunch(track)
-                    }
-
-                    ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                        TrackListRow(
-                            track = track,
-                            metadata = metadata,
-                            showArtist = showArtist,
-                            onDownloadClick = { onDownloadClick(track) },
-                            onPlayOrPauseClick = { onPlayOrPauseClick(track) },
-                            modifier = cardModifier,
-                            onGotoArtistClick = onGotoArtistClick,
-                            onGotoAlbumClick = onGotoAlbumClick,
-                            downloadProgress = downloadProgressMap[track.trackId],
-                            isPlaying = playerPlayingTrack?.trackId == track.trackId,
-                            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = listOf(track))) },
-                            onToggleSelected = { viewModel.toggleTrackSelected(track) },
-                            isSelected = selection.isTrackSelected(track),
-                            selectOnShortClick = selection.tracks.isNotEmpty(),
-                            thumbnail = thumbnail.value,
-                        )
+                        ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
+                            TrackListRow(
+                                track = track,
+                                metadata = metadata,
+                                showArtist = showArtist,
+                                onDownloadClick = { onDownloadClick(track) },
+                                onPlayClick = { onPlayClick(track) },
+                                modifier = cardModifier,
+                                onGotoArtistClick = onGotoArtistClick,
+                                onGotoAlbumClick = onGotoAlbumClick,
+                                downloadProgress = downloadProgressMap[track.trackId],
+                                onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
+                                onToggleSelected = { viewModel.toggleSelected(track) },
+                                isSelected = selection.isSelected(track),
+                                selectOnShortClick = selection.tracks.isNotEmpty(),
+                                thumbnail = thumbnail.value,
+                            )
+                        }
                     }
                 }
             }

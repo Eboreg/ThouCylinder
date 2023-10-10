@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Pause
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,10 +34,9 @@ import java.util.UUID
 fun AlbumTrackRow(
     track: Track,
     downloadProgress: DownloadProgress?,
-    isPlaying: Boolean,
     onToggleSelected: () -> Unit,
     onDownloadClick: () -> Unit,
-    onPlayOrPauseClick: () -> Unit,
+    onPlayClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
     onAlbumClick: ((UUID) -> Unit)? = null,
@@ -80,11 +78,8 @@ fun AlbumTrackRow(
                 )
 
                 IconButton(
-                    onClick = onPlayOrPauseClick,
-                    content = {
-                        if (isPlaying) Icon(Icons.Sharp.Pause, stringResource(R.string.pause))
-                        else Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play))
-                    },
+                    onClick = onPlayClick,
+                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                 )
             }
 

@@ -43,9 +43,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MediaStoreRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-) {
+class MediaStoreRepository @Inject constructor(@ApplicationContext private val context: Context) {
     data class TrackMediaStoreEntry(val uri: Uri, val file: File, val track: Track)
 
     data class ImportedImage(

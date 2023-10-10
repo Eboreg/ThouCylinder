@@ -6,7 +6,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.PlaylistPojo
@@ -46,12 +45,8 @@ interface PlaylistDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPlaylistTracks(vararg playlistTracks: PlaylistTrack)
 
-    @Transaction
-    suspend fun upsertPlaylistWithTracks(playlist: Playlist, trackIds: List<UUID>) {
+    suspend fun upsertPlaylistWithTracks(playlist: Playlist, tracks: List<PlaylistTrack>) {
         val now = Instant.now()
-        val playlistTracks = trackIds.mapIndexed { index, trackId ->
-            PlaylistTrack(playlist.playlistId, trackId, index)
-        }
 
         if (_playlistExists(playlist.playlistId)) {
             _updatePlaylists(playlist.copy(updated = now))
@@ -59,6 +54,6 @@ interface PlaylistDao {
         } else {
             _insertPlaylists(playlist.copy(created = now, updated = now))
         }
-        insertPlaylistTracks(*playlistTracks.toTypedArray())
+        insertPlaylistTracks(*tracks.toTypedArray())
     }
 }

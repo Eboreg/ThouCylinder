@@ -1,27 +1,19 @@
 package us.huseli.thoucylinder.compose.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Bookmark
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Cancel
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Edit
-import androidx.compose.material3.Badge
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,7 +26,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,13 +34,11 @@ import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.EditAlbumDialog
-import us.huseli.thoucylinder.compose.AlbumArt
-import us.huseli.thoucylinder.compose.utils.RoundedIconBlock
 import us.huseli.thoucylinder.compose.AlbumTrackRow
+import us.huseli.thoucylinder.compose.LargeAlbumArtSection
 import us.huseli.thoucylinder.compose.SelectedTracksButtons
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AlbumScreen(
     modifier: Modifier = Modifier,
@@ -62,7 +51,6 @@ fun AlbumScreen(
     val albumArtLoadStatus by viewModel.albumArtLoadStatus.collectAsStateWithLifecycle()
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val playerPlayingTrack by viewModel.playerPlayingTrack.collectAsStateWithLifecycle(null)
     val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
 
@@ -115,80 +103,14 @@ fun AlbumScreen(
 
         LazyColumn(modifier = modifier) {
             item {
-                AlbumArt(
-                    image = albumArt,
+                LargeAlbumArtSection(
+                    albumArt = albumArt,
                     loadStatus = albumArtLoadStatus,
-                    modifier = Modifier.fillMaxHeight(),
-                    topContent = {
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth().padding(5.dp),
-                        ) {
-                            FilledTonalIconButton(onClick = onBackClick) {
-                                Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back))
-                            }
-                            Row(modifier = Modifier.padding(5.dp)) {
-                                if (albumPojo?.album?.isOnYoutube == true || albumPojo?.album?.isLocal == true) {
-                                    RoundedIconBlock {
-                                        if (albumPojo?.album?.isOnYoutube == true) {
-                                            Icon(
-                                                painterResource(R.drawable.youtube),
-                                                stringResource(R.string.youtube_playlist),
-                                                modifier = Modifier.fillMaxHeight(),
-                                            )
-                                        }
-                                        if (albumPojo?.album?.isLocal == true) {
-                                            Icon(
-                                                painterResource(R.drawable.hard_drive),
-                                                stringResource(R.string.stored_locally),
-                                                modifier = Modifier.fillMaxHeight(),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    bottomContent = {
-                        Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
-                            albumPojo?.genres?.takeIf { it.isNotEmpty() }?.let { genres ->
-                                FlowRow(
-                                    modifier = Modifier
-                                        .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
-                                        .align(Alignment.CenterHorizontally),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                                ) {
-                                    genres.forEach { genre ->
-                                        Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
-                                            Badge(
-                                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                content = { Text(text = genre.genreName) },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            albumPojo?.styles?.takeIf { it.isNotEmpty() }?.let { styles ->
-                                FlowRow(
-                                    modifier = Modifier
-                                        .padding(start = 5.dp, end = 5.dp, bottom = 5.dp)
-                                        .align(Alignment.CenterHorizontally),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                                ) {
-                                    styles.forEach { style ->
-                                        Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
-                                            Badge(
-                                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                                content = { Text(text = style.styleName) },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    isOnYoutube = albumPojo?.album?.isOnYoutube == true,
+                    isLocal = albumPojo?.album?.isLocal == true,
+                    genres = albumPojo?.genres,
+                    styles = albumPojo?.styles,
+                    onBackClick = onBackClick,
                 )
             }
 
@@ -245,6 +167,10 @@ fun AlbumScreen(
                                 content = { Icon(Icons.Sharp.Delete, null) },
                             )
                         }
+                        IconButton(
+                            onClick = { viewModel.playAlbum() },
+                            content = { Icon(Icons.Sharp.PlayArrow, null) }
+                        )
                     }
                 }
 
@@ -272,13 +198,12 @@ fun AlbumScreen(
                         track = track,
                         downloadProgress = trackDownloadProgress[track.trackId],
                         onDownloadClick = { viewModel.downloadTrack(track) },
-                        onPlayOrPauseClick = { viewModel.playOrPause(track) },
+                        onPlayClick = { viewModel.play(track) },
                         showArtist = track.artist != pojo.album.artist,
                         onArtistClick = onArtistClick,
-                        onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = listOf(track))) },
-                        isPlaying = playerPlayingTrack?.trackId == track.trackId,
-                        onToggleSelected = { viewModel.toggleTrackSelected(track) },
-                        isSelected = selection.isTrackSelected(track),
+                        onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
+                        onToggleSelected = { viewModel.toggleSelected(track) },
+                        isSelected = selection.isSelected(track),
                         selectOnShortClick = selection.tracks.isNotEmpty(),
                     )
                 }

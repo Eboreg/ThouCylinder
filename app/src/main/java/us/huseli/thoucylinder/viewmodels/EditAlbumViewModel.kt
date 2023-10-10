@@ -10,25 +10,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DiscogsMasterData
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResultItem
-import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.repositories.DiscogsRepository
-import us.huseli.thoucylinder.repositories.MediaStoreRepository
+import us.huseli.thoucylinder.repositories.Repositories
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class EditAlbumViewModel @Inject constructor(
-    private val discogsRepo: DiscogsRepository,
-    private val mediaStoreRepo: MediaStoreRepository,
-) : ViewModel() {
+class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : ViewModel() {
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
     private val _images = MutableStateFlow<List<Pair<Image, ImageBitmap>>>(emptyList())
     private val _initialTracks = MutableStateFlow<List<Track>>(emptyList())
@@ -49,13 +45,14 @@ class EditAlbumViewModel @Inject constructor(
     fun loadSearchResults(album: Album) = viewModelScope.launch(Dispatchers.IO) {
         _loadingSearchResults.value = true
         _searchResults.value =
-            discogsRepo.searchMasters(query = album.title, artist = album.artist)?.data?.results ?: emptyList()
+            repos.discogs.searchMasters(query = album.title, artist = album.artist)?.data?.results ?: emptyList()
         _loadingSearchResults.value = false
     }
 
     fun selectMasterId(masterId: Int, context: Context) = viewModelScope.launch(Dispatchers.IO) {
         val master =
-            _masters.value[masterId] ?: discogsRepo.getMaster(masterId)?.data?.also { _masters.value += masterId to it }
+            _masters.value[masterId]
+                ?: repos.discogs.getMaster(masterId)?.data?.also { _masters.value += masterId to it }
 
         if (master != null) {
             _selectedMasterId.value = masterId
@@ -107,7 +104,7 @@ class EditAlbumViewModel @Inject constructor(
             image.getImageBitmap()?.also { pairs.add(Pair(image, it)) }
         }
         _albumPojo.value?.also { pojo ->
-            mediaStoreRepo.getAlbumArtFromAlbumFolder(pojo).forEach { importedImage ->
+            repos.mediaStore.getAlbumArtFromAlbumFolder(pojo).forEach { importedImage ->
                 val image = Image(
                     width = importedImage.bitmap.width,
                     height = importedImage.bitmap.height,

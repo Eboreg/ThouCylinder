@@ -12,6 +12,7 @@ import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
@@ -30,9 +31,10 @@ import java.util.concurrent.Executors
         PlaylistTrack::class,
         YoutubeSearchToken::class,
         YoutubeQueryTrack::class,
+        QueueTrack::class,
     ],
     exportSchema = false,
-    version = 37,
+    version = 40,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -41,6 +43,7 @@ abstract class Database : RoomDatabase() {
     abstract fun albumDao(): AlbumDao
     abstract fun playlistDao(): PlaylistDao
     abstract fun youtubeSearchDao(): YoutubeSearchDao
+    abstract fun queueDao(): QueueDao
 
     companion object {
         fun build(context: Context): Database {

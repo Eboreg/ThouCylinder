@@ -9,6 +9,7 @@ object Constants {
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
     const val NAV_ARG_PLAYLIST = "playlist"
+    const val PREF_QUEUE_INDEX = "queueIndex"
     const val URL_CONNECT_TIMEOUT = 4_050
     const val URL_READ_TIMEOUT = 10_000
     val VIDEO_MIMETYPE_FILTER = Regex("^audio/.*$")

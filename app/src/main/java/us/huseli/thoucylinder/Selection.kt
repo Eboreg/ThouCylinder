@@ -1,39 +1,60 @@
 package us.huseli.thoucylinder
 
+import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 
+@Suppress("unused")
 data class Selection(
     val tracks: List<Track> = emptyList(),
     val albums: List<Album> = emptyList(),
+    val queueTracks: List<AbstractQueueTrack> = emptyList(),
 ) {
-    fun addAlbum(album: Album): Selection {
-        if (!albums.map { it.albumId }.contains(album.albumId))
-            return Selection(tracks = tracks, albums = albums + album)
-        return this
-    }
+    constructor(track: Track) : this(tracks = listOf(track))
 
-    fun isTrackSelected(track: Track) = tracks.map { it.trackId }.contains(track.trackId)
+    constructor(queueTrack: AbstractQueueTrack) : this(
+        tracks = emptyList(),
+        albums = emptyList(),
+        queueTracks = listOf(queueTrack)
+    )
 
-    fun removeAlbum(album: Album): Selection {
-        if (albums.map { it.albumId }.contains(album.albumId))
-            return Selection(tracks = tracks, albums = albums.filterNot { it.albumId == album.albumId })
-        return this
-    }
+    fun isSelected(queueTrack: AbstractQueueTrack) =
+        queueTracks.map { it.queueTrackId }.contains(queueTrack.queueTrackId)
 
-    fun toggleTrackSelected(track: Track): Selection =
-        if (isTrackSelected(track)) removeTrack(track)
-        else addTrack(track)
+    fun isSelected(track: Track) = tracks.map { it.trackId }.contains(track.trackId)
 
-    private fun addTrack(track: Track): Selection {
-        if (!tracks.map { it.trackId }.contains(track.trackId))
-            return Selection(tracks = tracks + track, albums = albums)
-        return this
-    }
+    fun toggleSelected(queueTrack: AbstractQueueTrack): Selection =
+        if (isSelected(queueTrack)) remove(queueTrack)
+        else add(queueTrack)
 
-    private fun removeTrack(track: Track): Selection {
-        if (tracks.map { it.trackId }.contains(track.trackId))
-            return Selection(tracks = tracks.filterNot { it.trackId == track.trackId }, albums = albums)
-        return this
-    }
+    fun toggleSelected(track: Track): Selection =
+        if (isSelected(track)) remove(track)
+        else add(track)
+
+    private fun add(album: Album): Selection =
+        Selection(tracks = tracks, albums = albums + album, queueTracks = queueTracks)
+
+    private fun add(queueTrack: AbstractQueueTrack): Selection =
+        Selection(tracks = tracks, albums = albums, queueTracks = queueTracks + queueTrack)
+
+    private fun add(track: Track): Selection =
+        Selection(tracks = tracks + track, albums = albums, queueTracks = queueTracks)
+
+    private fun remove(album: Album): Selection = Selection(
+        tracks = tracks,
+        albums = albums.filterNot { it.albumId == album.albumId },
+        queueTracks = queueTracks,
+    )
+
+    private fun remove(queueTrack: AbstractQueueTrack): Selection = Selection(
+        tracks = tracks,
+        albums = albums,
+        queueTracks = queueTracks.filterNot { it.queueTrackId == queueTrack.queueTrackId },
+    )
+
+    private fun remove(track: Track): Selection = Selection(
+        tracks = tracks.filterNot { it.trackId == track.trackId },
+        albums = albums,
+        queueTracks = queueTracks,
+    )
 }

@@ -50,5 +50,4 @@ interface TrackDao {
 
     @Query("SELECT * FROM Track WHERE (title LIKE :query OR artist LIKE :query) AND isInLibrary = 1")
     fun simpleTrackSearch(query: String): PagingSource<Int, Track>
-
 }

@@ -10,16 +10,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.database.AlbumDao
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.database.ArtistDao
-import us.huseli.thoucylinder.database.PlaylistDao
-import us.huseli.thoucylinder.database.TrackDao
-import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -29,13 +25,11 @@ import javax.inject.Singleton
 
 
 @Singleton
-class LocalRepository @Inject constructor(
-    private val database: Database,
-    artistDao: ArtistDao,
-    private val trackDao: TrackDao,
-    private val albumDao: AlbumDao,
-    private val playlistDao: PlaylistDao,
-) {
+class LocalRepository @Inject constructor(private val database: Database) {
+    private val trackDao = database.trackDao()
+    private val albumDao = database.albumDao()
+    private val playlistDao = database.playlistDao()
+    private val artistDao = database.artistDao()
     private val _tempAlbumPojos = MutableStateFlow<Map<UUID, AlbumWithTracksPojo>>(emptyMap())
     private val _imageCache = mutableMapOf<Image, ImageBitmap?>()
     private val _imageCacheMutex = Mutex()
@@ -44,33 +38,14 @@ class LocalRepository @Inject constructor(
     val artistPojos = artistDao.flowArtistPojos()
     val playlists = playlistDao.flowPlaylists()
     val tempAlbumPojos = _tempAlbumPojos.asStateFlow()
-    val trackPager = Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracks() }
+    val trackPager: Pager<Int, Track> = Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracks() }
 
     fun addOrUpdateTempAlbum(pojo: AlbumWithTracksPojo) {
         _tempAlbumPojos.value += pojo.album.albumId to pojo
     }
 
     suspend fun addSelectionToPlaylist(selection: Selection, playlist: AbstractPlaylist) = database.withTransaction {
-        val playlistTracks = mutableListOf<PlaylistTrack>()
-
-        playlistTracks.addAll(
-            selection.tracks.mapIndexed { index, track ->
-                PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = index)
-            }
-        )
-        selection.albums.forEachIndexed { albumIdx, album ->
-            albumDao.getAlbumWithTracks(album.albumId)?.tracks?.also { tracks ->
-                playlistTracks.addAll(
-                    tracks.mapIndexed { trackIdx, track ->
-                        PlaylistTrack(
-                            playlistId = playlist.playlistId,
-                            trackId = track.trackId,
-                            position = albumIdx + trackIdx,
-                        )
-                    }
-                )
-            }
-        }
+        val playlistTracks = getPlaylistTracksFromSelection(playlist, selection)
         playlistDao.insertPlaylistTracks(*playlistTracks.toTypedArray())
     }
 
@@ -99,8 +74,11 @@ class LocalRepository @Inject constructor(
         }
     }
 
-    suspend fun insertPlaylist(playlist: Playlist, trackIds: List<UUID>) =
-        playlistDao.upsertPlaylistWithTracks(playlist, trackIds)
+    suspend fun insertPlaylist(playlist: Playlist, selection: Selection? = null) = database.withTransaction {
+        val playlistTracks =
+            selection?.let { getPlaylistTracksFromSelection(playlist, it) } ?: emptyList()
+        playlistDao.upsertPlaylistWithTracks(playlist, playlistTracks)
+    }
 
     suspend fun insertTrack(track: Track) = trackDao.insertTracks(track)
 
@@ -131,4 +109,38 @@ class LocalRepository @Inject constructor(
 
     fun searchTracks(query: String): Pager<Int, Track> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.simpleTrackSearch(query) }
+
+    private suspend fun getPlaylistTracksFromSelection(
+        playlist: AbstractPlaylist,
+        selection: Selection,
+    ): List<PlaylistTrack> {
+        // TODO: This is a little stupid. If, potentially, tracks _and_ albums were selected at the same time,
+        // PlaylistTracks would get identical values for "position".
+        val playlistTracks = mutableListOf<PlaylistTrack>()
+
+        playlistTracks.addAll(
+            selection.tracks.mapIndexed { index, track ->
+                PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = index)
+            }
+        )
+        playlistTracks.addAll(
+            selection.queueTracks.mapIndexed { index, queueTrack ->
+                PlaylistTrack(playlistId = playlist.playlistId, trackId = queueTrack.trackId, position = index)
+            }
+        )
+        selection.albums.forEachIndexed { albumIdx, album ->
+            albumDao.getAlbumWithTracks(album.albumId)?.tracks?.also { tracks ->
+                playlistTracks.addAll(
+                    tracks.mapIndexed { trackIdx, track ->
+                        PlaylistTrack(
+                            playlistId = playlist.playlistId,
+                            trackId = track.trackId,
+                            position = albumIdx + trackIdx,
+                        )
+                    }
+                )
+            }
+        }
+        return playlistTracks
+    }
 }

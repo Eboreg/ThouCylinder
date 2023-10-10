@@ -156,7 +156,7 @@ fun SearchResults(
                     tracks = tracks,
                     viewModel = viewModel,
                     onDownloadClick = { viewModel.downloadTrack(it) },
-                    onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                    onPlayClick = { viewModel.play(it) },
                     onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }

@@ -82,7 +82,7 @@ fun ArtistScreen(
                         tracks = tracks,
                         viewModel = viewModel,
                         onDownloadClick = { viewModel.downloadTrack(it) },
-                        onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                        onPlayClick = { viewModel.play(it) },
                         onGotoAlbumClick = onAlbumClick,
                         showArtist = false,
                         onAddToPlaylistClick = onAddToPlaylistClick,

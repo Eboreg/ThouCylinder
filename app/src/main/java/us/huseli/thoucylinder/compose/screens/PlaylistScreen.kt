@@ -61,7 +61,7 @@ fun PlaylistScreen(
             viewModel = viewModel,
             modifier = Modifier.padding(horizontal = 10.dp),
             onDownloadClick = { viewModel.downloadTrack(it) },
-            onPlayOrPauseClick = { viewModel.playOrPause(it) },
+            onPlayClick = { viewModel.play(it) },
             onAddToPlaylistClick = { onAddToPlaylistClick(it) },
             listState = listState,
             onGotoArtistClick = onArtistClick,

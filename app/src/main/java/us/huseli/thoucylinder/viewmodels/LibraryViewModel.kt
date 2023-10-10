@@ -13,42 +13,29 @@ import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.dataclasses.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.repositories.LocalRepository
-import us.huseli.thoucylinder.repositories.MediaStoreRepository
-import us.huseli.thoucylinder.repositories.PlayerRepository
-import us.huseli.thoucylinder.repositories.YoutubeRepository
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(
-    private val repo: LocalRepository,
-    playerRepo: PlayerRepository,
-    youtubeRepo: YoutubeRepository,
-    private val mediaStoreRepo: MediaStoreRepository,
-) : BaseViewModel(repo, playerRepo, youtubeRepo, mediaStoreRepo) {
+class LibraryViewModel @Inject constructor(private val repos: Repositories) : BaseViewModel(repos) {
     private val _artistImages = MutableStateFlow<Map<String, Image>>(emptyMap())
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
 
-    val albumPojos = repo.albumPojos
+    val albumPojos = repos.local.albumPojos
     val artistImages = _artistImages.asStateFlow()
-    val artistPojos: Flow<List<ArtistPojo>> = repo.artistPojos
+    val artistPojos: Flow<List<ArtistPojo>> = repos.local.artistPojos
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val pagingTracks: Flow<PagingData<Track>> = repo.trackPager.flow.cachedIn(viewModelScope)
-    val playlists = repo.playlists
+    val pagingTracks: Flow<PagingData<Track>> = repos.local.trackPager.flow.cachedIn(viewModelScope)
+    val playlists = repos.local.playlists
 
     init {
-        viewModelScope.launch(Dispatchers.IO) { _artistImages.value = mediaStoreRepo.collectArtistImages() }
+        viewModelScope.launch(Dispatchers.IO) { _artistImages.value = repos.mediaStore.collectArtistImages() }
     }
 
-    fun addPlaylist(playlist: Playlist) = viewModelScope.launch(Dispatchers.IO) {
-        repo.insertPlaylist(playlist, emptyList())
-    }
-
-    fun deleteAll() = viewModelScope.launch(Dispatchers.IO) { repo.deleteAll() }
+    fun deleteAll() = viewModelScope.launch(Dispatchers.IO) { repos.local.deleteAll() }
 
     fun setDisplayType(value: DisplayType) {
         _displayType.value = value

@@ -82,7 +82,7 @@ fun LibraryScreen(
                         viewModel = viewModel,
                         listState = trackListState,
                         onDownloadClick = { viewModel.downloadTrack(it) },
-                        onPlayOrPauseClick = { viewModel.playOrPause(it) },
+                        onPlayClick = { viewModel.play(it) },
                         onGotoArtistClick = onArtistClick,
                         onGotoAlbumClick = onAlbumClick,
                         onAddToPlaylistClick = onAddToPlaylistClick,

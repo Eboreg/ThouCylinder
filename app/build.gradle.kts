@@ -87,9 +87,12 @@ val lifecycleVersion = "2.6.2"
 val roomVersion = "2.5.2"
 val daggerVersion = "2.48.1"
 val composeVersion = "1.5.3"
+val media3Version = "1.1.1"
+val pagingVersion = "3.3.0-alpha02"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Compose:
     implementation("androidx.compose.ui:ui:$composeVersion")
@@ -113,7 +116,8 @@ dependencies {
     kapt("com.google.dagger:hilt-compiler:$daggerVersion")
 
     // Media:
-    implementation("androidx.media3:media3-exoplayer:1.1.1")
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
 
     // Room:
     implementation("androidx.room:room-runtime:$roomVersion")
@@ -138,7 +142,7 @@ dependencies {
 
     // Paging:
     // https://developer.android.com/topic/libraries/architecture/paging/v3-overview
-    implementation("androidx.paging:paging-common-ktx:3.3.0-alpha02")
-    implementation("androidx.paging:paging-compose-android:3.3.0-alpha02")
-    implementation("androidx.room:room-paging:2.5.2")
+    implementation("androidx.paging:paging-common-ktx:$pagingVersion")
+    implementation("androidx.paging:paging-compose-android:$pagingVersion")
+    implementation("androidx.room:room-paging:$roomVersion")
 }

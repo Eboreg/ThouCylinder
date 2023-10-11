@@ -18,7 +18,7 @@ data class YoutubeVideo(
     val length: String? = null,
     val playlistItemId: String? = null,
     val playlistPosition: Int? = null,
-    @Embedded("metadata") val metadata: YoutubeMetadata? = null,
+    @Embedded("YoutubeVideo_metadata_") val metadata: YoutubeMetadata? = null,
     @Ignore val thumbnail: Image? = null,
 ) : Parcelable {
     constructor(

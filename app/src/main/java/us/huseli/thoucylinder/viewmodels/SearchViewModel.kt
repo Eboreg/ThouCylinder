@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.viewmodels
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,10 +15,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
@@ -31,7 +33,7 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
     private val _filteredQuery = _query.filter { it.length >= 3 }.distinctUntilChanged()
     private val _localAlbums = MutableStateFlow<List<AlbumPojo>>(emptyList())
     private val _youtubeAlbums = MutableStateFlow<List<AlbumPojo>>(emptyList())
-    private val _youtubeTracks = MutableStateFlow<PagingData<Track>>(PagingData.empty())
+    private val _youtubeTracks = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
 
     val isSearching: Flow<Boolean> = combine(
         _isSearchingYoutubeAlbums,
@@ -44,7 +46,7 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
 
     val localAlbums = _localAlbums.asStateFlow()
 
-    val localTracks: Flow<PagingData<Track>> = _filteredQuery.flatMapLatest { query ->
+    val localTracks: Flow<PagingData<TrackPojo>> = _filteredQuery.flatMapLatest { query ->
         _isSearchingLocalTracks.value = true
         repos.local.searchTracks(query).flow.cachedIn(viewModelScope).also {
             _isSearchingLocalTracks.value = false
@@ -53,12 +55,6 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
 
     val youtubeAlbums = _youtubeAlbums.asStateFlow()
     val youtubeTracksPaging = _youtubeTracks.asStateFlow()
-
-    /*
-    val youtubeTracksPaging = _filteredQuery.flatMapLatest { query ->
-        repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope)
-    }.distinctUntilChanged()
-     */
 
     fun populateTempAlbum(pojo: AlbumPojo) {
         repos.local.addOrUpdateTempAlbum(AlbumWithTracksPojo(album = pojo.album))
@@ -85,7 +81,11 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
                     _isSearchingYoutubeAlbums.value = false
                 }
                 viewModelScope.launch(Dispatchers.IO) {
-                    repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope).collectLatest {
+                    repos.youtube.searchTracks(query).flow.map { pagingData ->
+                        pagingData.map {
+                            TrackPojo(track = it, album = null)
+                        }
+                    }.cachedIn(viewModelScope).collectLatest {
                         _youtubeTracks.value = it
                     }
                 }

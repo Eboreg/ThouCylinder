@@ -43,7 +43,8 @@ fun LibraryScreen(
     onAddToPlaylistClick: (Selection) -> Unit,
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
-    val tracks = viewModel.pagingTracks.collectAsLazyPagingItems()
+    // val tracks = viewModel.pagingTracks.collectAsLazyPagingItems()
+    val tracksPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
     val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
@@ -66,9 +67,10 @@ fun LibraryScreen(
             when (listType) {
                 ListType.ALBUMS -> when (displayType) {
                     DisplayType.LIST -> AlbumList(
-                        albums = albumPojos,
+                        pojos = albumPojos,
                         viewModel = viewModel,
                         onAlbumClick = { onAlbumClick(it.album.albumId) },
+                        onAddToPlaylistClick = onAddToPlaylistClick,
                     )
                     DisplayType.GRID -> AlbumGrid(
                         albums = albumPojos,
@@ -78,21 +80,21 @@ fun LibraryScreen(
                 }
                 ListType.TRACKS -> when (displayType) {
                     DisplayType.LIST -> TrackList(
-                        tracks = tracks,
+                        pojos = tracksPojos,
                         viewModel = viewModel,
                         listState = trackListState,
                         onDownloadClick = { viewModel.downloadTrack(it) },
-                        onPlayClick = { viewModel.play(it) },
-                        onGotoArtistClick = onArtistClick,
-                        onGotoAlbumClick = onAlbumClick,
+                        onPlayClick = { viewModel.playTrack(it) },
+                        onArtistClick = onArtistClick,
+                        onAlbumClick = onAlbumClick,
                         onAddToPlaylistClick = onAddToPlaylistClick,
                     )
                     DisplayType.GRID -> TrackGrid(
-                        tracks = tracks,
+                        pojos = tracksPojos,
                         viewModel = viewModel,
                         gridState = trackGridState,
-                        onGotoArtistClick = onArtistClick,
-                        onGotoAlbumClick = onAlbumClick,
+                        onArtistClick = onArtistClick,
+                        onAlbumClick = onAlbumClick,
                         onAddToPlaylistClick = onAddToPlaylistClick,
                     )
                 }

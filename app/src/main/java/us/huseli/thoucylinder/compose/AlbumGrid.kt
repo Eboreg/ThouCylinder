@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,8 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.compose.utils.ItemGrid
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
 
 @Composable
@@ -26,8 +28,9 @@ fun AlbumGrid(
     viewModel: BaseViewModel,
     modifier: Modifier = Modifier,
     onAlbumClick: (AlbumPojo) -> Unit,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
-    ItemGrid(things = albums, modifier = modifier, onCardClick = onAlbumClick) { pojo ->
+    ItemGrid(things = albums, modifier = modifier, onClick = onAlbumClick, contentPadding = contentPadding) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {

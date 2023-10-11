@@ -1,6 +1,6 @@
 package us.huseli.thoucylinder
 
-import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 
@@ -17,6 +17,9 @@ data class Selection(
         albums = emptyList(),
         queueTracks = listOf(queueTrack)
     )
+
+    val trackCount: Int
+        get() = tracks.size + queueTracks.size
 
     fun isSelected(queueTrack: AbstractQueueTrack) =
         queueTracks.map { it.queueTrackId }.contains(queueTrack.queueTrackId)

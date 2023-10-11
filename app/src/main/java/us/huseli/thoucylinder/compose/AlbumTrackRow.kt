@@ -8,11 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
@@ -24,15 +20,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
-import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumTrackRow(
     track: Track,
+    album: Album,
     downloadProgress: DownloadProgress?,
     onToggleSelected: () -> Unit,
     onDownloadClick: () -> Unit,
@@ -48,7 +45,7 @@ fun AlbumTrackRow(
     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
         Column(
             modifier = modifier.combinedClickable(
-                onClick = { if (selectOnShortClick) onToggleSelected() },
+                onClick = { if (selectOnShortClick) onToggleSelected() else onPlayClick() },
                 onLongClick = onToggleSelected,
             ).let { modifier ->
                 if (isSelected) {
@@ -69,17 +66,13 @@ fun AlbumTrackRow(
 
                 TrackContextMenuWithButton(
                     track = track,
+                    album = album,
                     metadata = track.metadata,
                     onDownloadClick = onDownloadClick,
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
-                    onGotoArtistClick = onArtistClick,
-                    onGotoAlbumClick = onAlbumClick,
+                    onArtistClick = onArtistClick,
+                    onAlbumClick = onAlbumClick,
                     onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-
-                IconButton(
-                    onClick = onPlayClick,
-                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                 )
             }
 

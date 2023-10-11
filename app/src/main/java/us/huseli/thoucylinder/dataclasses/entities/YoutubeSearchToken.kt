@@ -1,23 +1,12 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
-import java.util.UUID
 
 @Entity
 data class YoutubeSearchToken(
-    @PrimaryKey val query: String,
-    val prevKey: String?,
-    val nextKey: String?,
-)
-
-@Entity(
-    primaryKeys = ["query", "trackId"],
-    indices = [Index("trackId")],
-)
-data class YoutubeQueryTrack(
-    val query: String,
-    val trackId: UUID,
-    val position: Int,
+    @ColumnInfo("YoutubeSearchToken_query") @PrimaryKey val query: String,
+    @ColumnInfo("YoutubeSearchToken_prevKey") val prevKey: String?,
+    @ColumnInfo("YoutubeSearchToken_nextKey") val nextKey: String?,
 )

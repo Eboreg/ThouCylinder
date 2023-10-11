@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,30 +13,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material.icons.sharp.MusicNote
-import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
-import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.themeColors
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -52,45 +46,38 @@ fun TrackListRow(
     onToggleSelected: () -> Unit,
     thumbnail: ImageBitmap?,
     modifier: Modifier = Modifier,
+    album: Album? = null,
     isSelected: Boolean = false,
     selectOnShortClick: Boolean = false,
+    containerColor: Color? = null,
     downloadProgress: DownloadProgress? = null,
-    onGotoArtistClick: ((String) -> Unit)? = null,
-    onGotoAlbumClick: ((UUID) -> Unit)? = null,
+    onArtistClick: ((String) -> Unit)? = null,
+    onAlbumClick: ((UUID) -> Unit)? = null,
 ) {
     Card(
-        colors = CardDefaults.outlinedCardColors(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = containerColor
+                ?: if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        ),
         shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier.fillMaxWidth().height(50.dp).combinedClickable(
-            onClick = { if (selectOnShortClick) onToggleSelected() },
+            onClick = { if (selectOnShortClick) onToggleSelected() else onPlayClick() },
             onLongClick = onToggleSelected,
         ),
-        border = if (isSelected) CardDefaults.outlinedCardBorder() else null,
     ) {
         Row {
-            if (isSelected) {
-                Box(modifier = Modifier.fillMaxHeight().padding(end = 10.dp).aspectRatio(1f)) {
+            Thumbnail(
+                image = thumbnail,
+                shape = MaterialTheme.shapes.extraSmall,
+                modifier = Modifier.fillMaxHeight().padding(end = 10.dp),
+                placeholder = {
                     Image(
-                        imageVector = Icons.Sharp.CheckCircle,
+                        imageVector = Icons.Sharp.MusicNote,
                         contentDescription = null,
-                        colorFilter = ColorFilter.tint(color = themeColors().Green),
-                        modifier = Modifier.fillMaxSize().aspectRatio(1f).padding(5.dp),
+                        modifier = Modifier.fillMaxSize().aspectRatio(1f),
                     )
-                }
-            } else {
-                Thumbnail(
-                    image = thumbnail,
-                    shape = MaterialTheme.shapes.extraSmall,
-                    modifier = Modifier.fillMaxHeight().padding(end = 10.dp),
-                    placeholder = {
-                        Image(
-                            imageVector = Icons.Sharp.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                        )
-                    },
-                )
-            }
+                },
+            )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -109,17 +96,13 @@ fun TrackListRow(
 
                 TrackContextMenuWithButton(
                     track = track,
+                    album = album,
                     metadata = metadata,
                     onDownloadClick = onDownloadClick,
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
-                    onGotoAlbumClick = onGotoAlbumClick,
-                    onGotoArtistClick = onGotoArtistClick,
+                    onAlbumClick = onAlbumClick,
+                    onArtistClick = onArtistClick,
                     onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-
-                IconButton(
-                    onClick = onPlayClick,
-                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                 )
             }
         }

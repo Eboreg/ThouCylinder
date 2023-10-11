@@ -20,10 +20,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.database.QueueDao
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.TrackQueue
-import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.toQueueTrackPojos
 import javax.inject.Inject
@@ -47,14 +47,20 @@ class PlayerRepository @Inject constructor(
     private val _currentPositionMs = MutableStateFlow(0L)
     private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
     private val _canGotoNext = MutableStateFlow(player.hasNextMediaItem())
+    private val _canGotoPrevious = MutableStateFlow(player.hasPreviousMediaItem())
     private val _canPlay = MutableStateFlow(player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+    private val _isRepeatEnabled = MutableStateFlow(false)
+    private val _isShuffleEnabled = MutableStateFlow(false)
 
     val currentPositionMs = _currentPositionMs.asStateFlow()
     val playbackState = _playbackState.asStateFlow()
     val currentPojo = _currentPojo.asStateFlow()
     val canGotoNext = _canGotoNext.asStateFlow()
+    val canGotoPrevious = _canGotoPrevious.asStateFlow()
     val canPlay = _canPlay.asStateFlow()
     val queue = _queue.asStateFlow()
+    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
+    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
 
     init {
         player.addListener(this)
@@ -80,7 +86,7 @@ class PlayerRepository @Inject constructor(
                     positionPollJob = launch {
                         while (true) {
                             _currentPositionMs.value = player.currentPosition
-                            delay(200)
+                            delay(500)
                         }
                     }
                 } else {
@@ -91,9 +97,11 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    /** Clear queue, add album, play. */
-    fun playAlbum(album: AlbumWithTracksPojo) = scope.launch {
-        val pojos = album.tracks.toQueueTrackPojos()
+    /** Clear queue, add albums, play. */
+    fun playAlbum(album: AlbumWithTracksPojo) = playAlbums(listOf(album))
+
+    fun playAlbums(albums: List<AlbumWithTracksPojo>) = scope.launch {
+        val pojos = albums.flatMap { album -> album.tracks.toQueueTrackPojos() }
 
         player.clearMediaItems()
         if (pojos.isNotEmpty()) {
@@ -141,14 +149,54 @@ class PlayerRepository @Inject constructor(
         }
     }
 
+    fun seekTo(positionMs: Long) = scope.launch {
+        player.seekTo(positionMs)
+    }
+
     fun skipToNext() = scope.launch {
         log("skipToNext: currentposition=${player.currentMediaItemIndex}, current item=${player.currentMediaItem}")
         if (player.hasNextMediaItem()) player.seekToNextMediaItem()
     }
 
+    fun skipToPrevious() = scope.launch {
+        if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
+    }
+
+    fun toggleRepeat() = scope.launch {
+        player.repeatMode = when (player.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    fun toggleShuffle() = scope.launch {
+        player.shuffleModeEnabled = !player.shuffleModeEnabled
+    }
+
+    /** PRIVATE METHODS ******************************************************/
+    private suspend fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? = mutex.withLock {
+        mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
+    }
+
+    private fun log(message: String) {
+        if (BuildConfig.DEBUG) Log.i("PlayerRepository", message)
+    }
+
+    private suspend fun saveQueue(queue: TrackQueue) {
+        mutex.withLock {
+            _queue.value = queue
+            queueDao.setQueue(queue.items)
+        }
+    }
+
+    private fun saveQueueIndex(value: Int) {
+        preferences.edit().putInt(PREF_QUEUE_INDEX, value).apply()
+    }
+
     /** OVERRIDDEN METHODS ***************************************************/
     override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
         _canGotoNext.value = availableCommands.contains(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+        _canGotoPrevious.value = availableCommands.contains(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
         _canPlay.value = availableCommands.contains(Player.COMMAND_PLAY_PAUSE)
     }
 
@@ -179,23 +227,14 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    /** PRIVATE METHODS ******************************************************/
-    private suspend fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? = mutex.withLock {
-        mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
-    }
-
-    private fun log(message: String) {
-        if (BuildConfig.DEBUG) Log.i("PlayerRepository", message)
-    }
-
-    private suspend fun saveQueue(queue: TrackQueue) {
-        mutex.withLock {
-            _queue.value = queue
-            queueDao.setQueue(queue.items)
+    override fun onRepeatModeChanged(repeatMode: Int) {
+        _isRepeatEnabled.value = when (repeatMode) {
+            Player.REPEAT_MODE_OFF -> false
+            else -> true
         }
     }
 
-    private fun saveQueueIndex(value: Int) {
-        preferences.edit().putInt(PREF_QUEUE_INDEX, value).apply()
+    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+        _isShuffleEnabled.value = shuffleModeEnabled
     }
 }

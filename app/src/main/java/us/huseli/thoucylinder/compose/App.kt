@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -26,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import us.huseli.retaintheme.compose.MainMenuItem
 import us.huseli.retaintheme.compose.ResponsiveScaffold
+import us.huseli.retaintheme.compose.SnackbarHosts
 import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.LibraryDestination
@@ -40,8 +43,8 @@ import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.viewmodels.AppViewModel
+import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
 import java.util.UUID
 
@@ -51,10 +54,13 @@ fun App(
     navController: NavHostController = rememberNavController(),
     viewModel: AppViewModel = hiltViewModel(),
     searchViewModel: SearchViewModel = hiltViewModel(),
+    queueViewModel: QueueViewModel = hiltViewModel(),
 ) {
     var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+    val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+    var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.importNewMediaStoreAlbums()
@@ -73,18 +79,22 @@ fun App(
             "library" -> navController.navigate(LibraryDestination.route)
             "queue" -> navController.navigate(QueueDestination.route)
         }
+        isCoverExpanded = false
     }
 
     val onAlbumClick = { albumId: UUID ->
         navController.navigate(AlbumDestination.route(albumId))
+        isCoverExpanded = false
     }
 
     val onArtistClick = { artist: String ->
         navController.navigate(ArtistDestination.route(artist))
+        isCoverExpanded = false
     }
 
     val onPlaylistClick = { playlistId: UUID ->
         navController.navigate(PlaylistDestination.route(playlistId))
+        isCoverExpanded = false
     }
 
     val onAddToPlaylistClick = { selection: Selection ->
@@ -102,12 +112,12 @@ fun App(
                 viewModel.addSelectionToPlaylist(selection, playlist)
                 addToPlaylistSelection = null
             },
-            onCreateNew = { name ->
-                val playlist = Playlist(name = name)
+            onCreateNew = { playlist ->
                 viewModel.addPlaylist(playlist, selection)
                 addToPlaylistSelection = null
             },
-            onCancel = { addToPlaylistSelection = null }
+            onCancel = { addToPlaylistSelection = null },
+            onGotoPlaylist = { onPlaylistClick(it) },
         )
     }
 
@@ -116,7 +126,7 @@ fun App(
         activeScreen = activeScreen,
         mainMenuItems = mainMenuItems,
         onMenuItemClick = onMenuItemClick,
-        bottomBar = { BottomBar() },
+        // bottomBar = { BottomBar(onClick = onBottomBarClick) },
         landscapeMenu = { innerPadding ->
             NavigationRail(modifier = Modifier.padding(innerPadding)) {
                 mainMenuItems.forEach { item ->
@@ -127,75 +137,95 @@ fun App(
                     )
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHosts() },
     ) { innerPadding ->
-        NavHost(
-            modifier = modifier.padding(innerPadding),
-            navController = navController,
-            startDestination = SearchDestination.route,
+        BoxWithConstraints(
+            modifier = modifier.fillMaxSize().padding(innerPadding)
         ) {
-            composable(route = SearchDestination.route) {
-                activeScreen = "search"
-                SearchScreen(
-                    viewModel = searchViewModel,
-                    onAlbumClick = onAlbumClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-            }
-
-            composable(route = LibraryDestination.route) {
-                activeScreen = "library"
-                LibraryScreen(
-                    onAlbumClick = onAlbumClick,
-                    onArtistClick = onArtistClick,
-                    onPlaylistClick = onPlaylistClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-            }
-
-            composable(route = QueueDestination.route) {
-                activeScreen = "queue"
-                QueueScreen(
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                    onAlbumClick = onAlbumClick,
-                    onArtistClick = onArtistClick,
-                )
-            }
-
-            composable(
-                route = AlbumDestination.routeTemplate,
-                arguments = AlbumDestination.arguments,
+            NavHost(
+                navController = navController,
+                startDestination = SearchDestination.route,
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(bottom = if (currentPojo != null) 80.dp else 0.dp)
             ) {
-                activeScreen = null
-                AlbumScreen(
-                    onBackClick = onBackClick,
-                    onArtistClick = onArtistClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                )
+                composable(route = SearchDestination.route) {
+                    activeScreen = "search"
+                    SearchScreen(
+                        viewModel = searchViewModel,
+                        onAlbumClick = onAlbumClick,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
+
+                composable(route = LibraryDestination.route) {
+                    activeScreen = "library"
+                    LibraryScreen(
+                        onAlbumClick = onAlbumClick,
+                        onArtistClick = onArtistClick,
+                        onPlaylistClick = onPlaylistClick,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
+
+                composable(route = QueueDestination.route) {
+                    activeScreen = "queue"
+                    QueueScreen(
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                        onAlbumClick = onAlbumClick,
+                        onArtistClick = onArtistClick,
+                    )
+                }
+
+                composable(
+                    route = AlbumDestination.routeTemplate,
+                    arguments = AlbumDestination.arguments,
+                ) {
+                    activeScreen = null
+                    AlbumScreen(
+                        onBackClick = onBackClick,
+                        onArtistClick = onArtistClick,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
+
+                composable(
+                    route = ArtistDestination.routeTemplate,
+                    arguments = ArtistDestination.arguments,
+                ) {
+                    activeScreen = null
+                    ArtistScreen(
+                        onBackClick = onBackClick,
+                        onAlbumClick = onAlbumClick,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
+
+                composable(
+                    route = PlaylistDestination.routeTemplate,
+                    arguments = PlaylistDestination.arguments,
+                ) {
+                    activeScreen = null
+                    PlaylistScreen(
+                        onAlbumClick = onAlbumClick,
+                        onArtistClick = onArtistClick,
+                        onBackClick = onBackClick,
+                        onAddToPlaylistClick = onAddToPlaylistClick,
+                    )
+                }
             }
 
-            composable(
-                route = ArtistDestination.routeTemplate,
-                arguments = ArtistDestination.arguments,
-            ) {
-                activeScreen = null
-                ArtistScreen(
-                    onBackClick = onBackClick,
-                    onAlbumClick = onAlbumClick,
+            currentPojo?.also { pojo ->
+                ModalCover(
+                    pojo = pojo,
+                    viewModel = queueViewModel,
+                    isExpanded = isCoverExpanded,
+                    onExpand = { isCoverExpanded = true },
+                    onCollapse = { isCoverExpanded = false },
                     onAddToPlaylistClick = onAddToPlaylistClick,
-                )
-            }
-
-            composable(
-                route = PlaylistDestination.routeTemplate,
-                arguments = PlaylistDestination.arguments,
-            ) {
-                activeScreen = null
-                PlaylistScreen(
-                    onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
-                    onBackClick = onBackClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
+                    onAlbumClick = onAlbumClick,
                 )
             }
         }

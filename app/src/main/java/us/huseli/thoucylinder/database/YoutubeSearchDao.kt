@@ -14,7 +14,7 @@ import java.util.UUID
 
 @Dao
 interface YoutubeSearchDao {
-    @Query("DELETE FROM Track WHERE isInLibrary = 0")
+    @Query("DELETE FROM Track WHERE Track_isInLibrary = 0")
     suspend fun _deleteAllTracks()
 
     @Query("DELETE FROM YoutubeSearchToken")
@@ -23,13 +23,13 @@ interface YoutubeSearchDao {
     @Query("DELETE FROM YoutubeQueryTrack")
     suspend fun _deleteAllQueryTracks()
 
-    @Query("DELETE FROM YoutubeQueryTrack WHERE `query` = :query")
+    @Query("DELETE FROM YoutubeQueryTrack WHERE YoutubeQueryTrack_query = :query")
     suspend fun _deleteQueryTracksByQuery(query: String)
 
-    @Query("DELETE FROM YoutubeSearchToken WHERE `query` = :query")
+    @Query("DELETE FROM YoutubeSearchToken WHERE YoutubeSearchToken_query = :query")
     suspend fun _deleteTokenByQuery(query: String)
 
-    @Query("DELETE FROM Track WHERE trackId IN (SELECT y.trackId FROM YoutubeQueryTrack y WHERE y.`query` = :query)")
+    @Query("DELETE FROM Track WHERE Track_trackId IN (SELECT YoutubeQueryTrack_trackId FROM YoutubeQueryTrack y WHERE YoutubeQueryTrack_query = :query)")
     suspend fun _deleteTracksByQuery(query: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -37,8 +37,8 @@ interface YoutubeSearchDao {
 
     @Query(
         """
-        INSERT OR IGNORE INTO YoutubeQueryTrack (`query`, trackId, position)
-        VALUES (:query, :trackId, (SELECT COALESCE(MAX(qt2.position), 0) + 1 FROM YoutubeQueryTrack qt2))
+        INSERT OR IGNORE INTO YoutubeQueryTrack (YoutubeQueryTrack_query, YoutubeQueryTrack_trackId, YoutubeQueryTrack_position)
+        VALUES (:query, :trackId, (SELECT COALESCE(MAX(qt2.YoutubeQueryTrack_position), 0) + 1 FROM YoutubeQueryTrack qt2))
         """
     )
     suspend fun _insertQueryTrack(query: String, trackId: UUID)
@@ -56,7 +56,7 @@ interface YoutubeSearchDao {
         _deleteQueryTracksByQuery(query)
     }
 
-    @Query("SELECT * FROM YoutubeSearchToken WHERE `query` = :query")
+    @Query("SELECT * FROM YoutubeSearchToken WHERE YoutubeSearchToken_query = :query")
     suspend fun getToken(query: String): YoutubeSearchToken?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -67,6 +67,13 @@ interface YoutubeSearchDao {
         tracks.forEach { track -> _insertQueryTrack(query, track.trackId) }
     }
 
-    @Query("SELECT t.* FROM Track t JOIN YoutubeQueryTrack y ON t.trackId = y.trackId AND y.`query` = :query ORDER BY y.position")
+    @Query(
+        """
+        SELECT t.* FROM Track t
+        JOIN YoutubeQueryTrack y ON Track_trackId = YoutubeQueryTrack_trackId
+        AND YoutubeQueryTrack_query = :query
+        ORDER BY YoutubeQueryTrack_position
+        """
+    )
     fun pageTracksByQuery(query: String): PagingSource<Int, Track>
 }

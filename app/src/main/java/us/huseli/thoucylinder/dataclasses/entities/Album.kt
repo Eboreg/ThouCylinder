@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.ContentValues
 import android.provider.MediaStore
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
@@ -12,17 +13,17 @@ import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
 import java.util.UUID
 
 @Entity(
-    indices = [Index("isInLibrary")],
+    indices = [Index("Album_isInLibrary")],
 )
 data class Album(
-    @PrimaryKey val albumId: UUID = UUID.randomUUID(),
-    val title: String,
-    val isInLibrary: Boolean,
-    val isLocal: Boolean,
-    val artist: String? = null,
-    val year: Int? = null,
-    @Embedded("youtubePlaylist") val youtubePlaylist: YoutubePlaylist? = null,
-    @Embedded("albumArt") val albumArt: Image? = null,
+    @PrimaryKey @ColumnInfo("Album_albumId") val albumId: UUID = UUID.randomUUID(),
+    @ColumnInfo("Album_title") val title: String,
+    @ColumnInfo("Album_isInLibrary") val isInLibrary: Boolean,
+    @ColumnInfo("Album_isLocal") val isLocal: Boolean,
+    @ColumnInfo("Album_artist") val artist: String? = null,
+    @ColumnInfo("Album_year") val year: Int? = null,
+    @Embedded("Album_youtubePlaylist_") val youtubePlaylist: YoutubePlaylist? = null,
+    @Embedded("Album_albumArt_") val albumArt: Image? = null,
 ) {
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -65,22 +66,27 @@ fun QueueTrackList(
     onArtistClick: (String) -> Unit,
 ) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle()
+    val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxWidth()) {
         SelectedTracksButtons(
-            selection = selection,
-            onAddToPlaylistClick = { onAddToPlaylistClick(selection) },
-            onUnselectAllClick = { viewModel.unselectAllTracks() },
+            trackCount = selectedTracks.size,
+            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(queueTracks = selectedTracks)) },
+            onUnselectAllClick = { viewModel.unselectAllQueueTracks() },
             extraButtons = {
                 SmallOutlinedButton(
-                    onClick = { viewModel.removeFromQueue(selection) },
+                    onClick = { viewModel.removeFromQueue(selectedTracks) },
                     text = stringResource(R.string.remove),
                 )
             },
         )
 
-        ListWithNumericBar(listState = listState, listSize = queue.items.size) {
+        ListWithNumericBar(
+            listState = listState,
+            listSize = queue.items.size,
+            modifier = Modifier.padding(vertical = 10.dp),
+        ) {
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -89,6 +95,10 @@ fun QueueTrackList(
                 items(queue.items) { pojo ->
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
                     var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
+                    val isSelected = selectedTracks.contains(pojo)
+                    val containerColor =
+                        if (!isSelected && playerCurrentPojo == pojo) MaterialTheme.colorScheme.secondaryContainer
+                        else null
 
                     LaunchedEffect(pojo.track.trackId) {
                         pojo.track.image?.let { thumbnail.value = viewModel.getImageBitmap(it) }
@@ -98,18 +108,20 @@ fun QueueTrackList(
                     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
                         TrackListRow(
                             track = pojo.track,
+                            album = pojo.album,
                             metadata = metadata,
                             showArtist = true,
                             onDownloadClick = { viewModel.downloadTrack(pojo.track) },
                             onPlayClick = { viewModel.play(pojo) },
-                            onGotoArtistClick = onArtistClick,
-                            onGotoAlbumClick = onAlbumClick,
+                            onArtistClick = onArtistClick,
+                            onAlbumClick = onAlbumClick,
                             downloadProgress = downloadProgressMap[pojo.track.trackId],
                             onAddToPlaylistClick = { onAddToPlaylistClick(Selection(pojo.track)) },
                             onToggleSelected = { viewModel.toggleSelected(pojo) },
-                            isSelected = selection.isSelected(pojo),
-                            selectOnShortClick = selection.queueTracks.isNotEmpty(),
+                            isSelected = isSelected,
+                            selectOnShortClick = selectedTracks.isNotEmpty(),
                             thumbnail = thumbnail.value,
+                            containerColor = containerColor,
                         )
                     }
                 }

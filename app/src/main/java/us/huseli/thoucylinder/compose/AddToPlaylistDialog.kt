@@ -20,24 +20,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
-import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.retaintheme.snackbar.SnackbarEngine
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistDialog(
     playlists: List<AbstractPlaylist>,
     onSelect: (AbstractPlaylist) -> Unit,
-    onCreateNew: (String) -> Unit,
+    onCreateNew: (Playlist) -> Unit,
     onCancel: () -> Unit,
+    onGotoPlaylist: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedPlaylist by rememberSaveable { mutableStateOf<AbstractPlaylist?>(null) }
     var name by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
 
     AlertDialog(
         modifier = modifier,
@@ -47,7 +53,24 @@ fun AddToPlaylistDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    selectedPlaylist?.also(onSelect) ?: run { if (name.isNotBlank()) onCreateNew(name) }
+                    selectedPlaylist?.also { playlist ->
+                        onSelect(playlist)
+                        SnackbarEngine.addInfo(
+                            message = context.getString(R.string.selection_was_added_to_playlist),
+                            actionLabel = context.getString(R.string.go_to_playlist),
+                            onActionPerformed = { onGotoPlaylist(playlist.playlistId) },
+                        )
+                    } ?: run {
+                        if (name.isNotBlank()) {
+                            val playlist = Playlist(name = name)
+                            onCreateNew(playlist)
+                            SnackbarEngine.addInfo(
+                                message = context.getString(R.string.playlist_was_created),
+                                actionLabel = context.getString(R.string.go_to_playlist),
+                                onActionPerformed = { onGotoPlaylist(playlist.playlistId) },
+                            )
+                        }
+                    }
                 },
                 enabled = selectedPlaylist != null || name.isNotBlank(),
                 content = { Text(stringResource(R.string.save)) },

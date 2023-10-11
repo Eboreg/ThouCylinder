@@ -1,22 +1,17 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.net.Uri
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
 import java.util.UUID
-
-abstract class AbstractQueueTrack {
-    abstract val queueTrackId: UUID
-    abstract val trackId: UUID
-    abstract val uri: Uri
-    abstract val position: Int
-}
 
 
 @Entity
 data class QueueTrack(
-    @PrimaryKey override val queueTrackId: UUID = UUID.randomUUID(),
-    override val trackId: UUID,
-    override val uri: Uri,
-    override val position: Int,
+    @ColumnInfo("QueueTrack_queueTrackId") @PrimaryKey override val queueTrackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("QueueTrack_trackId") override val trackId: UUID,
+    @ColumnInfo("QueueTrack_uri") override val uri: Uri,
+    @ColumnInfo("QueueTrack_position") override val position: Int,
 ) : AbstractQueueTrack()

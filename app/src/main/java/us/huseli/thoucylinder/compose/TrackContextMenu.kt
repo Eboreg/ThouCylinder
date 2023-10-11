@@ -22,8 +22,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 
@@ -36,14 +37,15 @@ fun TrackContextMenu(
     onDismissRequest: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
+    album: Album? = null,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
-    onGotoArtistClick: ((String) -> Unit)? = null,
-    onGotoAlbumClick: ((UUID) -> Unit)? = null,
+    onArtistClick: ((String) -> Unit)? = null,
+    onAlbumClick: ((UUID) -> Unit)? = null,
 ) {
     var isInfoDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     if (isInfoDialogOpen) {
-        TrackInfoDialog(track = track, metadata = metadata, onClose = { isInfoDialogOpen = false })
+        TrackInfoDialog(track = track, album = album, metadata = metadata, onClose = { isInfoDialogOpen = false })
     }
 
     DropdownMenu(
@@ -70,25 +72,25 @@ fun TrackContextMenu(
                 onDismissRequest()
             }
         )
-        if (onGotoArtistClick != null) {
+        if (onArtistClick != null) {
             track.artist?.also { artist ->
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.go_to_artist)) },
                     leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
                     onClick = {
-                        onGotoArtistClick(artist)
+                        onArtistClick(artist)
                         onDismissRequest()
                     },
                 )
             }
         }
-        if (onGotoAlbumClick != null) {
+        if (onAlbumClick != null) {
             track.albumId?.also { albumId ->
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.go_to_album)) },
                     leadingIcon = { Icon(Icons.Sharp.Album, null) },
                     onClick = {
-                        onGotoAlbumClick(albumId)
+                        onAlbumClick(albumId)
                         onDismissRequest()
                     },
                 )
@@ -113,9 +115,10 @@ fun TrackContextMenuWithButton(
     onDownloadClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
+    album: Album? = null,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
-    onGotoArtistClick: ((String) -> Unit)? = null,
-    onGotoAlbumClick: ((UUID) -> Unit)? = null,
+    onArtistClick: ((String) -> Unit)? = null,
+    onAlbumClick: ((UUID) -> Unit)? = null,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -126,12 +129,13 @@ fun TrackContextMenuWithButton(
             Icon(Icons.Sharp.MoreVert, null)
             TrackContextMenu(
                 track = track,
+                album = album,
                 metadata = metadata,
                 onDownloadClick = onDownloadClick,
                 onDismissRequest = { isMenuShown = false },
                 isShown = isMenuShown,
-                onGotoArtistClick = onGotoArtistClick,
-                onGotoAlbumClick = onGotoAlbumClick,
+                onArtistClick = onArtistClick,
+                onAlbumClick = onAlbumClick,
                 offset = offset,
                 onAddToPlaylistClick = onAddToPlaylistClick,
             )

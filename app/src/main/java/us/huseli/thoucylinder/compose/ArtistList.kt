@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -26,7 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
-import us.huseli.thoucylinder.dataclasses.ArtistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.toBitmap
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
@@ -38,11 +40,13 @@ fun ArtistList(
     artists: List<ArtistPojo>,
     images: Map<String, Image?>,
     onArtistClick: ((String) -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     ItemList(
         things = artists,
         modifier = modifier,
-        onCardClick = onArtistClick?.let { { onArtistClick(it.name) } },
+        onClick = onArtistClick?.let { { onArtistClick(it.name) } },
+        contentPadding = contentPadding,
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -51,10 +55,11 @@ fun ArtistList(
             if (imageBitmap.value == null) imageBitmap.value = artist.firstAlbumArt?.toBitmap()?.asImageBitmap()
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Thumbnail(
                 image = imageBitmap.value,
                 modifier = Modifier.fillMaxHeight(),
+                shape = MaterialTheme.shapes.extraSmall,
                 placeholder = {
                     Image(
                         imageVector = Icons.Sharp.InterpreterMode,

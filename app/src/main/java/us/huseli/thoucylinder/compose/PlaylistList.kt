@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.compose
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,7 +30,7 @@ import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
-import us.huseli.thoucylinder.dataclasses.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 
 @Composable
 fun PlaylistList(
@@ -37,6 +38,7 @@ fun PlaylistList(
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
     onAddPlaylist: (Playlist) -> Unit,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     var isAddDialogOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -60,7 +62,12 @@ fun PlaylistList(
         )
     }
 
-    ItemList(things = playlists, onCardClick = onPlaylistClick, cardHeight = 60.dp) { playlist ->
+    ItemList(
+        things = playlists,
+        onClick = onPlaylistClick,
+        cardHeight = 60.dp,
+        contentPadding = contentPadding,
+    ) { playlist ->
         Row(
             modifier = Modifier.padding(vertical = 5.dp).fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,

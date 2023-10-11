@@ -8,23 +8,28 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.TrackList
-import us.huseli.thoucylinder.dataclasses.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
 import java.util.UUID
 
@@ -41,15 +46,26 @@ fun PlaylistScreen(
     val playlist by viewModel.playlist.collectAsStateWithLifecycle(
         PlaylistPojo(playlistId = viewModel.playlistId)
     )
-    val tracks = viewModel.tracks.collectAsLazyPagingItems()
+    val tracks: LazyPagingItems<TrackPojo> = viewModel.tracks.collectAsLazyPagingItems()
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = onBackClick,
-                content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
-            )
-            Text(text = playlist.name, style = MaterialTheme.typography.headlineSmall)
+        Surface(
+            color = BottomAppBarDefaults.containerColor,
+            tonalElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBackClick,
+                    content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
+                )
+                Text(
+                    text = playlist.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         if (tracks.itemCount == 0) {
@@ -57,15 +73,15 @@ fun PlaylistScreen(
         }
 
         TrackList(
-            tracks = tracks,
+            pojos = tracks,
             viewModel = viewModel,
             modifier = Modifier.padding(horizontal = 10.dp),
             onDownloadClick = { viewModel.downloadTrack(it) },
-            onPlayClick = { viewModel.play(it) },
+            onPlayClick = { viewModel.playTrack(it) },
             onAddToPlaylistClick = { onAddToPlaylistClick(it) },
             listState = listState,
-            onGotoArtistClick = onArtistClick,
-            onGotoAlbumClick = onAlbumClick,
+            onArtistClick = onArtistClick,
+            onAlbumClick = onAlbumClick,
         )
     }
 }

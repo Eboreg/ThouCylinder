@@ -1,25 +1,55 @@
 package us.huseli.thoucylinder.viewmodels
 
 import dagger.hilt.android.lifecycle.HiltViewModel
-import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.QueueTrackPojo
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.TrackQueue
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
+import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
 class QueueViewModel @Inject constructor(private val repos: Repositories) : BaseViewModel(repos) {
-    val queue = repos.player.queue
-    val playerCurrentPojo = repos.player.currentPojo
-    val playerPlaybackState = repos.player.playbackState
-    val playerCurrentPositionMs = repos.player.currentPositionMs
-    val playerCanGotoNext = repos.player.canGotoNext
-    val playerCanPlay = repos.player.canPlay
+    private val _selectedQueueTracks = MutableStateFlow<List<AbstractQueueTrack>>(emptyList())
+
+    val selectedQueueTracks: StateFlow<List<AbstractQueueTrack>> = _selectedQueueTracks.asStateFlow()
+    val queue: StateFlow<TrackQueue> = repos.player.queue
+    val playerCurrentPojo: StateFlow<QueueTrackPojo?> = repos.player.currentPojo
+    val playerPlaybackState: StateFlow<PlayerRepository.PlaybackState> = repos.player.playbackState
+    val playerCurrentPositionMs: StateFlow<Long> = repos.player.currentPositionMs
+    val playerCanGotoNext: StateFlow<Boolean> = repos.player.canGotoNext
+    val playerCanGotoPrevious: StateFlow<Boolean> = repos.player.canGotoPrevious
+    val playerCanPlay: StateFlow<Boolean> = repos.player.canPlay
+    val playerIsRepeatEnabled = repos.player.isRepeatEnabled
+    val playerIsShuffleEnabled = repos.player.isShuffleEnabled
 
     fun play(pojo: QueueTrackPojo) = repos.player.play(pojo)
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
-    fun removeFromQueue(selection: Selection) = repos.player.removeFromQueue(selection.queueTracks)
+    fun removeFromQueue(queueTracks: List<AbstractQueueTrack>) = repos.player.removeFromQueue(queueTracks)
+
+    fun seekTo(positionMs: Long) = repos.player.seekTo(positionMs)
 
     fun skipToNext() = repos.player.skipToNext()
+
+    fun skipToPrevious() = repos.player.skipToPrevious()
+
+    fun toggleRepeat() = repos.player.toggleRepeat()
+
+    fun toggleSelected(queueTrack: AbstractQueueTrack) {
+        if (_selectedQueueTracks.value.contains(queueTrack))
+            _selectedQueueTracks.value -= queueTrack
+        else
+            _selectedQueueTracks.value += queueTrack
+    }
+
+    fun toggleShuffle() = repos.player.toggleShuffle()
+
+    fun unselectAllQueueTracks() {
+        _selectedQueueTracks.value = emptyList()
+    }
 }

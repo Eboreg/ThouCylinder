@@ -24,20 +24,21 @@ import us.huseli.thoucylinder.R
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SelectedTracksButtons(
-    trackCount: Int,
+fun SelectedAlbumsButtons(
+    albumCount: Int,
+    onPlayClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     onUnselectAllClick: () -> Unit,
     extraButtons: (@Composable () -> Unit)? = null,
 ) {
-    if (trackCount > 0) {
+    if (albumCount > 0) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         ) {
             Text(
-                pluralStringResource(R.plurals.x_selected_tracks, trackCount, trackCount),
+                pluralStringResource(R.plurals.x_selected_albums, albumCount, albumCount),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -48,6 +49,13 @@ fun SelectedTracksButtons(
                         onUnselectAllClick()
                     },
                     text = stringResource(R.string.add_to_playlist),
+                )
+                SmallOutlinedButton(
+                    onClick = {
+                        onPlayClick()
+                        onUnselectAllClick()
+                    },
+                    text = stringResource(R.string.play),
                 )
                 extraButtons?.invoke()
                 IconButton(

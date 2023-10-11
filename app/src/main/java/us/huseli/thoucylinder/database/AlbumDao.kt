@@ -10,9 +10,9 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.AbstractAlbumPojo
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
@@ -42,13 +42,13 @@ interface AlbumDao {
     suspend fun _updateAlbums(vararg albums: Album)
 
     /** Public methods *******************************************************/
-    @Query("SELECT EXISTS(SELECT albumId FROM Album WHERE albumId = :albumId AND isInLibrary = 1)")
+    @Query("SELECT EXISTS(SELECT Album_albumId FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1)")
     suspend fun albumExists(albumId: UUID): Boolean
 
-    @Query("DELETE FROM AlbumGenre WHERE albumId = :albumId")
+    @Query("DELETE FROM AlbumGenre WHERE AlbumGenre_albumId = :albumId")
     suspend fun clearAlbumGenres(albumId: UUID)
 
-    @Query("DELETE FROM AlbumStyle WHERE albumId = :albumId")
+    @Query("DELETE FROM AlbumStyle WHERE AlbumStyle_albumId = :albumId")
     suspend fun clearAlbumStyles(albumId: UUID)
 
     @Query("DELETE FROM Album")
@@ -57,23 +57,23 @@ interface AlbumDao {
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
 
-    @Query("SELECT * FROM Album WHERE albumId = :albumId AND isInLibrary = 1")
+    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1")
     @Transaction
     fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
 
     @Query(
         """
-        SELECT a.*, SUM(t.metadatadurationMs) AS durationMs, MIN(t.year) AS minYear, MAX(t.year) AS maxYear,
-            COUNT(t.trackId) AS trackCount
-        FROM Album a LEFT JOIN Track t ON a.albumId = t.albumId AND t.isInLibrary = 1 AND a.isInLibrary = 1
-        GROUP BY a.albumId
-        ORDER BY LOWER(a.artist), LOWER(a.title)
+        SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear,
+            COUNT(Track_trackId) AS trackCount
+        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId AND Track_isInLibrary = 1 AND Album_isInLibrary = 1
+        GROUP BY Album_albumId
+        ORDER BY LOWER(Album_artist), LOWER(Album_title)
         """
     )
     @Transaction
     fun flowAlbumPojos(): Flow<List<AlbumPojo>>
 
-    @Query("SELECT * FROM Album WHERE albumId = :albumId AND isInLibrary = 1")
+    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1")
     @Transaction
     suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo?
 
@@ -94,17 +94,17 @@ interface AlbumDao {
     suspend fun insertAlbums(vararg albums: Album) =
         _insertAlbums(*albums.map { it.copy(isInLibrary = true) }.toTypedArray())
 
-    @Query("SELECT * FROM Album WHERE isInLibrary = 1")
+    @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>
 
     @Query(
         """
-        SELECT a.*, SUM(t.metadatadurationMs) AS durationMs, MIN(t.year) AS minYear, MAX(t.year) AS maxYear,
-            COUNT(t.trackId) AS trackCount
-        FROM Album a LEFT JOIN Track t ON a.albumId = t.albumId
-        WHERE (a.title LIKE :query OR a.artist LIKE :query) AND a.isInLibrary = 1
-        GROUP BY a.albumId
-        ORDER BY LOWER(a.artist), LOWER(a.title)
+        SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear,
+            COUNT(Track_trackId) AS trackCount
+        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId
+        WHERE (Album_title LIKE :query OR Album_artist LIKE :query) AND Album_isInLibrary = 1
+        GROUP BY Album_albumId
+        ORDER BY LOWER(Album_artist), LOWER(Album_title)
         """
     )
     @Transaction

@@ -52,7 +52,7 @@ fun AlbumScreen(
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
-    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
 
     var addDownloadedAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
     var addAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -96,8 +96,8 @@ fun AlbumScreen(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SelectedTracksButtons(
-            selection = selection,
-            onAddToPlaylistClick = { onAddToPlaylistClick(selection) },
+            trackCount = selectedTracks.size,
+            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
             onUnselectAllClick = { viewModel.unselectAllTracks() },
         )
 
@@ -196,15 +196,16 @@ fun AlbumScreen(
 
                     AlbumTrackRow(
                         track = track,
+                        album = pojo.album,
                         downloadProgress = trackDownloadProgress[track.trackId],
                         onDownloadClick = { viewModel.downloadTrack(track) },
-                        onPlayClick = { viewModel.play(track) },
+                        onPlayClick = { viewModel.playTrack(track) },
                         showArtist = track.artist != pojo.album.artist,
                         onArtistClick = onArtistClick,
                         onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
                         onToggleSelected = { viewModel.toggleSelected(track) },
-                        isSelected = selection.isSelected(track),
-                        selectOnShortClick = selection.tracks.isNotEmpty(),
+                        isSelected = selectedTracks.contains(track),
+                        selectOnShortClick = selectedTracks.isNotEmpty(),
                     )
                 }
             }

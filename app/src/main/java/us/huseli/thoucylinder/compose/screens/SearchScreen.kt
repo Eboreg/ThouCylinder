@@ -33,8 +33,8 @@ import us.huseli.thoucylinder.compose.SearchForm
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
 import java.util.UUID
 
@@ -132,7 +132,7 @@ fun SearchScreen(
 @Composable
 fun SearchResults(
     albums: List<AlbumPojo>,
-    tracks: LazyPagingItems<Track>,
+    tracks: LazyPagingItems<TrackPojo>,
     viewModel: SearchViewModel,
     displayType: DisplayType,
     listType: ListType,
@@ -145,18 +145,19 @@ fun SearchResults(
             ListType.ALBUMS -> {
                 AlbumList(
                     modifier = modifier,
-                    albums = albums,
+                    pojos = albums,
                     viewModel = viewModel,
                     onAlbumClick = onAlbumClick,
+                    onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }
             ListType.TRACKS -> {
                 TrackList(
                     modifier = modifier,
-                    tracks = tracks,
+                    pojos = tracks,
                     viewModel = viewModel,
                     onDownloadClick = { viewModel.downloadTrack(it) },
-                    onPlayClick = { viewModel.play(it) },
+                    onPlayClick = { viewModel.playTrack(it) },
                     onAddToPlaylistClick = onAddToPlaylistClick,
                 )
             }
@@ -175,7 +176,7 @@ fun SearchResults(
             ListType.TRACKS -> {
                 TrackGrid(
                     modifier = modifier,
-                    tracks = tracks,
+                    pojos = tracks,
                     viewModel = viewModel,
                     onAddToPlaylistClick = onAddToPlaylistClick,
                 )

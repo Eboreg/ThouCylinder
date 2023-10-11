@@ -1,6 +1,9 @@
 package us.huseli.thoucylinder.dataclasses
 
-import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.plus
+import us.huseli.thoucylinder.dataclasses.pojos.reindexed
 
 class TrackQueue(items: List<QueueTrackPojo> = emptyList()) {
     val items = items.reindexed()

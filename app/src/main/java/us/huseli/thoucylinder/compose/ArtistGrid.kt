@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.compose
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemGrid
-import us.huseli.thoucylinder.dataclasses.ArtistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.toBitmap
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
@@ -36,11 +37,13 @@ fun ArtistGrid(
     artists: List<ArtistPojo>,
     images: Map<String, Image?>,
     onArtistClick: (String) -> Unit,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     ItemGrid(
         things = artists,
         modifier = modifier,
-        onCardClick = { onArtistClick(it.name) },
+        onClick = { onArtistClick(it.name) },
+        contentPadding = contentPadding,
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 

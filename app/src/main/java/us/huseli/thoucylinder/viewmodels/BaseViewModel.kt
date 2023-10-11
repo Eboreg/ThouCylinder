@@ -12,18 +12,20 @@ import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.repositories.Repositories
 import java.util.UUID
 
 abstract class BaseViewModel(private val repos: Repositories) : ViewModel() {
-    private val _selection = MutableStateFlow(Selection())
+    private val _selectedAlbums = MutableStateFlow<List<Album>>(emptyList())
+    private val _selectedTracks = MutableStateFlow<List<Track>>(emptyList())
     private val _trackDownloadProgressMap = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
 
-    val selection = _selection.asStateFlow()
+    val selectedAlbums = _selectedAlbums.asStateFlow()
+    val selectedTracks = _selectedTracks.asStateFlow()
     val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
 
     fun addPlaylist(playlist: Playlist, selection: Selection? = null) = viewModelScope.launch(Dispatchers.IO) {
@@ -58,17 +60,33 @@ abstract class BaseViewModel(private val repos: Repositories) : ViewModel() {
         return youtubeMetadata?.toTrackMetadata()
     }
 
-    fun play(track: Track) = repos.player.playTrack(track)
+    fun playAlbum(albumId: UUID) = playAlbums(listOf(albumId))
 
-    fun toggleSelected(track: Track) {
-        _selection.value = _selection.value.toggleSelected(track)
+    fun playAlbums(albumIds: List<UUID>) = viewModelScope.launch(Dispatchers.IO) {
+        repos.player.playAlbums(albumIds.mapNotNull { repos.local.getAlbumWithTracks(it) })
     }
 
-    fun toggleSelected(queueTrack: AbstractQueueTrack) {
-        _selection.value = _selection.value.toggleSelected(queueTrack)
+    fun playTrack(track: Track) = repos.player.playTrack(track)
+
+    fun toggleSelected(album: Album) {
+        if (_selectedAlbums.value.contains(album))
+            _selectedAlbums.value -= album
+        else
+            _selectedAlbums.value += album
+    }
+
+    fun toggleSelected(track: Track) {
+        if (_selectedTracks.value.contains(track))
+            _selectedTracks.value -= track
+        else
+            _selectedTracks.value += track
+    }
+
+    fun unselectAllAlbums() {
+        _selectedAlbums.value = emptyList()
     }
 
     fun unselectAllTracks() {
-        _selection.value = _selection.value.copy(tracks = emptyList())
+        _selectedTracks.value = emptyList()
     }
 }

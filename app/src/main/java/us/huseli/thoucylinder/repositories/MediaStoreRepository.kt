@@ -19,7 +19,7 @@ import us.huseli.thoucylinder.MediaStoreException
 import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.entities.MediaStoreData

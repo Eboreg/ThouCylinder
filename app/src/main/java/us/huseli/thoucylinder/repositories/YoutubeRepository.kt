@@ -29,8 +29,8 @@ import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_FILTER
 import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata

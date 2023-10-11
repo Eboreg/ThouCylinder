@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -12,7 +13,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.getMediaStoreFileNullable
@@ -23,26 +24,26 @@ import java.util.UUID
     foreignKeys = [
         ForeignKey(
             entity = Album::class,
-            parentColumns = ["albumId"],
-            childColumns = ["albumId"],
+            parentColumns = ["Album_albumId"],
+            childColumns = ["Track_albumId"],
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("albumId"), Index("title"), Index("artist"), Index("isInLibrary")],
+    indices = [Index("Track_albumId"), Index("Track_title"), Index("Track_artist"), Index("Track_isInLibrary")],
 )
 data class Track(
-    @PrimaryKey val trackId: UUID = UUID.randomUUID(),
-    val title: String,
-    val isInLibrary: Boolean,
-    val artist: String? = null,
-    val albumId: UUID? = null,
-    val albumPosition: Int? = null,
-    val year: Int? = null,
-    @Embedded("metadata") val metadata: TrackMetadata? = null,
-    @Embedded("youtubeVideo") val youtubeVideo: YoutubeVideo? = null,
-    @Embedded("image") val image: Image? = null,
-    @Embedded("mediaStoreData") val mediaStoreData: MediaStoreData? = null,
+    @ColumnInfo("Track_trackId") @PrimaryKey val trackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("Track_title") val title: String,
+    @ColumnInfo("Track_isInLibrary") val isInLibrary: Boolean,
+    @ColumnInfo("Track_artist") val artist: String? = null,
+    @ColumnInfo("Track_albumId") val albumId: UUID? = null,
+    @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
+    @ColumnInfo("Track_year") val year: Int? = null,
+    @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
+    @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
+    @Embedded("Track_image_") val image: Image? = null,
+    @Embedded("Track_mediaStoreData_") val mediaStoreData: MediaStoreData? = null,
     @Ignore val tempTrackData: TempTrackData? = null,
 ) {
     constructor(
@@ -97,7 +98,7 @@ data class Track(
     }
 
     fun toQueueTrackPojo(index: Int): QueueTrackPojo? =
-        playUri?.let { uri -> QueueTrackPojo(track = this, uri = uri, position = index) }
+        playUri?.let { uri -> QueueTrackPojo(track = this, uri = uri, position = index, album = null) }
 
     fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""

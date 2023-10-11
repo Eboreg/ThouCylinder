@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +21,6 @@ import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material.icons.sharp.MoreVert
-import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -49,10 +49,9 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.itemKey
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.themeColors
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
 import java.util.UUID
@@ -60,22 +59,23 @@ import java.util.UUID
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackGrid(
-    tracks: LazyPagingItems<Track>,
+    pojos: LazyPagingItems<TrackPojo>,
     viewModel: BaseViewModel,
     modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     onAddToPlaylistClick: (Selection) -> Unit,
-    onGotoArtistClick: ((String) -> Unit)? = null,
-    onGotoAlbumClick: ((UUID) -> Unit)? = null,
+    onArtistClick: ((String) -> Unit)? = null,
+    onAlbumClick: ((UUID) -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxWidth()) {
         SelectedTracksButtons(
-            selection = selection,
-            onAddToPlaylistClick = { onAddToPlaylistClick(selection) },
+            trackCount = selectedTracks.size,
+            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
             onUnselectAllClick = { viewModel.unselectAllTracks() },
         )
 
@@ -84,12 +84,15 @@ fun TrackGrid(
             columns = GridCells.Adaptive(minSize = 160.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp),
+            contentPadding = contentPadding,
         ) {
-            items(count = tracks.itemCount, key = tracks.itemKey { it.trackId }) { index ->
-                tracks[index]?.also { track ->
+            // items(count = pojos.itemCount, key = pojos.itemKey { it.track.trackId }) { index ->
+            items(count = pojos.itemCount) { index ->
+                pojos[index]?.also { pojo ->
+                    val track = pojo.track
                     val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
                     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
-                    val isSelected = selection.isSelected(track)
+                    val isSelected = selectedTracks.contains(track)
                     var metadata by rememberSaveable { mutableStateOf(track.metadata) }
 
                     LaunchedEffect(Unit) {
@@ -100,7 +103,10 @@ fun TrackGrid(
                     OutlinedCard(
                         shape = MaterialTheme.shapes.extraSmall,
                         modifier = Modifier.combinedClickable(
-                            onClick = { if (selection.tracks.isNotEmpty()) viewModel.toggleSelected(track) },
+                            onClick = {
+                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(track)
+                                else viewModel.playTrack(track)
+                            },
                             onLongClick = { viewModel.toggleSelected(track) },
                         ),
                         border = CardDefaults.outlinedCardBorder()
@@ -149,36 +155,19 @@ fun TrackGrid(
                                             )
                                             TrackContextMenu(
                                                 track = track,
+                                                album = pojo.album,
                                                 metadata = metadata,
                                                 onDownloadClick = { viewModel.downloadTrack(track) },
                                                 onDismissRequest = { isContextMenuShown = false },
                                                 isShown = isContextMenuShown,
-                                                onGotoAlbumClick = onGotoAlbumClick,
-                                                onGotoArtistClick = onGotoArtistClick,
+                                                onAlbumClick = onAlbumClick,
+                                                onArtistClick = onArtistClick,
                                                 offset = DpOffset(0.dp, (-20).dp),
                                                 onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
                                             )
                                         }
                                     }
                                 },
-                                bottomContent = {
-                                    FilledTonalIconButton(
-                                        onClick = { viewModel.play(track) },
-                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            contentColor = contentColorFor(MaterialTheme.colorScheme.error),
-                                        ),
-                                        modifier = Modifier.size(50.dp).align(Alignment.End),
-                                        shape = CutCornerShape(topStartPercent = 100),
-                                        content = {
-                                            Icon(
-                                                imageVector = Icons.Sharp.PlayArrow,
-                                                contentDescription = null,
-                                                modifier = Modifier.offset(10.dp, 10.dp),
-                                            )
-                                        }
-                                    )
-                                }
                             )
 
                             if (isSelected) {

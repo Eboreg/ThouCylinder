@@ -11,10 +11,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.entities.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -38,7 +39,8 @@ class LocalRepository @Inject constructor(private val database: Database) {
     val artistPojos = artistDao.flowArtistPojos()
     val playlists = playlistDao.flowPlaylists()
     val tempAlbumPojos = _tempAlbumPojos.asStateFlow()
-    val trackPager: Pager<Int, Track> = Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracks() }
+    val trackPojoPager: Pager<Int, TrackPojo> =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojos() }
 
     fun addOrUpdateTempAlbum(pojo: AlbumWithTracksPojo) {
         _tempAlbumPojos.value += pojo.album.albumId to pojo
@@ -63,7 +65,9 @@ class LocalRepository @Inject constructor(private val database: Database) {
 
     suspend fun deleteTracks(tracks: List<Track>) = trackDao.deleteTracks(*tracks.toTypedArray())
 
-    fun getAlbumWithTracks(albumId: UUID) = albumDao.flowAlbumWithTracks(albumId)
+    fun flowAlbumWithTracks(albumId: UUID) = albumDao.flowAlbumWithTracks(albumId)
+
+    suspend fun getAlbumWithTracks(albumId: UUID) = albumDao.getAlbumWithTracks(albumId)
 
     suspend fun getImageBitmap(image: Image): ImageBitmap? {
         return _imageCacheMutex.withLock {
@@ -86,10 +90,10 @@ class LocalRepository @Inject constructor(private val database: Database) {
 
     suspend fun listTracks(): List<Track> = trackDao.listTracks()
 
-    fun pageTracksByArtist(artist: String): Pager<Int, Track> =
+    fun pageTracksByArtist(artist: String): Pager<Int, TrackPojo> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracksByArtist(artist) }
 
-    fun pageTracksByPlaylistId(playlistId: UUID): Pager<Int, Track> =
+    fun pageTracksByPlaylistId(playlistId: UUID): Pager<Int, TrackPojo> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracksByPlaylistId(playlistId) }
 
     suspend fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = database.withTransaction {
@@ -107,35 +111,38 @@ class LocalRepository @Inject constructor(private val database: Database) {
 
     suspend fun searchAlbums(query: String): List<AlbumPojo> = albumDao.simpleAlbumSearch(query)
 
-    fun searchTracks(query: String): Pager<Int, Track> =
+    fun searchTracks(query: String): Pager<Int, TrackPojo> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.simpleTrackSearch(query) }
 
     private suspend fun getPlaylistTracksFromSelection(
         playlist: AbstractPlaylist,
         selection: Selection,
     ): List<PlaylistTrack> {
-        // TODO: This is a little stupid. If, potentially, tracks _and_ albums were selected at the same time,
-        // PlaylistTracks would get identical values for "position".
         val playlistTracks = mutableListOf<PlaylistTrack>()
+        var index = 0
 
         playlistTracks.addAll(
-            selection.tracks.mapIndexed { index, track ->
-                PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = index)
+            selection.tracks.map { track ->
+                PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = index++)
             }
         )
         playlistTracks.addAll(
-            selection.queueTracks.mapIndexed { index, queueTrack ->
-                PlaylistTrack(playlistId = playlist.playlistId, trackId = queueTrack.trackId, position = index)
+            selection.queueTracks.map { queueTrack ->
+                PlaylistTrack(
+                    playlistId = playlist.playlistId,
+                    trackId = queueTrack.trackId,
+                    position = index++,
+                )
             }
         )
-        selection.albums.forEachIndexed { albumIdx, album ->
+        selection.albums.forEach { album ->
             albumDao.getAlbumWithTracks(album.albumId)?.tracks?.also { tracks ->
                 playlistTracks.addAll(
-                    tracks.mapIndexed { trackIdx, track ->
+                    tracks.map { track ->
                         PlaylistTrack(
                             playlistId = playlist.playlistId,
                             trackId = track.trackId,
-                            position = albumIdx + trackIdx,
+                            position = index++,
                         )
                     }
                 )

@@ -8,7 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import java.time.Instant
@@ -17,13 +17,13 @@ import java.util.UUID
 @Dao
 interface PlaylistDao {
     /** Pseudo-private methods ***********************************************/
-    @Query("DELETE FROM PlaylistTrack WHERE playlistId = :playlistId")
+    @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
     suspend fun _clearPlaylistTracks(playlistId: UUID)
 
     @Insert
     suspend fun _insertPlaylists(vararg playlists: Playlist)
 
-    @Query("SELECT EXISTS(SELECT playlistId FROM Playlist WHERE playlistId = :playlistId)")
+    @Query("SELECT EXISTS(SELECT Playlist_playlistId FROM Playlist WHERE Playlist_playlistId = :playlistId)")
     suspend fun _playlistExists(playlistId: UUID): Boolean
 
     @Update
@@ -32,12 +32,12 @@ interface PlaylistDao {
     /** Public methods *******************************************************/
     @Query(
         """
-        SELECT p.*, COUNT(pt.trackId) AS trackCount, SUM(t.metadatadurationMs) AS totalDurationMs
+        SELECT p.*, COUNT(PlaylistTrack_trackId) AS trackCount, SUM(Track_metadata_durationMs) AS totalDurationMs
         FROM Playlist p 
-            LEFT JOIN PlaylistTrack pt ON p.playlistId = pt.playlistId 
-            LEFT JOIN Track t ON pt.trackId = t.trackId
-        GROUP BY p.playlistId
-        HAVING p.playlistId IS NOT NULL
+            LEFT JOIN PlaylistTrack pt ON Playlist_playlistId = PlaylistTrack_playlistId 
+            LEFT JOIN Track t ON PlaylistTrack_trackId = Track_trackId
+        GROUP BY Playlist_playlistId
+        HAVING Playlist_playlistId IS NOT NULL
         """
     )
     fun flowPlaylists(): Flow<List<PlaylistPojo>>

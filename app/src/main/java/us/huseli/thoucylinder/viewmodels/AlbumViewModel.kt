@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.LoadStatus
-import us.huseli.thoucylinder.dataclasses.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
@@ -48,7 +48,7 @@ class AlbumViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            combine(repos.local.getAlbumWithTracks(_albumId), repos.local.tempAlbumPojos) { pojo, tempPojos ->
+            combine(repos.local.flowAlbumWithTracks(_albumId), repos.local.tempAlbumPojos) { pojo, tempPojos ->
                 pojo ?: tempPojos[_albumId]
             }.filterNotNull().distinctUntilChanged().collect { pojo ->
                 _albumPojo.value = pojo

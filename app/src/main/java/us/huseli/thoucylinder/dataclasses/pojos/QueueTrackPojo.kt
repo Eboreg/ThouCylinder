@@ -1,21 +1,26 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.pojos
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
-import us.huseli.thoucylinder.dataclasses.entities.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 data class QueueTrackPojo(
     @Embedded val track: Track,
-    override val uri: Uri,
-    override val queueTrackId: UUID = UUID.randomUUID(),
-    override val position: Int = 0,
+    @Embedded val album: Album?,
+    @ColumnInfo("QueueTrack_uri") override val uri: Uri,
+    @ColumnInfo("QueueTrack_queueTrackId") override val queueTrackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("QueueTrack_position") override val position: Int = 0,
 ) : AbstractQueueTrack() {
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
+    val artist: String?
+        get() = track.artist ?: album?.artist
     override val trackId: UUID
         get() = track.trackId
 

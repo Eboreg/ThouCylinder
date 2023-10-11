@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.pojos
 
 import java.io.File
 import kotlin.time.Duration

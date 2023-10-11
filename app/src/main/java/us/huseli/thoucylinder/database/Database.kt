@@ -21,20 +21,20 @@ import java.util.concurrent.Executors
 
 @androidx.room.Database(
     entities = [
-        Track::class,
-        Album::class,
         Genre::class,
         Style::class,
-        AlbumGenre::class,
-        AlbumStyle::class,
+        Track::class,
+        Album::class,
         Playlist::class,
         PlaylistTrack::class,
         YoutubeSearchToken::class,
         YoutubeQueryTrack::class,
         QueueTrack::class,
+        AlbumGenre::class,
+        AlbumStyle::class,
     ],
     exportSchema = false,
-    version = 40,
+    version = 41,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

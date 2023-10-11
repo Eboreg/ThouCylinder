@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.ArtistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
@@ -28,7 +28,7 @@ class LibraryViewModel @Inject constructor(private val repos: Repositories) : Ba
     val artistPojos: Flow<List<ArtistPojo>> = repos.local.artistPojos
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val pagingTracks: Flow<PagingData<Track>> = repos.local.trackPager.flow.cachedIn(viewModelScope)
+    val pagingTrackPojos: Flow<PagingData<TrackPojo>> = repos.local.trackPojoPager.flow.cachedIn(viewModelScope)
     val playlists = repos.local.playlists
 
     init {

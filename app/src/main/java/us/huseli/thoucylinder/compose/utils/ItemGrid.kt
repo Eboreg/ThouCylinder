@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose.utils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -16,7 +17,8 @@ import androidx.compose.ui.unit.dp
 fun <T> ItemGrid(
     things: List<T>,
     modifier: Modifier = Modifier,
-    onCardClick: ((T) -> Unit)? = null,
+    onClick: ((T) -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -24,10 +26,11 @@ fun <T> ItemGrid(
         columns = GridCells.Adaptive(minSize = 160.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
+        contentPadding = contentPadding,
     ) {
         items(things) { thing ->
             val cardModifier =
-                if (onCardClick != null) Modifier.clickable { onCardClick(thing) }
+                if (onClick != null) Modifier.clickable { onClick(thing) }
                 else Modifier
 
             OutlinedCard(

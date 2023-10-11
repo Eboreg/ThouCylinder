@@ -4,6 +4,7 @@
     <string name="add_to_library">Add to library</string>
     <string name="add_to_playlist">Add to playlist</string>
     <string name="advanced_search">Advanced search</string>
+    <string name="album">Album</string>
     <string name="album_artist">Album artist</string>
     <string name="album_title">Album title</string>
     <string name="albums">Albums</string>
@@ -64,9 +65,16 @@
     <string name="year">Year</string>
     <string name="youtube">Youtube</string>
     <string name="youtube_playlist">Youtube playlist</string>
+    <string name="selection_was_added_to_playlist">Selection was added to playlist.</string>
+    <string name="go_to_playlist">Go to playlist</string>
+    <string name="playlist_was_created">Playlist was created.</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>
+    </plurals>
+    <plurals name="x_selected_albums">
+        <item quantity="one">1 selected album</item>
+        <item quantity="other">%1$d selected albums</item>
     </plurals>
     <plurals name="x_selected_tracks">
         <item quantity="one">1 selected track</item>

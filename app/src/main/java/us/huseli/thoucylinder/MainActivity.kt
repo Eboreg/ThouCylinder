@@ -7,13 +7,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
-import us.huseli.retaintheme.ui.theme.RetainTheme
 import us.huseli.thoucylinder.compose.App
 
 @AndroidEntryPoint
@@ -40,13 +35,8 @@ class MainActivity : ComponentActivity() {
         requestPermissionLauncher.launch(permissions)
 
         setContent {
-            RetainTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    App()
-                }
+            ThouCylinderTheme {
+                App()
             }
         }
     }

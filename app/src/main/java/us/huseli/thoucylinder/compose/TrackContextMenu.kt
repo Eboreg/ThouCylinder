@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.compose
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
+import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Info
@@ -41,6 +42,7 @@ fun TrackContextMenu(
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((UUID) -> Unit)? = null,
+    onEnqueueNextClick: () -> Unit,
 ) {
     var isInfoDialogOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -69,6 +71,14 @@ fun TrackContextMenu(
             leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
                 onAddToPlaylistClick()
+                onDismissRequest()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.play_next)) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+            onClick = {
+                onEnqueueNextClick()
                 onDismissRequest()
             }
         )
@@ -119,6 +129,7 @@ fun TrackContextMenuWithButton(
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((UUID) -> Unit)? = null,
+    onEnqueueNextClick: () -> Unit,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -138,6 +149,7 @@ fun TrackContextMenuWithButton(
                 onAlbumClick = onAlbumClick,
                 offset = offset,
                 onAddToPlaylistClick = onAddToPlaylistClick,
+                onEnqueueNextClick = onEnqueueNextClick,
             )
         }
     )

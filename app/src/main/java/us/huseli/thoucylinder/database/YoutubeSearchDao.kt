@@ -23,15 +23,6 @@ interface YoutubeSearchDao {
     @Query("DELETE FROM YoutubeQueryTrack")
     suspend fun _deleteAllQueryTracks()
 
-    @Query("DELETE FROM YoutubeQueryTrack WHERE YoutubeQueryTrack_query = :query")
-    suspend fun _deleteQueryTracksByQuery(query: String)
-
-    @Query("DELETE FROM YoutubeSearchToken WHERE YoutubeSearchToken_query = :query")
-    suspend fun _deleteTokenByQuery(query: String)
-
-    @Query("DELETE FROM Track WHERE Track_trackId IN (SELECT YoutubeQueryTrack_trackId FROM YoutubeQueryTrack y WHERE YoutubeQueryTrack_query = :query)")
-    suspend fun _deleteTracksByQuery(query: String)
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun _insertTracks(vararg tracks: Track)
 
@@ -48,12 +39,6 @@ interface YoutubeSearchDao {
         _deleteAllTokens()
         _deleteAllQueryTracks()
         _deleteAllTracks()
-    }
-
-    suspend fun deleteDataByQuery(query: String) {
-        _deleteTracksByQuery(query)
-        _deleteTokenByQuery(query)
-        _deleteQueryTracksByQuery(query)
     }
 
     @Query("SELECT * FROM YoutubeSearchToken WHERE YoutubeSearchToken_query = :query")

@@ -26,17 +26,17 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Base
     val playerIsRepeatEnabled = repos.player.isRepeatEnabled
     val playerIsShuffleEnabled = repos.player.isShuffleEnabled
 
-    fun play(pojo: QueueTrackPojo) = repos.player.play(pojo)
-
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
     fun removeFromQueue(queueTracks: List<AbstractQueueTrack>) = repos.player.removeFromQueue(queueTracks)
 
     fun seekTo(positionMs: Long) = repos.player.seekTo(positionMs)
 
+    fun skipTo(index: Int) = repos.player.skipTo(index)
+
     fun skipToNext() = repos.player.skipToNext()
 
-    fun skipToPrevious() = repos.player.skipToPrevious()
+    fun skipToStartOrPrevious() = repos.player.skipToStartOrPrevious()
 
     fun toggleRepeat() = repos.player.toggleRepeat()
 

@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.dataclasses.pojos
 
 import androidx.room.ColumnInfo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration
@@ -17,6 +18,8 @@ data class PlaylistPojo(
 ) : AbstractPlaylist() {
     val totalDuration: Duration
         get() = totalDurationMs.milliseconds
+
+    fun toPlaylist() = Playlist(playlistId = playlistId, name = name, created = created, updated = updated)
 
     override fun toString() = name
 }

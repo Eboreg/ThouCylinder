@@ -5,7 +5,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
@@ -13,7 +13,7 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(private val repos: Repositories) : BaseViewModel(repos) {
     val playlists = repos.local.playlists
 
-    fun addSelectionToPlaylist(selection: Selection, playlist: AbstractPlaylist) =
+    fun addSelectionToPlaylist(selection: Selection, playlist: PlaylistPojo) =
         viewModelScope.launch(Dispatchers.IO) {
             repos.local.addSelectionToPlaylist(selection, playlist)
         }

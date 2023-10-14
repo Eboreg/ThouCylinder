@@ -3,11 +3,10 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +27,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
+import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -53,11 +54,14 @@ fun TrackListRow(
     downloadProgress: DownloadProgress? = null,
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((UUID) -> Unit)? = null,
+    onEnqueueNextClick: () -> Unit,
 ) {
+    val artist = track.artist ?: album?.artist
+
     Card(
         colors = CardDefaults.outlinedCardColors(
             containerColor = containerColor
-                ?: if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                ?: if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         ),
         shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier.fillMaxWidth().height(50.dp).combinedClickable(
@@ -65,30 +69,39 @@ fun TrackListRow(
             onLongClick = onToggleSelected,
         ),
     ) {
-        Row {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
                 image = thumbnail,
                 shape = MaterialTheme.shapes.extraSmall,
-                modifier = Modifier.fillMaxHeight().padding(end = 10.dp),
                 placeholder = {
                     Image(
                         imageVector = Icons.Sharp.MusicNote,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize().aspectRatio(1f),
                     )
                 },
+                borderWidth = if (isSelected) 0.dp else 1.dp,
             )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxHeight().padding(vertical = 5.dp),
             ) {
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = track.toString(showAlbumPosition = false, showArtist = showArtist),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = track.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                    )
+                    if (artist != null && showArtist) {
+                        Text(
+                            text = artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                        )
+                    }
+                }
 
                 metadata?.let {
                     Text(text = it.duration.sensibleFormat(), modifier = Modifier.padding(start = 5.dp))
@@ -103,6 +116,7 @@ fun TrackListRow(
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
                     onAddToPlaylistClick = onAddToPlaylistClick,
+                    onEnqueueNextClick = onEnqueueNextClick,
                 )
             }
         }

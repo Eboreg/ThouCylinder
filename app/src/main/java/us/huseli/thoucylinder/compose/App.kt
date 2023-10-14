@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -29,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import us.huseli.retaintheme.compose.MainMenuItem
 import us.huseli.retaintheme.compose.ResponsiveScaffold
 import us.huseli.retaintheme.compose.SnackbarHosts
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.LibraryDestination
@@ -43,6 +45,7 @@ import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
@@ -56,11 +59,14 @@ fun App(
     searchViewModel: SearchViewModel = hiltViewModel(),
     queueViewModel: QueueViewModel = hiltViewModel(),
 ) {
-    var activeScreen by rememberSaveable { mutableStateOf<String?>("search") }
+    var activeScreen by rememberSaveable { mutableStateOf<String?>("library") }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
     val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle()
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
+    var isCreatePlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var isAddToPlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.importNewMediaStoreAlbums()
@@ -99,25 +105,57 @@ fun App(
 
     val onAddToPlaylistClick = { selection: Selection ->
         addToPlaylistSelection = selection
+        isAddToPlaylistDialogOpen = true
     }
 
     val onBackClick: () -> Unit = {
         navController.popBackStack()
     }
 
-    addToPlaylistSelection?.also { selection ->
-        AddToPlaylistDialog(
-            playlists = playlists,
-            onSelect = { playlist ->
-                viewModel.addSelectionToPlaylist(selection, playlist)
-                addToPlaylistSelection = null
+    val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
+        SnackbarEngine.addInfo(
+            message = context.getString(R.string.selection_was_added_to_playlist),
+            actionLabel = context.getString(R.string.go_to_playlist),
+            onActionPerformed = { onPlaylistClick(playlistId) },
+        )
+    }
+
+    if (isAddToPlaylistDialogOpen) {
+        addToPlaylistSelection?.also { selection ->
+            AddToPlaylistDialog(
+                playlists = playlists,
+                onSelect = { playlist ->
+                    viewModel.addSelectionToPlaylist(selection, playlist)
+                    isAddToPlaylistDialogOpen = false
+                    addToPlaylistSelection = null
+                    displayAddedToPlaylistMessage(playlist.playlistId)
+                },
+                onCancel = {
+                    isAddToPlaylistDialogOpen = false
+                    addToPlaylistSelection = null
+                },
+                onCreateNewClick = {
+                    isCreatePlaylistDialogOpen = true
+                    isAddToPlaylistDialogOpen = false
+                }
+            )
+        }
+    }
+
+    if (isCreatePlaylistDialogOpen) {
+        CreatePlaylistDialog(
+            onSave = { name ->
+                val pojo = PlaylistPojo(name = name)
+
+                isCreatePlaylistDialogOpen = false
+                viewModel.createPlaylist(pojo, addToPlaylistSelection)
+
+                if (addToPlaylistSelection != null) {
+                    displayAddedToPlaylistMessage(pojo.playlistId)
+                    addToPlaylistSelection = null
+                } else onPlaylistClick(pojo.playlistId)
             },
-            onCreateNew = { playlist ->
-                viewModel.addPlaylist(playlist, selection)
-                addToPlaylistSelection = null
-            },
-            onCancel = { addToPlaylistSelection = null },
-            onGotoPlaylist = { onPlaylistClick(it) },
+            onCancel = { isCreatePlaylistDialogOpen = false },
         )
     }
 
@@ -126,7 +164,6 @@ fun App(
         activeScreen = activeScreen,
         mainMenuItems = mainMenuItems,
         onMenuItemClick = onMenuItemClick,
-        // bottomBar = { BottomBar(onClick = onBottomBarClick) },
         landscapeMenu = { innerPadding ->
             NavigationRail(modifier = Modifier.padding(innerPadding)) {
                 mainMenuItems.forEach { item ->
@@ -145,7 +182,7 @@ fun App(
         ) {
             NavHost(
                 navController = navController,
-                startDestination = SearchDestination.route,
+                startDestination = LibraryDestination.route,
                 modifier = Modifier
                     .matchParentSize()
                     .padding(bottom = if (currentPojo != null) 80.dp else 0.dp)
@@ -166,6 +203,7 @@ fun App(
                         onArtistClick = onArtistClick,
                         onPlaylistClick = onPlaylistClick,
                         onAddToPlaylistClick = onAddToPlaylistClick,
+                        onCreatePlaylistClick = { isCreatePlaylistDialogOpen = true },
                     )
                 }
 
@@ -216,9 +254,9 @@ fun App(
                 }
             }
 
-            currentPojo?.also { pojo ->
+            if (currentPojo != null) {
                 ModalCover(
-                    pojo = pojo,
+                    pojo = currentPojo,
                     viewModel = queueViewModel,
                     isExpanded = isCoverExpanded,
                     onExpand = { isCoverExpanded = true },

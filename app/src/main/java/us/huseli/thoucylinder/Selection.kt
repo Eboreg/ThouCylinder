@@ -12,19 +12,12 @@ data class Selection(
 ) {
     constructor(track: Track) : this(tracks = listOf(track))
 
-    constructor(queueTrack: AbstractQueueTrack) : this(
-        tracks = emptyList(),
-        albums = emptyList(),
-        queueTracks = listOf(queueTrack)
-    )
+    constructor(album: Album) : this(albums = listOf(album))
+
+    constructor(queueTrack: AbstractQueueTrack) : this(queueTracks = listOf(queueTrack))
 
     val trackCount: Int
         get() = tracks.size + queueTracks.size
-
-    fun isSelected(queueTrack: AbstractQueueTrack) =
-        queueTracks.map { it.queueTrackId }.contains(queueTrack.queueTrackId)
-
-    fun isSelected(track: Track) = tracks.map { it.trackId }.contains(track.trackId)
 
     fun toggleSelected(queueTrack: AbstractQueueTrack): Selection =
         if (isSelected(queueTrack)) remove(queueTrack)
@@ -42,6 +35,11 @@ data class Selection(
 
     private fun add(track: Track): Selection =
         Selection(tracks = tracks + track, albums = albums, queueTracks = queueTracks)
+
+    private fun isSelected(queueTrack: AbstractQueueTrack) =
+        queueTracks.map { it.queueTrackId }.contains(queueTrack.queueTrackId)
+
+    private fun isSelected(track: Track) = tracks.map { it.trackId }.contains(track.trackId)
 
     private fun remove(album: Album): Selection = Selection(
         tracks = tracks,

@@ -18,7 +18,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 
 @Composable
-fun AddPlaylistDialog(
+fun CreatePlaylistDialog(
     onSave: (String) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,

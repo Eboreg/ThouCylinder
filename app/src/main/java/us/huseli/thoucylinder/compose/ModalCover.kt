@@ -50,16 +50,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
@@ -69,7 +71,7 @@ import kotlin.time.DurationUnit
 @Suppress("AnimateAsStateLabel")
 @Composable
 fun BoxWithConstraintsScope.ModalCover(
-    pojo: QueueTrackPojo,
+    pojo: QueueTrackPojo?,
     modifier: Modifier = Modifier,
     viewModel: QueueViewModel = hiltViewModel(),
     isExpanded: Boolean,
@@ -83,9 +85,10 @@ fun BoxWithConstraintsScope.ModalCover(
     val canGotoNext by viewModel.playerCanGotoNext.collectAsStateWithLifecycle()
     val canPlay by viewModel.playerCanPlay.collectAsStateWithLifecycle()
     val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-    val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+    val endPosition = pojo?.track?.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
     val currentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
     val isPlaying = playbackState == PlayerRepository.PlaybackState.PLAYING
+    val context = LocalContext.current
 
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var isExpanding by rememberSaveable { mutableStateOf(false) }
@@ -115,7 +118,7 @@ fun BoxWithConstraintsScope.ModalCover(
     }
 
     LaunchedEffect(pojo) {
-        pojo.track.image?.also { imageBitmap.value = viewModel.getImageBitmap(it) }
+        imageBitmap.value = pojo?.track?.image?.let { viewModel.getImageBitmap(it) }
     }
 
     Surface(
@@ -146,28 +149,31 @@ fun BoxWithConstraintsScope.ModalCover(
                     content = { Icon(Icons.Sharp.KeyboardArrowDown, null) },
                 )
                 Column {
-                    IconButton(
-                        onClick = { isContextMenuShown = !isContextMenuShown },
-                        content = { Icon(Icons.Sharp.MoreVert, null) },
-                    )
-                    TrackContextMenu(
-                        track = pojo.track,
-                        album = pojo.album,
-                        metadata = pojo.track.metadata,
-                        onDownloadClick = { viewModel.downloadTrack(pojo.track) },
-                        onDismissRequest = { isContextMenuShown = false },
-                        isShown = isContextMenuShown,
-                        onAlbumClick = onAlbumClick,
-                        onArtistClick = onArtistClick,
-                        onAddToPlaylistClick = { onAddToPlaylistClick(Selection(pojo.track)) },
-                        offset = DpOffset(10.dp, 0.dp),
-                    )
+                    if (pojo != null) {
+                        IconButton(
+                            onClick = { isContextMenuShown = !isContextMenuShown },
+                            content = { Icon(Icons.Sharp.MoreVert, null) },
+                        )
+                        TrackContextMenu(
+                            track = pojo.track,
+                            album = pojo.album,
+                            metadata = pojo.track.metadata,
+                            onDownloadClick = { viewModel.downloadTrack(pojo.track) },
+                            onDismissRequest = { isContextMenuShown = false },
+                            isShown = isContextMenuShown,
+                            onAlbumClick = onAlbumClick,
+                            onArtistClick = onArtistClick,
+                            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(pojo.track)) },
+                            offset = DpOffset(10.dp, 0.dp),
+                            onEnqueueNextClick = { viewModel.enqueueTrackNext(pojo.track, context) },
+                        )
+                    }
                 }
             }
 
-            Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(vertical = 5.dp)) {
                 // Row for thumbnail and collapsed content:
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.zIndex(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Thumbnail(
                         modifier = Modifier.padding(horizontal = thumbnailPadding),
                         image = imageBitmap.value,
@@ -184,16 +190,16 @@ fun BoxWithConstraintsScope.ModalCover(
                     if (!isExpanded || isExpanding || isCollapsing) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = pojo.track.title,
+                                text = pojo?.track?.title ?: "-",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            pojo.track.artist?.also { artist ->
+                            pojo?.track?.artist?.also { artist ->
                                 Text(
                                     text = artist,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                                 )
                             }
                         }
@@ -228,7 +234,7 @@ fun BoxWithConstraintsScope.ModalCover(
                     }
                 }
 
-                if (isExpanded || isExpanding || isCollapsing) {
+                if ((isExpanded || isExpanding || isCollapsing) && pojo != null) {
                     ModalCoverExpandedContent(
                         pojo = pojo,
                         viewModel = viewModel,
@@ -285,90 +291,96 @@ fun ModalCoverExpandedContent(
     }
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+        modifier = Modifier.fillMaxSize().padding(vertical = 15.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = pojo.track.title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.titleLarge,
-        )
-        pojo.track.artist?.also { artist ->
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+        ) {
             Text(
-                text = artist,
+                text = pojo.track.title,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            pojo.track.artist?.also { artist ->
+                Text(
+                    text = artist,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
+        }
+
+        Slider(
+            value = currentPositionMs,
+            onValueChange = { currentPositionMs = it },
+            valueRange = 0f..endPosition,
+            interactionSource = sliderInteractionSource,
+            modifier = Modifier.padding(horizontal = 20.dp),
+            onValueChangeFinished = { viewModel.seekTo(currentPositionMs.toLong()) },
+        )
+
+        // Large button row:
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            IconToggleButton(
+                checked = isShuffleEnabled,
+                onCheckedChange = { viewModel.toggleShuffle() },
+                content = { Icon(Icons.Sharp.Shuffle, null) },
+                colors = toggleButtonColors,
+            )
+            IconButton(
+                onClick = { viewModel.skipToStartOrPrevious() },
+                content = {
+                    Icon(
+                        imageVector = Icons.Sharp.SkipPrevious,
+                        contentDescription = null,
+                        modifier = Modifier.scale(1.5f),
+                    )
+                },
+                enabled = canGotoPrevious,
+                modifier = Modifier.size(60.dp),
+            )
+            FilledTonalIconButton(
+                onClick = { viewModel.playOrPauseCurrent() },
+                content = {
+                    val description =
+                        if (isPlaying) stringResource(R.string.pause)
+                        else stringResource(R.string.play)
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
+                        contentDescription = description,
+                        modifier = Modifier.scale(1.75f),
+                    )
+                },
+                enabled = canPlay,
+                modifier = Modifier.size(80.dp),
+            )
+            IconButton(
+                onClick = { viewModel.skipToNext() },
+                content = {
+                    Icon(
+                        imageVector = Icons.Sharp.SkipNext,
+                        contentDescription = stringResource(R.string.next),
+                        modifier = Modifier.scale(1.5f),
+                    )
+                },
+                enabled = canGotoNext,
+                modifier = Modifier.size(60.dp),
+            )
+            IconToggleButton(
+                checked = isRepeatEnabled,
+                onCheckedChange = { viewModel.toggleRepeat() },
+                content = { Icon(Icons.Sharp.Repeat, null) },
+                colors = toggleButtonColors,
             )
         }
-    }
-
-    Slider(
-        value = currentPositionMs,
-        onValueChange = { currentPositionMs = it },
-        valueRange = 0f..endPosition,
-        interactionSource = sliderInteractionSource,
-        modifier = Modifier.padding(horizontal = 20.dp),
-        onValueChangeFinished = { viewModel.seekTo(currentPositionMs.toLong()) },
-    )
-
-    // Large button row:
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        IconToggleButton(
-            checked = isShuffleEnabled,
-            onCheckedChange = { viewModel.toggleShuffle() },
-            content = { Icon(Icons.Sharp.Shuffle, null) },
-            colors = toggleButtonColors,
-        )
-        IconButton(
-            onClick = { viewModel.skipToPrevious() },
-            content = {
-                Icon(
-                    imageVector = Icons.Sharp.SkipPrevious,
-                    contentDescription = null,
-                    modifier = Modifier.scale(1.5f),
-                )
-            },
-            enabled = canGotoPrevious,
-            modifier = Modifier.size(60.dp),
-        )
-        FilledTonalIconButton(
-            onClick = { viewModel.playOrPauseCurrent() },
-            content = {
-                val description =
-                    if (isPlaying) stringResource(R.string.pause)
-                    else stringResource(R.string.play)
-                Icon(
-                    imageVector = if (isPlaying) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
-                    contentDescription = description,
-                    modifier = Modifier.scale(1.75f),
-                )
-            },
-            enabled = canPlay,
-            modifier = Modifier.size(80.dp),
-        )
-        IconButton(
-            onClick = { viewModel.skipToNext() },
-            content = {
-                Icon(
-                    imageVector = Icons.Sharp.SkipNext,
-                    contentDescription = stringResource(R.string.next),
-                    modifier = Modifier.scale(1.5f),
-                )
-            },
-            enabled = canGotoNext,
-            modifier = Modifier.size(60.dp),
-        )
-        IconToggleButton(
-            checked = isRepeatEnabled,
-            onCheckedChange = { viewModel.toggleRepeat() },
-            content = { Icon(Icons.Sharp.Repeat, null) },
-            colors = toggleButtonColors,
-        )
     }
 }

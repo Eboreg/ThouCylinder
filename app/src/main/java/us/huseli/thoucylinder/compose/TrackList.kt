@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
@@ -36,7 +37,6 @@ fun TrackList(
     onPlayClick: (Track) -> Unit,
     onAddToPlaylistClick: (Selection) -> Unit,
     modifier: Modifier = Modifier,
-    cardModifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((UUID) -> Unit)? = null,
@@ -45,15 +45,20 @@ fun TrackList(
 ) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column {
         SelectedTracksButtons(
             trackCount = selectedTracks.size,
             onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
             onUnselectAllClick = { viewModel.unselectAllTracks() },
         )
 
-        ListWithNumericBar(listState = listState, listSize = pojos.itemCount) {
+        ListWithNumericBar(
+            listState = listState,
+            listSize = pojos.itemCount,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        ) {
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -77,7 +82,7 @@ fun TrackList(
                                 showArtist = showArtist,
                                 onDownloadClick = { onDownloadClick(pojo.track) },
                                 onPlayClick = { onPlayClick(pojo.track) },
-                                modifier = cardModifier,
+                                modifier = modifier,
                                 onArtistClick = onArtistClick,
                                 onAlbumClick = onAlbumClick,
                                 downloadProgress = downloadProgressMap[pojo.track.trackId],
@@ -86,6 +91,7 @@ fun TrackList(
                                 isSelected = selectedTracks.contains(pojo.track),
                                 selectOnShortClick = selectedTracks.isNotEmpty(),
                                 thumbnail = thumbnail.value,
+                                onEnqueueNextClick = { viewModel.enqueueTrackNext(pojo.track, context) },
                             )
                         }
                     }

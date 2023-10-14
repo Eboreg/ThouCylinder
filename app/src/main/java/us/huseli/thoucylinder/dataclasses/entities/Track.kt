@@ -39,13 +39,14 @@ data class Track(
     @ColumnInfo("Track_artist") val artist: String? = null,
     @ColumnInfo("Track_albumId") val albumId: UUID? = null,
     @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
+    @ColumnInfo("Track_discNumber") val discNumber: Int? = null,
     @ColumnInfo("Track_year") val year: Int? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: Image? = null,
     @Embedded("Track_mediaStoreData_") val mediaStoreData: MediaStoreData? = null,
     @Ignore val tempTrackData: TempTrackData? = null,
-) {
+) : Comparable<Track> {
     constructor(
         trackId: UUID,
         title: String,
@@ -53,6 +54,7 @@ data class Track(
         artist: String?,
         albumId: UUID?,
         albumPosition: Int?,
+        discNumber: Int?,
         year: Int?,
         metadata: TrackMetadata?,
         youtubeVideo: YoutubeVideo?,
@@ -65,6 +67,7 @@ data class Track(
         artist = artist,
         albumId = albumId,
         albumPosition = albumPosition,
+        discNumber = discNumber,
         year = year,
         metadata = metadata,
         youtubeVideo = youtubeVideo,
@@ -73,11 +76,20 @@ data class Track(
         tempTrackData = null,
     )
 
-    val isOnYoutube: Boolean
-        get() = youtubeVideo != null
-
     private val playUri: Uri?
         get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
+
+    val discNumberNonNull: Int
+        get() = discNumber ?: 1
+
+    val albumPositionNonNull: Int
+        get() = albumPosition ?: 0
+
+    val positionPair: Pair<Int, Int>
+        get() = Pair(discNumberNonNull, albumPositionNonNull)
+
+    val isOnYoutube: Boolean
+        get() = youtubeVideo != null
 
     fun generateBasename(): String {
         var name = ""
@@ -107,6 +119,14 @@ data class Track(
         string += title
 
         return string
+    }
+
+    override fun compareTo(other: Track): Int {
+        if (discNumberNonNull != other.discNumberNonNull)
+            return discNumberNonNull - other.discNumberNonNull
+        if (albumPositionNonNull != other.albumPositionNonNull)
+            return albumPositionNonNull - other.albumPositionNonNull
+        return title.compareTo(other.title)
     }
 
     override fun toString(): String = toString(showAlbumPosition = true, showArtist = true)

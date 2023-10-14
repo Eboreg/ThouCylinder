@@ -27,8 +27,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import us.huseli.retaintheme.circular
-import us.huseli.retaintheme.ui.theme.RetainColorDark
-import us.huseli.retaintheme.ui.theme.RetainColorLight
+import us.huseli.retaintheme.ui.theme.RetainBasicColorsDark
+import us.huseli.retaintheme.ui.theme.RetainBasicColorsLight
 import us.huseli.thoucylinder.R
 
 @Composable
@@ -40,7 +40,7 @@ fun ObnoxiousProgressIndicator(
     tonalElevation: Dp = 0.dp,
 ) {
     var rowWidth by remember { mutableIntStateOf(0) }
-    val colors = listOf(RetainColorDark, RetainColorLight).map {
+    val colors = listOf(RetainBasicColorsDark, RetainBasicColorsLight).map {
         listOf(
             it.Brown,
             it.Blue,

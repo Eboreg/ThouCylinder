@@ -34,7 +34,7 @@ fun ListSettingsRow(
     modifier: Modifier = Modifier,
     availableDisplayTypes: List<DisplayType> = DisplayType.values().toList(),
     excludeListTypes: List<ListType> = emptyList(),
-    tonalElevation: Dp = 1.dp,
+    tonalElevation: Dp = 2.dp,
 ) {
     Surface(
         color = BottomAppBarDefaults.containerColor,

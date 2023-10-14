@@ -13,6 +13,7 @@ import android.util.Size
 import androidx.core.database.getIntOrNull
 import androidx.core.database.getStringOrNull
 import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import us.huseli.thoucylinder.ExtractTrackDataException
 import us.huseli.thoucylinder.MediaStoreException
@@ -21,6 +22,7 @@ import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.entities.MediaStoreData
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -103,7 +105,6 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
     }
 
     fun listNewMediaStoreAlbums(existingTracks: List<Track>): List<AlbumWithTracksPojo> {
-        // val audioCollection = getReadOnlyAudioCollection()
         val audioCollection = getReadWriteAudioCollection()
         val projection = arrayOf(
             MediaStore.Audio.Media.RELATIVE_PATH,
@@ -135,6 +136,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
             val albumArtistIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ARTIST)
             val yearIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
             val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
+            val discNumberIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DISC_NUMBER)
             val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
 
             while (cursor.moveToNext()) {
@@ -142,7 +144,6 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                     val file = File(filename)
                     val mimeType = cursor.getStringOrNull(mimeTypeIdx)
                     val mediaStoreSubdir = cursor.getStringOrNull(relativePathIdx)
-                    val id3 = file.extractID3Data()
                     val contentUri = ContentUris.withAppendedId(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                         cursor.getLong(idIdx),
@@ -162,16 +163,18 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                         !mediaStoreUris.contains(contentUri) &&
                         (contentUriAlt == null || !mediaStoreUris.contains(contentUriAlt))
                     ) {
+                        val ff = FFprobeKit.getMediaInformation(file.path)?.mediaInformation
+                        val id3 = ff?.extractID3Data() ?: ID3Data()
                         val lastPathSegments = mediaStoreSubdir
                             .replace(Regex("^${Environment.DIRECTORY_MUSIC}/(.*?)/?$"), "$1")
                             .trim('/').split("/").last().split(" - ", limit = 2)
                         val pathArtist = lastPathSegments.takeIf { it.size > 1 }?.get(0)
                         val pathTitle = lastPathSegments.last().takeIf { it.isNotBlank() }
                         val trackArtist =
-                            cursor.getStringOrNull(artistIdx)?.takeIf { it != "<unknown>" } ?: id3.artist
+                            id3.artist ?: cursor.getStringOrNull(artistIdx)?.takeIf { it != "<unknown>" }
                         val albumArtist =
-                            cursor.getStringOrNull(albumArtistIdx)?.takeIf { it != "<unknown>" } ?: id3.albumArtist
-                        val albumTitle = cursor.getStringOrNull(albumIdx) ?: id3.album ?: pathTitle
+                            id3.albumArtist ?: cursor.getStringOrNull(albumArtistIdx)?.takeIf { it != "<unknown>" }
+                        val albumTitle = id3.album ?: cursor.getStringOrNull(albumIdx) ?: pathTitle
                         val finalAlbumArtist = albumArtist ?: pathArtist ?: trackArtist
                         val finalAlbumTitle = albumTitle ?: "Unknown album"
 
@@ -187,13 +190,14 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                             Pair(
                                 mediaStoreSubdir,
                                 Track(
-                                    title = cursor.getStringOrNull(titleIdx) ?: id3.title ?: "Unknown title",
+                                    title = id3.title ?: cursor.getStringOrNull(titleIdx) ?: "Unknown title",
                                     isInLibrary = false,
                                     artist = trackArtist ?: finalAlbumArtist,
-                                    albumPosition = cursor.getIntOrNull(trackIdx) ?: id3.trackNumber,
-                                    year = cursor.getIntOrNull(yearIdx) ?: id3.year,
+                                    albumPosition = id3.trackNumber ?: cursor.getIntOrNull(trackIdx),
+                                    discNumber = id3.discNumber ?: cursor.getIntOrNull(discNumberIdx),
+                                    year = id3.year ?: cursor.getIntOrNull(yearIdx),
                                     albumId = album.albumId,
-                                    metadata = file.extractTrackMetadata().copy(
+                                    metadata = file.extractTrackMetadata(ff).copy(
                                         durationMs = cursor.getIntOrNull(durationIdx)?.toLong() ?: 0L,
                                         extension = filename.split(".").last(),
                                         mimeType = mimeType,

@@ -18,6 +18,7 @@ import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 @Dao
@@ -57,10 +58,6 @@ interface AlbumDao {
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
 
-    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1")
-    @Transaction
-    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
-
     @Query(
         """
         SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear,
@@ -75,7 +72,15 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1")
     @Transaction
-    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo?
+    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
+
+    @Query(
+        """
+        SELECT * FROM Track WHERE Track_albumId = :albumId AND Track_isInLibrary = 1
+        ORDER BY Track_discNumber, Track_albumPosition
+        """
+    )
+    suspend fun getTracks(albumId: UUID): List<Track>
 
     suspend fun insertAlbumGenres(pojo: AbstractAlbumPojo) {
         _insertGenres(*pojo.genres.toTypedArray())
@@ -96,6 +101,14 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>
+
+    @Query(
+        """
+        SELECT * FROM Track WHERE Track_isInLibrary = 1 AND Track_albumId IN (:albumIds)
+        ORDER BY Track_albumId, Track_discNumber, Track_albumPosition
+        """
+    )
+    suspend fun listTracks(albumIds: List<UUID>): List<Track>
 
     @Query(
         """

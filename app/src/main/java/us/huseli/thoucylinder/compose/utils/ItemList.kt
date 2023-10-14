@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose.utils
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,8 @@ fun <T> ItemList(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     cardHeight: Dp? = 80.dp,
+    gap: Dp = 10.dp,
+    border: BorderStroke? = null,
     isSelected: (T) -> Boolean = { false },
     onClick: ((T) -> Unit)? = null,
     onLongClick: ((T) -> Unit)? = null,
@@ -34,10 +38,15 @@ fun <T> ItemList(
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
-    ListWithNumericBar(listState = listState, listSize = things.size, minItems = 20, modifier = modifier) {
+    ListWithNumericBar(
+        listState = listState,
+        listSize = things.size,
+        minItems = 20,
+        modifier = modifier.padding(horizontal = 10.dp),
+    ) {
         LazyColumn(
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(gap),
             contentPadding = contentPadding,
         ) {
             items(things) { thing ->
@@ -46,6 +55,7 @@ fun <T> ItemList(
                     else MaterialTheme.colorScheme.surface
 
                 Card(
+                    border = border,
                     colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
                     shape = MaterialTheme.shapes.extraSmall,
                     modifier = cardModifier.fillMaxWidth()

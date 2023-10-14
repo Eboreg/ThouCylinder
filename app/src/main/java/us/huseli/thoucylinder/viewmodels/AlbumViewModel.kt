@@ -15,12 +15,11 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
-import us.huseli.thoucylinder.LoadStatus
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import java.util.UUID
 import javax.inject.Inject
@@ -33,13 +32,11 @@ class AlbumViewModel @Inject constructor(
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
 
     private val _albumArt = MutableStateFlow<ImageBitmap?>(null)
-    private val _albumArtLoadStatus = MutableStateFlow(LoadStatus.LOADING)
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
     private val _downloadProgress = MutableStateFlow<DownloadProgress?>(null)
     private val _trackDownloadProgress = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
 
     val albumArt = _albumArt.asStateFlow()
-    val albumArtLoadStatus = _albumArtLoadStatus.asStateFlow()
     val albumPojo = _albumPojo.asStateFlow()
     val downloadProgress = _downloadProgress.asStateFlow()
     val trackDownloadProgress = _trackDownloadProgress.asStateFlow()
@@ -58,7 +55,6 @@ class AlbumViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             albumPojo.filterNotNull().distinctUntilChanged().collect { pojo ->
                 _albumArt.value = pojo.album.albumArt?.getImageBitmap()
-                _albumArtLoadStatus.value = LoadStatus.LOADED
             }
         }
     }
@@ -110,8 +106,10 @@ class AlbumViewModel @Inject constructor(
         }
     }
 
-    fun playAlbum() {
-        _albumPojo.value?.also { repos.player.playAlbum(it) }
+    fun playAlbum(startAt: Track? = null) = viewModelScope.launch {
+        _albumPojo.value?.also { pojo ->
+            repos.player.replaceAndPlay(tracks = pojo.tracks, startIndex = startAt?.let { pojo.indexOfTrack(it) })
+        }
     }
 
     fun removeAlbumFromLibrary() = viewModelScope.launch(Dispatchers.IO) {

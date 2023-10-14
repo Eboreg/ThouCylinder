@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.viewmodels
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
@@ -9,13 +10,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import java.util.UUID
 
@@ -28,8 +31,8 @@ abstract class BaseViewModel(private val repos: Repositories) : ViewModel() {
     val selectedTracks = _selectedTracks.asStateFlow()
     val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
 
-    fun addPlaylist(playlist: Playlist, selection: Selection? = null) = viewModelScope.launch(Dispatchers.IO) {
-        repos.local.insertPlaylist(playlist, selection)
+    fun createPlaylist(pojo: PlaylistPojo, selection: Selection? = null) = viewModelScope.launch(Dispatchers.IO) {
+        repos.local.insertPlaylist(pojo, selection)
     }
 
     fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
@@ -51,7 +54,22 @@ abstract class BaseViewModel(private val repos: Repositories) : ViewModel() {
         }
     }
 
+    fun enqueueAlbumNext(album: Album, context: Context) = viewModelScope.launch {
+        repos.player.insertNext(repos.local.listAlbumTracks(album.albumId))
+        SnackbarEngine.addInfo(context.getString(R.string.album_enqueued_next))
+    }
+
+    fun enqueueTrackNext(track: Track, context: Context) {
+        repos.player.insertNext(track = track)
+        SnackbarEngine.addInfo(context.getString(R.string.track_enqueued_next))
+    }
+
     suspend fun getImageBitmap(image: Image): ImageBitmap? = repos.local.getImageBitmap(image)
+
+    suspend fun getPlaylistImage(playlistId: UUID): ImageBitmap? =
+        repos.local.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
+            album.albumArt?.let { image -> repos.local.getImageBitmap(image) }
+        }
 
     suspend fun getTrackMetadata(track: Track): TrackMetadata? {
         if (track.metadata != null) return track.metadata
@@ -63,10 +81,14 @@ abstract class BaseViewModel(private val repos: Repositories) : ViewModel() {
     fun playAlbum(albumId: UUID) = playAlbums(listOf(albumId))
 
     fun playAlbums(albumIds: List<UUID>) = viewModelScope.launch(Dispatchers.IO) {
-        repos.player.playAlbums(albumIds.mapNotNull { repos.local.getAlbumWithTracks(it) })
+        repos.player.replaceAndPlay(repos.local.listAlbumTracks(albumIds))
     }
 
-    fun playTrack(track: Track) = repos.player.playTrack(track)
+    fun playPlaylist(playlistId: UUID) = viewModelScope.launch(Dispatchers.IO) {
+        repos.player.replaceAndPlay(repos.local.listPlaylistTracks(playlistId))
+    }
+
+    fun playTrack(track: Track) = repos.player.insertAndPlay(track)
 
     fun toggleSelected(album: Album) {
         if (_selectedAlbums.value.contains(album))

@@ -1,19 +1,20 @@
 package us.huseli.thoucylinder.compose.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Bookmark
-import androidx.compose.material.icons.sharp.BookmarkBorder
-import androidx.compose.material.icons.sharp.Cancel
-import androidx.compose.material.icons.sharp.Delete
-import androidx.compose.material.icons.sharp.Download
-import androidx.compose.material.icons.sharp.Edit
-import androidx.compose.material.icons.sharp.PlayArrow
+import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -22,21 +23,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.EditAlbumDialog
+import us.huseli.thoucylinder.compose.AlbumBadges
+import us.huseli.thoucylinder.compose.AlbumButtons
 import us.huseli.thoucylinder.compose.AlbumTrackRow
-import us.huseli.thoucylinder.compose.LargeAlbumArtSection
+import us.huseli.thoucylinder.compose.EditAlbumDialog
 import us.huseli.thoucylinder.compose.SelectedTracksButtons
+import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
 @Composable
@@ -48,11 +55,11 @@ fun AlbumScreen(
     onAddToPlaylistClick: (Selection) -> Unit,
 ) {
     val albumArt by viewModel.albumArt.collectAsStateWithLifecycle()
-    val albumArtLoadStatus by viewModel.albumArtLoadStatus.collectAsStateWithLifecycle()
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var addDownloadedAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
     var addAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -92,85 +99,93 @@ fun AlbumScreen(
                 }
             )
         }
-    }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        SelectedTracksButtons(
-            trackCount = selectedTracks.size,
-            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
-            onUnselectAllClick = { viewModel.unselectAllTracks() },
-        )
+        Column {
+            SelectedTracksButtons(
+                trackCount = selectedTracks.size,
+                onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
+                onUnselectAllClick = { viewModel.unselectAllTracks() },
+            )
 
-        LazyColumn(modifier = modifier) {
-            item {
-                LargeAlbumArtSection(
-                    albumArt = albumArt,
-                    loadStatus = albumArtLoadStatus,
-                    isOnYoutube = albumPojo?.album?.isOnYoutube == true,
-                    isLocal = albumPojo?.album?.isLocal == true,
-                    genres = albumPojo?.genres,
-                    styles = albumPojo?.styles,
-                    onBackClick = onBackClick,
-                )
-            }
-
-            albumPojo?.let { pojo ->
+            LazyColumn(modifier = modifier.padding(horizontal = 10.dp)) {
                 item {
                     Row(
-                        modifier = Modifier
-                            .padding(start = 10.dp, end = if (pojo.album.youtubePlaylist != null) 0.dp else 10.dp)
-                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(text = pojo.toString(), modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = onBackClick,
+                            content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                            modifier = Modifier.width(40.dp),
+                        )
+                        if (pojo.album.isOnYoutube) {
+                            LargeIconBadge {
+                                Icon(painterResource(R.drawable.youtube), null, modifier = Modifier.height(20.dp))
+                                Text(text = stringResource(R.string.youtube))
+                            }
+                        }
+                        if (pojo.album.isLocal) {
+                            LargeIconBadge {
+                                Icon(painterResource(R.drawable.hard_drive), null, modifier = Modifier.height(20.dp))
+                                Text(text = stringResource(R.string.local))
+                            }
+                        }
+                    }
+                }
+                item {
+                    var height by remember { mutableStateOf(0.dp) }
 
-                        if (!pojo.album.isLocal) {
-                            if (downloadProgress != null) {
-                                IconButton(
-                                    onClick = { viewModel.cancelDownload() },
-                                    content = { Icon(Icons.Sharp.Cancel, stringResource(R.string.cancel_download)) },
+                    BoxWithConstraints {
+                        height = this.maxWidth * 0.4f
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(modifier = Modifier.weight(0.4f)) {
+                                Thumbnail(
+                                    image = albumArt,
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    placeholder = { Image(Icons.Sharp.Album, null) },
                                 )
-                            } else {
-                                if (pojo.album.isInLibrary) {
-                                    IconButton(
-                                        onClick = {
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(0.6f).heightIn(min = height),
+                                verticalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                Column {
+                                    Text(
+                                        text = pojo.album.title,
+                                        style = if (pojo.album.title.length > 35) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (pojo.album.artist != null) {
+                                        Text(
+                                            text = pojo.album.artist,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    AlbumBadges(pojo = pojo)
+                                }
+                                Row {
+                                    AlbumButtons(
+                                        pojo = pojo,
+                                        modifier = Modifier.align(Alignment.Bottom),
+                                        onCancelDownloadClick = { viewModel.cancelDownload() },
+                                        onRemoveFromLibraryClick = {
                                             viewModel.removeAlbumFromLibrary()
                                             onBackClick()
                                         },
-                                        content = {
-                                            Icon(Icons.Sharp.Bookmark, stringResource(R.string.remove_from_library))
-                                        },
-                                    )
-                                } else {
-                                    IconButton(
-                                        onClick = { addAlbumDialogOpen = true },
-                                        content = {
-                                            Icon(Icons.Sharp.BookmarkBorder, stringResource(R.string.add_to_library))
-                                        },
+                                        onAddToLibraryClick = { addAlbumDialogOpen = true },
+                                        onDownloadClick = { addDownloadedAlbumDialogOpen = true },
+                                        onEditClick = { editAlbumDialogOpen = true },
+                                        onDeleteClick = { viewModel.deleteAlbumWithTracks() },
+                                        onPlayClick = { viewModel.playAlbum() },
                                     )
                                 }
-                                IconButton(
-                                    onClick = { addDownloadedAlbumDialogOpen = true },
-                                    content = { Icon(Icons.Sharp.Download, stringResource(R.string.download)) },
-                                )
                             }
                         }
-                        if (pojo.album.isInLibrary) {
-                            IconButton(
-                                onClick = { editAlbumDialogOpen = true },
-                                content = { Icon(Icons.Sharp.Edit, stringResource(R.string.edit)) },
-                            )
-                        }
-                        if (BuildConfig.DEBUG) {
-                            IconButton(
-                                onClick = { viewModel.deleteAlbumWithTracks() },
-                                content = { Icon(Icons.Sharp.Delete, null) },
-                            )
-                        }
-                        IconButton(
-                            onClick = { viewModel.playAlbum() },
-                            content = { Icon(Icons.Sharp.PlayArrow, null) }
-                        )
                     }
                 }
 
@@ -178,7 +193,7 @@ fun AlbumScreen(
                     item {
                         val statusText = stringResource(progress.status.stringId)
 
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column {
                             Text(
                                 text = "$statusText ${progress.item} …",
                                 style = MaterialTheme.typography.bodySmall,
@@ -199,13 +214,15 @@ fun AlbumScreen(
                         album = pojo.album,
                         downloadProgress = trackDownloadProgress[track.trackId],
                         onDownloadClick = { viewModel.downloadTrack(track) },
-                        onPlayClick = { viewModel.playTrack(track) },
+                        onPlayClick = { viewModel.playAlbum(startAt = track) },
                         showArtist = track.artist != pojo.album.artist,
                         onArtistClick = onArtistClick,
                         onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
                         onToggleSelected = { viewModel.toggleSelected(track) },
                         isSelected = selectedTracks.contains(track),
                         selectOnShortClick = selectedTracks.isNotEmpty(),
+                        showDiscNumber = pojo.discCount > 1,
+                        onEnqueueNextClick = { viewModel.enqueueTrackNext(track, context) },
                     )
                 }
             }

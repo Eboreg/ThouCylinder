@@ -2,15 +2,20 @@
 
 package us.huseli.thoucylinder.database
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import java.time.Instant
 import java.util.UUID
 
@@ -40,10 +45,42 @@ interface PlaylistDao {
         HAVING Playlist_playlistId IS NOT NULL
         """
     )
-    fun flowPlaylists(): Flow<List<PlaylistPojo>>
+    fun flowPojos(): Flow<List<PlaylistPojo>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertPlaylistTracks(vararg playlistTracks: PlaylistTrack)
+    suspend fun insertTracks(vararg playlistTracks: PlaylistTrack)
+
+    @Query(
+        """
+        SELECT DISTINCT a.* FROM Album a
+        JOIN Track t ON t.Track_albumId = a.Album_albumId
+        JOIN PlaylistTrack pt ON pt.PlaylistTrack_trackId = t.Track_trackId 
+            AND pt.PlaylistTrack_playlistId = :playlistId
+        """
+    )
+    suspend fun listAlbums(playlistId: UUID): List<Album>
+
+    @Query(
+        """
+        SELECT DISTINCT t.* FROM Track t
+        JOIN PlaylistTrack pt ON pt.PlaylistTrack_trackId = t.Track_trackId
+            AND pt.PlaylistTrack_playlistId = :playlistId
+        ORDER BY pt.PlaylistTrack_position
+        """
+    )
+    suspend fun listTracks(playlistId: UUID): List<Track>
+
+    @Query(
+        """
+        SELECT DISTINCT t.*, a.* FROM Track t 
+        LEFT JOIN Album a ON Track_albumId = Album_albumId
+        JOIN PlaylistTrack pt ON t.Track_trackId = pt.PlaylistTrack_trackId 
+            AND pt.PlaylistTrack_playlistId = :playlistId AND t.Track_isInLibrary = 1
+        ORDER BY pt.PlaylistTrack_position
+        """
+    )
+    @Transaction
+    fun pageTracks(playlistId: UUID): PagingSource<Int, TrackPojo>
 
     suspend fun upsertPlaylistWithTracks(playlist: Playlist, tracks: List<PlaylistTrack>) {
         val now = Instant.now()
@@ -54,6 +91,6 @@ interface PlaylistDao {
         } else {
             _insertPlaylists(playlist.copy(created = now, updated = now))
         }
-        insertPlaylistTracks(*tracks.toTypedArray())
+        insertTracks(*tracks.toTypedArray())
     }
 }

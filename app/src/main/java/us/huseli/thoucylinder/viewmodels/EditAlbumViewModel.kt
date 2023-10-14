@@ -61,7 +61,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
                     album = pojo.album.copy(
                         title = master.title,
                         artist = master.artist,
-                        year = master.year,
+                        year = master.year?.takeIf { it > 1000 } ?: pojo.album.year,
                     ),
                     genres = master.genres.map { Genre(genreName = it) },
                     styles = master.styles.map { Style(styleName = it) },
@@ -135,21 +135,32 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
     private fun updateTracksFromMaster(master: DiscogsMasterData) {
         _albumPojo.value = _albumPojo.value?.let { pojo ->
             val tracks = pojo.tracks.toMutableList().apply {
-                master.tracklist.forEachIndexed { masterTrackIdx, masterTrack ->
-                    indexOfFirst { it.albumPosition == masterTrackIdx + 1 }.takeIf { it > -1 }?.let { trackIdx ->
+                val masterPositionPairs = master.tracklist.map { it.positionPair }
+
+                master.tracklist.forEach { masterTrack ->
+                    val trackIdx = indexOfFirst { track ->
+                        track.discNumberNonNull == masterTrack.discNumberNonNull &&
+                            track.albumPositionNonNull == masterTrack.albumPositionNonNull
+                    }
+
+                    if (trackIdx > -1) {
                         set(
                             trackIdx,
                             this[trackIdx].copy(
                                 title = masterTrack.title,
                                 artist = masterTrack.artist ?: master.artist,
-                                year = masterTrack.year ?: this[trackIdx].year ?: master.year,
+                                year = masterTrack.year?.takeIf { it > 1000 }
+                                    ?: this[trackIdx].year
+                                    ?: master.year?.takeIf { it > 1000 }
+                                    ?: _albumPojo.value?.album?.year,
                             )
                         )
                     }
                 }
-                // If master tracklist is shorter than our tracklist, reset the "extra" tracks to initial state:
+
+                // If our tracklist contains tracks not in master tracklist, reset the "extra" tracks to initial state:
                 forEachIndexed { trackIdx, track ->
-                    if (track.albumPosition != null && track.albumPosition > master.tracklist.size) {
+                    if (!masterPositionPairs.contains(track.positionPair)) {
                         this[trackIdx] = _initialTracks.value[trackIdx]
                     }
                 }

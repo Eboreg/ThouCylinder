@@ -15,14 +15,9 @@ import android.provider.MediaStore
 import android.provider.MediaStore.MediaColumns
 import android.util.Log
 import android.util.Size
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.Composable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import us.huseli.retaintheme.ui.theme.RetainColorDark
-import us.huseli.retaintheme.ui.theme.RetainColorLight
-import us.huseli.retaintheme.ui.theme.RetainColorScheme
 import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
 import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
 import us.huseli.thoucylinder.dataclasses.getMediaStoreEntry
@@ -189,10 +184,6 @@ fun Long.bytesToString(): String {
 }
 
 
-@Composable
-fun themeColors(): RetainColorScheme = if (isSystemInDarkTheme()) RetainColorDark else RetainColorLight
-
-
 fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
     getInteger(name)
 } catch (_: NullPointerException) {
@@ -238,3 +229,6 @@ fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString
 
 fun JSONObject.getIntOrNull(name: String): Int? =
     if (has(name)) getStringOrNull(name)?.takeWhile { it.isDigit() }?.takeIf { it.isNotEmpty() }?.toInt() else null
+
+
+fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble(name) else null

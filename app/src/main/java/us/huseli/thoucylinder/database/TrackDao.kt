@@ -56,17 +56,6 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT t.*, a.* FROM Track t 
-        LEFT JOIN Album a ON Track_albumId = Album_albumId
-        JOIN PlaylistTrack pt ON Track_trackId = PlaylistTrack_trackId 
-        AND PlaylistTrack_playlistId = :playlistId AND Track_isInLibrary = 1
-        """
-    )
-    @Transaction
-    fun pageTracksByPlaylistId(playlistId: UUID): PagingSource<Int, TrackPojo>
-
-    @Query(
-        """
         SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
         WHERE (Track_title LIKE :query OR Track_artist LIKE :query) AND Track_isInLibrary = 1
         """

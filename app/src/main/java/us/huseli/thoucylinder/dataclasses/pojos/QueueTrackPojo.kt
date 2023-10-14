@@ -34,6 +34,7 @@ data class QueueTrackPojo(
     fun toMediaItem(): MediaItem = MediaItem.Builder()
         .setMediaId(queueTrackId.toString())
         .setUri(uri)
+        .setTag(this)
         .build()
 }
 

@@ -26,7 +26,9 @@ class DiscogsRepository @Inject constructor() {
     private val gson: Gson = GsonBuilder().create()
 
     suspend fun getMaster(masterId: Int): DiscogsMaster? {
-        return gson.fromJson(request("masters/$masterId"), DiscogsMaster::class.java).also {
+        val json = request("masters/$masterId")
+        Log.i("DiscogsRepository", "getMaster: json=$json")
+        return gson.fromJson(json, DiscogsMaster::class.java).also {
             Log.i("DiscogsRepository", "getMaster: $it")
         }
     }

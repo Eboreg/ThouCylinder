@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.themeColors
 
 @Composable
 fun TrackInfoDialog(
@@ -76,7 +76,7 @@ fun TrackInfoDialog(
 
 @Composable
 fun TrackInfoBooleanRow(label: String, value: Boolean) {
-    val colors = themeColors()
+    val colors = LocalBasicColors.current
     val iconModifier = Modifier.size(20.dp)
 
     Row(verticalAlignment = Alignment.CenterVertically) {

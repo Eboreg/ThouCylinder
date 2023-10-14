@@ -28,7 +28,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
@@ -43,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -50,9 +50,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.themeColors
 import us.huseli.thoucylinder.viewmodels.BaseViewModel
 import java.util.UUID
 
@@ -61,7 +62,6 @@ import java.util.UUID
 fun TrackGrid(
     pojos: LazyPagingItems<TrackPojo>,
     viewModel: BaseViewModel,
-    modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     onAddToPlaylistClick: (Selection) -> Unit,
@@ -71,8 +71,9 @@ fun TrackGrid(
 ) {
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.padding(horizontal = 10.dp)) {
         SelectedTracksButtons(
             trackCount = selectedTracks.size,
             onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
@@ -96,7 +97,11 @@ fun TrackGrid(
                     var metadata by rememberSaveable { mutableStateOf(track.metadata) }
 
                     LaunchedEffect(Unit) {
-                        track.image?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+                        track.image
+                            ?.also { imageBitmap.value = viewModel.getImageBitmap(it) }
+                            ?: kotlin.run {
+                                pojo.album?.albumArt?.also { imageBitmap.value = viewModel.getImageBitmap(it) }
+                            }
                         if (metadata == null) metadata = viewModel.getTrackMetadata(track)
                     }
 
@@ -164,6 +169,7 @@ fun TrackGrid(
                                                 onArtistClick = onArtistClick,
                                                 offset = DpOffset(0.dp, (-20).dp),
                                                 onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
+                                                onEnqueueNextClick = { viewModel.enqueueTrackNext(track, context) },
                                             )
                                         }
                                     }
@@ -175,7 +181,7 @@ fun TrackGrid(
                                     imageVector = Icons.Sharp.CheckCircle,
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize().padding(10.dp),
-                                    tint = themeColors().Green.copy(alpha = 0.7f),
+                                    tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
                                 )
                             }
                         }
@@ -185,19 +191,23 @@ fun TrackGrid(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.padding(5.dp).weight(1f)) {
-                                ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                                    val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
-                                    val titleLines = if (artist != null) 1 else 2
+                                val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
+                                val titleLines = if (artist != null) 1 else 2
 
+                                Text(
+                                    text = track.title,
+                                    maxLines = titleLines,
+                                    minLines = titleLines,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                                )
+                                if (artist != null) {
                                     Text(
-                                        text = track.title,
-                                        maxLines = titleLines,
-                                        minLines = titleLines,
+                                        text = artist,
+                                        maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
+                                        style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                                     )
-                                    if (artist != null) {
-                                        Text(text = artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
                                 }
                             }
                         }

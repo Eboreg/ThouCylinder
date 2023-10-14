@@ -36,5 +36,10 @@ data class AlbumWithTracksPojo(
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
     val tracks: List<Track> = emptyList(),
 ) : AbstractAlbumPojo() {
+    val discCount: Int
+        get() = tracks.mapNotNull { it.discNumber }.takeIf { it.isNotEmpty() }?.max() ?: 1
+
+    fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
+
     override fun toString() = album.toString()
 }

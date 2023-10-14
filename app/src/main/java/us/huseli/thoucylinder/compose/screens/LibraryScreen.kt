@@ -2,17 +2,15 @@ package us.huseli.thoucylinder.compose.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -41,9 +39,9 @@ fun LibraryScreen(
     onArtistClick: (String) -> Unit,
     onPlaylistClick: (UUID) -> Unit,
     onAddToPlaylistClick: (Selection) -> Unit,
+    onCreatePlaylistClick: () -> Unit,
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
-    // val tracks = viewModel.pagingTracks.collectAsLazyPagingItems()
     val tracksPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
     val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
@@ -63,7 +61,7 @@ fun LibraryScreen(
             availableDisplayTypes = availableDisplayTypes,
         )
 
-        Column(modifier = Modifier.padding(horizontal = 10.dp)) {
+        Column {
             when (listType) {
                 ListType.ALBUMS -> when (displayType) {
                     DisplayType.LIST -> AlbumList(
@@ -71,6 +69,7 @@ fun LibraryScreen(
                         viewModel = viewModel,
                         onAlbumClick = { onAlbumClick(it.album.albumId) },
                         onAddToPlaylistClick = onAddToPlaylistClick,
+                        onArtistClick = onArtistClick,
                     )
                     DisplayType.GRID -> AlbumGrid(
                         albums = albumPojos,
@@ -115,10 +114,10 @@ fun LibraryScreen(
                 ListType.PLAYLISTS -> {
                     PlaylistList(
                         playlists = playlists,
+                        viewModel = viewModel,
                         onPlaylistClick = { onPlaylistClick(it.playlistId) },
-                        // TODO: Add a callback
-                        onPlaylistPlayClick = { },
-                        onAddPlaylist = { viewModel.addPlaylist(it) },
+                        onPlaylistPlayClick = { viewModel.playPlaylist(it.playlistId) },
+                        onCreatePlaylistClick = onCreatePlaylistClick,
                     )
                 }
             }
@@ -126,7 +125,7 @@ fun LibraryScreen(
 
         if (BuildConfig.DEBUG) {
             Row {
-                Button(
+                TextButton(
                     onClick = { viewModel.deleteAll() },
                     content = { Text(text = "Delete all") }
                 )

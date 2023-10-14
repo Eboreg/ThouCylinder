@@ -6,8 +6,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 
 @Dao
 interface QueueDao {
@@ -23,7 +23,7 @@ interface QueueDao {
         FROM QueueTrack qt 
         JOIN Track t ON Track_trackId = QueueTrack_trackId
         LEFT JOIN Album a ON Track_albumId = Album_albumId
-        ORDER BY QueueTrack_position
+        ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )
     @Transaction

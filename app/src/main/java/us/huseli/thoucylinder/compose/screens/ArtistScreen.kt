@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.compose.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.BottomAppBarDefaults
@@ -53,7 +52,7 @@ fun ArtistScreen(
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
             color = BottomAppBarDefaults.containerColor,
-            tonalElevation = 1.dp,
+            tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -78,7 +77,7 @@ fun ArtistScreen(
             excludeListTypes = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
         )
 
-        Column(modifier = Modifier.padding(horizontal = 10.dp)) {
+        Column {
             when (listType) {
                 ListType.ALBUMS -> when (displayType) {
                     DisplayType.LIST -> AlbumList(

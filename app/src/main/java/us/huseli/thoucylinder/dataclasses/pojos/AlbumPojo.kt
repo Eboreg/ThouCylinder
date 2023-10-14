@@ -42,9 +42,9 @@ data class AlbumPojo(
 ) : AbstractAlbumPojo() {
     private val years: Pair<Int, Int>?
         get() {
-            val year = this.album.year
-            val minYear = this.minYear
-            val maxYear = this.maxYear
+            val year = this.album.year?.takeIf { it > 1000 }
+            val minYear = this.minYear?.takeIf { it > 1000 }
+            val maxYear = this.maxYear?.takeIf { it > 1000 }
 
             return if (year != null) Pair(year, year)
             else if (minYear != null && maxYear != null) Pair(minYear, maxYear)

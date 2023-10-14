@@ -51,7 +51,7 @@ fun PlaylistScreen(
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
             color = BottomAppBarDefaults.containerColor,
-            tonalElevation = 1.dp,
+            tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -75,9 +75,8 @@ fun PlaylistScreen(
         TrackList(
             pojos = tracks,
             viewModel = viewModel,
-            modifier = Modifier.padding(horizontal = 10.dp),
             onDownloadClick = { viewModel.downloadTrack(it) },
-            onPlayClick = { viewModel.playTrack(it) },
+            onPlayClick = { viewModel.playPlaylist(startAt = it) },
             onAddToPlaylistClick = { onAddToPlaylistClick(it) },
             listState = listState,
             onArtistClick = onArtistClick,

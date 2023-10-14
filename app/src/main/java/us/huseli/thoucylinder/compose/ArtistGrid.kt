@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.InterpreterMode
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,30 +20,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
-import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
+import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.Image
+import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.toBitmap
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable
 fun ArtistGrid(
-    modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
     artists: List<ArtistPojo>,
     images: Map<String, Image?>,
     onArtistClick: (String) -> Unit,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
-    ItemGrid(
-        things = artists,
-        modifier = modifier,
-        onClick = { onArtistClick(it.name) },
-        contentPadding = contentPadding,
-    ) { artist ->
+    ItemGrid(things = artists, onClick = { onArtistClick(it.name) }, contentPadding = contentPadding) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
@@ -65,9 +61,14 @@ fun ArtistGrid(
         )
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.padding(5.dp).weight(1f)) {
-                Text(text = artist.name, maxLines = 2)
                 Text(
-                    style = MaterialTheme.typography.bodySmall,
+                    text = artist.name,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                )
+                Text(
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                     text = pluralStringResource(R.plurals.x_tracks, artist.trackCount, artist.trackCount),
                 )
             }

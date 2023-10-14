@@ -10,6 +10,15 @@ data class DiscogsMasterTrack(
 ) {
     val artist: String?
         get() = artists?.join()
+
+    val discNumberNonNull: Int
+        get() = position.split("-").takeIf { it.size > 1 }?.first()?.toIntOrNull() ?: 1
+
+    val albumPositionNonNull: Int
+        get() = position.split("-").last().toIntOrNull() ?: 0
+
+    val positionPair: Pair<Int, Int>
+        get() = Pair(discNumberNonNull, albumPositionNonNull)
 }
 
 

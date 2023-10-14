@@ -101,7 +101,6 @@ fun SearchScreen(
             when (displaySearchType) {
                 SearchType.LOCAL -> {
                     SearchResults(
-                        modifier = Modifier.padding(horizontal = 10.dp).fillMaxWidth(),
                         albums = localAlbums,
                         tracks = localTracks,
                         viewModel = viewModel,
@@ -113,7 +112,6 @@ fun SearchScreen(
                 }
                 SearchType.YOUTUBE -> {
                     SearchResults(
-                        modifier = Modifier.padding(horizontal = 10.dp).fillMaxWidth(),
                         albums = youtubeAlbums,
                         tracks = youtubeTracks,
                         viewModel = viewModel,
@@ -138,13 +136,11 @@ fun SearchResults(
     listType: ListType,
     onAlbumClick: (AlbumPojo) -> Unit,
     onAddToPlaylistClick: (Selection) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     when (displayType) {
         DisplayType.LIST -> when (listType) {
             ListType.ALBUMS -> {
                 AlbumList(
-                    modifier = modifier,
                     pojos = albums,
                     viewModel = viewModel,
                     onAlbumClick = onAlbumClick,
@@ -153,7 +149,6 @@ fun SearchResults(
             }
             ListType.TRACKS -> {
                 TrackList(
-                    modifier = modifier,
                     pojos = tracks,
                     viewModel = viewModel,
                     onDownloadClick = { viewModel.downloadTrack(it) },
@@ -167,7 +162,6 @@ fun SearchResults(
         DisplayType.GRID -> when (listType) {
             ListType.ALBUMS -> {
                 AlbumGrid(
-                    modifier = modifier,
                     albums = albums,
                     viewModel = viewModel,
                     onAlbumClick = onAlbumClick,
@@ -175,7 +169,6 @@ fun SearchResults(
             }
             ListType.TRACKS -> {
                 TrackGrid(
-                    modifier = modifier,
                     pojos = tracks,
                     viewModel = viewModel,
                     onAddToPlaylistClick = onAddToPlaylistClick,

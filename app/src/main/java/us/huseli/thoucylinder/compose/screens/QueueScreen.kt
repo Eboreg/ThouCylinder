@@ -4,10 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
@@ -20,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -68,6 +68,7 @@ fun QueueTrackList(
     val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle()
     val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxWidth()) {
         SelectedTracksButtons(
@@ -82,22 +83,19 @@ fun QueueTrackList(
             },
         )
 
-        ListWithNumericBar(
-            listState = listState,
-            listSize = queue.items.size,
-            modifier = Modifier.padding(vertical = 10.dp),
-        ) {
+        ListWithNumericBar(listState = listState, listSize = queue.items.size) {
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 contentPadding = PaddingValues(10.dp),
             ) {
-                items(queue.items) { pojo ->
+                itemsIndexed(queue.items) { pojoIdx, pojo ->
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
                     var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
                     val isSelected = selectedTracks.contains(pojo)
                     val containerColor =
-                        if (!isSelected && playerCurrentPojo == pojo) MaterialTheme.colorScheme.secondaryContainer
+                        if (!isSelected && playerCurrentPojo == pojo)
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                         else null
 
                     LaunchedEffect(pojo.track.trackId) {
@@ -112,7 +110,7 @@ fun QueueTrackList(
                             metadata = metadata,
                             showArtist = true,
                             onDownloadClick = { viewModel.downloadTrack(pojo.track) },
-                            onPlayClick = { viewModel.play(pojo) },
+                            onPlayClick = { viewModel.skipTo(pojoIdx) },
                             onArtistClick = onArtistClick,
                             onAlbumClick = onAlbumClick,
                             downloadProgress = downloadProgressMap[pojo.track.trackId],
@@ -122,6 +120,7 @@ fun QueueTrackList(
                             selectOnShortClick = selectedTracks.isNotEmpty(),
                             thumbnail = thumbnail.value,
                             containerColor = containerColor,
+                            onEnqueueNextClick = { viewModel.enqueueTrackNext(pojo.track, context) },
                         )
                     }
                 }

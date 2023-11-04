@@ -45,7 +45,11 @@ import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
@@ -59,18 +63,24 @@ fun App(
     searchViewModel: SearchViewModel = hiltViewModel(),
     queueViewModel: QueueViewModel = hiltViewModel(),
 ) {
-    var activeScreen by rememberSaveable { mutableStateOf<String?>("library") }
-    var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
+    val context = LocalContext.current
     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
     val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+
+    var activeScreen by rememberSaveable { mutableStateOf<String?>("library") }
+    var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
+    var infoDialogTrack by rememberSaveable { mutableStateOf<Track?>(null) }
+    var isAddToPlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
     var isCreatePlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var isAddToPlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
-    val context = LocalContext.current
+    var addDownloadedAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
+    var addAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
+    var editAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
 
     LaunchedEffect(Unit) {
-        viewModel.importNewMediaStoreAlbums()
+        viewModel.importNewMediaStoreAlbums(context = context)
         viewModel.deleteOrphanTracksAndAlbums()
+        viewModel.deleteTempTracksAndAlbums()
     }
 
     val mainMenuItems = listOf(
@@ -88,35 +98,77 @@ fun App(
         isCoverExpanded = false
     }
 
-    val onAlbumClick = { albumId: UUID ->
-        navController.navigate(AlbumDestination.route(albumId))
-        isCoverExpanded = false
-    }
-
-    val onArtistClick = { artist: String ->
-        navController.navigate(ArtistDestination.route(artist))
-        isCoverExpanded = false
-    }
-
     val onPlaylistClick = { playlistId: UUID ->
         navController.navigate(PlaylistDestination.route(playlistId))
         isCoverExpanded = false
     }
 
-    val onAddToPlaylistClick = { selection: Selection ->
-        addToPlaylistSelection = selection
-        isAddToPlaylistDialogOpen = true
-    }
-
-    val onBackClick: () -> Unit = {
-        navController.popBackStack()
-    }
+    val appCallbacks = AppCallbacks(
+        onAddAlbumToLibraryClick = { album -> addAlbumDialogAlbum = album },
+        onAddToPlaylistClick = { selection ->
+            addToPlaylistSelection = selection
+            isAddToPlaylistDialogOpen = true
+        },
+        onAlbumClick = { albumId ->
+            navController.navigate(AlbumDestination.route(albumId))
+            isCoverExpanded = false
+        },
+        onArtistClick = { artist ->
+            navController.navigate(ArtistDestination.route(artist))
+            isCoverExpanded = false
+        },
+        onBackClick = { navController.popBackStack() },
+        onCancelAlbumDownloadClick = { viewModel.cancelAlbumDownload(it) },
+        onCreatePlaylistClick = { isCreatePlaylistDialogOpen = true },
+        onDeletePlaylistClick = { pojo ->
+            viewModel.deletePlaylist(pojo) {
+                SnackbarEngine.addInfo(
+                    message = context.getString(R.string.the_playlist_was_deleted),
+                    actionLabel = context.getString(R.string.undo),
+                    onActionPerformed = {
+                        viewModel.undoDeletePlaylist { pojo ->
+                            SnackbarEngine.addInfo(
+                                message = context.getString(R.string.the_playlist_was_restored),
+                                actionLabel = context.getString(R.string.go_to_playlist),
+                                onActionPerformed = { onPlaylistClick(pojo.playlistId) },
+                            )
+                        }
+                    }
+                )
+            }
+        },
+        onDownloadAlbumClick = { album -> addDownloadedAlbumDialogAlbum = album },
+        onDownloadTrackClick = { track -> viewModel.downloadTrack(track) },
+        onEditAlbumClick = { album -> editAlbumDialogAlbum = album },
+        onPlaylistClick = onPlaylistClick,
+        onShowTrackInfoClick = { track -> infoDialogTrack = track },
+    )
 
     val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
         SnackbarEngine.addInfo(
             message = context.getString(R.string.selection_was_added_to_playlist),
             actionLabel = context.getString(R.string.go_to_playlist),
-            onActionPerformed = { onPlaylistClick(playlistId) },
+            onActionPerformed = { appCallbacks.onPlaylistClick(playlistId) },
+        )
+    }
+
+    infoDialogTrack?.also { track ->
+        var metadata by rememberSaveable { mutableStateOf(track.metadata) }
+        var album by rememberSaveable { mutableStateOf<Album?>(null) }
+
+        LaunchedEffect(Unit) {
+            if (metadata == null) metadata = viewModel.getTrackMetadata(track)
+            album = viewModel.getTrackAlbum(track)
+        }
+
+        TrackInfoDialog(
+            isDownloaded = track.isDownloaded,
+            isOnYoutube = track.isOnYoutube,
+            metadata = metadata,
+            albumTitle = album?.title,
+            albumArtist = album?.artist,
+            year = track.year ?: album?.year,
+            onClose = { infoDialogTrack = null },
         )
     }
 
@@ -145,17 +197,55 @@ fun App(
     if (isCreatePlaylistDialogOpen) {
         CreatePlaylistDialog(
             onSave = { name ->
-                val pojo = PlaylistPojo(name = name)
+                val playlist = Playlist(name = name)
 
                 isCreatePlaylistDialogOpen = false
-                viewModel.createPlaylist(pojo, addToPlaylistSelection)
+                viewModel.createPlaylist(playlist, addToPlaylistSelection)
 
                 if (addToPlaylistSelection != null) {
-                    displayAddedToPlaylistMessage(pojo.playlistId)
+                    displayAddedToPlaylistMessage(playlist.playlistId)
                     addToPlaylistSelection = null
-                } else onPlaylistClick(pojo.playlistId)
+                } else appCallbacks.onPlaylistClick(playlist.playlistId)
             },
             onCancel = { isCreatePlaylistDialogOpen = false },
+        )
+    }
+
+    addDownloadedAlbumDialogAlbum?.also { album ->
+        EditAlbumDialog(
+            initialAlbum = album,
+            title = stringResource(R.string.add_album_to_library),
+            onCancel = { addDownloadedAlbumDialogAlbum = null },
+            onSave = {
+                addDownloadedAlbumDialogAlbum = null
+                viewModel.downloadAndSaveAlbum(it)
+            },
+        )
+    }
+
+    addAlbumDialogAlbum?.also { album ->
+        EditAlbumDialog(
+            initialAlbum = album,
+            title = stringResource(R.string.add_album_to_library),
+            onCancel = { addAlbumDialogAlbum = null },
+            onSave = {
+                addAlbumDialogAlbum = null
+                viewModel.saveAlbumWithTracks(it)
+                viewModel.tagAlbumTracks(it)
+            },
+        )
+    }
+
+    editAlbumDialogAlbum?.also { album ->
+        EditAlbumDialog(
+            initialAlbum = album,
+            title = stringResource(R.string.update_album),
+            onCancel = { editAlbumDialogAlbum = null },
+            onSave = {
+                editAlbumDialogAlbum = null
+                viewModel.saveAlbumWithTracks(it)
+                viewModel.tagAlbumTracks(it)
+            }
         )
     }
 
@@ -191,29 +281,18 @@ fun App(
                     activeScreen = "search"
                     SearchScreen(
                         viewModel = searchViewModel,
-                        onAlbumClick = onAlbumClick,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
+                        appCallbacks = appCallbacks,
                     )
                 }
 
                 composable(route = LibraryDestination.route) {
                     activeScreen = "library"
-                    LibraryScreen(
-                        onAlbumClick = onAlbumClick,
-                        onArtistClick = onArtistClick,
-                        onPlaylistClick = onPlaylistClick,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                        onCreatePlaylistClick = { isCreatePlaylistDialogOpen = true },
-                    )
+                    LibraryScreen(appCallbacks = appCallbacks)
                 }
 
                 composable(route = QueueDestination.route) {
                     activeScreen = "queue"
-                    QueueScreen(
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                        onAlbumClick = onAlbumClick,
-                        onArtistClick = onArtistClick,
-                    )
+                    QueueScreen(appCallbacks = appCallbacks)
                 }
 
                 composable(
@@ -221,11 +300,7 @@ fun App(
                     arguments = AlbumDestination.arguments,
                 ) {
                     activeScreen = null
-                    AlbumScreen(
-                        onBackClick = onBackClick,
-                        onArtistClick = onArtistClick,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                    )
+                    AlbumScreen(appCallbacks = appCallbacks)
                 }
 
                 composable(
@@ -233,11 +308,7 @@ fun App(
                     arguments = ArtistDestination.arguments,
                 ) {
                     activeScreen = null
-                    ArtistScreen(
-                        onBackClick = onBackClick,
-                        onAlbumClick = onAlbumClick,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                    )
+                    ArtistScreen(appCallbacks = appCallbacks)
                 }
 
                 composable(
@@ -245,25 +316,24 @@ fun App(
                     arguments = PlaylistDestination.arguments,
                 ) {
                     activeScreen = null
-                    PlaylistScreen(
-                        onAlbumClick = onAlbumClick,
-                        onArtistClick = onArtistClick,
-                        onBackClick = onBackClick,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                    )
+                    PlaylistScreen(appCallbacks = appCallbacks)
                 }
             }
 
-            if (currentPojo != null) {
+            currentPojo?.also { pojo ->
                 ModalCover(
-                    pojo = currentPojo,
+                    pojo = pojo,
                     viewModel = queueViewModel,
                     isExpanded = isCoverExpanded,
                     onExpand = { isCoverExpanded = true },
                     onCollapse = { isCoverExpanded = false },
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                    onArtistClick = onArtistClick,
-                    onAlbumClick = onAlbumClick,
+                    trackCallbacks = TrackCallbacks(
+                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(track = pojo.track)) },
+                        onDownloadClick = { appCallbacks.onDownloadTrackClick(pojo.track) },
+                        onShowInfoClick = { appCallbacks.onShowTrackInfoClick(pojo.track) },
+                        onAlbumClick = pojo.album?.albumId?.let { { appCallbacks.onAlbumClick(it) } },
+                        onArtistClick = pojo.artist?.let { { appCallbacks.onArtistClick(it) } },
+                    ),
                 )
             }
         }

@@ -17,15 +17,7 @@ class YoutubeTrackSearchMediator(
     private val repo: YoutubeRepository,
     private val database: Database,
 ) : RemoteMediator<Int, Track>() {
-    override suspend fun initialize(): InitializeAction {
-        return super.initialize()
-    }
-
     override suspend fun load(loadType: LoadType, state: PagingState<Int, Track>): MediatorResult {
-        Log.i(
-            "YoutubeTrackSearchMediator",
-            "load: loadType=$loadType, anchorPosition=${state.anchorPosition}, pages=${state.pages}",
-        )
         return try {
             val key = when (loadType) {
                 LoadType.REFRESH -> null

@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
@@ -24,57 +22,44 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.TrackListRow
-import us.huseli.thoucylinder.dataclasses.TrackQueue
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
-import java.util.UUID
 
 @Composable
 fun QueueScreen(
     modifier: Modifier = Modifier,
     viewModel: QueueViewModel = hiltViewModel(),
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onAlbumClick: (UUID) -> Unit,
-    onArtistClick: (String) -> Unit,
+    appCallbacks: AppCallbacks,
 ) {
+    val context = LocalContext.current
+    val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle()
     val queue by viewModel.queue.collectAsStateWithLifecycle()
 
-    QueueTrackList(
-        queue = queue,
-        viewModel = viewModel,
-        modifier = modifier,
-        onAddToPlaylistClick = onAddToPlaylistClick,
-        onAlbumClick = onAlbumClick,
-        onArtistClick = onArtistClick,
+    val reorderableState = rememberReorderableLazyListState(
+        onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
+        onDragEnd = { from, to -> viewModel.onMoveTrackFinished(from, to) },
     )
-}
-
-
-@Composable
-fun QueueTrackList(
-    queue: TrackQueue,
-    viewModel: QueueViewModel,
-    modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onAlbumClick: (UUID) -> Unit,
-    onArtistClick: (String) -> Unit,
-) {
-    val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-    val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle()
-    val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxWidth()) {
         SelectedTracksButtons(
             trackCount = selectedTracks.size,
-            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(queueTracks = selectedTracks)) },
-            onUnselectAllClick = { viewModel.unselectAllQueueTracks() },
+            callbacks = TrackSelectionCallbacks(
+                onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(queueTracks = selectedTracks)) },
+                onPlayClick = { viewModel.playQueueTracks(selectedTracks) },
+                onPlayNextClick = { viewModel.playQueueTracksNext(selectedTracks, context) },
+                onUnselectAllClick = { viewModel.unselectAllQueueTracks() },
+            ),
             extraButtons = {
                 SmallOutlinedButton(
                     onClick = { viewModel.removeFromQueue(selectedTracks) },
@@ -83,45 +68,57 @@ fun QueueTrackList(
             },
         )
 
-        ListWithNumericBar(listState = listState, listSize = queue.items.size) {
+        val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
+        val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+
+        ListWithNumericBar(listState = reorderableState.listState, listSize = queue.size) {
             LazyColumn(
-                state = listState,
+                modifier = Modifier.reorderable(reorderableState),
+                state = reorderableState.listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 contentPadding = PaddingValues(10.dp),
             ) {
-                itemsIndexed(queue.items) { pojoIdx, pojo ->
+                itemsIndexed(queue, key = { _, pojo -> pojo.queueTrackId }) { pojoIdx, pojo ->
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
                     var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
-                    val isSelected = selectedTracks.contains(pojo)
-                    val containerColor =
-                        if (!isSelected && playerCurrentPojo == pojo)
-                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                        else null
 
                     LaunchedEffect(pojo.track.trackId) {
-                        pojo.track.image?.let { thumbnail.value = viewModel.getImageBitmap(it) }
+                        thumbnail.value = viewModel.getTrackThumbnail(pojo, context)
                         if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
                     }
 
                     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                        TrackListRow(
-                            track = pojo.track,
-                            album = pojo.album,
-                            metadata = metadata,
-                            showArtist = true,
-                            onDownloadClick = { viewModel.downloadTrack(pojo.track) },
-                            onPlayClick = { viewModel.skipTo(pojoIdx) },
-                            onArtistClick = onArtistClick,
-                            onAlbumClick = onAlbumClick,
-                            downloadProgress = downloadProgressMap[pojo.track.trackId],
-                            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(pojo.track)) },
-                            onToggleSelected = { viewModel.toggleSelected(pojo) },
-                            isSelected = isSelected,
-                            selectOnShortClick = selectedTracks.isNotEmpty(),
-                            thumbnail = thumbnail.value,
-                            containerColor = containerColor,
-                            onEnqueueNextClick = { viewModel.enqueueTrackNext(pojo.track, context) },
-                        )
+                        ReorderableItem(reorderableState = reorderableState, key = pojo.queueTrackId) { isDragging ->
+                            val isSelected = selectedTracks.contains(pojo)
+                            val containerColor =
+                                if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
+                                else if (!isSelected && playerCurrentPojo == pojo)
+                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                else null
+
+                            TrackListRow(
+                                title = pojo.track.title,
+                                isDownloadable = pojo.track.isDownloadable,
+                                downloadProgress = downloadProgressMap[pojo.track.trackId],
+                                thumbnail = thumbnail.value,
+                                containerColor = containerColor,
+                                reorderableState = reorderableState,
+                                artist = pojo.artist,
+                                duration = metadata?.duration,
+                                callbacks = TrackCallbacks.fromAppCallbacks(
+                                    track = pojo.track,
+                                    appCallbacks = appCallbacks,
+                                    onAlbumClick = pojo.album?.albumId?.let { { appCallbacks.onAlbumClick(it) } },
+                                    onArtistClick = pojo.artist?.let { { appCallbacks.onArtistClick(it) } },
+                                    onTrackClick = {
+                                        if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                                        else viewModel.skipTo(pojoIdx)
+                                    },
+                                    onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = pojo) },
+                                ),
+                                isSelected = selectedTracks.contains(pojo),
+                            )
+                        }
                     }
                 }
             }

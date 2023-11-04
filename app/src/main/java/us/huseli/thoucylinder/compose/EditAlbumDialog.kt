@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,23 +22,55 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
+
+@Composable
+fun EditAlbumDialog(
+    initialAlbum: Album,
+    title: String,
+    modifier: Modifier = Modifier,
+    viewModel: EditAlbumViewModel = hiltViewModel(),
+    onCancel: () -> Unit,
+    onSave: (AlbumWithTracksPojo) -> Unit,
+) {
+    val context = LocalContext.current
+    val pojo by viewModel.albumPojo.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.setAlbum(initialAlbum, context)
+    }
+
+    pojo?.also {
+        EditAlbumDialog(
+            initialAlbumPojo = it,
+            title = title,
+            onCancel = onCancel,
+            onSave = onSave,
+            modifier = modifier,
+            viewModel = viewModel,
+        )
+    }
+}
+
 
 @Composable
 fun EditAlbumDialog(
@@ -48,47 +81,51 @@ fun EditAlbumDialog(
     onCancel: () -> Unit,
     onSave: (AlbumWithTracksPojo) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val pojo by viewModel.albumPojo.collectAsStateWithLifecycle()
-    val imagePairs by viewModel.images.collectAsStateWithLifecycle()
     var step2 by rememberSaveable { mutableStateOf(false) }
+    val onCancelClick = {
+        viewModel.unsetAlbum()
+        onCancel()
+    }
 
     LaunchedEffect(initialAlbumPojo) {
-        viewModel.setAlbum(initialAlbumPojo)
+        viewModel.setAlbum(initialAlbumPojo, context)
     }
 
     if (!step2) {
-        EditAlbumDialogStep1(
+        EditAlbumDialogDetails(
             modifier = modifier,
             viewModel = viewModel,
             onNextClick = { step2 = true },
-            onCancelClick = onCancel,
+            onCancelClick = onCancelClick,
             title = title,
         )
     } else {
-        if (imagePairs.isNotEmpty()) {
-            EditAlbumDialogStep2(
-                modifier = modifier,
-                imagePairs = imagePairs,
-                onSelect = { image ->
-                    pojo?.let {
-                        it.copy(
-                            album = it.album.copy(albumArt = image),
-                            tracks = it.tracks.map { track -> track.copy(image = image) },
-                        )
-                    }?.let(onSave) ?: run(onCancel)
-                },
-                onCancel = onCancel,
-                onPreviousClick = { step2 = false },
-            )
-        } else {
-            pojo?.let(onSave) ?: run(onCancel)
-        }
+        EditAlbumDialogAlbumArt(
+            modifier = modifier,
+            onSelect = { bitmap ->
+                scope.launch {
+                    pojo?.also { pojo ->
+                        val mediaStoreImage = bitmap?.let {
+                            MediaStoreImage.fromBitmap(bitmap, pojo.album, context)
+                        }
+                        val tracks = pojo.tracks.map { track -> track.copy(image = mediaStoreImage) }
+                        onSave(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage), tracks = tracks))
+                    } ?: run(onCancelClick)
+                }
+            },
+            onCancel = onCancelClick,
+            onPreviousClick = { step2 = false },
+            viewModel = viewModel,
+        )
     }
 }
 
 
 @Composable
-fun EditAlbumDialogStep1(
+fun EditAlbumDialogDetails(
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel,
     title: String,
@@ -165,13 +202,15 @@ fun EditAlbumDialogStep1(
 
 
 @Composable
-fun EditAlbumDialogStep2(
+fun EditAlbumDialogAlbumArt(
     modifier: Modifier = Modifier,
-    imagePairs: List<Pair<Image, ImageBitmap>>,
-    onSelect: (Image?) -> Unit,
+    viewModel: EditAlbumViewModel,
+    onSelect: (Bitmap?) -> Unit,
     onCancel: () -> Unit,
     onPreviousClick: () -> Unit,
 ) {
+    val bitmaps by viewModel.bitmaps.collectAsStateWithLifecycle()
+
     AlertDialog(
         modifier = modifier.padding(10.dp),
         title = { Text(text = stringResource(R.string.select_cover_art)) },
@@ -196,13 +235,13 @@ fun EditAlbumDialogStep2(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(imagePairs) { (image, imageBitmap) ->
+                items(bitmaps) { bitmap ->
                     Column(
-                        modifier = Modifier.clickable { onSelect(image) }.fillMaxSize(),
+                        modifier = Modifier.clickable { onSelect(bitmap) }.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Thumbnail(image = imageBitmap)
-                        Text(text = "${imageBitmap.width}x${imageBitmap.height}")
+                        Thumbnail(image = bitmap.asImageBitmap())
+                        Text(text = "${bitmap.width}x${bitmap.height}")
                     }
                 }
                 item {

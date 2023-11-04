@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
@@ -16,19 +17,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
 
 @Composable
 fun TrackInfoDialog(
-    track: Track,
+    isDownloaded: Boolean,
+    isOnYoutube: Boolean,
     metadata: TrackMetadata?,
     modifier: Modifier = Modifier,
-    album: Album? = null,
+    albumTitle: String? = null,
+    albumArtist: String? = null,
+    year: Int? = null,
     onClose: () -> Unit,
 ) {
     AlertDialog(
@@ -39,11 +42,11 @@ fun TrackInfoDialog(
         confirmButton = {},
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                TrackInfoTextRow(label = stringResource(R.string.year), value = track.year?.toString() ?: "-")
-                if (album != null) {
-                    TrackInfoTextRow(label = stringResource(R.string.album), value = album.title)
-                    TrackInfoTextRow(label = stringResource(R.string.album_artist), value = album.artist ?: "-")
-                }
+                TrackInfoTextRow(label = stringResource(R.string.year), value = year?.toString() ?: "-")
+                if (albumTitle != null)
+                    TrackInfoTextRow(label = stringResource(R.string.album), value = albumTitle)
+                if (albumArtist != null)
+                    TrackInfoTextRow(label = stringResource(R.string.album_artist), value = albumArtist)
                 metadata?.let { metadata ->
                     TrackInfoTextRow(label = stringResource(R.string.mime_type), value = metadata.mimeType)
                     TrackInfoTextRow(
@@ -67,8 +70,8 @@ fun TrackInfoDialog(
                         value = metadata.loudnessDbString ?: "-",
                     )
                 }
-                TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = track.isDownloaded)
-                TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = track.isOnYoutube)
+                TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = isDownloaded)
+                TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = isOnYoutube)
             }
         }
     )
@@ -88,8 +91,8 @@ fun TrackInfoBooleanRow(label: String, value: Boolean) {
 
 @Composable
 fun TrackInfoTextRow(label: String, value: String) {
-    Row {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(text = label, modifier = Modifier.weight(0.4f))
-        Text(text = value)
+        Text(text = value, modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
     }
 }

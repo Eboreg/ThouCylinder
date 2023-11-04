@@ -5,8 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BottomAppBarDefaults
@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 inline fun SelectedItemsActionSection(
     visible: Boolean,
     tonalElevation: Dp = 2.dp,
-    crossinline content: @Composable RowScope.() -> Unit,
+    crossinline content: @Composable ColumnScope.() -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -32,10 +32,9 @@ inline fun SelectedItemsActionSection(
             color = BottomAppBarDefaults.containerColor,
             tonalElevation = tonalElevation,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            Column(
                 modifier = Modifier.fillMaxWidth().padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
                 content = content,
             )
         }

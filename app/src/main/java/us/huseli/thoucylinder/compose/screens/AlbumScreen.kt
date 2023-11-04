@@ -24,7 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,71 +39,39 @@ import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.compose.AlbumBadges
 import us.huseli.thoucylinder.compose.AlbumButtons
 import us.huseli.thoucylinder.compose.AlbumTrackRow
-import us.huseli.thoucylinder.compose.EditAlbumDialog
+import us.huseli.thoucylinder.compose.AlbumTrackRowData
 import us.huseli.thoucylinder.compose.SelectedTracksButtons
-import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.compose.utils.LargeIconBadge
+import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
 @Composable
 fun AlbumScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumViewModel = hiltViewModel(),
-    onBackClick: () -> Unit,
-    onArtistClick: (String) -> Unit,
-    onAddToPlaylistClick: (Selection) -> Unit,
+    appCallbacks: AppCallbacks,
 ) {
-    val albumArt by viewModel.albumArt.collectAsStateWithLifecycle()
+    val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
-    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val trackDownloadProgress by viewModel.trackDownloadProgress.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle(null)
+    val trackDownloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    var addDownloadedAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var addAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var editAlbumDialogOpen by rememberSaveable { mutableStateOf(false) }
-
     albumPojo?.let { pojo ->
-        if (addDownloadedAlbumDialogOpen) {
-            EditAlbumDialog(
-                initialAlbumPojo = pojo,
-                title = stringResource(R.string.add_album_to_library),
-                onCancel = { addDownloadedAlbumDialogOpen = false },
-                onSave = {
-                    addDownloadedAlbumDialogOpen = false
-                    viewModel.downloadAndSaveAlbum(it)
-                },
-            )
-        } else if (addAlbumDialogOpen) {
-            EditAlbumDialog(
-                initialAlbumPojo = pojo,
-                title = stringResource(R.string.add_album_to_library),
-                onCancel = { addAlbumDialogOpen = false },
-                onSave = {
-                    addAlbumDialogOpen = false
-                    viewModel.saveAlbumWithTracks(it)
-                    viewModel.tagAlbumTracks(it)
-                }
-            )
-        } else if (editAlbumDialogOpen) {
-            EditAlbumDialog(
-                initialAlbumPojo = pojo,
-                title = stringResource(R.string.update_album),
-                onCancel = { editAlbumDialogOpen = false },
-                onSave = {
-                    editAlbumDialogOpen = false
-                    viewModel.saveAlbumWithTracks(it)
-                    viewModel.tagAlbumTracks(it)
-                }
-            )
-        }
-
         Column {
             SelectedTracksButtons(
                 trackCount = selectedTracks.size,
-                onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
-                onUnselectAllClick = { viewModel.unselectAllTracks() },
+                callbacks = TrackSelectionCallbacks(
+                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
+                    onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
+                    onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
+                    onUnselectAllClick = { viewModel.unselectAllTracks() },
+                )
             )
 
             LazyColumn(modifier = modifier.padding(horizontal = 10.dp)) {
@@ -114,7 +81,7 @@ fun AlbumScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(
-                            onClick = onBackClick,
+                            onClick = appCallbacks.onBackClick,
                             content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                             modifier = Modifier.width(40.dp),
                         )
@@ -166,22 +133,28 @@ fun AlbumScreen(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     }
-                                    AlbumBadges(pojo = pojo)
+                                    AlbumBadges(
+                                        genres = pojo.genres.map { it.genreName },
+                                        styles = pojo.styles.map { it.styleName },
+                                    )
                                 }
-                                Row {
+
+                                Row(modifier = Modifier.fillMaxWidth()) {
                                     AlbumButtons(
-                                        pojo = pojo,
+                                        isLocal = pojo.album.isLocal,
+                                        isInLibrary = pojo.album.isInLibrary,
                                         modifier = Modifier.align(Alignment.Bottom),
-                                        onCancelDownloadClick = { viewModel.cancelDownload() },
-                                        onRemoveFromLibraryClick = {
-                                            viewModel.removeAlbumFromLibrary()
-                                            onBackClick()
-                                        },
-                                        onAddToLibraryClick = { addAlbumDialogOpen = true },
-                                        onDownloadClick = { addDownloadedAlbumDialogOpen = true },
-                                        onEditClick = { editAlbumDialogOpen = true },
-                                        onDeleteClick = { viewModel.deleteAlbumWithTracks() },
-                                        onPlayClick = { viewModel.playAlbum() },
+                                        isDownloading = downloadProgress != null,
+                                        callbacks = AlbumCallbacks.fromAppCallbacks(
+                                            album = pojo.album,
+                                            appCallbacks = appCallbacks,
+                                            onPlayClick = { viewModel.playAlbum() },
+                                            onPlayNextClick = { viewModel.playAlbumNext(context) },
+                                            onRemoveFromLibraryClick = {
+                                                viewModel.removeAlbumFromLibrary(pojo.album)
+                                                appCallbacks.onBackClick()
+                                            },
+                                        )
                                     )
                                 }
                             }
@@ -206,23 +179,32 @@ fun AlbumScreen(
                     }
                 }
 
-                items(pojo.tracks) { track ->
-                    viewModel.loadTrackMetadata(track)
+                items(pojo.trackPojos) { trackPojo ->
+                    viewModel.loadTrackMetadata(trackPojo.track)
 
                     AlbumTrackRow(
-                        track = track,
-                        album = pojo.album,
-                        downloadProgress = trackDownloadProgress[track.trackId],
-                        onDownloadClick = { viewModel.downloadTrack(track) },
-                        onPlayClick = { viewModel.playAlbum(startAt = track) },
-                        showArtist = track.artist != pojo.album.artist,
-                        onArtistClick = onArtistClick,
-                        onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
-                        onToggleSelected = { viewModel.toggleSelected(track) },
-                        isSelected = selectedTracks.contains(track),
-                        selectOnShortClick = selectedTracks.isNotEmpty(),
-                        showDiscNumber = pojo.discCount > 1,
-                        onEnqueueNextClick = { viewModel.enqueueTrackNext(track, context) },
+                        data = AlbumTrackRowData(
+                            title = trackPojo.track.title,
+                            isDownloadable = trackPojo.track.isDownloadable,
+                            artist = trackPojo.artist,
+                            duration = trackPojo.track.metadata?.duration,
+                            albumPosition = trackPojo.track.albumPosition,
+                            discNumber = trackPojo.track.discNumber,
+                            downloadProgress = trackDownloadProgressMap[trackPojo.trackId],
+                            showArtist = trackPojo.artist != pojo.album.artist,
+                            showDiscNumber = pojo.discCount > 1,
+                            isSelected = selectedTracks.contains(trackPojo),
+                        ),
+                        callbacks = TrackCallbacks.fromAppCallbacks(
+                            pojo = trackPojo,
+                            appCallbacks = appCallbacks,
+                            onTrackClick = {
+                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(trackPojo)
+                                else viewModel.playAlbum(startAt = trackPojo.track)
+                            },
+                            onPlayNextClick = { viewModel.playAlbumNext(context) },
+                            onLongClick = { viewModel.selectTracksFromLastSelected(to = trackPojo) },
+                        ),
                     )
                 }
             }

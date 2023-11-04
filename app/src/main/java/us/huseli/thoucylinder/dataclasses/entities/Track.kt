@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.room.ColumnInfo
@@ -12,8 +13,7 @@ import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
-import us.huseli.thoucylinder.dataclasses.Image
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.getMediaStoreFileNullable
@@ -43,7 +43,7 @@ data class Track(
     @ColumnInfo("Track_year") val year: Int? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
-    @Embedded("Track_image_") val image: Image? = null,
+    @Embedded("Track_image_") val image: MediaStoreImage? = null,
     @Embedded("Track_mediaStoreData_") val mediaStoreData: MediaStoreData? = null,
     @Ignore val tempTrackData: TempTrackData? = null,
 ) : Comparable<Track> {
@@ -58,7 +58,7 @@ data class Track(
         year: Int?,
         metadata: TrackMetadata?,
         youtubeVideo: YoutubeVideo?,
-        image: Image?,
+        image: MediaStoreImage?,
         mediaStoreData: MediaStoreData?,
     ) : this(
         trackId = trackId,
@@ -76,20 +76,23 @@ data class Track(
         tempTrackData = null,
     )
 
-    private val playUri: Uri?
+    val playUri: Uri?
         get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
 
     val discNumberNonNull: Int
         get() = discNumber ?: 1
 
-    val albumPositionNonNull: Int
+    private val albumPositionNonNull: Int
         get() = albumPosition ?: 0
-
-    val positionPair: Pair<Int, Int>
-        get() = Pair(discNumberNonNull, albumPositionNonNull)
 
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
+
+    val isDownloaded: Boolean
+        get() = mediaStoreData != null || tempTrackData != null
+
+    val isDownloadable: Boolean
+        get() = !isDownloaded && isOnYoutube
 
     fun generateBasename(): String {
         var name = ""
@@ -100,17 +103,16 @@ data class Track(
         return name.sanitizeFilename()
     }
 
-    val isDownloaded: Boolean
-        get() = mediaStoreData != null || tempTrackData != null
-
     fun getContentValues() = ContentValues().apply {
         put(MediaStore.Audio.Media.TITLE, title)
         albumPosition?.also { put(MediaStore.Audio.Media.TRACK, it.toString()) }
         artist?.also { put(MediaStore.Audio.Media.ARTIST, it) }
     }
 
-    fun toQueueTrackPojo(index: Int): QueueTrackPojo? =
-        playUri?.let { uri -> QueueTrackPojo(track = this, uri = uri, position = index, album = null) }
+    suspend fun getFullImage(context: Context): Bitmap? = image?.getBitmap(context) ?: youtubeVideo?.getBitmap()
+
+    suspend fun getThumbnail(context: Context): Bitmap? =
+        image?.getThumbnailBitmap(context) ?: youtubeVideo?.getBitmap()
 
     fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""
@@ -140,12 +142,7 @@ data class TempTrackData(
 
 data class MediaStoreData(
     val uri: Uri,
+    val relativePath: String,
 ) {
     fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
-}
-
-
-fun List<Track>.toQueueTrackPojos(startIndex: Int = 0): List<QueueTrackPojo> {
-    var offset = 0
-    return mapNotNull { track -> track.toQueueTrackPojo(startIndex + offset)?.also { offset++ } }
 }

@@ -5,18 +5,17 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
@@ -25,7 +24,9 @@ import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class SearchViewModel @Inject constructor(private val repos: Repositories) : BaseViewModel(repos) {
+class SearchViewModel @Inject constructor(
+    private val repos: Repositories
+) : AbstractSelectViewModel("SearchViewModel", repos) {
     private val _isSearchingLocalAlbums = MutableStateFlow(false)
     private val _isSearchingLocalTracks = MutableStateFlow(false)
     private val _isSearchingYoutubeAlbums = MutableStateFlow(false)
@@ -35,33 +36,42 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
     private val _youtubeAlbums = MutableStateFlow<List<AlbumPojo>>(emptyList())
     private val _youtubeTracks = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
 
-    val isSearching: Flow<Boolean> = combine(
-        _isSearchingYoutubeAlbums,
-        repos.youtube.isSearchingTracks,
-        _isSearchingLocalAlbums,
-        _isSearchingLocalTracks,
-    ) { s1, s2, s3, s4 ->
-        s1 || s2 || s3 || s4
+    val localAlbumPojos = _filteredQuery.flatMapLatest { query ->
+        _isSearchingLocalAlbums.value = true
+        repos.room.searchAlbums(query).also { _isSearchingLocalAlbums.value = false }
     }.distinctUntilChanged()
-
-    val localAlbums = _localAlbums.asStateFlow()
 
     val localTracks: Flow<PagingData<TrackPojo>> = _filteredQuery.flatMapLatest { query ->
         _isSearchingLocalTracks.value = true
-        repos.local.searchTracks(query).flow.cachedIn(viewModelScope).also {
+        repos.room.searchTracks(query).flow.cachedIn(viewModelScope).also {
             _isSearchingLocalTracks.value = false
         }
     }.distinctUntilChanged()
 
     val youtubeAlbums = _youtubeAlbums.asStateFlow()
     val youtubeTracksPaging = _youtubeTracks.asStateFlow()
+    val selectedYoutubeAlbums = repos.room.getSelectedAlbumFlow("${javaClass.simpleName}-youtube")
+    val selectedYoutubeTracks = repos.room.getSelectedTrackFlow("${javaClass.simpleName}-youtube")
+    val isSearchingYoutubeTracks = repos.youtube.isSearchingTracks
+    val isSearchingYoutubeAlbums = _isSearchingYoutubeAlbums.asStateFlow()
+    val isSearchingLocalAlbums = _isSearchingLocalAlbums.asStateFlow()
+    val isSearchingLocalTracks = _isSearchingLocalTracks.asStateFlow()
 
-    fun populateTempAlbum(pojo: AlbumPojo) {
-        repos.local.addOrUpdateTempAlbum(AlbumWithTracksPojo(album = pojo.album))
-        viewModelScope.launch(Dispatchers.IO) {
-            val albumWithTracks = repos.youtube.populateAlbumTracks(album = pojo.album, withMetadata = false)
-            repos.local.addOrUpdateTempAlbum(albumWithTracks)
+    suspend fun ensureVideoMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
+        pojos.map { pojo -> pojo.copy(track = repos.youtube.ensureVideoMetadata(pojo.track)) }
+
+    suspend fun populateTempAlbums(albums: List<Album>): List<AlbumWithTracksPojo> {
+        val pojos = mutableListOf<AlbumWithTracksPojo>()
+        albums.forEach { album ->
+            if (!repos.room.albumExists(album.albumId)) {
+                val pojo = repos.youtube.populateAlbumTracks(album = album, withMetadata = true)
+                repos.room.insertTempAlbumWithTracks(pojo)
+                pojos.add(pojo)
+            } else {
+                pojos.add(repos.room.getAlbumWithTracks(album.albumId)!!)
+            }
         }
+        return pojos
     }
 
     fun search(query: String) {
@@ -72,15 +82,11 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
                 _isSearchingLocalAlbums.value = true
                 _isSearchingYoutubeAlbums.value = true
 
-                viewModelScope.launch(Dispatchers.IO) {
-                    _localAlbums.value = repos.local.searchAlbums(query)
-                    _isSearchingLocalAlbums.value = false
-                }
-                viewModelScope.launch(Dispatchers.IO) {
+                viewModelScope.launch {
                     _youtubeAlbums.value = repos.youtube.getAlbumSearchResult(query)
                     _isSearchingYoutubeAlbums.value = false
                 }
-                viewModelScope.launch(Dispatchers.IO) {
+                viewModelScope.launch {
                     repos.youtube.searchTracks(query).flow.map { pagingData ->
                         pagingData.map {
                             TrackPojo(track = it, album = null)
@@ -92,4 +98,19 @@ class SearchViewModel @Inject constructor(private val repos: Repositories) : Bas
             }
         }
     }
+
+    fun selectLocalAlbumsFromLastSelected(to: Album) =
+        selectAlbumsFromLastSelected(albums = _localAlbums.value.map { it.album }, to = to)
+
+    fun selectYoutubeAlbumsFromLastSelected(to: Album) =
+        selectAlbumsFromLastSelected(albums = _youtubeAlbums.value.map { it.album }, to = to)
+
+    fun toggleSelectedYoutube(album: Album) = repos.room.toggleAlbumSelected("${javaClass.simpleName}-youtube", album)
+
+    fun toggleSelectedYoutube(track: TrackPojo) =
+        repos.room.toggleTrackSelected("${javaClass.simpleName}-youtube", track)
+
+    fun unselectAllYoutubeAlbums() = repos.room.unselectAllAlbums("${javaClass.simpleName}-youtube")
+
+    fun unselectAllYoutubeTracks() = repos.room.unselectAllTracks("${javaClass.simpleName}-youtube")
 }

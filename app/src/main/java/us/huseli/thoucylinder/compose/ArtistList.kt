@@ -19,22 +19,19 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.toBitmap
-import us.huseli.thoucylinder.viewmodels.LibraryViewModel
+import java.io.File
 
 @Composable
 fun ArtistList(
-    viewModel: LibraryViewModel = hiltViewModel(),
     artists: List<ArtistPojo>,
-    images: Map<String, Image?>,
+    images: Map<String, File>,
     onArtistClick: ((String) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
@@ -42,12 +39,12 @@ fun ArtistList(
         things = artists,
         onClick = onArtistClick?.let { { onArtistClick(it.name) } },
         contentPadding = contentPadding,
+        key = { it.name },
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            images[artist.name.lowercase()]?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
-            if (imageBitmap.value == null) imageBitmap.value = artist.firstAlbumArt?.toBitmap()?.asImageBitmap()
+            images[artist.name.lowercase()]?.let { imageBitmap.value = it.toBitmap()?.asImageBitmap() }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

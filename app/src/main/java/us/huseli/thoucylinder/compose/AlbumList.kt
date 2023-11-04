@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.MoreVert
@@ -24,52 +26,47 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.viewmodels.BaseViewModel
 
 @Composable
 fun AlbumList(
     pojos: List<AlbumPojo>,
-    viewModel: BaseViewModel,
-    onAlbumClick: (AlbumPojo) -> Unit,
-    onAddToPlaylistClick: (Selection) -> Unit,
+    albumCallbacks: (Album) -> AlbumCallbacks,
+    albumSelectionCallbacks: AlbumSelectionCallbacks,
+    selectedAlbums: List<Album>,
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    onArtistClick: ((String) -> Unit)? = null,
+    listState: LazyListState = rememberLazyListState(),
+    onEmpty: @Composable (() -> Unit)? = null,
 ) {
-    val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle()
-    val selectOnShortClick = selectedAlbums.isNotEmpty()
-    val isSelected = { pojo: AlbumPojo -> selectedAlbums.contains(pojo.album) }
     val context = LocalContext.current
+    val isSelected = { pojo: AlbumPojo -> selectedAlbums.contains(pojo.album) }
 
     Column {
-        SelectedAlbumsButtons(
-            albumCount = selectedAlbums.size,
-            onPlayClick = { viewModel.playAlbums(selectedAlbums.map { it.albumId }) },
-            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(albums = selectedAlbums)) },
-            onUnselectAllClick = { viewModel.unselectAllAlbums() }
-        )
+        SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
         ItemList(
             things = pojos,
             isSelected = isSelected,
-            onClick = { pojo ->
-                if (selectOnShortClick) viewModel.toggleSelected(pojo.album)
-                else onAlbumClick(pojo)
-            },
-            onLongClick = { pojo -> viewModel.toggleSelected(pojo.album) },
+            onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
+            onLongClick = { pojo -> albumCallbacks(pojo.album).onAlbumLongClick?.invoke() },
             contentPadding = contentPadding,
+            onEmpty = onEmpty,
+            key = { it.album.albumId },
+            listState = listState,
         ) { pojo ->
             var isContextMenuOpen by rememberSaveable { mutableStateOf(false) }
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
@@ -80,9 +77,7 @@ fun AlbumList(
             ).joinToString(" • ").takeIf { it.isNotBlank() }
 
             LaunchedEffect(pojo.album.albumId) {
-                pojo.album.albumArt?.let {
-                    imageBitmap.value = viewModel.getImageBitmap(it)
-                }
+                imageBitmap.value = pojo.album.getThumbnail(context)?.asImageBitmap()
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,7 +93,7 @@ fun AlbumList(
                 ) {
                     Text(
                         text = pojo.album.title,
-                        maxLines = 1,
+                        maxLines = if (pojo.album.artist != null && showArtist) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
                         style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                     )
@@ -121,13 +116,11 @@ fun AlbumList(
                         content = { Icon(Icons.Sharp.MoreVert, null) },
                     )
                     AlbumContextMenu(
-                        album = pojo.album,
+                        isLocal = pojo.album.isLocal,
+                        isInLibrary = pojo.album.isInLibrary,
                         expanded = isContextMenuOpen,
                         onDismissRequest = { isContextMenuOpen = false },
-                        onAddToPlaylistClick = { onAddToPlaylistClick(Selection(album = pojo.album)) },
-                        onEnqueueNextClick = { viewModel.enqueueAlbumNext(album = pojo.album, context = context) },
-                        onPlayClick = { viewModel.playAlbum(pojo.album.albumId) },
-                        onArtistClick = onArtistClick,
+                        callbacks = albumCallbacks(pojo.album),
                     )
                 }
             }

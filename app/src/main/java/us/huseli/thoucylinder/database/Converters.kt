@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.database
 
 import android.net.Uri
+import android.util.Size
 import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -52,4 +53,16 @@ object Converters {
     @TypeConverter
     @JvmStatic
     fun longToInstant(value: Long): Instant = Instant.ofEpochSecond(value)
+
+    @TypeConverter
+    @JvmStatic
+    fun sizeToString(value: Size): String = "(${value.width}, ${value.height})"
+
+    @TypeConverter
+    @JvmStatic
+    fun stringToSize(value: String): Size? =
+        Regex("^\\((\\d+), (\\d+)\\)$").find(value)
+            ?.groupValues
+            ?.takeIf { it.size >= 3 }
+            ?.let { Size(it[1].toInt(), it[2].toInt()) }
 }

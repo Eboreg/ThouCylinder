@@ -12,7 +12,6 @@ class TrackDownloadException(val type: ErrorType, cause: Throwable? = null) : Ex
 
 open class MediaStoreException : Exception()
 
-@Suppress("unused")
 class MediaStoreFormatException(val filename: String) : MediaStoreException()
 
 @Suppress("unused")

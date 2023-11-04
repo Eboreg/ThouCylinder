@@ -78,15 +78,15 @@ android {
 
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
 
 val lifecycleVersion = "2.6.2"
-val roomVersion = "2.5.2"
+val roomVersion = "2.6.0"
 val daggerVersion = "2.48.1"
-val composeVersion = "1.5.3"
+val composeVersion = "1.5.4"
 val media3Version = "1.1.1"
 val pagingVersion = "3.3.0-alpha02"
 
@@ -102,7 +102,7 @@ dependencies {
 
     // Material:
     implementation("androidx.compose.material3:material3:1.1.2")
-    implementation("androidx.compose.material:material-icons-extended:1.6.0-alpha07")
+    implementation("androidx.compose.material:material-icons-extended:1.6.0-alpha08")
     // implementation("androidx.compose.material:material-icons-extended:$composeVersion")
 
     // Lifecycle:
@@ -128,7 +128,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.1.0")
+    implementation("com.github.Eboreg:RetainTheme:2.2.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
@@ -145,4 +145,7 @@ dependencies {
     implementation("androidx.paging:paging-common-ktx:$pagingVersion")
     implementation("androidx.paging:paging-compose-android:$pagingVersion")
     implementation("androidx.room:room-paging:$roomVersion")
+
+    // Reorder:
+    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
 }

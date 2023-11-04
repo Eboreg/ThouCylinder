@@ -30,12 +30,14 @@ fun <T> ItemList(
     listState: LazyListState = rememberLazyListState(),
     cardHeight: Dp? = 80.dp,
     gap: Dp = 10.dp,
+    key: ((item: T) -> Any)? = null,
     border: BorderStroke? = null,
     isSelected: (T) -> Boolean = { false },
     onClick: ((T) -> Unit)? = null,
     onLongClick: ((T) -> Unit)? = null,
     cardModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    onEmpty: (@Composable () -> Unit)? = null,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
     ListWithNumericBar(
@@ -49,7 +51,7 @@ fun <T> ItemList(
             verticalArrangement = Arrangement.spacedBy(gap),
             contentPadding = contentPadding,
         ) {
-            items(things) { thing ->
+            items(things, key = key) { thing ->
                 val containerColor =
                     if (isSelected(thing)) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surface
@@ -71,4 +73,6 @@ fun <T> ItemList(
             }
         }
     }
+
+    if (things.isEmpty()) onEmpty?.invoke()
 }

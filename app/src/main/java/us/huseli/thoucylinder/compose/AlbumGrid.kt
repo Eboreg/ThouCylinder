@@ -16,26 +16,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.viewmodels.BaseViewModel
 
 @Composable
 fun AlbumGrid(
     albums: List<AlbumPojo>,
-    viewModel: BaseViewModel,
-    onAlbumClick: (AlbumPojo) -> Unit,
+    albumCallbacks: (Album) -> AlbumCallbacks,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    onEmpty: @Composable (() -> Unit)? = null,
 ) {
-    ItemGrid(things = albums, onClick = onAlbumClick, contentPadding = contentPadding) { pojo ->
+    val context = LocalContext.current
+
+    ItemGrid(
+        things = albums,
+        onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
+        contentPadding = contentPadding,
+        onEmpty = onEmpty,
+        key = { it.album.albumId },
+    ) { pojo ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            pojo.album.albumArt?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
+            imageBitmap.value = pojo.album.getFullImage(context)?.asImageBitmap()
         }
 
         Thumbnail(

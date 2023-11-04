@@ -4,38 +4,34 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 data class QueueTrackPojo(
-    @Embedded val track: Track,
-    @Embedded val album: Album?,
-    @ColumnInfo("QueueTrack_uri") override val uri: Uri,
-    @ColumnInfo("QueueTrack_queueTrackId") override val queueTrackId: UUID = UUID.randomUUID(),
-    @ColumnInfo("QueueTrack_position") override val position: Int = 0,
-) : AbstractQueueTrack() {
+    @Embedded override val track: Track,
+    @Embedded override val album: Album?,
+    @ColumnInfo("QueueTrack_uri") val uri: Uri,
+    @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("QueueTrack_position") val position: Int = 0,
+) : TrackPojo(track, album) {
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
-    val artist: String?
-        get() = track.artist ?: album?.artist
-    override val trackId: UUID
-        get() = track.trackId
 
     override fun equals(other: Any?) = other is QueueTrackPojo &&
         other.track.trackId == track.trackId &&
         other.queueTrackId == queueTrackId &&
         other.uri == uri
 
-    override fun hashCode(): Int = 31 * (31 * track.trackId.hashCode() + uri.hashCode()) + queueTrackId.hashCode()
-
     fun toMediaItem(): MediaItem = MediaItem.Builder()
         .setMediaId(queueTrackId.toString())
         .setUri(uri)
         .setTag(this)
         .build()
+
+    override fun hashCode(): Int =
+        31 * (31 * (31 * track.trackId.hashCode()) + uri.hashCode()) + queueTrackId.hashCode()
 }
 
 

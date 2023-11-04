@@ -10,17 +10,15 @@ data class MediaStoreEntry(
     val id: Long,
     val file: File,
     val relativePath: String,
+    val uri: Uri,
 ) {
     val parentDirNames: List<String>
         get() = relativePath.trim('/').split('/').drop(1)
-
-    /** Call with e.g. MediaStore.Audio.Media.EXTERNAL_CONTENT_URI */
-    fun getContentUri(baseUri: Uri) = ContentUris.withAppendedId(baseUri, id)
 }
 
 
 fun Context.getMediaStoreEntries(
-    queryUri: Uri,
+    collection: Uri,
     selection: String? = null,
     selectionArgs: Array<String>? = null,
     limit: Int? = null,
@@ -32,18 +30,21 @@ fun Context.getMediaStoreEntries(
     )
     val entries = mutableListOf<MediaStoreEntry>()
 
-    contentResolver.query(queryUri, projection, selection, selectionArgs, null)?.use { cursor ->
+    contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
         val dataColumn = cursor.getColumnIndexOrThrow(MediaColumns.DATA)
         val relativePathColumn = cursor.getColumnIndexOrThrow(MediaColumns.RELATIVE_PATH)
         val idColumn = cursor.getColumnIndexOrThrow(MediaColumns._ID)
 
         while (cursor.moveToNext()) {
             if (limit != null && entries.size == limit) break
+            val id = cursor.getLong(idColumn)
+
             entries.add(
                 MediaStoreEntry(
-                    id = cursor.getLong(idColumn),
+                    id = id,
                     file = File(cursor.getString(dataColumn)),
                     relativePath = cursor.getString(relativePathColumn),
+                    uri = ContentUris.withAppendedId(collection, id),
                 )
             )
         }
@@ -54,7 +55,7 @@ fun Context.getMediaStoreEntries(
 
 
 fun Context.getMediaStoreEntry(
-    queryUri: Uri,
+    collection: Uri,
     selection: String? = null,
     selectionArgs: Array<String>? = null,
-): MediaStoreEntry? = getMediaStoreEntries(queryUri, selection, selectionArgs, 1).firstOrNull()
+): MediaStoreEntry? = getMediaStoreEntries(collection, selection, selectionArgs, 1).firstOrNull()

@@ -1,12 +1,12 @@
 package us.huseli.thoucylinder.dataclasses
 
+import android.content.Context
+import android.graphics.Bitmap
 import android.os.Parcelable
 import androidx.room.Embedded
-import androidx.room.Ignore
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.toDuration
-import us.huseli.thoucylinder.dataclasses.entities.TempTrackData
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 import kotlin.time.Duration
@@ -18,37 +18,26 @@ data class YoutubeVideo(
     val length: String? = null,
     val playlistItemId: String? = null,
     val playlistPosition: Int? = null,
-    @Embedded("YoutubeVideo_metadata_") val metadata: YoutubeMetadata? = null,
-    @Ignore val thumbnail: Image? = null,
+    @Embedded("metadata_") val metadata: YoutubeMetadata? = null,
+    @Embedded("thumbnail_") val thumbnail: YoutubeThumbnail? = null,
 ) : Parcelable {
-    constructor(
-        id: String,
-        title: String,
-        length: String?,
-        playlistItemId: String?,
-        playlistPosition: Int?,
-        metadata: YoutubeMetadata?,
-    ) : this(id, title, length, playlistItemId, playlistPosition, metadata, null)
-
     @IgnoredOnParcel
     val duration: Duration?
         get() = length?.toDuration()
 
-    override fun toString(): String = if (duration != null) "$title ($duration)" else title
+    suspend fun getBitmap(): Bitmap? = thumbnail?.getBitmap()
 
-    fun toTrack(
-        isInLibrary: Boolean,
-        albumId: UUID? = null,
-        tempTrackData: TempTrackData? = null,
-        image: Image? = null,
-    ) = Track(
+    suspend fun saveMediaStoreImage(context: Context): MediaStoreImage? =
+        thumbnail?.url?.let { MediaStoreImage.fromUrl(url = it, video = this, context = context) }
+
+    fun toTrack(isInLibrary: Boolean, albumId: UUID? = null): Track = Track(
         title = title,
         isInLibrary = isInLibrary,
         youtubeVideo = this,
-        image = image,
         albumPosition = playlistPosition,
         albumId = albumId,
-        tempTrackData = tempTrackData,
         metadata = metadata?.toTrackMetadata(),
     )
+
+    override fun toString(): String = if (duration != null) "$title ($duration)" else title
 }

@@ -18,8 +18,10 @@ import androidx.compose.ui.unit.dp
 fun <T> ItemGrid(
     things: List<T>,
     modifier: Modifier = Modifier,
+    key: ((item: T) -> Any)? = null,
     onClick: ((T) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    onEmpty: (@Composable () -> Unit)? = null,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -29,7 +31,7 @@ fun <T> ItemGrid(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         contentPadding = contentPadding,
     ) {
-        items(things) { thing ->
+        items(things, key = key) { thing ->
             val cardModifier =
                 if (onClick != null) Modifier.clickable { onClick(thing) }
                 else Modifier
@@ -41,4 +43,6 @@ fun <T> ItemGrid(
             )
         }
     }
+
+    if (things.isEmpty()) onEmpty?.invoke()
 }

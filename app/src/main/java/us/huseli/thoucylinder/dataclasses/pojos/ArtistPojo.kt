@@ -1,6 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.pojos
 
-import java.io.File
+import android.net.Uri
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -8,7 +8,7 @@ data class ArtistPojo(
     val name: String,
     val albumCount: Int,
     val trackCount: Int,
-    val firstAlbumArt: File?,
+    val firstAlbumArt: Uri?,
     val totalDurationMs: Long,
 ) {
     val totalDuration: Duration

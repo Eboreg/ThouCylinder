@@ -22,30 +22,31 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.Image
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.toBitmap
-import us.huseli.thoucylinder.viewmodels.LibraryViewModel
+import java.io.File
 
 @Composable
 fun ArtistGrid(
-    viewModel: LibraryViewModel = hiltViewModel(),
     artists: List<ArtistPojo>,
-    images: Map<String, Image?>,
+    images: Map<String, File>,
     onArtistClick: (String) -> Unit,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
-    ItemGrid(things = artists, onClick = { onArtistClick(it.name) }, contentPadding = contentPadding) { artist ->
+    ItemGrid(
+        things = artists,
+        onClick = { onArtistClick(it.name) },
+        contentPadding = contentPadding,
+        key = { it.name },
+    ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            images[artist.name.lowercase()]?.let { imageBitmap.value = viewModel.getImageBitmap(it) }
-            if (imageBitmap.value == null) imageBitmap.value = artist.firstAlbumArt?.toBitmap()?.asImageBitmap()
+            images[artist.name.lowercase()]?.let { imageBitmap.value = it.toBitmap()?.asImageBitmap() }
         }
 
         Thumbnail(

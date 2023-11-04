@@ -8,38 +8,68 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Transaction
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import java.util.UUID
 
 @Dao
 interface TrackDao {
     /** Pseudo-private methods ***********************************************/
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun _insertTracks(vararg tracks: Track)
 
+    @Query(
+        """
+        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId 
+        WHERE Track_isInLibrary = 1 AND LOWER(Track_title) >= LOWER(:fromTitle) AND LOWER(Track_title) <= LOWER(:toTitle)  
+        ORDER BY LOWER(Track_title)
+        """
+    )
+    suspend fun _listTrackPojosBetween(fromTitle: String, toTitle: String): List<TrackPojo>
+
+    @RawQuery(observedEntities = [Track::class, Album::class])
+    fun _searchTracks(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
+
     /** Public methods *******************************************************/
+
     @Query("DELETE FROM Track")
     suspend fun clearTracks()
 
     @Delete
     suspend fun deleteTracks(vararg tracks: Track)
 
+    @Query("DELETE FROM Track WHERE Track_isInLibrary = 0")
+    suspend fun deleteTempTracks()
+
     @Query("DELETE FROM Track WHERE Track_albumId = :albumId")
     suspend fun deleteTracksByAlbumId(albumId: UUID)
 
-    suspend fun insertTracks(vararg tracks: Track) =
+    suspend fun insertTracks(tracks: List<Track>) =
         _insertTracks(*tracks.map { it.copy(isInLibrary = true) }.toTypedArray())
+
+    suspend fun insertTempTracks(tracks: List<Track>) =
+        _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
 
     @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
     suspend fun listTracks(): List<Track>
+
+    suspend fun listTracksBetween(from: TrackPojo, to: TrackPojo): List<TrackPojo> {
+        if (from.track.title.lowercase() < to.track.title.lowercase())
+            return _listTrackPojosBetween(from.track.title, to.track.title)
+        return _listTrackPojosBetween(to.track.title, from.track.title)
+    }
 
     @Transaction
     @Query(
         """
         SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId 
-        AND Track_isInLibrary = 1 ORDER BY LOWER(Track_title)
+        WHERE Track_isInLibrary = 1 ORDER BY LOWER(Track_title)
         """
     )
     fun pageTrackPojos(): PagingSource<Int, TrackPojo>
@@ -54,12 +84,19 @@ interface TrackDao {
     @Transaction
     fun pageTracksByArtist(artist: String): PagingSource<Int, TrackPojo>
 
-    @Query(
-        """
-        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
-        WHERE (Track_title LIKE :query OR Track_artist LIKE :query) AND Track_isInLibrary = 1
-        """
-    )
-    @Transaction
-    fun simpleTrackSearch(query: String): PagingSource<Int, TrackPojo>
+    fun searchTracks(query: String): PagingSource<Int, TrackPojo> {
+        val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
+            .joinToString(" OR ") {
+                "Track_title LIKE '%$it%' OR Track_artist LIKE '%$it%' OR Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'"
+            }
+
+        return _searchTracks(
+            SimpleSQLiteQuery(
+                """
+                SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
+                WHERE ($terms) AND Track_isInLibrary = 1
+                """.trimIndent()
+            )
+        )
+    }
 }

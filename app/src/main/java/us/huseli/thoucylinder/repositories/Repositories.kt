@@ -5,7 +5,7 @@ import javax.inject.Singleton
 
 @Singleton
 class Repositories @Inject constructor(
-    val local: LocalRepository,
+    val room: RoomRepository,
     val discogs: DiscogsRepository,
     val mediaStore: MediaStoreRepository,
     val player: PlayerRepository,

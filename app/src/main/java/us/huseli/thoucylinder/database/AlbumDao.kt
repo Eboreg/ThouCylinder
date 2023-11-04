@@ -7,18 +7,22 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import java.util.UUID
 
 @Dao
@@ -39,11 +43,14 @@ interface AlbumDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun _insertStyles(vararg styles: Style)
 
+    @RawQuery
+    fun _searchAlbums(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
+
     @Update
     suspend fun _updateAlbums(vararg albums: Album)
 
     /** Public methods *******************************************************/
-    @Query("SELECT EXISTS(SELECT Album_albumId FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1)")
+    @Query("SELECT EXISTS(SELECT Album_albumId FROM Album WHERE Album_albumId = :albumId)")
     suspend fun albumExists(albumId: UUID): Boolean
 
     @Query("DELETE FROM AlbumGenre WHERE AlbumGenre_albumId = :albumId")
@@ -58,11 +65,18 @@ interface AlbumDao {
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
 
+    @Query("DELETE FROM Album WHERE Album_isInLibrary = 0")
+    suspend fun deleteTempAlbums()
+
+    @Query("DELETE FROM Track WHERE Track_albumId = :albumId")
+    suspend fun deleteTracks(albumId: UUID)
+
     @Query(
         """
         SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear,
             COUNT(Track_trackId) AS trackCount
-        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId AND Track_isInLibrary = 1 AND Album_isInLibrary = 1
+        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId 
+        WHERE Album_isInLibrary = 1
         GROUP BY Album_albumId
         ORDER BY LOWER(Album_artist), LOWER(Album_title)
         """
@@ -70,17 +84,16 @@ interface AlbumDao {
     @Transaction
     fun flowAlbumPojos(): Flow<List<AlbumPojo>>
 
-    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId AND Album_isInLibrary = 1")
+    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     @Transaction
     fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
 
-    @Query(
-        """
-        SELECT * FROM Track WHERE Track_albumId = :albumId AND Track_isInLibrary = 1
-        ORDER BY Track_discNumber, Track_albumPosition
-        """
-    )
-    suspend fun getTracks(albumId: UUID): List<Track>
+    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
+    suspend fun getAlbum(albumId: UUID): Album?
+
+    @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
+    @Transaction
+    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo?
 
     suspend fun insertAlbumGenres(pojo: AbstractAlbumPojo) {
         _insertGenres(*pojo.genres.toTypedArray())
@@ -96,33 +109,44 @@ interface AlbumDao {
         }.toTypedArray())
     }
 
-    suspend fun insertAlbums(vararg albums: Album) =
-        _insertAlbums(*albums.map { it.copy(isInLibrary = true) }.toTypedArray())
+    suspend fun insertAlbum(album: Album) = _insertAlbums(album.copy(isInLibrary = true))
+
+    suspend fun insertTempAlbum(album: Album) = _insertAlbums(album.copy(isInLibrary = false))
 
     @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>
 
     @Query(
         """
-        SELECT * FROM Track WHERE Track_isInLibrary = 1 AND Track_albumId IN (:albumIds)
+        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
+        WHERE Track_albumId IN (:albumIds)
         ORDER BY Track_albumId, Track_discNumber, Track_albumPosition
         """
     )
-    suspend fun listTracks(albumIds: List<UUID>): List<Track>
+    suspend fun listTrackPojos(albumIds: List<UUID>): List<TrackPojo>
 
-    @Query(
-        """
-        SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear,
-            COUNT(Track_trackId) AS trackCount
-        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId
-        WHERE (Album_title LIKE :query OR Album_artist LIKE :query) AND Album_isInLibrary = 1
-        GROUP BY Album_albumId
-        ORDER BY LOWER(Album_artist), LOWER(Album_title)
-        """
-    )
-    @Transaction
-    suspend fun simpleAlbumSearch(query: String): List<AlbumPojo>
+    @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
+    suspend fun listTracks(albumId: UUID): List<Track>
 
-    suspend fun updateAlbums(vararg albums: Album) =
-        _updateAlbums(*albums.map { it.copy(isInLibrary = true) }.toTypedArray())
+    fun searchAlbums(query: String): Flow<List<AlbumPojo>> {
+        val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
+            .joinToString(" OR ") { "Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'" }
+
+        return _searchAlbums(
+            SimpleSQLiteQuery(
+                """
+                SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear,
+                    MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount
+                FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId
+                WHERE ($terms) AND Album_isInLibrary = 1
+                GROUP BY Album_albumId
+                ORDER BY LOWER(Album_artist), LOWER(Album_title)
+                """.trimIndent()
+            )
+        )
+    }
+
+    suspend fun updateAlbum(album: Album) {
+        _updateAlbums(album.copy(isInLibrary = true))
+    }
 }

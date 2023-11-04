@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,23 +32,29 @@ import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
-import java.util.UUID
 
 @Composable
 fun ArtistScreen(
     modifier: Modifier = Modifier,
     viewModel: ArtistViewModel = hiltViewModel(),
-    onBackClick: () -> Unit,
-    onAlbumClick: (UUID) -> Unit,
-    onAddToPlaylistClick: (Selection) -> Unit,
+    appCallbacks: AppCallbacks,
 ) {
     val artist = viewModel.artist
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
     val tracks: LazyPagingItems<TrackPojo> = viewModel.tracks.collectAsLazyPagingItems()
-    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
+    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle()
+    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle(emptyList())
+    val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle(emptyList())
+    val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
@@ -57,7 +64,7 @@ fun ArtistScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = onBackClick,
+                    onClick = appCallbacks.onBackClick,
                     content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
                 )
                 Text(
@@ -79,37 +86,82 @@ fun ArtistScreen(
 
         Column {
             when (listType) {
-                ListType.ALBUMS -> when (displayType) {
-                    DisplayType.LIST -> AlbumList(
-                        pojos = albumPojos,
-                        viewModel = viewModel,
-                        showArtist = false,
-                        onAlbumClick = { onAlbumClick(it.album.albumId) },
-                        onAddToPlaylistClick = onAddToPlaylistClick,
+                ListType.ALBUMS -> {
+                    val albumCallbacks = { album: Album ->
+                        AlbumCallbacks.fromAppCallbacks(
+                            album = album,
+                            appCallbacks = appCallbacks,
+                            onPlayClick = { viewModel.playAlbum(album) },
+                            onPlayNextClick = { viewModel.playAlbumNext(album, context) },
+                            onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(album) },
+                            onAlbumLongClick = { viewModel.selectAlbumsFromLastSelected(album) },
+                            onAlbumClick = {
+                                if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(album)
+                                else appCallbacks.onAlbumClick(album.albumId)
+                            },
+                        )
+                    }
+                    val albumSelectionCallbacks = AlbumSelectionCallbacks(
+                        albums = selectedAlbums,
+                        appCallbacks = appCallbacks,
+                        onPlayClick = { viewModel.playAlbums(selectedAlbums) },
+                        onPlayNextClick = { viewModel.playAlbumsNext(selectedAlbums, context) },
+                        onUnselectAllClick = { viewModel.unselectAllAlbums() },
+                        onSelectAllClick = { viewModel.selectAlbums(albumPojos.map { it.album }) },
                     )
-                    DisplayType.GRID -> AlbumGrid(
-                        albums = albumPojos,
-                        viewModel = viewModel,
-                        onAlbumClick = { onAlbumClick(it.album.albumId) },
-                    )
+
+                    when (displayType) {
+                        DisplayType.LIST -> AlbumList(
+                            pojos = albumPojos,
+                            albumCallbacks = albumCallbacks,
+                            albumSelectionCallbacks = albumSelectionCallbacks,
+                            selectedAlbums = selectedAlbums,
+                            showArtist = false,
+                        )
+                        DisplayType.GRID -> AlbumGrid(
+                            albums = albumPojos,
+                            albumCallbacks = albumCallbacks,
+                        )
+                    }
                 }
-                ListType.TRACKS -> when (displayType) {
-                    DisplayType.LIST -> TrackList(
-                        pojos = tracks,
-                        viewModel = viewModel,
-                        onDownloadClick = { viewModel.downloadTrack(it) },
-                        onPlayClick = { viewModel.playTrack(it) },
-                        onAlbumClick = onAlbumClick,
-                        showArtist = false,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
+                ListType.TRACKS -> {
+                    val trackCallbacks = { pojo: TrackPojo ->
+                        TrackCallbacks.fromAppCallbacks(
+                            pojo = pojo,
+                            appCallbacks = appCallbacks,
+                            onTrackClick = {
+                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                                else viewModel.playTrackPojo(pojo)
+                            },
+                            onPlayNextClick = { viewModel.playTrackPojoNext(pojo, context) },
+                            onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
+                        )
+                    }
+                    val trackSelectionCallbacks = TrackSelectionCallbacks(
+                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
+                        onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
+                        onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
+                        onUnselectAllClick = { viewModel.unselectAllTracks() },
                     )
-                    DisplayType.GRID -> TrackGrid(
-                        pojos = tracks,
-                        viewModel = viewModel,
-                        onAlbumClick = onAlbumClick,
-                        showArtist = false,
-                        onAddToPlaylistClick = onAddToPlaylistClick,
-                    )
+
+                    when (displayType) {
+                        DisplayType.LIST -> TrackList(
+                            trackPojos = tracks,
+                            viewModel = viewModel,
+                            showArtist = false,
+                            selectedTracks = selectedTracks,
+                            trackCallbacks = trackCallbacks,
+                            trackSelectionCallbacks = trackSelectionCallbacks,
+                        )
+                        DisplayType.GRID -> TrackGrid(
+                            trackPojos = tracks,
+                            viewModel = viewModel,
+                            showArtist = false,
+                            trackCallbacks = trackCallbacks,
+                            trackSelectionCallbacks = trackSelectionCallbacks,
+                            selectedTracks = selectedTracks,
+                        )
+                    }
                 }
                 ListType.ARTISTS -> {}
                 ListType.PLAYLISTS -> {}

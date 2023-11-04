@@ -1,61 +1,23 @@
 package us.huseli.thoucylinder
 
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 
-@Suppress("unused")
 data class Selection(
     val tracks: List<Track> = emptyList(),
     val albums: List<Album> = emptyList(),
-    val queueTracks: List<AbstractQueueTrack> = emptyList(),
+    val queueTracks: List<QueueTrackPojo> = emptyList(),
 ) {
     constructor(track: Track) : this(tracks = listOf(track))
 
-    constructor(album: Album) : this(albums = listOf(album))
+    constructor(trackPojo: TrackPojo) : this(tracks = listOf(trackPojo.track))
 
-    constructor(queueTrack: AbstractQueueTrack) : this(queueTracks = listOf(queueTrack))
+    constructor(trackPojos: List<TrackPojo>) : this(tracks = trackPojos.map { it.track })
+
+    constructor(album: Album) : this(albums = listOf(album))
 
     val trackCount: Int
         get() = tracks.size + queueTracks.size
-
-    fun toggleSelected(queueTrack: AbstractQueueTrack): Selection =
-        if (isSelected(queueTrack)) remove(queueTrack)
-        else add(queueTrack)
-
-    fun toggleSelected(track: Track): Selection =
-        if (isSelected(track)) remove(track)
-        else add(track)
-
-    private fun add(album: Album): Selection =
-        Selection(tracks = tracks, albums = albums + album, queueTracks = queueTracks)
-
-    private fun add(queueTrack: AbstractQueueTrack): Selection =
-        Selection(tracks = tracks, albums = albums, queueTracks = queueTracks + queueTrack)
-
-    private fun add(track: Track): Selection =
-        Selection(tracks = tracks + track, albums = albums, queueTracks = queueTracks)
-
-    private fun isSelected(queueTrack: AbstractQueueTrack) =
-        queueTracks.map { it.queueTrackId }.contains(queueTrack.queueTrackId)
-
-    private fun isSelected(track: Track) = tracks.map { it.trackId }.contains(track.trackId)
-
-    private fun remove(album: Album): Selection = Selection(
-        tracks = tracks,
-        albums = albums.filterNot { it.albumId == album.albumId },
-        queueTracks = queueTracks,
-    )
-
-    private fun remove(queueTrack: AbstractQueueTrack): Selection = Selection(
-        tracks = tracks,
-        albums = albums,
-        queueTracks = queueTracks.filterNot { it.queueTrackId == queueTrack.queueTrackId },
-    )
-
-    private fun remove(track: Track): Selection = Selection(
-        tracks = tracks.filterNot { it.trackId == track.trackId },
-        albums = albums,
-        queueTracks = queueTracks,
-    )
 }

@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder
 
-import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -9,23 +8,18 @@ import android.icu.text.DecimalFormatSymbols
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
-import android.os.CancellationSignal
-import android.os.Environment
 import android.provider.MediaStore
 import android.provider.MediaStore.MediaColumns
-import android.util.Log
-import android.util.Size
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import android.util.TypedValue
+import android.webkit.MimeTypeMap
+import androidx.compose.ui.unit.Dp
+import androidx.core.graphics.scale
 import org.json.JSONObject
-import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
-import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
 import us.huseli.thoucylinder.dataclasses.getMediaStoreEntry
 import java.io.File
 import java.io.FileNotFoundException
-import java.net.URL
-import java.net.URLConnection
 import java.util.Locale
+import kotlin.math.max
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
@@ -84,29 +78,6 @@ fun Double.formattedString(maxDecimals: Int, locale: Locale = Locale.getDefault(
 }
 
 
-suspend fun urlRequest(
-    urlString: String,
-    headers: Map<String, String> = emptyMap(),
-    body: ByteArray? = null,
-): URLConnection = withContext(Dispatchers.IO) {
-    return@withContext URL(urlString).openConnection().apply {
-        if (BuildConfig.DEBUG) {
-            connectTimeout = 0
-            readTimeout = 0
-        } else {
-            connectTimeout = URL_CONNECT_TIMEOUT
-            readTimeout = URL_READ_TIMEOUT
-        }
-        Log.i("Utils", "urlRequest: $urlString")
-        headers.forEach { (key, value) -> setRequestProperty(key, value) }
-        if (body != null) {
-            doOutput = true
-            getOutputStream().write(body, 0, body.size)
-        }
-    }
-}
-
-
 @Suppress("unused")
 fun getReadOnlyAudioCollection(): Uri =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
@@ -152,27 +123,23 @@ fun File.deleteWithEmptyParentDirs(parentDirNames: List<String>) {
 }
 
 
-fun Context.deleteMediaStoreUriAndFile(filename: String, mediaStorePath: String?) {
-    val audioCollection = getReadWriteAudioCollection()
-    val dirName =
-        "${Environment.DIRECTORY_MUSIC}/" + if (mediaStorePath?.isNotEmpty() == true) "$mediaStorePath/" else ""
-    val selection = "${MediaStore.Audio.Media.DISPLAY_NAME} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} = ?"
-    val selectionArgs = arrayOf(filename, dirName)
+fun Context.deleteMediaStoreUriAndFile(collection: Uri, relativePath: String, filename: String) {
+    val selection = "${MediaStore.Images.Media.DISPLAY_NAME} = ? AND ${MediaStore.Images.Media.RELATIVE_PATH} = ?"
+    val selectionArgs = arrayOf(filename, relativePath)
 
     getMediaStoreEntry(
-        queryUri = audioCollection,
+        collection = collection,
         selection = selection,
         selectionArgs = selectionArgs,
     )?.also { entry ->
-        val contentUri = entry.getContentUri(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI)
-        contentResolver.delete(contentUri, null, null)
+        contentResolver.delete(entry.uri, null, null)
         entry.file.deleteWithEmptyParentDirs(entry.parentDirNames)
     }
 }
 
 
-val Context.thumbnailDir: File
-    get() = File(filesDir, "thumbnails").apply { mkdirs() }
+fun Context.deleteMediaStoreUriAndFile(collection: Uri, pathAndFilename: Pair<String, String>) =
+    deleteMediaStoreUriAndFile(collection, pathAndFilename.first, pathAndFilename.second)
 
 
 fun Long.bytesToString(): String {
@@ -193,14 +160,6 @@ fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
 }
 
 fun MediaFormat.getIntegerOrDefault(name: String, default: Int?): Int? = getIntegerOrNull(name) ?: default
-
-
-fun ContentResolver.loadThumbnailOrNull(uri: Uri, size: Size, signal: CancellationSignal?): Bitmap? =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) try {
-        loadThumbnail(uri, size, signal)
-    } catch (_: FileNotFoundException) {
-        null
-    } else null
 
 
 /**
@@ -232,3 +191,26 @@ fun JSONObject.getIntOrNull(name: String): Int? =
 
 
 fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble(name) else null
+
+
+fun Context.dpToPx(dp: Int): Int =
+    TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp.toFloat(), resources.displayMetrics).toInt()
+
+
+fun File.isImage(): Boolean =
+    isFile && MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)?.startsWith("image/") == true
+
+
+fun Bitmap.size() = width * height
+
+
+fun Bitmap.scaleToMaxSize(maxSizeDp: Dp, context: Context): Bitmap {
+    val maxSize = context.dpToPx(maxSizeDp.value.toInt())
+    return if (width > maxSize || height > maxSize) {
+        val scaleBy = maxSize.toDouble() / max(width, height)
+        scale((width * scaleBy).toInt(), (height * scaleBy).toInt())
+    } else this
+}
+
+
+fun String.substringMax(startIndex: Int, endIndex: Int) = substring(startIndex, kotlin.math.min(endIndex, length))

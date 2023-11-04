@@ -10,11 +10,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.DragHandle
 import androidx.compose.material.icons.sharp.MusicNote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,38 +27,30 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.burnoutcrew.reorderable.ReorderableLazyListState
+import org.burnoutcrew.reorderable.detectReorder
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import kotlin.time.Duration
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackListRow(
-    track: Track,
-    metadata: TrackMetadata?,
-    showArtist: Boolean,
-    onDownloadClick: () -> Unit,
-    onPlayClick: () -> Unit,
-    onAddToPlaylistClick: () -> Unit,
-    onToggleSelected: () -> Unit,
+    title: String,
+    artist: String?,
+    duration: Duration?,
     thumbnail: ImageBitmap?,
+    isSelected: Boolean,
+    isDownloadable: Boolean,
+    callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
-    album: Album? = null,
-    isSelected: Boolean = false,
-    selectOnShortClick: Boolean = false,
     containerColor: Color? = null,
+    reorderableState: ReorderableLazyListState? = null,
     downloadProgress: DownloadProgress? = null,
-    onArtistClick: ((String) -> Unit)? = null,
-    onAlbumClick: ((UUID) -> Unit)? = null,
-    onEnqueueNextClick: () -> Unit,
 ) {
-    val artist = track.artist ?: album?.artist
-
     Card(
         colors = CardDefaults.outlinedCardColors(
             containerColor = containerColor
@@ -65,20 +58,15 @@ fun TrackListRow(
         ),
         shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier.fillMaxWidth().height(50.dp).combinedClickable(
-            onClick = { if (selectOnShortClick) onToggleSelected() else onPlayClick() },
-            onLongClick = onToggleSelected,
+            onClick = { callbacks.onTrackClick?.invoke() },
+            onLongClick = callbacks.onLongClick,
         ),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
                 image = thumbnail,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholder = {
-                    Image(
-                        imageVector = Icons.Sharp.MusicNote,
-                        contentDescription = null,
-                    )
-                },
+                placeholder = { Image(imageVector = Icons.Sharp.MusicNote, contentDescription = null) },
                 borderWidth = if (isSelected) 0.dp else 1.dp,
             )
 
@@ -88,12 +76,12 @@ fun TrackListRow(
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(
-                        text = track.title,
-                        maxLines = 1,
+                        text = title,
+                        maxLines = if (artist == null) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                         style = ThouCylinderTheme.typographyExtended.listSmallHeader,
                     )
-                    if (artist != null && showArtist) {
+                    if (artist != null) {
                         Text(
                             text = artist,
                             maxLines = 1,
@@ -103,21 +91,18 @@ fun TrackListRow(
                     }
                 }
 
-                metadata?.let {
-                    Text(text = it.duration.sensibleFormat(), modifier = Modifier.padding(start = 5.dp))
-                }
+                if (duration != null)
+                    Text(text = duration.sensibleFormat(), modifier = Modifier.padding(start = 5.dp))
 
-                TrackContextMenuWithButton(
-                    track = track,
-                    album = album,
-                    metadata = metadata,
-                    onDownloadClick = onDownloadClick,
-                    modifier = Modifier.padding(start = 10.dp).width(30.dp),
-                    onAlbumClick = onAlbumClick,
-                    onArtistClick = onArtistClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                    onEnqueueNextClick = onEnqueueNextClick,
-                )
+                TrackContextMenuWithButton(isDownloadable = isDownloadable, callbacks = callbacks)
+
+                if (reorderableState != null) {
+                    Icon(
+                        Icons.Sharp.DragHandle,
+                        null,
+                        modifier = Modifier.detectReorder(reorderableState).height(18.dp).padding(end = 10.dp),
+                    )
+                }
             }
         }
 

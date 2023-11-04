@@ -22,45 +22,45 @@ import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import kotlin.time.Duration
+
+data class AlbumTrackRowData(
+    val title: String,
+    val isDownloadable: Boolean,
+    val artist: String? = null,
+    val duration: Duration? = null,
+    val albumPosition: Int? = null,
+    val discNumber: Int? = null,
+    val downloadProgress: DownloadProgress? = null,
+    val showArtist: Boolean = true,
+    val showDiscNumber: Boolean = false,
+    val isSelected: Boolean = false,
+)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumTrackRow(
-    track: Track,
-    album: Album,
-    downloadProgress: DownloadProgress?,
-    onToggleSelected: () -> Unit,
-    onDownloadClick: () -> Unit,
-    onPlayClick: () -> Unit,
-    onAddToPlaylistClick: () -> Unit,
+    data: AlbumTrackRowData,
+    callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
-    onAlbumClick: ((UUID) -> Unit)? = null,
-    onArtistClick: ((String) -> Unit)? = null,
-    showArtist: Boolean = true,
-    showDiscNumber: Boolean = false,
-    isSelected: Boolean = false,
-    selectOnShortClick: Boolean = false,
-    onEnqueueNextClick: () -> Unit,
 ) {
     val surfaceColor =
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer
+        if (data.isSelected) MaterialTheme.colorScheme.primaryContainer
         else Color.Transparent
 
     Column(
         modifier = modifier.combinedClickable(
-            onClick = { if (selectOnShortClick) onToggleSelected() else onPlayClick() },
-            onLongClick = onToggleSelected,
+            onClick = { callbacks.onTrackClick?.invoke() },
+            onLongClick = callbacks.onLongClick,
         )
     ) {
         Surface(shape = MaterialTheme.shapes.extraSmall, color = surfaceColor) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val position =
-                    if (showDiscNumber && track.discNumber != null && track.albumPosition != null)
-                        "${track.discNumber}.${track.albumPosition}"
-                    else track.albumPosition?.toString() ?: ""
+                    if (data.showDiscNumber && data.discNumber != null && data.albumPosition != null)
+                        "${data.discNumber}.${data.albumPosition}"
+                    else data.albumPosition?.toString() ?: ""
                 Text(
                     text = position,
                     modifier = Modifier.width(40.dp),
@@ -69,42 +69,37 @@ fun AlbumTrackRow(
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = track.title,
-                        maxLines = if (track.artist == null || !showArtist) 2 else 1,
+                        text = data.title,
+                        maxLines = if (data.artist == null || !data.showArtist) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                         style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                     )
-                    if (track.artist != null && showArtist) {
+                    if (data.artist != null && data.showArtist) {
                         Text(
-                            text = track.artist,
+                            text = data.artist,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                         )
                     }
                 }
-                track.metadata?.let {
+                data.duration?.also {
                     Text(
-                        text = it.duration.sensibleFormat(),
+                        text = it.sensibleFormat(),
                         modifier = Modifier.padding(start = 10.dp),
                         style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
                     )
                 }
 
                 TrackContextMenuWithButton(
-                    track = track,
-                    album = album,
-                    metadata = track.metadata,
-                    onDownloadClick = onDownloadClick,
+                    isDownloadable = data.isDownloadable,
+                    callbacks = callbacks,
                     modifier = Modifier.padding(start = 10.dp).width(30.dp),
-                    onArtistClick = onArtistClick,
-                    onAlbumClick = onAlbumClick,
-                    onAddToPlaylistClick = onAddToPlaylistClick,
-                    onEnqueueNextClick = onEnqueueNextClick,
+                    hideAlbum = true,
                 )
             }
 
-            downloadProgress?.let { progress ->
+            data.downloadProgress?.also { progress ->
                 val statusText = stringResource(progress.status.stringId)
 
                 Column(modifier = Modifier.padding(bottom = 5.dp)) {

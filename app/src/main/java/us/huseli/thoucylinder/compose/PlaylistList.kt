@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -33,17 +34,19 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.viewmodels.BaseViewModel
+import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable
 fun PlaylistList(
     playlists: List<PlaylistPojo>,
-    viewModel: BaseViewModel,
+    viewModel: LibraryViewModel,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
     onCreatePlaylistClick: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
+    val context = LocalContext.current
+
     Row(
         horizontalArrangement = Arrangement.End,
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp, horizontal = 10.dp),
@@ -59,11 +62,12 @@ fun PlaylistList(
         onClick = onPlaylistClick,
         cardHeight = 60.dp,
         contentPadding = contentPadding,
+        key = { it.playlistId },
     ) { playlist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            viewModel.getPlaylistImage(playlist.playlistId)?.also { imageBitmap.value = it }
+            viewModel.getPlaylistImage(playlist.playlistId, context)?.also { imageBitmap.value = it }
         }
 
         Row(

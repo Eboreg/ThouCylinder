@@ -13,12 +13,6 @@ data class DiscogsMasterTrack(
 
     val discNumberNonNull: Int
         get() = position.split("-").takeIf { it.size > 1 }?.first()?.toIntOrNull() ?: 1
-
-    val albumPositionNonNull: Int
-        get() = position.split("-").last().toIntOrNull() ?: 0
-
-    val positionPair: Pair<Int, Int>
-        get() = Pair(discNumberNonNull, albumPositionNonNull)
 }
 
 
@@ -42,6 +36,23 @@ data class DiscogsMasterData(
 ) {
     val artist: String
         get() = artists.join()
+
+    fun getPositionPairs(): List<PositionPair> {
+        val pairs = mutableListOf<PositionPair>()
+        var discNumber = 1
+        var albumPosition = 1
+
+        tracklist.forEach { track ->
+            if (track.discNumberNonNull != discNumber) {
+                discNumber = track.discNumberNonNull
+                albumPosition = 1
+            }
+            pairs.add(PositionPair(discNumber, albumPosition))
+            albumPosition++
+        }
+
+        return pairs
+    }
 }
 
 

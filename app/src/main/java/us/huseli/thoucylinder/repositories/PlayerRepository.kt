@@ -1,6 +1,8 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
+import android.util.Log
+import androidx.annotation.MainThread
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -19,16 +21,16 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.database.QueueDao
-import us.huseli.thoucylinder.dataclasses.TrackQueue
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractQueueTrack
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.toQueueTrackPojos
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.reindexed
+import us.huseli.thoucylinder.dataclasses.pojos.toQueueTrackPojos
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
 
 @Singleton
+@MainThread
 class PlayerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueDao: QueueDao,
@@ -40,26 +42,27 @@ class PlayerRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var positionPollJob: Job? = null
     private val mutex = Mutex()
-    private val _queue = MutableStateFlow(TrackQueue())
 
-    private val _currentPojo = MutableStateFlow<QueueTrackPojo?>(null)
+    private val nextItemIndex: Int
+        get() = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
+
     private val _currentPositionMs = MutableStateFlow(0L)
-    private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
-    private val _canGotoNext = MutableStateFlow(player.hasNextMediaItem())
-    private val _canGotoPrevious = MutableStateFlow(player.hasPreviousMediaItem())
-    private val _canPlay = MutableStateFlow(player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
-    private val _isRepeatEnabled = MutableStateFlow(false)
     private val _isShuffleEnabled = MutableStateFlow(false)
+    private val _isRepeatEnabled = MutableStateFlow(false)
+    private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
+    private val _currentPojo = MutableStateFlow<QueueTrackPojo?>(null)
+    private val _canGotoNext = MutableStateFlow(player.hasNextMediaItem())
+    private val _canPlay = MutableStateFlow(player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+    private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
 
     val currentPositionMs = _currentPositionMs.asStateFlow()
+    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
+    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
     val playbackState = _playbackState.asStateFlow()
     val currentPojo = _currentPojo.asStateFlow()
     val canGotoNext = _canGotoNext.asStateFlow()
-    val canGotoPrevious = _canGotoPrevious.asStateFlow()
     val canPlay = _canPlay.asStateFlow()
     val queue = _queue.asStateFlow()
-    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
-    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
 
     init {
         player.addListener(this)
@@ -100,45 +103,50 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun insertNext(track: Track) = insertNext(listOf(track))
+    fun insertNext(trackPojos: List<TrackPojo>) = insertTracksAt(trackPojos, nextItemIndex)
 
-    fun insertNext(tracks: List<Track>) = scope.launch {
-        val startIdx = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
-        val mediaItems =
-            tracks.mapIndexedNotNull { idx, track -> track.toQueueTrackPojo(idx + startIdx)?.toMediaItem() }
+    fun insertNextAndPlay(pojo: TrackPojo) {
+        val index = nextItemIndex
+        val mediaItems = insertTracksAt(listOf(pojo), index)
 
-        if (mediaItems.isNotEmpty()) player.addMediaItems(startIdx, mediaItems)
-    }
-
-    /** Insert track in queue right after at current position and play it. */
-    fun insertAndPlay(track: Track) = scope.launch {
-        val index = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
-        val pojo = track.toQueueTrackPojo(index)
-
-        if (pojo != null) {
-            player.addMediaItem(index, pojo.toMediaItem())
+        if (mediaItems.isNotEmpty()) {
             player.seekTo(index, 0L)
             player.play()
         }
     }
 
-    /** Plays/pauses the current item, if any. */
-    fun playOrPauseCurrent() = scope.launch {
+    fun moveNext(pojos: List<QueueTrackPojo>) {
+        removeFromQueue(pojos)
+        player.addMediaItems(nextItemIndex, pojos.map { it.toMediaItem() })
+    }
+
+    fun moveNextAndPlay(pojos: List<QueueTrackPojo>) {
+        moveNext(pojos)
+        player.seekTo(nextItemIndex, 0L)
+        player.play()
+    }
+
+    fun onMoveTrackFinished(from: Int, to: Int) = player.moveMediaItem(from, to)
+
+    fun playOrPauseCurrent() {
+        /** Plays/pauses the current item, if any. */
         if (player.isPlaying) player.pause()
         else player.play()
     }
 
-    fun removeFromQueue(queueTracks: List<AbstractQueueTrack>) {
-        val indices = _queue.value.getIndices(queueTracks)
+    fun removeFromQueue(queueTracks: List<QueueTrackPojo>) {
+        val ids = queueTracks.map { it.queueTrackId }
+        val indices =
+            _queue.value.mapIndexedNotNull { index, pojo -> if (ids.contains(pojo.queueTrackId)) index else null }
 
         indices.sortedDescending().forEach { index ->
             player.removeMediaItem(index)
         }
     }
 
-    /** Clear queue, add tracks, play. */
-    fun replaceAndPlay(tracks: List<Track>, startIndex: Int? = null) = scope.launch {
-        val pojos = tracks.toQueueTrackPojos()
+    fun replaceAndPlay(trackPojos: List<TrackPojo>, startIndex: Int? = null) {
+        /** Clear queue, add tracks, play. */
+        val pojos = trackPojos.toQueueTrackPojos()
 
         player.clearMediaItems()
         if (pojos.isNotEmpty()) {
@@ -148,40 +156,45 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun seekTo(positionMs: Long) = scope.launch {
-        player.seekTo(positionMs)
-    }
+    fun seekTo(positionMs: Long) = player.seekTo(positionMs)
 
-    fun skipTo(index: Int) = scope.launch {
+    fun skipTo(index: Int) {
         if (player.mediaItemCount > index) {
             player.seekTo(index, 0L)
             player.play()
         }
     }
 
-    fun skipToNext() = scope.launch {
+    fun skipToNext() {
         if (player.hasNextMediaItem()) player.seekToNextMediaItem()
     }
 
-    fun skipToStartOrPrevious() = scope.launch {
+    fun skipToStartOrPrevious() {
         if (player.currentPosition > 5000 || !player.hasPreviousMediaItem()) player.seekTo(0L)
         else player.seekToPreviousMediaItem()
     }
 
-    fun toggleRepeat() = scope.launch {
+    fun toggleRepeat() {
         player.repeatMode = when (player.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             else -> Player.REPEAT_MODE_OFF
         }
     }
 
-    fun toggleShuffle() = scope.launch {
+    fun toggleShuffle() {
         player.shuffleModeEnabled = !player.shuffleModeEnabled
     }
 
     /** PRIVATE METHODS ******************************************************/
-    private suspend fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? = mutex.withLock {
+    private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? =
         mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
+
+    private fun insertTracksAt(trackPojos: List<TrackPojo>, index: Int): List<MediaItem> {
+        val mediaItems =
+            trackPojos.mapIndexedNotNull { idx, pojo -> pojo.toQueueTrackPojo(idx + index)?.toMediaItem() }
+
+        if (mediaItems.isNotEmpty()) player.addMediaItems(index, mediaItems)
+        return mediaItems
     }
 
     private fun saveQueueIndex(value: Int) {
@@ -191,7 +204,6 @@ class PlayerRepository @Inject constructor(
     /** OVERRIDDEN METHODS ***************************************************/
     override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
         _canGotoNext.value = availableCommands.contains(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
-        _canGotoPrevious.value = availableCommands.contains(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
         _canPlay.value = availableCommands.contains(Player.COMMAND_PLAY_PAUSE)
     }
 
@@ -204,12 +216,15 @@ class PlayerRepository @Inject constructor(
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         // Called when player's currently playing MediaItem changes.
-        saveQueueIndex(player.currentMediaItemIndex)
         scope.launch {
-            val pojo = findQueueItemByMediaItem(mediaItem)
-            if (pojo != _currentPojo.value) {
-                _currentPojo.value = pojo
-                _currentPositionMs.value = player.currentPosition
+            mutex.withLock {
+                saveQueueIndex(player.currentMediaItemIndex)
+                val pojo = findQueueItemByMediaItem(mediaItem)
+                if (pojo != _currentPojo.value) {
+                    Log.i("PlayerRepository", "current track URI: ${pojo?.uri}")
+                    _currentPojo.value = pojo
+                    _currentPositionMs.value = player.currentPosition
+                }
             }
         }
     }
@@ -226,23 +241,26 @@ class PlayerRepository @Inject constructor(
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-        if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
-            val queueTracks = mutableListOf<QueueTrackPojo>()
+        if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) scope.launch {
+            mutex.withLock {
+                val queue = mutableListOf<QueueTrackPojo>()
 
-            if (timeline.windowCount > 0) {
-                val window = Timeline.Window()
-                for (idx in 0 until timeline.windowCount) {
-                    timeline.getWindow(idx, window)
-                    window.mediaItem.localConfiguration?.tag?.also { tag ->
-                        if (tag is QueueTrackPojo) queueTracks.add(tag)
+                if (timeline.windowCount > 0) {
+                    val window = Timeline.Window()
+                    for (idx in 0 until timeline.windowCount) {
+                        timeline.getWindow(idx, window)
+                        window.mediaItem.localConfiguration?.tag?.also { tag ->
+                            if (tag is QueueTrackPojo) queue.add(tag)
+                        }
                     }
                 }
-            }
 
-            val queue = TrackQueue(queueTracks)
-            _queue.value = queue
-            scope.launch {
-                queueDao.setQueue(queue.items)
+                val queueReindexed = queue.reindexed()
+                Log.i("PlayerRepository", "onTimelineChanged: queueReindexed=$queueReindexed")
+
+                _queue.value = queueReindexed
+                queueDao.setQueue(queueReindexed)
+                saveQueueIndex(player.currentMediaItemIndex)
             }
         }
     }

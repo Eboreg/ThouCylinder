@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.dataclasses.pojos
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import us.huseli.thoucylinder.dataclasses.PositionPair
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
@@ -38,6 +39,27 @@ data class AlbumWithTracksPojo(
 ) : AbstractAlbumPojo() {
     val discCount: Int
         get() = tracks.mapNotNull { it.discNumber }.takeIf { it.isNotEmpty() }?.max() ?: 1
+
+    val trackPojos: List<TrackPojo>
+        get() = tracks.map { TrackPojo(track = it, album = album) }
+
+    fun getPositionPairs(): List<PositionPair> {
+        val pairs = mutableListOf<PositionPair>()
+        var discNumber = 1
+        var albumPosition = 1
+
+        tracks.forEach { track ->
+            if (track.discNumberNonNull != discNumber) {
+                discNumber = track.discNumberNonNull
+                albumPosition = 1
+            }
+            if (track.albumPosition != null) albumPosition = track.albumPosition
+            pairs.add(PositionPair(discNumber, albumPosition))
+            albumPosition++
+        }
+
+        return pairs
+    }
 
     fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
 

@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
 import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
@@ -23,94 +24,85 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 
 
 @Composable
 fun TrackContextMenu(
-    track: Track,
-    metadata: TrackMetadata?,
     isShown: Boolean,
-    onDownloadClick: () -> Unit,
+    isDownloadable: Boolean,
+    callbacks: TrackCallbacks,
     onDismissRequest: () -> Unit,
-    onAddToPlaylistClick: () -> Unit,
     modifier: Modifier = Modifier,
-    album: Album? = null,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
-    onArtistClick: ((String) -> Unit)? = null,
-    onAlbumClick: ((UUID) -> Unit)? = null,
-    onEnqueueNextClick: () -> Unit,
+    hideAlbum: Boolean = false,
 ) {
-    var isInfoDialogOpen by rememberSaveable { mutableStateOf(false) }
-
-    if (isInfoDialogOpen) {
-        TrackInfoDialog(track = track, album = album, metadata = metadata, onClose = { isInfoDialogOpen = false })
-    }
-
     DropdownMenu(
         modifier = modifier,
         expanded = isShown,
         onDismissRequest = onDismissRequest,
         offset = offset,
     ) {
-        if (track.isOnYoutube && !track.isDownloaded) {
+        if (isDownloadable) {
             DropdownMenuItem(
                 text = { Text(text = stringResource(id = R.string.download)) },
                 leadingIcon = { Icon(Icons.Sharp.Download, null) },
                 onClick = {
-                    onDownloadClick()
+                    callbacks.onDownloadClick()
                     onDismissRequest()
                 },
             )
         }
+
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
-                onAddToPlaylistClick()
+                callbacks.onAddToPlaylistClick()
                 onDismissRequest()
             }
         )
-        DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.play_next)) },
-            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
-            onClick = {
-                onEnqueueNextClick()
-                onDismissRequest()
-            }
-        )
-        if (onArtistClick != null) {
-            track.artist?.also { artist ->
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.go_to_artist)) },
-                    leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
-                    onClick = {
-                        onArtistClick(artist)
-                        onDismissRequest()
-                    },
-                )
-            }
+
+        callbacks.onPlayNextClick?.also { onPlayNextClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play_next)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+                onClick = {
+                    onPlayNextClick()
+                    onDismissRequest()
+                }
+            )
         }
-        if (onAlbumClick != null) {
-            track.albumId?.also { albumId ->
+
+        callbacks.onArtistClick?.also { onArtistClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.go_to_artist)) },
+                leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
+                onClick = {
+                    onArtistClick()
+                    onDismissRequest()
+                },
+            )
+        }
+
+        if (!hideAlbum) {
+            callbacks.onAlbumClick?.also { onAlbumClick ->
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.go_to_album)) },
                     leadingIcon = { Icon(Icons.Sharp.Album, null) },
                     onClick = {
-                        onAlbumClick(albumId)
+                        onAlbumClick()
                         onDismissRequest()
                     },
                 )
             }
         }
+
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.track_information)) },
             leadingIcon = { Icon(Icons.Sharp.Info, null) },
             onClick = {
-                isInfoDialogOpen = true
+                callbacks.onShowInfoClick()
                 onDismissRequest()
             },
         )
@@ -120,16 +112,11 @@ fun TrackContextMenu(
 
 @Composable
 fun TrackContextMenuWithButton(
-    track: Track,
-    metadata: TrackMetadata?,
-    onDownloadClick: () -> Unit,
-    onAddToPlaylistClick: () -> Unit,
+    isDownloadable: Boolean,
+    callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
-    album: Album? = null,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
-    onArtistClick: ((String) -> Unit)? = null,
-    onAlbumClick: ((UUID) -> Unit)? = null,
-    onEnqueueNextClick: () -> Unit,
+    hideAlbum: Boolean = false,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -137,19 +124,14 @@ fun TrackContextMenuWithButton(
         modifier = modifier,
         onClick = { isMenuShown = !isMenuShown },
         content = {
-            Icon(Icons.Sharp.MoreVert, null)
+            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.height(18.dp))
             TrackContextMenu(
-                track = track,
-                album = album,
-                metadata = metadata,
-                onDownloadClick = onDownloadClick,
+                callbacks = callbacks,
                 onDismissRequest = { isMenuShown = false },
                 isShown = isMenuShown,
-                onArtistClick = onArtistClick,
-                onAlbumClick = onAlbumClick,
                 offset = offset,
-                onAddToPlaylistClick = onAddToPlaylistClick,
-                onEnqueueNextClick = onEnqueueNextClick,
+                isDownloadable = isDownloadable,
+                hideAlbum = hideAlbum,
             )
         }
     )

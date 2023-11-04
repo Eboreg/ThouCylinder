@@ -42,53 +42,57 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
+import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
-import java.util.UUID
+import kotlin.math.absoluteValue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
 @Suppress("AnimateAsStateLabel")
 @Composable
 fun BoxWithConstraintsScope.ModalCover(
-    pojo: QueueTrackPojo?,
+    pojo: QueueTrackPojo,
+    trackCallbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
     viewModel: QueueViewModel = hiltViewModel(),
     isExpanded: Boolean,
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onArtistClick: ((String) -> Unit)? = null,
-    onAlbumClick: ((UUID) -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     val playbackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
     val canGotoNext by viewModel.playerCanGotoNext.collectAsStateWithLifecycle()
     val canPlay by viewModel.playerCanPlay.collectAsStateWithLifecycle()
     val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-    val endPosition = pojo?.track?.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+    val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
     val currentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
     val isPlaying = playbackState == PlayerRepository.PlaybackState.PLAYING
-    val context = LocalContext.current
 
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var isExpanding by rememberSaveable { mutableStateOf(false) }
@@ -118,7 +122,8 @@ fun BoxWithConstraintsScope.ModalCover(
     }
 
     LaunchedEffect(pojo) {
-        imageBitmap.value = pojo?.track?.image?.let { viewModel.getImageBitmap(it) }
+        imageBitmap.value = pojo.track.getFullImage(context)?.asImageBitmap()
+            ?: pojo.album?.getFullImage(context)?.asImageBitmap()
     }
 
     Surface(
@@ -149,25 +154,16 @@ fun BoxWithConstraintsScope.ModalCover(
                     content = { Icon(Icons.Sharp.KeyboardArrowDown, null) },
                 )
                 Column {
-                    if (pojo != null) {
-                        IconButton(
-                            onClick = { isContextMenuShown = !isContextMenuShown },
-                            content = { Icon(Icons.Sharp.MoreVert, null) },
-                        )
-                        TrackContextMenu(
-                            track = pojo.track,
-                            album = pojo.album,
-                            metadata = pojo.track.metadata,
-                            onDownloadClick = { viewModel.downloadTrack(pojo.track) },
-                            onDismissRequest = { isContextMenuShown = false },
-                            isShown = isContextMenuShown,
-                            onAlbumClick = onAlbumClick,
-                            onArtistClick = onArtistClick,
-                            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(pojo.track)) },
-                            offset = DpOffset(10.dp, 0.dp),
-                            onEnqueueNextClick = { viewModel.enqueueTrackNext(pojo.track, context) },
-                        )
-                    }
+                    IconButton(
+                        onClick = { isContextMenuShown = !isContextMenuShown },
+                        content = { Icon(Icons.Sharp.MoreVert, null) },
+                    )
+                    TrackContextMenu(
+                        isDownloadable = pojo.track.isDownloadable,
+                        callbacks = trackCallbacks,
+                        isShown = isContextMenuShown,
+                        onDismissRequest = { isContextMenuShown = false },
+                    )
                 }
             }
 
@@ -190,11 +186,11 @@ fun BoxWithConstraintsScope.ModalCover(
                     if (!isExpanded || isExpanding || isCollapsing) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = pojo?.track?.title ?: "-",
+                                text = pojo.track.title,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            pojo?.track?.artist?.also { artist ->
+                            pojo.track.artist?.also { artist ->
                                 Text(
                                     text = artist,
                                     maxLines = 1,
@@ -234,11 +230,11 @@ fun BoxWithConstraintsScope.ModalCover(
                     }
                 }
 
-                if ((isExpanded || isExpanding || isCollapsing) && pojo != null) {
+                if (isExpanded || isExpanding || isCollapsing) {
                     ModalCoverExpandedContent(
                         pojo = pojo,
                         viewModel = viewModel,
-                        endPosition = endPosition?.toFloat() ?: 0f,
+                        endPositionMs = endPosition?.toFloat() ?: 0f,
                         canPlay = canPlay,
                         canGotoNext = canGotoNext,
                         isPlaying = isPlaying,
@@ -261,12 +257,11 @@ fun BoxWithConstraintsScope.ModalCover(
 fun ModalCoverExpandedContent(
     pojo: QueueTrackPojo,
     viewModel: QueueViewModel,
-    endPosition: Float,
+    endPositionMs: Float,
     canPlay: Boolean,
     canGotoNext: Boolean,
     isPlaying: Boolean,
 ) {
-    val canGotoPrevious by viewModel.playerCanGotoPrevious.collectAsStateWithLifecycle()
     val isRepeatEnabled by viewModel.playerIsRepeatEnabled.collectAsStateWithLifecycle()
     val isShuffleEnabled by viewModel.playerIsShuffleEnabled.collectAsStateWithLifecycle()
     val toggleButtonColors = IconButtonDefaults.iconToggleButtonColors(
@@ -277,6 +272,7 @@ fun ModalCoverExpandedContent(
 
     var isDragging by remember { mutableStateOf(false) }
     var currentPositionMs by rememberSaveable { mutableFloatStateOf(0f) }
+    var currentPositionSeconds by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         sliderInteractionSource.interactions.collect { interaction ->
@@ -287,6 +283,20 @@ fun ModalCoverExpandedContent(
     LaunchedEffect(Unit) {
         viewModel.playerCurrentPositionMs.collect { pos ->
             if (!isDragging) currentPositionMs = pos.toFloat()
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            delay(1000)
+            currentPositionSeconds++
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { currentPositionMs }.collect {
+            if ((it - (currentPositionSeconds * 1000)).absoluteValue > 500)
+                currentPositionSeconds = (it / 1000).toInt()
         }
     }
 
@@ -315,14 +325,26 @@ fun ModalCoverExpandedContent(
             }
         }
 
-        Slider(
-            value = currentPositionMs,
-            onValueChange = { currentPositionMs = it },
-            valueRange = 0f..endPosition,
-            interactionSource = sliderInteractionSource,
-            modifier = Modifier.padding(horizontal = 20.dp),
-            onValueChangeFinished = { viewModel.seekTo(currentPositionMs.toLong()) },
-        )
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Slider(
+                value = currentPositionMs,
+                onValueChange = { currentPositionMs = it },
+                valueRange = 0f..endPositionMs,
+                interactionSource = sliderInteractionSource,
+                onValueChangeFinished = { viewModel.seekTo(currentPositionMs.toLong()) },
+                modifier = Modifier.height(30.dp),
+            )
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = currentPositionSeconds.seconds.sensibleFormat(),
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                )
+                Text(
+                    text = endPositionMs.toDouble().milliseconds.sensibleFormat(),
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                )
+            }
+        }
 
         // Large button row:
         Row(
@@ -345,7 +367,6 @@ fun ModalCoverExpandedContent(
                         modifier = Modifier.scale(1.5f),
                     )
                 },
-                enabled = canGotoPrevious,
                 modifier = Modifier.size(60.dp),
             )
             FilledTonalIconButton(

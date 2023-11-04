@@ -51,34 +51,30 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
-import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.viewmodels.BaseViewModel
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackGrid(
-    pojos: LazyPagingItems<TrackPojo>,
-    viewModel: BaseViewModel,
+fun <T : TrackPojo> TrackGrid(
+    trackPojos: LazyPagingItems<T>,
+    selectedTracks: List<T>,
+    viewModel: AbstractBaseViewModel,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
-    onAddToPlaylistClick: (Selection) -> Unit,
-    onArtistClick: ((String) -> Unit)? = null,
-    onAlbumClick: ((UUID) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    trackCallbacks: (T) -> TrackCallbacks,
+    trackSelectionCallbacks: TrackSelectionCallbacks,
+    onEmpty: (@Composable () -> Unit)? = null,
 ) {
-    val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.padding(horizontal = 10.dp)) {
-        SelectedTracksButtons(
-            trackCount = selectedTracks.size,
-            onAddToPlaylistClick = { onAddToPlaylistClick(Selection(tracks = selectedTracks)) },
-            onUnselectAllClick = { viewModel.unselectAllTracks() },
-        )
+        SelectedTracksButtons(trackCount = selectedTracks.size, callbacks = trackSelectionCallbacks)
 
         LazyVerticalGrid(
             state = gridState,
@@ -87,37 +83,30 @@ fun TrackGrid(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             contentPadding = contentPadding,
         ) {
-            // items(count = pojos.itemCount, key = pojos.itemKey { it.track.trackId }) { index ->
-            items(count = pojos.itemCount) { index ->
-                pojos[index]?.also { pojo ->
+            items(count = trackPojos.itemCount) { index ->
+                trackPojos[index]?.also { pojo ->
                     val track = pojo.track
-                    val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
                     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
-                    val isSelected = selectedTracks.contains(track)
-                    var metadata by rememberSaveable { mutableStateOf(track.metadata) }
-
-                    LaunchedEffect(Unit) {
-                        track.image
-                            ?.also { imageBitmap.value = viewModel.getImageBitmap(it) }
-                            ?: kotlin.run {
-                                pojo.album?.albumArt?.also { imageBitmap.value = viewModel.getImageBitmap(it) }
-                            }
-                        if (metadata == null) metadata = viewModel.getTrackMetadata(track)
-                    }
+                    val isSelected = selectedTracks.contains(pojo)
 
                     OutlinedCard(
                         shape = MaterialTheme.shapes.extraSmall,
                         modifier = Modifier.combinedClickable(
-                            onClick = {
-                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(track)
-                                else viewModel.playTrack(track)
-                            },
-                            onLongClick = { viewModel.toggleSelected(track) },
+                            onClick = { trackCallbacks(pojo).onTrackClick?.invoke() },
+                            onLongClick = { trackCallbacks(pojo).onLongClick?.invoke() },
                         ),
                         border = CardDefaults.outlinedCardBorder()
                             .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
                     ) {
                         Box(modifier = Modifier.aspectRatio(1f)) {
+                            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+                            var metadata by rememberSaveable { mutableStateOf(track.metadata) }
+
+                            LaunchedEffect(Unit) {
+                                imageBitmap.value = viewModel.getTrackFullImage(pojo, context)
+                                if (metadata == null) metadata = viewModel.getTrackMetadata(track)
+                            }
+
                             AlbumArt(
                                 image = imageBitmap.value,
                                 modifier = Modifier.fillMaxWidth(),
@@ -159,17 +148,11 @@ fun TrackGrid(
                                                 modifier = Modifier.rotate(-45f).offset(10.dp, 0.dp),
                                             )
                                             TrackContextMenu(
-                                                track = track,
-                                                album = pojo.album,
-                                                metadata = metadata,
-                                                onDownloadClick = { viewModel.downloadTrack(track) },
-                                                onDismissRequest = { isContextMenuShown = false },
-                                                isShown = isContextMenuShown,
-                                                onAlbumClick = onAlbumClick,
-                                                onArtistClick = onArtistClick,
+                                                isDownloadable = track.isDownloadable,
                                                 offset = DpOffset(0.dp, (-20).dp),
-                                                onAddToPlaylistClick = { onAddToPlaylistClick(Selection(track)) },
-                                                onEnqueueNextClick = { viewModel.enqueueTrackNext(track, context) },
+                                                callbacks = trackCallbacks(pojo),
+                                                isShown = isContextMenuShown,
+                                                onDismissRequest = { isContextMenuShown = false },
                                             )
                                         }
                                     }
@@ -227,5 +210,7 @@ fun TrackGrid(
                 }
             }
         }
+
+        if (trackPojos.itemCount == 0) onEmpty?.invoke()
     }
 }

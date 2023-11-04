@@ -3,7 +3,6 @@ package us.huseli.thoucylinder
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,12 +16,9 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
+        // TODO: What does this do?
         val contract = ActivityResultContracts.RequestMultiplePermissions()
-        val requestPermissionLauncher = registerForActivityResult(contract) { results ->
-            results.forEach { (permission, granted) ->
-                Log.i("MainActivity", "requestPermissionLauncher: permission=$permission, granted=$granted")
-            }
-        }
+        val requestPermissionLauncher = registerForActivityResult(contract) { }
         val permissions =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                 arrayOf(

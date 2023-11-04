@@ -29,8 +29,7 @@ fun SearchForm(
     onSearch: (String) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    // TODO: remove default
-    var query by rememberSaveable { mutableStateOf("roxy music for your pleasure") }
+    var query by rememberSaveable { mutableStateOf("") }
 
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(

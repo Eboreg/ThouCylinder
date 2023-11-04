@@ -12,32 +12,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AlbumBadges(
-    pojo: AbstractAlbumPojo,
+    genres: List<String>,
+    styles: List<String>,
     modifier: Modifier = Modifier,
 ) {
-    if (pojo.genres.isNotEmpty() || pojo.styles.isNotEmpty()) {
+    if (genres.isNotEmpty() || styles.isNotEmpty()) {
         FlowRow(
             verticalArrangement = Arrangement.spacedBy(5.dp),
             modifier = modifier.padding(vertical = 10.dp),
         ) {
-            pojo.genres.forEach { genre ->
+            genres.forEach { genre ->
                 Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
                     Badge(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        content = { Text(text = genre.genreName) },
+                        content = { Text(text = genre) },
                     )
                 }
             }
-            pojo.styles.forEach { style ->
+            styles.forEach { style ->
                 Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
                     Badge(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        content = { Text(text = style.styleName) },
+                        content = { Text(text = style) },
                     )
                 }
             }

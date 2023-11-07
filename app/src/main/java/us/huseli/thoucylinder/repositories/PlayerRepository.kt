@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.MainThread
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
@@ -19,12 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.database.QueueDao
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.toQueueTrackPojos
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.dataclasses.pojos.reindexed
-import us.huseli.thoucylinder.dataclasses.pojos.toQueueTrackPojos
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -103,13 +105,14 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun insertNext(trackPojos: List<TrackPojo>) = insertTracksAt(trackPojos, nextItemIndex)
+    fun insertNext(trackPojos: List<AbstractTrackPojo>) = insertTracksAt(trackPojos, nextItemIndex)
 
-    fun insertNextAndPlay(pojo: TrackPojo) {
+    fun insertNextAndPlay(pojo: AbstractTrackPojo) {
         val index = nextItemIndex
         val mediaItems = insertTracksAt(listOf(pojo), index)
 
         if (mediaItems.isNotEmpty()) {
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(index, 0L)
             player.play()
         }
@@ -122,6 +125,7 @@ class PlayerRepository @Inject constructor(
 
     fun moveNextAndPlay(pojos: List<QueueTrackPojo>) {
         moveNext(pojos)
+        if (player.playbackState == Player.STATE_IDLE) player.prepare()
         player.seekTo(nextItemIndex, 0L)
         player.play()
     }
@@ -144,13 +148,14 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun replaceAndPlay(trackPojos: List<TrackPojo>, startIndex: Int? = null) {
+    fun replaceAndPlay(trackPojos: List<AbstractTrackPojo>, startIndex: Int? = null) {
         /** Clear queue, add tracks, play. */
         val pojos = trackPojos.toQueueTrackPojos()
 
         player.clearMediaItems()
         if (pojos.isNotEmpty()) {
             player.addMediaItems(pojos.map { it.toMediaItem() })
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(max(startIndex ?: 0, 0), 0L)
             player.play()
         }
@@ -160,18 +165,25 @@ class PlayerRepository @Inject constructor(
 
     fun skipTo(index: Int) {
         if (player.mediaItemCount > index) {
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(index, 0L)
             player.play()
         }
     }
 
     fun skipToNext() {
-        if (player.hasNextMediaItem()) player.seekToNextMediaItem()
+        if (player.hasNextMediaItem()) {
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            player.seekToNextMediaItem()
+        }
     }
 
     fun skipToStartOrPrevious() {
         if (player.currentPosition > 5000 || !player.hasPreviousMediaItem()) player.seekTo(0L)
-        else player.seekToPreviousMediaItem()
+        else {
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            player.seekToPreviousMediaItem()
+        }
     }
 
     fun toggleRepeat() {
@@ -189,7 +201,7 @@ class PlayerRepository @Inject constructor(
     private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? =
         mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
 
-    private fun insertTracksAt(trackPojos: List<TrackPojo>, index: Int): List<MediaItem> {
+    private fun insertTracksAt(trackPojos: List<AbstractTrackPojo>, index: Int): List<MediaItem> {
         val mediaItems =
             trackPojos.mapIndexedNotNull { idx, pojo -> pojo.toQueueTrackPojo(idx + index)?.toMediaItem() }
 
@@ -263,5 +275,9 @@ class PlayerRepository @Inject constructor(
                 saveQueueIndex(player.currentMediaItemIndex)
             }
         }
+    }
+
+    override fun onPlayerError(error: PlaybackException) {
+        SnackbarEngine.addError(error.toString())
     }
 }

@@ -1,9 +1,7 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -11,18 +9,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
-import androidx.compose.material.icons.sharp.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -48,7 +40,6 @@ fun AlbumList(
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
     showArtist: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     listState: LazyListState = rememberLazyListState(),
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
@@ -63,15 +54,13 @@ fun AlbumList(
             isSelected = isSelected,
             onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
             onLongClick = { pojo -> albumCallbacks(pojo.album).onAlbumLongClick?.invoke() },
-            contentPadding = contentPadding,
             onEmpty = onEmpty,
             key = { it.album.albumId },
             listState = listState,
         ) { pojo ->
-            var isContextMenuOpen by rememberSaveable { mutableStateOf(false) }
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
-                pojo.trackCount?.let { pluralStringResource(R.plurals.x_tracks, it, it) },
+                pluralStringResource(R.plurals.x_tracks, pojo.trackCount, pojo.trackCount),
                 pojo.yearString,
                 pojo.duration?.sensibleFormat(),
             ).joinToString(" • ").takeIf { it.isNotBlank() }
@@ -84,8 +73,8 @@ fun AlbumList(
                 Thumbnail(
                     image = imageBitmap.value,
                     shape = MaterialTheme.shapes.extraSmall,
-                    placeholder = { Image(Icons.Sharp.Album, null) },
-                    borderWidth = if (isSelected(pojo)) 0.dp else 1.dp,
+                    placeholderIcon = Icons.Sharp.Album,
+                    borderWidth = if (isSelected(pojo)) null else 1.dp,
                 )
                 Column(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp).fillMaxHeight().weight(1f),
@@ -110,19 +99,11 @@ fun AlbumList(
                     }
                 }
 
-                Column {
-                    IconButton(
-                        onClick = { isContextMenuOpen = !isContextMenuOpen },
-                        content = { Icon(Icons.Sharp.MoreVert, null) },
-                    )
-                    AlbumContextMenu(
-                        isLocal = pojo.album.isLocal,
-                        isInLibrary = pojo.album.isInLibrary,
-                        expanded = isContextMenuOpen,
-                        onDismissRequest = { isContextMenuOpen = false },
-                        callbacks = albumCallbacks(pojo.album),
-                    )
-                }
+                AlbumContextMenuWithButton(
+                    isLocal = pojo.album.isLocal,
+                    isInLibrary = pojo.album.isInLibrary,
+                    callbacks = albumCallbacks(pojo.album),
+                )
             }
         }
     }

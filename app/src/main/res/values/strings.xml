@@ -70,6 +70,7 @@
     <string name="the_playlist_was_deleted">The playlist was deleted.</string>
     <string name="undo">Undo</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
+    <string name="debug">Debug</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>

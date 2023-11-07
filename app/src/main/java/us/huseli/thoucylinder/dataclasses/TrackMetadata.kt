@@ -1,15 +1,12 @@
 package us.huseli.thoucylinder.dataclasses
 
-import android.content.ContentValues
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.Parcelable
-import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.MediaInformation
 import kotlinx.parcelize.Parcelize
-import us.huseli.thoucylinder.ExtractTrackDataException
 import us.huseli.thoucylinder.bytesToString
 import us.huseli.thoucylinder.formattedString
 import us.huseli.thoucylinder.getIntegerOrDefault
@@ -42,20 +39,11 @@ data class TrackMetadata(
 
     val sizeString: String?
         get() = size?.bytesToString()
-
-    fun getContentValues() = ContentValues().apply {
-        put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
-        put(MediaStore.Audio.Media.DURATION, durationMs.toInt())
-        bitrate?.also { put(MediaStore.Audio.Media.BITRATE, it) }
-    }
 }
 
 
-/**
- * Extract metadata from audio file with MediaExtractor and ffmpeg.
- * @throws ExtractTrackDataException
- */
 fun File.extractTrackMetadata(ff: MediaInformation?): TrackMetadata {
+    /** Extract metadata from audio file with MediaExtractor and ffmpeg. */
     val extractor = MediaExtractor()
     extractor.setDataSource(path)
 
@@ -93,7 +81,7 @@ fun File.extractTrackMetadata(ff: MediaInformation?): TrackMetadata {
         }
     }
     extractor.release()
-    throw ExtractTrackDataException(this, extractor)
+    throw Exception("Could not extract metadata for $this")
 }
 
 

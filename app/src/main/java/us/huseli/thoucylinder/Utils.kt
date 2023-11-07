@@ -214,3 +214,18 @@ fun Bitmap.scaleToMaxSize(maxSizeDp: Dp, context: Context): Bitmap {
 
 
 fun String.substringMax(startIndex: Int, endIndex: Int) = substring(startIndex, kotlin.math.min(endIndex, length))
+
+
+inline fun <T> Iterable<T>.sumOfOrNull(selector: (T) -> Long?): Long? {
+    /**
+     * Variation of sumOf(), which returns null if there are no elements in the
+     * iterable for which `selector` returns non-null.
+     */
+    var sum: Long? = null
+    for (element in this) {
+        selector(element)?.also {
+            sum = sum?.plus(it) ?: it
+        }
+    }
+    return sum
+}

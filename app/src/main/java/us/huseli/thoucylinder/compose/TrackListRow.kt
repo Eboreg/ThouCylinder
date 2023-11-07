@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.compose
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -66,8 +65,8 @@ fun TrackListRow(
             Thumbnail(
                 image = thumbnail,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholder = { Image(imageVector = Icons.Sharp.MusicNote, contentDescription = null) },
-                borderWidth = if (isSelected) 0.dp else 1.dp,
+                placeholderIcon = Icons.Sharp.MusicNote,
+                borderWidth = if (isSelected) null else 1.dp,
             )
 
             Row(
@@ -91,8 +90,13 @@ fun TrackListRow(
                     }
                 }
 
-                if (duration != null)
-                    Text(text = duration.sensibleFormat(), modifier = Modifier.padding(start = 5.dp))
+                if (duration != null) {
+                    Text(
+                        text = duration.sensibleFormat(),
+                        modifier = Modifier.padding(start = 5.dp),
+                        style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                    )
+                }
 
                 TrackContextMenuWithButton(isDownloadable = isDownloadable, callbacks = callbacks)
 

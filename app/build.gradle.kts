@@ -98,7 +98,7 @@ dependencies {
     implementation("androidx.compose.ui:ui:$composeVersion")
     implementation("androidx.compose.ui:ui-graphics:$composeVersion")
     implementation("androidx.activity:activity-compose:1.8.0")
-    implementation("androidx.navigation:navigation-compose:2.7.4")
+    implementation("androidx.navigation:navigation-compose:2.7.5")
 
     // Material:
     implementation("androidx.compose.material3:material3:1.1.2")
@@ -112,7 +112,7 @@ dependencies {
 
     // Hilt:
     implementation("com.google.dagger:hilt-android:$daggerVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
     kapt("com.google.dagger:hilt-compiler:$daggerVersion")
 
     // Media:
@@ -128,7 +128,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.2.1")
+    implementation("com.github.Eboreg:RetainTheme:2.3.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

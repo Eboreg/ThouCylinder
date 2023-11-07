@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -110,7 +109,7 @@ fun AlbumScreen(
                                 Thumbnail(
                                     image = albumArt,
                                     shape = MaterialTheme.shapes.extraSmall,
-                                    placeholder = { Image(Icons.Sharp.Album, null) },
+                                    placeholderIcon = Icons.Sharp.Album,
                                 )
                             }
 

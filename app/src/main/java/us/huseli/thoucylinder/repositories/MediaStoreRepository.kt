@@ -13,10 +13,7 @@ import androidx.core.database.getStringOrNull
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
-import us.huseli.thoucylinder.ExtractTrackDataException
-import us.huseli.thoucylinder.MediaStoreException
 import us.huseli.thoucylinder.MediaStoreFormatException
-import us.huseli.thoucylinder.TrackDownloadException
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
@@ -41,8 +38,6 @@ import javax.inject.Singleton
 
 @Singleton
 class MediaStoreRepository @Inject constructor(@ApplicationContext private val context: Context) {
-    data class TrackMediaStoreEntry(val uri: Uri, val file: File, val track: Track)
-
     /** IMAGE RELATED METHODS ************************************************/
 
     fun collectAlbumImages(pojo: AlbumWithTracksPojo): Set<File> {
@@ -172,24 +167,28 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                                 isLocal = true,
                             ).also { albums.add(it) }
 
-                        tracks.add(
-                            Track(
-                                title = id3.title ?: cursor.getStringOrNull(titleIdx) ?: "Unknown title",
-                                isInLibrary = false,
-                                artist = trackArtist ?: finalAlbumArtist,
-                                albumPosition = albumPosition,
-                                discNumber = id3.discNumber ?: cursor.getIntOrNull(discNumberIdx),
-                                year = id3.year ?: cursor.getIntOrNull(yearIdx),
-                                albumId = album.albumId,
-                                metadata = file.extractTrackMetadata(ff).copy(
-                                    durationMs = durationMs,
-                                    extension = filename.split(".").last(),
-                                    mimeType = mimeType,
-                                    size = file.length(),
-                                ),
-                                mediaStoreData = MediaStoreData(uri = contentUri, relativePath = relativePath),
+                        try {
+                            tracks.add(
+                                Track(
+                                    title = id3.title ?: cursor.getStringOrNull(titleIdx) ?: "Unknown title",
+                                    isInLibrary = false,
+                                    artist = trackArtist ?: finalAlbumArtist,
+                                    albumPosition = albumPosition,
+                                    discNumber = id3.discNumber ?: cursor.getIntOrNull(discNumberIdx),
+                                    year = id3.year ?: cursor.getIntOrNull(yearIdx),
+                                    albumId = album.albumId,
+                                    metadata = file.extractTrackMetadata(ff).copy(
+                                        durationMs = durationMs,
+                                        extension = filename.split(".").last(),
+                                        mimeType = mimeType,
+                                        size = file.length(),
+                                    ),
+                                    mediaStoreData = MediaStoreData(uri = contentUri, relativePath = relativePath),
+                                )
                             )
-                        )
+                        } catch (e: Exception) {
+                            Log.e(javaClass.simpleName, "listNewMediaStoreAlbums: $e, file=$file", e)
+                        }
                     }
                 }
             }
@@ -204,9 +203,8 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
     }
 
     fun listOrphanTracks(allTracks: List<Track>): List<Track> {
-        /** Collect tracks that have no Youtube connection and no existing media files. */
+        /** Collect tracks that have no existing media files. */
         return allTracks
-            .filter { track -> track.youtubeVideo == null }
             .filterNot { track ->
                 track.mediaStoreData?.uri?.let { uri ->
                     try {
@@ -219,59 +217,54 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
             }
     }
 
-    fun moveTaggedAlbumToMediaStore(
-        pojo: AlbumWithTracksPojo,
+    fun moveTaggedTrackToMediaStore(
+        track: Track,
+        tempFile: File,
+        relativePath: String,
+        album: Album? = null,
         progressCallback: (DownloadProgress) -> Unit,
-    ): AlbumWithTracksPojo {
-        /**
-         * album.tracks should have tempTrackData set (done by e.g. YoutubeVideo.toTempTrack()), or exception is thrown.
-         */
-        val tracks = pojo.tracks.mapIndexed { index, track ->
-            val relativePath = "${Environment.DIRECTORY_MUSIC}/${pojo.album.getMediaStoreSubdir()}"
-            val entry = moveTrackToMediaStore(
-                track = track,
+    ): Track {
+        val getFilename = { extension: String -> "${track.generateBasename()}.$extension" }
+        val progress = DownloadProgress(status = DownloadProgress.Status.MOVING, progress = 0.0, item = track.title)
+
+        progressCallback(progress)
+
+        val mediaStoreUri = try {
+            moveTempFileToMediaStore(
+                tempFile = tempFile,
                 relativePath = relativePath,
-                progressCallback = {
-                    progressCallback(it.copy(progress = (index + it.progress) / pojo.tracks.size))
-                },
-            )
-            val metadata = entry.file.extractTrackMetadata()
+                filename = getFilename(tempFile.extension),
+            ).also { progressCallback(progress.copy(progress = 1.0)) }
+        } catch (e: MediaStoreFormatException) {
+            progressCallback(progress.copy(status = DownloadProgress.Status.CONVERTING))
 
-            context.contentResolver.update(
-                entry.uri,
-                getTrackContentValues(entry.track, metadata, pojo.album),
-                null,
-                null,
-            )
-            tagTrack(track = entry.track, localFile = entry.file, album = pojo.album)
-            track.copy(
-                metadata = metadata,
-                mediaStoreData = MediaStoreData(uri = entry.uri, relativePath = relativePath),
-                isInLibrary = true,
-                tempTrackData = null,
-                albumId = pojo.album.albumId,
-            )
+            val convertedFile = File(tempFile.path.substringBeforeLast('.') + ".opus")
+            val session = FFmpegKit.execute("-i ${tempFile.path} -vn ${convertedFile.path}")
+
+            tempFile.delete()
+            if (!session.returnCode.isValueSuccess) {
+                convertedFile.delete()
+                throw Exception("FFMPEG conversion of $track failed")
+            }
+            progressCallback(progress.copy(progress = 0.5))
+            moveTempFileToMediaStore(
+                tempFile = convertedFile,
+                relativePath = relativePath,
+                filename = getFilename("opus"),
+            ).also { progressCallback(progress.copy(progress = 1.0)) }
         }
+        val mediaStoreFile = context.getMediaStoreFile(mediaStoreUri)
+        val metadata = mediaStoreFile.extractTrackMetadata()
 
-        return pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true))
-    }
-
-    fun moveTaggedTrackToMediaStore(track: Track, progressCallback: (DownloadProgress) -> Unit): Track {
-        val entry = moveTrackToMediaStore(
-            track = track,
-            progressCallback = progressCallback,
-            relativePath = Environment.DIRECTORY_MUSIC,
-        )
-        val metadata = entry.file.extractTrackMetadata()
-
-        tagTrack(track = track, localFile = entry.file)
-        context.contentResolver.update(entry.uri, getTrackContentValues(track, metadata), null, null)
+        context.contentResolver.update(mediaStoreUri, getTrackContentValues(track, metadata, album), null, null)
+        tagTrack(track = track, localFile = mediaStoreFile, album = album)
 
         return track.copy(
             metadata = metadata,
             isInLibrary = true,
             tempTrackData = null,
-            mediaStoreData = MediaStoreData(uri = entry.uri, relativePath = Environment.DIRECTORY_MUSIC),
+            mediaStoreData = MediaStoreData(uri = mediaStoreUri, relativePath = relativePath),
+            albumId = album?.albumId,
         )
     }
 
@@ -296,40 +289,49 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         }
     }
 
-    /** Does not check if file exists. */
+    /** PRIVATE METHODS *******************************************************/
+
     private fun getFileFromTrack(track: Track): File? =
         track.tempTrackData?.localFile ?: track.mediaStoreData?.getFile(context)
 
     private fun getTrackContentValues(track: Track, metadata: TrackMetadata? = null, album: Album? = null) =
         ContentValues().apply {
-            album?.getContentValues()?.also { putAll(it) }
-            (metadata ?: track.metadata)?.getContentValues()?.let { putAll(it) }
-            putAll(track.getContentValues())
+            album?.also { put(MediaStore.Audio.Media.ALBUM, it.title) }
+            (track.artist ?: album?.artist)?.also { put(MediaStore.Audio.Media.ARTIST, it) }
+            album?.artist?.also { put(MediaStore.Audio.Media.ALBUM_ARTIST, it) }
+            album?.year?.also { put(MediaStore.Audio.Media.YEAR, it) }
+            (metadata ?: track.metadata)?.also {
+                put(MediaStore.Audio.Media.MIME_TYPE, it.mimeType)
+                put(MediaStore.Audio.Media.DURATION, it.durationMs.toInt())
+                it.bitrate?.also { bitrate -> put(MediaStore.Audio.Media.BITRATE, bitrate) }
+            }
+            put(MediaStore.Audio.Media.TITLE, track.title)
+            track.albumPosition?.also { put(MediaStore.Audio.Media.TRACK, it.toString()) }
         }
 
     /**
      * @throws MediaStoreFormatException
      */
-    private fun moveMusicFileToMediaStore(localFile: File, relativePath: String, filename: String): Uri {
+    private fun moveTempFileToMediaStore(tempFile: File, relativePath: String, filename: String): Uri {
         // If file already exists, just delete it first.
         context.deleteMediaStoreUriAndFile(getReadWriteAudioCollection(), relativePath, filename)
 
         val contentValues = ContentValues().apply {
             put(MediaStore.Audio.Media.RELATIVE_PATH, relativePath)
             put(MediaStore.Audio.Media.DISPLAY_NAME, filename)
-            put(MediaStore.Audio.Media.SIZE, localFile.length())
+            put(MediaStore.Audio.Media.SIZE, tempFile.length())
             put(MediaStore.Audio.Media.IS_PENDING, 1)
         }
-        val trackUri = try {
+        val contentUri = try {
             context.contentResolver.insert(getReadWriteAudioCollection(), contentValues)
         } catch (e: IllegalArgumentException) {
             throw MediaStoreFormatException(filename)
         }
 
-        if (trackUri != null) {
+        if (contentUri != null) {
             try {
-                context.contentResolver.openOutputStream(trackUri, "w")?.use { outputStream ->
-                    localFile.inputStream().use { inputStream ->
+                context.contentResolver.openOutputStream(contentUri, "w")?.use { outputStream ->
+                    tempFile.inputStream().use { inputStream ->
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                             inputStream.transferTo(outputStream)
                         else outputStream.write(inputStream.readBytes())
@@ -337,64 +339,18 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                 }
                 contentValues.clear()
                 contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
-                context.contentResolver.update(trackUri, contentValues, null, null)
+                context.contentResolver.update(contentUri, contentValues, null, null)
             } catch (e: Exception) {
                 // Roll back:
-                context.contentResolver.delete(trackUri, null, null)
-                localFile.delete()
-                context.getMediaStoreFileNullable(trackUri)?.delete()
+                context.contentResolver.delete(contentUri, null, null)
+                tempFile.delete()
+                context.getMediaStoreFileNullable(contentUri)?.delete()
                 throw e
             }
-        } else throw MediaStoreException()
+        } else throw Exception("Could not get content URI for $filename")
 
-        localFile.delete()
-        return trackUri
-    }
-
-    private fun moveTrackToMediaStore(
-        track: Track,
-        relativePath: String,
-        progressCallback: (DownloadProgress) -> Unit,
-    ): TrackMediaStoreEntry {
-        val getFilename = { extension: String -> "${track.generateBasename()}.$extension" }
-        val progress = DownloadProgress(status = DownloadProgress.Status.MOVING, progress = 0.0, item = track.title)
-        val localFile = getFileFromTrack(track)
-            ?: throw TrackDownloadException(TrackDownloadException.ErrorType.NO_FILE)
-
-        progressCallback(progress)
-
-        return try {
-            val uri = moveMusicFileToMediaStore(
-                localFile = localFile,
-                relativePath = relativePath,
-                filename = getFilename(localFile.extension),
-            )
-            progressCallback(progress.copy(progress = 1.0))
-            TrackMediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
-        } catch (e: MediaStoreFormatException) {
-            progressCallback(progress.copy(status = DownloadProgress.Status.CONVERTING))
-
-            val convertedFile = File(localFile.path.substringBeforeLast('.') + ".opus")
-            val session = FFmpegKit.execute("-i ${localFile.path} -vn ${convertedFile.path}")
-
-            localFile.delete()
-            if (!session.returnCode.isValueSuccess) {
-                convertedFile.delete()
-                throw TrackDownloadException(TrackDownloadException.ErrorType.FFMPEG_CONVERT)
-            }
-            progressCallback(progress.copy(progress = 0.5))
-            val uri = moveMusicFileToMediaStore(
-                localFile = convertedFile,
-                relativePath = relativePath,
-                filename = getFilename("opus"),
-            )
-            progressCallback(progress.copy(progress = 1.0))
-            TrackMediaStoreEntry(uri = uri, file = context.getMediaStoreFile(uri), track = track)
-        } catch (e: MediaStoreException) {
-            throw TrackDownloadException(TrackDownloadException.ErrorType.MEDIA_STORE, cause = e)
-        } catch (e: ExtractTrackDataException) {
-            throw TrackDownloadException(TrackDownloadException.ErrorType.EXTRACT_TRACK_DATA, cause = e)
-        }
+        tempFile.delete()
+        return contentUri
     }
 
     private fun tagTrack(track: Track, localFile: File, album: Album? = null) {

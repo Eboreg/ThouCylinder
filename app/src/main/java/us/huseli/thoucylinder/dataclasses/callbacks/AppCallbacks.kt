@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.callbacks
 
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
@@ -19,5 +20,5 @@ data class AppCallbacks(
     val onDownloadTrackClick: (Track) -> Unit,
     val onEditAlbumClick: (Album) -> Unit,
     val onPlaylistClick: (UUID) -> Unit,
-    val onShowTrackInfoClick: (Track) -> Unit,
+    val onShowTrackInfoClick: (AbstractTrackPojo) -> Unit,
 )

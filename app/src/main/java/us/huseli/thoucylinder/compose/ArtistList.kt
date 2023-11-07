@@ -1,9 +1,7 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.InterpreterMode
@@ -16,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,6 +24,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
+import us.huseli.thoucylinder.getMediaStoreFileNullable
 import us.huseli.thoucylinder.toBitmap
 import java.io.File
 
@@ -33,25 +33,28 @@ fun ArtistList(
     artists: List<ArtistPojo>,
     images: Map<String, File>,
     onArtistClick: ((String) -> Unit)? = null,
-    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
+    val context = LocalContext.current
+
     ItemList(
         things = artists,
         onClick = onArtistClick?.let { { onArtistClick(it.name) } },
-        contentPadding = contentPadding,
         key = { it.name },
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            images[artist.name.lowercase()]?.let { imageBitmap.value = it.toBitmap()?.asImageBitmap() }
+            imageBitmap.value = images[artist.name.lowercase()]?.toBitmap()?.asImageBitmap()
+                ?: artist.firstAlbumArtThumbnail?.let {
+                    context.getMediaStoreFileNullable(it)?.toBitmap()?.asImageBitmap()
+                }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
                 image = imageBitmap.value,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholder = { Image(Icons.Sharp.InterpreterMode, null) },
+                placeholderIcon = Icons.Sharp.InterpreterMode,
             )
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(

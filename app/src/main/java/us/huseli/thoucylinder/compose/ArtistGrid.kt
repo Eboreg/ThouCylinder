@@ -1,11 +1,8 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -19,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +25,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
+import us.huseli.thoucylinder.getMediaStoreFileNullable
 import us.huseli.thoucylinder.toBitmap
 import java.io.File
 
@@ -37,6 +36,8 @@ fun ArtistGrid(
     onArtistClick: (String) -> Unit,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
+    val context = LocalContext.current
+
     ItemGrid(
         things = artists,
         onClick = { onArtistClick(it.name) },
@@ -46,22 +47,20 @@ fun ArtistGrid(
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
-            images[artist.name.lowercase()]?.let { imageBitmap.value = it.toBitmap()?.asImageBitmap() }
+            imageBitmap.value = images[artist.name.lowercase()]?.toBitmap()?.asImageBitmap()
+                ?: artist.firstAlbumArt?.let {
+                    context.getMediaStoreFileNullable(it)?.toBitmap()?.asImageBitmap()
+                }
         }
 
         Thumbnail(
             image = imageBitmap.value,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Image(
-                    imageVector = Icons.Sharp.InterpreterMode,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                )
-            },
+            borderWidth = null,
+            placeholderIcon = Icons.Sharp.InterpreterMode,
         )
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.padding(5.dp).weight(1f)) {
+            Column(modifier = Modifier.padding(horizontal = 5.dp, vertical = 10.dp).weight(1f)) {
                 Text(
                     text = artist.name,
                     maxLines = 1,

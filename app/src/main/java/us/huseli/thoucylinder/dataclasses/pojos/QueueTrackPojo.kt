@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -15,7 +16,7 @@ data class QueueTrackPojo(
     @ColumnInfo("QueueTrack_uri") val uri: Uri,
     @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: UUID = UUID.randomUUID(),
     @ColumnInfo("QueueTrack_position") val position: Int = 0,
-) : TrackPojo(track, album) {
+) : AbstractTrackPojo() {
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
 

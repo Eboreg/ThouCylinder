@@ -10,8 +10,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
@@ -36,6 +38,9 @@ interface TrackDao {
     @RawQuery(observedEntities = [Track::class, Album::class])
     fun _searchTracks(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
 
+    @Update
+    suspend fun _updateTracks(vararg tracks: Track)
+
     /** Public methods *******************************************************/
 
     @Query("DELETE FROM Track")
@@ -59,7 +64,7 @@ interface TrackDao {
     @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
     suspend fun listTracks(): List<Track>
 
-    suspend fun listTracksBetween(from: TrackPojo, to: TrackPojo): List<TrackPojo> {
+    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo): List<TrackPojo> {
         if (from.track.title.lowercase() < to.track.title.lowercase())
             return _listTrackPojosBetween(from.track.title, to.track.title)
         return _listTrackPojosBetween(to.track.title, from.track.title)
@@ -77,7 +82,9 @@ interface TrackDao {
     @Query(
         """
         SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
-        WHERE (Track_artist = :artist OR (Track_artist IS NULL AND Album_artist = :artist)) AND Track_isInLibrary = 1
+        WHERE (
+            LOWER(Track_artist) = LOWER(:artist) OR (Track_artist IS NULL AND LOWER(Album_artist) = LOWER(:artist))
+        ) AND Track_isInLibrary = 1
         ORDER BY LOWER(Track_title)
         """
     )
@@ -99,4 +106,7 @@ interface TrackDao {
             )
         )
     }
+
+    suspend fun updateTracks(vararg tracks: Track) =
+        _updateTracks(*tracks.map { it.copy(isInLibrary = true) }.toTypedArray())
 }

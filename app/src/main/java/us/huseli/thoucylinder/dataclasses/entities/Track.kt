@@ -1,10 +1,8 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
-import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -101,12 +99,6 @@ data class Track(
         name += title
 
         return name.sanitizeFilename()
-    }
-
-    fun getContentValues() = ContentValues().apply {
-        put(MediaStore.Audio.Media.TITLE, title)
-        albumPosition?.also { put(MediaStore.Audio.Media.TRACK, it.toString()) }
-        artist?.also { put(MediaStore.Audio.Media.ARTIST, it) }
     }
 
     suspend fun getFullImage(context: Context): Bitmap? = image?.getBitmap(context) ?: youtubeVideo?.getBitmap()

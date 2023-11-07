@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,13 +21,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.compose.ListWithNumericBar
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
 
 @Composable
-fun <T : TrackPojo> TrackList(
+fun <T : AbstractTrackPojo> TrackList(
     trackPojos: LazyPagingItems<out T>,
     viewModel: AbstractBaseViewModel,
     selectedTracks: List<T>,
@@ -69,28 +67,26 @@ fun <T : TrackPojo> TrackList(
                         var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
 
                         LaunchedEffect(pojo.track.trackId) {
-                            thumbnail.value = viewModel.getTrackThumbnail(pojo, context)
+                            thumbnail.value = pojo.getThumbnail(context)
                             if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
                         }
 
-                        ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                            TrackListRow(
-                                title = pojo.track.title,
-                                isDownloadable = pojo.track.isDownloadable,
-                                modifier = modifier,
-                                downloadProgress = downloadProgressMap[pojo.track.trackId],
-                                thumbnail = thumbnail.value,
-                                duration = metadata?.duration,
-                                artist = if (showArtist) pojo.artist else null,
-                                callbacks = trackCallbacks(pojo),
-                                isSelected = selectedTracks.contains(pojo),
-                            )
-                        }
+                        TrackListRow(
+                            title = pojo.track.title,
+                            isDownloadable = pojo.track.isDownloadable,
+                            modifier = modifier,
+                            downloadProgress = downloadProgressMap[pojo.track.trackId],
+                            thumbnail = thumbnail.value,
+                            duration = metadata?.duration,
+                            artist = if (showArtist) pojo.artist else null,
+                            callbacks = trackCallbacks(pojo),
+                            isSelected = selectedTracks.contains(pojo),
+                        )
                     }
                 }
             }
         }
 
-        if (trackPojos.itemCount == 0) onEmpty?.invoke()
+        if (trackPojos.itemCount == 0 && onEmpty != null) onEmpty()
     }
 }

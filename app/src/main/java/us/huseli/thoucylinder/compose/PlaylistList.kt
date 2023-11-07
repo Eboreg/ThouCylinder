@@ -1,18 +1,12 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.QueueMusic
-import androidx.compose.material.icons.sharp.Add
 import androidx.compose.material.icons.sharp.PlayArrow
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,26 +36,13 @@ fun PlaylistList(
     viewModel: LibraryViewModel,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
-    onCreatePlaylistClick: () -> Unit,
-    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     val context = LocalContext.current
-
-    Row(
-        horizontalArrangement = Arrangement.End,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp, horizontal = 10.dp),
-    ) {
-        FilledTonalIconButton(
-            onClick = onCreatePlaylistClick,
-            content = { Icon(Icons.Sharp.Add, stringResource(R.string.add_playlist)) },
-        )
-    }
 
     ItemList(
         things = playlists,
         onClick = onPlaylistClick,
         cardHeight = 60.dp,
-        contentPadding = contentPadding,
         key = { it.playlistId },
     ) { playlist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
@@ -77,7 +58,7 @@ fun PlaylistList(
             Thumbnail(
                 image = imageBitmap.value,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholder = { Image(Icons.AutoMirrored.Sharp.QueueMusic, null) }
+                placeholderIcon = Icons.AutoMirrored.Sharp.QueueMusic,
             )
 
             Column(
@@ -95,10 +76,13 @@ fun PlaylistList(
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                 )
             }
-            IconButton(
-                onClick = { onPlaylistPlayClick(playlist) },
-                content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
-            )
+
+            if (playlist.trackCount > 0) {
+                IconButton(
+                    onClick = { onPlaylistPlayClick(playlist) },
+                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
+                )
+            }
         }
     }
 }

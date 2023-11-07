@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
 import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
@@ -124,7 +123,8 @@ fun TrackContextMenuWithButton(
         modifier = modifier,
         onClick = { isMenuShown = !isMenuShown },
         content = {
-            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.height(18.dp))
+            Icon(Icons.Sharp.MoreVert, null)
+            // Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.height(20.dp))
             TrackContextMenu(
                 callbacks = callbacks,
                 onDismissRequest = { isMenuShown = false },

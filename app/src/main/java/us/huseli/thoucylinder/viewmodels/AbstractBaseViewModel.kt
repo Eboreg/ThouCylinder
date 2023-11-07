@@ -1,30 +1,20 @@
 package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import java.util.UUID
 
 abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel() {
     val trackDownloadProgressMap = repos.youtube.trackDownloadProgressMap
-
-    suspend fun getTrackThumbnail(pojo: TrackPojo, context: Context): ImageBitmap? =
-        pojo.track.getThumbnail(context)?.asImageBitmap()
-            ?: pojo.album?.getThumbnail(context)?.asImageBitmap()
-
-    suspend fun getTrackFullImage(pojo: TrackPojo, context: Context): ImageBitmap? =
-        pojo.track.getFullImage(context)?.asImageBitmap()
-            ?: pojo.album?.getFullImage(context)?.asImageBitmap()
 
     suspend fun getTrackMetadata(track: Track): TrackMetadata? {
         if (track.metadata != null) return track.metadata
@@ -55,13 +45,13 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         repos.player.replaceAndPlay(trackPojos = pojos, startIndex = startIndex)
     }
 
-    fun playTrackPojo(pojo: TrackPojo) = repos.player.insertNextAndPlay(pojo)
+    fun playTrackPojo(pojo: AbstractTrackPojo) = repos.player.insertNextAndPlay(pojo)
 
-    fun playTrackPojoNext(pojo: TrackPojo, context: Context) = playTrackPojosNext(listOf(pojo), context)
+    fun playTrackPojoNext(pojo: AbstractTrackPojo, context: Context) = playTrackPojosNext(listOf(pojo), context)
 
-    fun playTrackPojos(pojos: List<TrackPojo>) = repos.player.replaceAndPlay(pojos)
+    fun playTrackPojos(pojos: List<AbstractTrackPojo>) = repos.player.replaceAndPlay(pojos)
 
-    fun playTrackPojosNext(pojos: List<TrackPojo>, context: Context) {
+    fun playTrackPojosNext(pojos: List<AbstractTrackPojo>, context: Context) {
         repos.player.insertNext(pojos)
         SnackbarEngine.addInfo(
             context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)

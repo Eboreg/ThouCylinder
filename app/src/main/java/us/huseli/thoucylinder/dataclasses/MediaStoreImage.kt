@@ -5,10 +5,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Environment
+import android.os.Parcelable
 import android.provider.MediaStore
 import android.util.Size
 import androidx.compose.ui.unit.dp
 import androidx.core.database.getStringOrNull
+import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
@@ -25,11 +27,12 @@ import java.io.File
 import java.util.UUID
 
 
+@Parcelize
 data class MediaStoreImage(
     val uri: Uri,
     val size: Size,
     val thumbnailUri: Uri? = null,
-) {
+) : Parcelable {
     fun ensureThumbnail(context: Context): MediaStoreImage {
         if (thumbnailUri == null) {
             getRelativePathAndFilename(context)?.also { (relativePath, filename) ->

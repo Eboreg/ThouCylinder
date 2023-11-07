@@ -1,29 +1,35 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
+import androidx.compose.material.icons.sharp.CheckCircle
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 
@@ -31,52 +37,78 @@ import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 fun AlbumGrid(
     albums: List<AlbumPojo>,
     albumCallbacks: (Album) -> AlbumCallbacks,
+    albumSelectionCallbacks: AlbumSelectionCallbacks,
+    selectedAlbums: List<Album>,
+    showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val isSelected: (AlbumPojo) -> Boolean = { selectedAlbums.contains(it.album) }
+
+    SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
         things = albums,
         onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
+        onLongClick = { pojo -> albumCallbacks(pojo.album).onAlbumLongClick?.invoke() },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         key = { it.album.albumId },
+        isSelected = isSelected,
     ) { pojo ->
-        val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+        Box(modifier = Modifier.aspectRatio(1f)) {
+            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
-        LaunchedEffect(Unit) {
-            imageBitmap.value = pojo.album.getFullImage(context)?.asImageBitmap()
+            LaunchedEffect(Unit) {
+                imageBitmap.value = pojo.album.getFullImage(context)?.asImageBitmap()
+            }
+
+            Thumbnail(
+                image = imageBitmap.value,
+                borderWidth = null,
+                placeholderIcon = Icons.Sharp.Album,
+            )
+
+            if (isSelected(pojo)) {
+                Icon(
+                    imageVector = Icons.Sharp.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().padding(10.dp),
+                    tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
+                )
+            }
         }
 
-        Thumbnail(
-            image = imageBitmap.value,
-            placeholder = {
-                Image(
-                    imageVector = Icons.Sharp.Album,
-                    contentDescription = null,
-                    alpha = 0.5f,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.padding(5.dp).weight(1f)) {
+                val artist = pojo.album.artist?.takeIf { it.isNotBlank() && showArtist }
+                val titleLines = if (artist != null) 1 else 2
+
+                Text(
+                    text = pojo.album.title,
+                    maxLines = titleLines,
+                    overflow = TextOverflow.Ellipsis,
+                    style = ThouCylinderTheme.typographyExtended.listSmallHeader,
                 )
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-                    verticalArrangement = Arrangement.Center,
-                ) {
+                if (artist != null) {
                     Text(
-                        text = pojo.album.title,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                        style = ThouCylinderTheme.typographyExtended.listNormalHeader,
+                        text = artist,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                     )
-                    pojo.album.artist?.also { artist ->
-                        Text(
-                            text = artist,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                            style = ThouCylinderTheme.typographyExtended.listNormalTitle,
-                        )
-                    }
                 }
             }
-        )
+
+            AlbumContextMenuWithButton(
+                isLocal = pojo.album.isLocal,
+                isInLibrary = pojo.album.isInLibrary,
+                callbacks = albumCallbacks(pojo.album),
+            )
+        }
     }
 }

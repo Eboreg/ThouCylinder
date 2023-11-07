@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.dataclasses.pojos
 
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -12,7 +13,7 @@ data class PlaylistTrackPojo(
     @Embedded override val album: Album?,
     @Embedded val playlist: Playlist,
     @ColumnInfo(name = "PlaylistTrack_position") val position: Int,
-) : TrackPojo(track, album) {
+) : AbstractTrackPojo() {
     fun toPlaylistTrack() =
         PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = position)
 

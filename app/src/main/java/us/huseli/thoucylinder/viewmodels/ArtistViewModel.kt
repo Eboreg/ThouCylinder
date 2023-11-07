@@ -39,7 +39,7 @@ class ArtistViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             repos.room.albumPojos
-                .map { pojos -> pojos.filter { pojo -> pojo.album.artist == artist } }
+                .map { pojos -> pojos.filter { pojo -> pojo.album.artist?.lowercase() == artist.lowercase() } }
                 .distinctUntilChanged()
                 .collect { pojos -> _albumPojos.value = pojos }
         }

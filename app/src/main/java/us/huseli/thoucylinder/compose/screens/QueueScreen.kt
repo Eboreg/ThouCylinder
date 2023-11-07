@@ -83,7 +83,7 @@ fun QueueScreen(
                     var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
 
                     LaunchedEffect(pojo.track.trackId) {
-                        thumbnail.value = viewModel.getTrackThumbnail(pojo, context)
+                        thumbnail.value = pojo.getThumbnail(context)
                         if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
                     }
 
@@ -106,7 +106,7 @@ fun QueueScreen(
                                 artist = pojo.artist,
                                 duration = metadata?.duration,
                                 callbacks = TrackCallbacks.fromAppCallbacks(
-                                    track = pojo.track,
+                                    pojo = pojo,
                                     appCallbacks = appCallbacks,
                                     onAlbumClick = pojo.album?.albumId?.let { { appCallbacks.onAlbumClick(it) } },
                                     onArtistClick = pojo.artist?.let { { appCallbacks.onArtistClick(it) } },

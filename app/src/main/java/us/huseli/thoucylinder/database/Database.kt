@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
@@ -34,7 +36,7 @@ import java.util.concurrent.Executors
         AlbumStyle::class,
     ],
     exportSchema = false,
-    version = 46,
+    version = 47,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -46,9 +48,18 @@ abstract class Database : RoomDatabase() {
     abstract fun queueDao(): QueueDao
 
     companion object {
+        private val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_length")
+                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_playlistItemId")
+                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_playlistPosition")
+            }
+        }
+
         fun build(context: Context): Database {
             val builder = Room
                 .databaseBuilder(context.applicationContext, Database::class.java, "db.sqlite3")
+                .addMigrations(MIGRATION_46_47)
                 .fallbackToDestructiveMigration()
 
             if (BuildConfig.DEBUG) {

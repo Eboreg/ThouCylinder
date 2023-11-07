@@ -1,9 +1,10 @@
 package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
-import android.util.Log
+import android.os.Environment
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -45,15 +46,24 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
         val allTracks = repos.room.listTracks()
         val albums = repos.room.listAlbums()
         val albumMultimap = albums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
-        // Collect tracks that have no Youtube connection and no existing media files:
+        // Collect tracks that have no existing media files:
         val orphanTracks = repos.mediaStore.listOrphanTracks(allTracks)
+        // Separate those that have Youtube connection from those that don't:
+        val (realOrphanTracks, youtubeOnlyTracks) = orphanTracks.partition { it.youtubeVideo == null }
         // And albums that _only_ have orphan tracks in them:
-        val orphanAlbums = albumMultimap
-            .filter { (_, tracks) -> orphanTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
-            .map { it.key }
+        val realOrphanAlbums = albumMultimap
+            .filter { (_, tracks) -> realOrphanTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
+            .keys
+        val youtubeOnlyAlbums = albumMultimap
+            .filter { (_, tracks) -> youtubeOnlyTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
+            .keys
 
-        repos.room.deleteTracks(orphanTracks)
-        repos.room.deleteAlbums(orphanAlbums)
+        // Delete the totally orphaned tracks and albums:
+        repos.room.deleteTracks(realOrphanTracks)
+        repos.room.deleteAlbums(realOrphanAlbums)
+        // Update the Youtube-only tracks and albums:
+        repos.room.updateAlbums(youtubeOnlyAlbums.map { it.copy(isLocal = false) })
+        repos.room.updateTracks(youtubeOnlyTracks.map { it.copy(mediaStoreData = null) })
     }
 
     fun deletePlaylist(pojo: PlaylistPojo, onFinish: (() -> Unit)? = null) = viewModelScope.launch {
@@ -65,21 +75,47 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
 
     fun deleteTempTracksAndAlbums() = viewModelScope.launch { repos.room.deleteTempTracksAndAlbums() }
 
-    fun downloadAndSaveAlbum(pojo: AlbumWithTracksPojo) {
+    fun downloadAndSaveAlbum(pojo: AlbumWithTracksPojo, onError: (Track, Throwable) -> Unit) {
         albumDownloadJobs[pojo.album.albumId] = viewModelScope.launch {
+            val tracks = mutableListOf<Track>()
+
             try {
-                val tracks = repos.youtube.downloadTracks(
-                    tracks = pojo.tracks,
-                    progressCallback = { repos.youtube.setAlbumDownloadProgress(pojo.album.albumId, it) },
-                )
-                val newPojo = repos.mediaStore.moveTaggedAlbumToMediaStore(
-                    pojo = pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true)),
-                    progressCallback = { repos.youtube.setAlbumDownloadProgress(pojo.album.albumId, it) },
-                )
-                repos.youtube.setAlbumDownloadProgress(pojo.album.albumId, null)
-                repos.room.saveAlbumWithTracks(newPojo)
-            } catch (e: Exception) {
-                Log.e("download", e.toString(), e)
+                pojo.tracks.map { repos.youtube.ensureVideoMetadata(it) }.forEachIndexed { index, track ->
+                    try {
+                        val tempFile = repos.youtube.downloadVideo(
+                            video = track.youtubeVideo!!,
+                            progressCallback = { downloadProgress ->
+                                repos.youtube.setAlbumDownloadProgress(
+                                    pojo.album.albumId,
+                                    downloadProgress.copy(
+                                        progress = (index + (downloadProgress.progress * 0.9)) / pojo.tracks.size
+                                    )
+                                )
+                            }
+                        )
+                        tracks.add(
+                            repos.mediaStore.moveTaggedTrackToMediaStore(
+                                track = track,
+                                tempFile = tempFile,
+                                relativePath = "${Environment.DIRECTORY_MUSIC}/${pojo.album.getMediaStoreSubdir()}",
+                                album = pojo.album,
+                                progressCallback = { downloadProgress ->
+                                    repos.youtube.setAlbumDownloadProgress(
+                                        pojo.album.albumId,
+                                        downloadProgress.copy(
+                                            progress = (index + downloadProgress.progress) / pojo.tracks.size
+                                        )
+                                    )
+                                },
+                            )
+                        )
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        onError(track, e)
+                    }
+                }
+
+                repos.room.saveAlbumWithTracks(pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true)))
             } finally {
                 repos.youtube.setAlbumDownloadProgress(pojo.album.albumId, null)
                 albumDownloadJobs -= pojo.album.albumId
@@ -89,18 +125,22 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
 
     fun downloadTrack(track: Track) = viewModelScope.launch {
         try {
-            var newTrack = repos.youtube.downloadTrack(
-                track = track,
+            var newTrack = repos.youtube.ensureVideoMetadata(track)
+            val tempFile = repos.youtube.downloadVideo(
+                video = newTrack.youtubeVideo!!,
+                progressCallback = {
+                    repos.youtube.setTrackDownloadProgress(track.trackId, it.copy(progress = it.progress * 0.8))
+                },
+            )
+            newTrack = repos.mediaStore.moveTaggedTrackToMediaStore(
+                track = newTrack,
+                tempFile = tempFile,
+                relativePath = Environment.DIRECTORY_MUSIC,
                 progressCallback = {
                     repos.youtube.setTrackDownloadProgress(track.trackId, it.copy(progress = it.progress * 0.8))
                 }
             )
-            newTrack = repos.mediaStore.moveTaggedTrackToMediaStore(newTrack) {
-                repos.youtube.setTrackDownloadProgress(track.trackId, it.copy(progress = 0.8 + (it.progress * 0.2)))
-            }
             withContext(Dispatchers.Main) { repos.room.insertTrack(newTrack) }
-        } catch (e: Exception) {
-            Log.e("downloadTrack", e.toString(), e)
         } finally {
             repos.youtube.setTrackDownloadProgress(track.trackId, null)
         }

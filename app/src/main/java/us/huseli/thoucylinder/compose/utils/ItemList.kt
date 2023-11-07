@@ -29,7 +29,7 @@ fun <T> ItemList(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     cardHeight: Dp? = 80.dp,
-    gap: Dp = 10.dp,
+    gap: Dp = 8.dp,
     key: ((item: T) -> Any)? = null,
     border: BorderStroke? = null,
     isSelected: (T) -> Boolean = { false },
@@ -74,5 +74,5 @@ fun <T> ItemList(
         }
     }
 
-    if (things.isEmpty()) onEmpty?.invoke()
+    if (things.isEmpty() && onEmpty != null) onEmpty()
 }

@@ -11,6 +11,7 @@ import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.sumOfOrNull
 
 data class AlbumWithTracksPojo(
     @Embedded override val album: Album,
@@ -38,10 +39,22 @@ data class AlbumWithTracksPojo(
     val tracks: List<Track> = emptyList(),
 ) : AbstractAlbumPojo() {
     val discCount: Int
-        get() = tracks.mapNotNull { it.discNumber }.takeIf { it.isNotEmpty() }?.max() ?: 1
+        get() = tracks.mapNotNull { it.discNumber }.maxOrNull() ?: 1
 
     val trackPojos: List<TrackPojo>
         get() = tracks.map { TrackPojo(track = it, album = album) }
+
+    override val trackCount: Int
+        get() = tracks.size
+
+    override val durationMs: Long?
+        get() = tracks.sumOfOrNull { it.metadata?.durationMs ?: it.youtubeVideo?.metadata?.durationMs }
+
+    override val minYear: Int?
+        get() = tracks.mapNotNull { it.year }.minOrNull()
+
+    override val maxYear: Int?
+        get() = tracks.mapNotNull { it.year }.maxOrNull()
 
     fun getPositionPairs(): List<PositionPair> {
         val pairs = mutableListOf<PositionPair>()

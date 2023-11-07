@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.BottomAppBarDefaults
@@ -117,10 +118,19 @@ fun ArtistScreen(
                             albumSelectionCallbacks = albumSelectionCallbacks,
                             selectedAlbums = selectedAlbums,
                             showArtist = false,
+                            onEmpty = {
+                                Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+                            },
                         )
                         DisplayType.GRID -> AlbumGrid(
                             albums = albumPojos,
                             albumCallbacks = albumCallbacks,
+                            albumSelectionCallbacks = albumSelectionCallbacks,
+                            selectedAlbums = selectedAlbums,
+                            showArtist = false,
+                            onEmpty = {
+                                Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+                            },
                         )
                     }
                 }
@@ -152,6 +162,9 @@ fun ArtistScreen(
                             selectedTracks = selectedTracks,
                             trackCallbacks = trackCallbacks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
+                            onEmpty = {
+                                Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
+                            },
                         )
                         DisplayType.GRID -> TrackGrid(
                             trackPojos = tracks,
@@ -160,6 +173,9 @@ fun ArtistScreen(
                             trackCallbacks = trackCallbacks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
                             selectedTracks = selectedTracks,
+                            onEmpty = {
+                                Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
+                            },
                         )
                     }
                 }

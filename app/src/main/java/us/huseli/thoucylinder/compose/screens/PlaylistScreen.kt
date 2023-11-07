@@ -84,15 +84,12 @@ fun PlaylistScreen(
             }
         }
 
-        if (tracks.itemCount == 0) {
-            Text(text = stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp))
-        }
-
         TrackList(
             trackPojos = tracks,
             viewModel = viewModel,
             listState = listState,
             selectedTracks = selectedTracks,
+            onEmpty = { Text(stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp)) },
             trackCallbacks = { pojo: PlaylistTrackPojo ->
                 TrackCallbacks.fromAppCallbacks(
                     pojo = pojo,
@@ -110,12 +107,13 @@ fun PlaylistScreen(
                 onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
                 onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
                 onUnselectAllClick = { viewModel.unselectAllTracks() },
-            )
-        ) {
-            SmallOutlinedButton(
-                onClick = { viewModel.removeTracks(selectedTracks) },
-                text = stringResource(R.string.add_to_playlist),
-            )
-        }
+            ),
+            extraTrackSelectionButtons = {
+                SmallOutlinedButton(
+                    onClick = { viewModel.removeTracks(selectedTracks) },
+                    text = stringResource(R.string.add_to_playlist),
+                )
+            }
+        )
     }
 }

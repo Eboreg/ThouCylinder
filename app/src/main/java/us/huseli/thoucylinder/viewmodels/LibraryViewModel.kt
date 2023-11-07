@@ -10,7 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
@@ -50,7 +50,7 @@ class LibraryViewModel @Inject constructor(
         }
 
     fun selectAlbumsFromLastSelected(to: Album) = viewModelScope.launch {
-        selectAlbumsFromLastSelected(albums = albumPojos.last().map { it.album }, to = to)
+        selectAlbumsFromLastSelected(albums = albumPojos.first().map { it.album }, to = to)
     }
 
     fun setDisplayType(value: DisplayType) {

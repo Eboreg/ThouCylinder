@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.compose
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,7 +50,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -122,8 +119,7 @@ fun BoxWithConstraintsScope.ModalCover(
     }
 
     LaunchedEffect(pojo) {
-        imageBitmap.value = pojo.track.getFullImage(context)?.asImageBitmap()
-            ?: pojo.album?.getFullImage(context)?.asImageBitmap()
+        imageBitmap.value = pojo.getFullImage(context)
     }
 
     Surface(
@@ -174,13 +170,7 @@ fun BoxWithConstraintsScope.ModalCover(
                         modifier = Modifier.padding(horizontal = thumbnailPadding),
                         image = imageBitmap.value,
                         shape = MaterialTheme.shapes.extraSmall,
-                        placeholder = {
-                            Image(
-                                imageVector = Icons.Sharp.MusicNote,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                            )
-                        },
+                        placeholderIcon = Icons.Sharp.MusicNote,
                     )
 
                     if (!isExpanded || isExpanding || isCollapsing) {
@@ -190,7 +180,7 @@ fun BoxWithConstraintsScope.ModalCover(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            pojo.track.artist?.also { artist ->
+                            pojo.artist?.also { artist ->
                                 Text(
                                     text = artist,
                                     maxLines = 1,
@@ -314,7 +304,7 @@ fun ModalCoverExpandedContent(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleLarge,
             )
-            pojo.track.artist?.also { artist ->
+            pojo.artist?.also { artist ->
                 Text(
                     text = artist,
                     maxLines = 1,

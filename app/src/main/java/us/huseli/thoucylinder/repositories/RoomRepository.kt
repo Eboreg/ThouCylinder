@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -71,7 +72,7 @@ class RoomRepository @Inject constructor(
 
     suspend fun albumExists(albumId: UUID) = albumDao.albumExists(albumId)
 
-    suspend fun deleteAlbums(albums: List<Album>) {
+    suspend fun deleteAlbums(albums: Collection<Album>) {
         val collection = getReadWriteImageCollection()
 
         albums.mapNotNull { it.albumArt }.forEach { image ->
@@ -165,7 +166,7 @@ class RoomRepository @Inject constructor(
         to: PlaylistTrackPojo,
     ): List<PlaylistTrackPojo> = playlistDao.listTracksBetween(playlistId, from, to)
 
-    suspend fun listTracksBetween(from: TrackPojo, to: TrackPojo) = trackDao.listTracksBetween(from, to)
+    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo) = trackDao.listTracksBetween(from, to)
 
     suspend fun listTracks(): List<Track> = trackDao.listTracks()
 
@@ -185,7 +186,7 @@ class RoomRepository @Inject constructor(
         val album = pojo.album.copy(albumArt = albumArt?.ensureThumbnail(context))
 
         if (albumDao.albumExists(album.albumId)) {
-            albumDao.updateAlbum(album)
+            albumDao.updateAlbums(album)
             trackDao.deleteTracksByAlbumId(album.albumId)
             albumDao.clearAlbumGenres(album.albumId)
             albumDao.clearAlbumStyles(album.albumId)
@@ -247,6 +248,10 @@ class RoomRepository @Inject constructor(
     fun unselectAllTracks(selectionKey: String) {
         _selectedTracks[selectionKey]?.also { it.value = emptyList() }
     }
+
+    suspend fun updateAlbums(albums: Collection<Album>) = albumDao.updateAlbums(*albums.toTypedArray())
+
+    suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
 
     private suspend fun getTracksFromSelection(selection: Selection): List<Track> {
         val tracks = mutableListOf<Track>()

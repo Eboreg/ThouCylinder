@@ -15,10 +15,10 @@ import kotlin.time.Duration.Companion.milliseconds
 
 data class AlbumPojo(
     @Embedded override val album: Album,
-    val durationMs: Long? = null,
-    val minYear: Int? = null,
-    val maxYear: Int? = null,
-    val trackCount: Int? = null,
+    override val durationMs: Long? = null,
+    override val minYear: Int? = null,
+    override val maxYear: Int? = null,
+    override val trackCount: Int,
     @Relation(
         parentColumn = "Album_albumId",
         entityColumn = "Genre_genreName",

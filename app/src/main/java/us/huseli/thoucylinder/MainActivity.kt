@@ -3,6 +3,8 @@ package us.huseli.thoucylinder
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.os.StrictMode
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,10 +32,20 @@ class MainActivity : ComponentActivity() {
 
         requestPermissionLauncher.launch(permissions)
 
-        setContent {
-            ThouCylinderTheme {
-                App()
+        StrictMode.setVmPolicy(
+            StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
+                .detectLeakedClosableObjects()
+                .build()
+        )
+
+        try {
+            setContent {
+                ThouCylinderTheme {
+                    App()
+                }
             }
+        } catch (e: Exception) {
+            Log.e(javaClass.simpleName, e.toString(), e)
         }
     }
 }

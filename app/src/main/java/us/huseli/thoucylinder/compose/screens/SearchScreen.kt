@@ -319,27 +319,19 @@ fun AlbumSearchResults(
                 albumSelectionCallbacks = albumSelectionCallbacks,
                 selectedAlbums = selectedAlbums,
                 onEmpty = {
-                    if (!isSearching) {
-                        Text(
-                            text = stringResource(R.string.no_albums_found),
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                        )
-                    }
-                }
+                    if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+                },
             )
         }
         DisplayType.GRID -> {
             AlbumGrid(
                 albums = albums,
                 albumCallbacks = albumCallbacks,
+                selectedAlbums = selectedAlbums,
+                albumSelectionCallbacks = albumSelectionCallbacks,
                 onEmpty = {
-                    if (!isSearching) {
-                        Text(
-                            text = stringResource(R.string.no_albums_found),
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                        )
-                    }
-                }
+                    if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+                },
             )
         }
     }
@@ -365,12 +357,8 @@ fun TrackSearchResults(
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
                 onEmpty = {
-                    if (!isSearching) {
-                        Text(
-                            text = stringResource(R.string.no_tracks_found),
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                        )
-                    }
+                    if (!isSearching)
+                        Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                 },
             )
         }
@@ -382,12 +370,8 @@ fun TrackSearchResults(
                 trackSelectionCallbacks = trackSelectionCallbacks,
                 selectedTracks = selectedTracks,
                 onEmpty = {
-                    if (!isSearching) {
-                        Text(
-                            text = stringResource(R.string.no_tracks_found),
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                        )
-                    }
+                    if (!isSearching)
+                        Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                 },
             )
         }

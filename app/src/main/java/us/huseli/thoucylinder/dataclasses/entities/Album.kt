@@ -1,14 +1,14 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
-import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
-import android.provider.MediaStore
+import android.os.Parcelable
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
@@ -17,6 +17,7 @@ import java.util.UUID
 @Entity(
     indices = [Index("Album_isInLibrary")],
 )
+@Parcelize
 data class Album(
     @PrimaryKey @ColumnInfo("Album_albumId") val albumId: UUID = UUID.randomUUID(),
     @ColumnInfo("Album_title") val title: String,
@@ -26,18 +27,9 @@ data class Album(
     @ColumnInfo("Album_year") val year: Int? = null,
     @Embedded("Album_youtubePlaylist_") val youtubePlaylist: YoutubePlaylist? = null,
     @Embedded("Album_albumArt_") val albumArt: MediaStoreImage? = null,
-) {
+) : Parcelable {
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
-
-    fun getContentValues() = ContentValues().apply {
-        put(MediaStore.Audio.Media.ALBUM, title)
-        artist?.also {
-            put(MediaStore.Audio.Media.ARTIST, it)
-            put(MediaStore.Audio.Media.ALBUM_ARTIST, it)
-        }
-        year?.also { put(MediaStore.Audio.Media.YEAR, it) }
-    }
 
     suspend fun getFullImage(context: Context): Bitmap? =
         albumArt?.getBitmap(context) ?: youtubePlaylist?.getBitmap()

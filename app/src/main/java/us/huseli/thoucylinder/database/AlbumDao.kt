@@ -146,7 +146,6 @@ interface AlbumDao {
         )
     }
 
-    suspend fun updateAlbum(album: Album) {
-        _updateAlbums(album.copy(isInLibrary = true))
-    }
+    suspend fun updateAlbums(vararg albums: Album) =
+        _updateAlbums(*albums.map { it.copy(isInLibrary = true) }.toTypedArray())
 }

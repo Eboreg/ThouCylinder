@@ -17,20 +17,20 @@ import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.deleteMediaStoreUriAndFile
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.MediaStoreData
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
 import us.huseli.thoucylinder.dataclasses.getMediaStoreEntries
+import us.huseli.thoucylinder.dataclasses.getMediaStoreEntry
+import us.huseli.thoucylinder.dataclasses.getMediaStoreFile
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.deleteMediaStoreUriAndFile
 import us.huseli.thoucylinder.escapeQuotes
-import us.huseli.thoucylinder.getMediaStoreFile
-import us.huseli.thoucylinder.getMediaStoreFileNullable
+import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
 import us.huseli.thoucylinder.getReadOnlyImageCollection
 import us.huseli.thoucylinder.getReadWriteAudioCollection
-import us.huseli.thoucylinder.isImage
 import java.io.File
 import java.io.FileNotFoundException
 import javax.inject.Inject
@@ -46,24 +46,12 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         val pathSelectors = relativePathSet.map { "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?" }
         if (pathSelectors.isEmpty()) return emptySet()
         val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND (${pathSelectors.joinToString(" OR ")})"
-        val tempDirs = pojo.tracks.mapNotNull { track ->
-            track.tempTrackData?.localFile?.parent?.let { dirname -> File(dirname).takeIf { it.isDirectory } }
-        }.toSet()
 
-        val files = context.getMediaStoreEntries(
+        return context.getMediaStoreEntries(
             collection = getReadOnlyImageCollection(),
             selection = selection,
             selectionArgs = arrayOf("cover.%", *relativePathSet.toTypedArray()),
         ).map { entry -> entry.file }.toMutableSet()
-
-        files.addAll(
-            tempDirs.flatMap { dir ->
-                dir.listFiles { file, name -> name.startsWith("cover.") && file.isImage() }
-                    ?.toList() ?: emptyList()
-            }
-        )
-
-        return files
     }
 
     fun collectArtistImages(): Map<String, File> {
@@ -81,7 +69,21 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
 
     /** AUDIO RELATED METHODS ************************************************/
 
-    fun listNewMediaStoreAlbums(existingTracks: List<Track>): List<AlbumWithTracksPojo> {
+    fun deleteImages(pojo: AlbumWithTracksPojo) {
+        deleteImagesByAlbums(listOf(pojo.album))
+        deleteImagesByTracks(pojo.tracks)
+    }
+
+    fun deleteImagesByAlbums(albums: Collection<Album>) = albums.forEach { it.albumArt?.delete(context) }
+
+    fun deleteImagesByTracks(tracks: Collection<Track>) = tracks.forEach { it.image?.delete(context) }
+
+    fun deleteTracks(tracks: Collection<Track>) = tracks
+        .mapNotNull { it.mediaStoreData?.uri }
+        .mapNotNull { context.getMediaStoreEntry(it) }
+        .forEach { it.deleteWithEmptyParentDirs(context) }
+
+    fun listNewMediaStoreAlbums(existingTracks: Collection<Track>): List<AlbumWithTracksPojo> {
         val audioCollection = getReadWriteAudioCollection()
         val projection = arrayOf(
             MediaStore.Audio.Media.RELATIVE_PATH,
@@ -202,7 +204,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         }
     }
 
-    fun listOrphanTracks(allTracks: List<Track>): List<Track> {
+    fun listOrphanTracks(allTracks: Collection<Track>): List<Track> {
         /** Collect tracks that have no existing media files. */
         return allTracks
             .filterNot { track ->
@@ -262,7 +264,6 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         return track.copy(
             metadata = metadata,
             isInLibrary = true,
-            tempTrackData = null,
             mediaStoreData = MediaStoreData(uri = mediaStoreUri, relativePath = relativePath),
             albumId = album?.albumId,
         )
@@ -270,7 +271,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
 
     fun tagAlbumTracks(pojo: AlbumWithTracksPojo) {
         pojo.tracks.forEach { track ->
-            val trackFile = getFileFromTrack(track)
+            val trackFile = track.mediaStoreData?.getFile(context)
 
             if (trackFile != null) {
                 if (!trackFile.canWrite())
@@ -290,9 +291,6 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
     }
 
     /** PRIVATE METHODS *******************************************************/
-
-    private fun getFileFromTrack(track: Track): File? =
-        track.tempTrackData?.localFile ?: track.mediaStoreData?.getFile(context)
 
     private fun getTrackContentValues(track: Track, metadata: TrackMetadata? = null, album: Album? = null) =
         ContentValues().apply {

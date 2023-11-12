@@ -28,15 +28,15 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 
 @Composable
 fun AlbumList(
-    pojos: List<AlbumPojo>,
-    albumCallbacks: (Album) -> AlbumCallbacks,
+    pojos: List<AbstractAlbumPojo>,
+    albumCallbacks: (AbstractAlbumPojo) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
     showArtist: Boolean = true,
@@ -44,7 +44,7 @@ fun AlbumList(
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val isSelected = { pojo: AlbumPojo -> selectedAlbums.contains(pojo.album) }
+    val isSelected = { pojo: AbstractAlbumPojo -> selectedAlbums.contains(pojo.album) }
 
     Column {
         SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
@@ -52,8 +52,8 @@ fun AlbumList(
         ItemList(
             things = pojos,
             isSelected = isSelected,
-            onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
-            onLongClick = { pojo -> albumCallbacks(pojo.album).onAlbumLongClick?.invoke() },
+            onClick = { pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
+            onLongClick = { pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
             onEmpty = onEmpty,
             key = { it.album.albumId },
             listState = listState,
@@ -86,13 +86,15 @@ fun AlbumList(
                         overflow = TextOverflow.Ellipsis,
                         style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                     )
-                    if (pojo.album.artist != null && showArtist) {
-                        Text(
-                            text = pojo.album.artist,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-                        )
+                    if (showArtist) {
+                        pojo.album.artist?.also { artist ->
+                            Text(
+                                text = artist,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                            )
+                        }
                     }
                     if (thirdRow != null) {
                         Text(text = thirdRow, style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary)
@@ -102,7 +104,7 @@ fun AlbumList(
                 AlbumContextMenuWithButton(
                     isLocal = pojo.album.isLocal,
                     isInLibrary = pojo.album.isInLibrary,
-                    callbacks = albumCallbacks(pojo.album),
+                    callbacks = albumCallbacks(pojo),
                 )
             }
         }

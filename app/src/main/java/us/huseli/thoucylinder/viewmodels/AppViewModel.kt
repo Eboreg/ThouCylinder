@@ -3,12 +3,15 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import android.os.Environment
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.PlaybackException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.retaintheme.toBitmap
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -17,19 +20,25 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.repositories.PlayerRepository
+import us.huseli.thoucylinder.repositories.PlayerRepositoryListener
 import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.size
-import us.huseli.thoucylinder.toBitmap
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class AppViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
+class AppViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos), PlayerRepositoryListener {
     private var albumDownloadJobs = mutableMapOf<UUID, Job>()
     private var deletedPlaylist: PlaylistPojo? = null
     private var deletedPlaylistTracks: List<PlaylistTrackPojo> = emptyList()
 
     val playlists = repos.room.playlists
+
+    init {
+        repos.player.addListener(this)
+    }
 
     fun addSelectionToPlaylist(selection: Selection, playlist: PlaylistPojo) =
         viewModelScope.launch {
@@ -40,6 +49,14 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
 
     fun createPlaylist(playlist: Playlist, selection: Selection? = null) = viewModelScope.launch {
         repos.room.insertPlaylist(playlist, selection)
+    }
+
+    fun deleteAlbumAndFiles(album: Album) = viewModelScope.launch {
+        repos.room.getAlbumWithTracks(album.albumId)?.also { pojo ->
+            repos.mediaStore.deleteImages(pojo)
+            repos.mediaStore.deleteTracks(pojo.tracks)
+            repos.room.deleteAlbumWithTracks(pojo.album)
+        }
     }
 
     fun deleteOrphanTracksAndAlbums() = viewModelScope.launch {
@@ -59,6 +76,8 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
             .keys
 
         // Delete the totally orphaned tracks and albums:
+        repos.mediaStore.deleteImagesByTracks(realOrphanTracks)
+        repos.mediaStore.deleteImagesByAlbums(realOrphanAlbums)
         repos.room.deleteTracks(realOrphanTracks)
         repos.room.deleteAlbums(realOrphanAlbums)
         // Update the Youtube-only tracks and albums:
@@ -74,6 +93,18 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
     }
 
     fun deleteTempTracksAndAlbums() = viewModelScope.launch { repos.room.deleteTempTracksAndAlbums() }
+
+    fun deleteTrackFiles(album: Album) = viewModelScope.launch {
+        repos.room.getAlbumWithTracks(album.albumId)?.also { pojo ->
+            repos.mediaStore.deleteTracks(pojo.tracks)
+            repos.room.updateTracks(pojo.tracks.map { it.copy(mediaStoreData = null) })
+            repos.room.updateAlbum(pojo.album.copy(isLocal = false))
+        }
+    }
+
+    fun downloadAndSaveAlbum(album: Album, onError: (Track, Throwable) -> Unit) = viewModelScope.launch {
+        repos.room.getAlbumWithTracks(album.albumId)?.also { downloadAndSaveAlbum(it, onError) }
+    }
 
     fun downloadAndSaveAlbum(pojo: AlbumWithTracksPojo, onError: (Track, Throwable) -> Unit) {
         albumDownloadJobs[pojo.album.albumId] = viewModelScope.launch {
@@ -155,7 +186,7 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
         newAlbums.forEach { pojo ->
             val bestBitmap = repos.mediaStore.collectAlbumImages(pojo)
                 .mapNotNull { it.toBitmap() }
-                .maxByOrNull { it.size() }
+                .maxByOrNull { it.width * it.height }
             val mediaStoreImage = bestBitmap?.let {
                 MediaStoreImage.fromBitmap(bitmap = it, album = pojo.album, context = context)
             }
@@ -184,4 +215,27 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
     private suspend fun ensureTrackMetadata(pojo: AlbumWithTracksPojo): AlbumWithTracksPojo = pojo.copy(
         tracks = pojo.tracks.map { track -> ensureTrackMetadata(track) }
     )
+
+    override fun onPlayerError(
+        error: PlaybackException,
+        currentPojo: QueueTrackPojo?,
+        lastAction: PlayerRepository.LastAction,
+    ) = viewModelScope.launch {
+        val metadataIsOld = currentPojo?.track?.youtubeVideo?.metadata?.expiresAt?.isBefore(Instant.now())
+
+        if (
+            error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
+            currentPojo != null &&
+            (currentPojo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
+        ) {
+            val track = repos.youtube.ensureVideoMetadata(currentPojo.track, forceReload = true)
+            val playUri = track.playUri
+
+            if (playUri != null && track.playUri != currentPojo.uri) {
+                repos.room.updateTrack(track)
+                repos.player.updateTrack(currentPojo.copy(track = track, uri = playUri))
+                if (repos.player.lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentPojo.position)
+            }
+        } else SnackbarEngine.addError(error.toString())
+    }
 }

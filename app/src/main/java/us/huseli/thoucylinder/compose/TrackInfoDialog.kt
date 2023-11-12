@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 
 @Composable
@@ -32,6 +33,7 @@ fun TrackInfoDialog(
     albumTitle: String? = null,
     albumArtist: String? = null,
     year: Int? = null,
+    localPath: String? = null,
     onClose: () -> Unit,
 ) {
     AlertDialog(
@@ -42,12 +44,12 @@ fun TrackInfoDialog(
         confirmButton = {},
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                TrackInfoTextRow(label = stringResource(R.string.year), value = year?.toString() ?: "-")
                 if (albumTitle != null)
                     TrackInfoTextRow(label = stringResource(R.string.album), value = albumTitle)
                 if (albumArtist != null)
                     TrackInfoTextRow(label = stringResource(R.string.album_artist), value = albumArtist)
-                metadata?.let { metadata ->
+                TrackInfoTextRow(label = stringResource(R.string.year), value = year?.toString() ?: "-")
+                metadata?.also { metadata ->
                     TrackInfoTextRow(label = stringResource(R.string.mime_type), value = metadata.mimeType)
                     TrackInfoTextRow(
                         label = stringResource(R.string.file_size),
@@ -65,13 +67,13 @@ fun TrackInfoDialog(
                         label = stringResource(R.string.sample_rate),
                         value = metadata.sampleRateString ?: "",
                     )
-                    TrackInfoTextRow(
-                        label = stringResource(R.string.loudness),
-                        value = metadata.loudnessDbString ?: "-",
-                    )
                 }
                 TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = isDownloaded)
                 TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = isOnYoutube)
+                localPath?.also {
+                    Text(text = stringResource(R.string.local_file))
+                    Text(text = it, style = ThouCylinderTheme.typographyExtended.listSmallTitle)
+                }
             }
         }
     )

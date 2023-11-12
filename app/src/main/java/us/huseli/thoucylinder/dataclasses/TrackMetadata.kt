@@ -7,8 +7,8 @@ import android.webkit.MimeTypeMap
 import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.MediaInformation
 import kotlinx.parcelize.Parcelize
-import us.huseli.thoucylinder.bytesToString
-import us.huseli.thoucylinder.formattedString
+import us.huseli.retaintheme.bytesToString
+import us.huseli.retaintheme.formattedString
 import us.huseli.thoucylinder.getIntegerOrDefault
 import java.io.File
 import kotlin.time.Duration
@@ -30,9 +30,6 @@ data class TrackMetadata(
 
     val duration: Duration
         get() = durationMs.milliseconds
-
-    val loudnessDbString: String?
-        get() = loudnessDb?.formattedString(2)?.let { "$it dB" }
 
     val sampleRateString: String?
         get() = sampleRate?.toDouble()?.div(1000)?.formattedString(1)?.let { "$it KHz" }

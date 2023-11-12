@@ -9,8 +9,6 @@ import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 
 data class AlbumPojo(
@@ -40,25 +38,5 @@ data class AlbumPojo(
     )
     override val styles: List<Style> = emptyList(),
 ) : AbstractAlbumPojo() {
-    private val years: Pair<Int, Int>?
-        get() {
-            val year = this.album.year?.takeIf { it > 1000 }
-            val minYear = this.minYear?.takeIf { it > 1000 }
-            val maxYear = this.maxYear?.takeIf { it > 1000 }
-
-            return if (year != null) Pair(year, year)
-            else if (minYear != null && maxYear != null) Pair(minYear, maxYear)
-            else null
-        }
-
-    val yearString: String?
-        get() = years?.let { (min, max) ->
-            if (min == max) min.toString()
-            else "$min–$max"
-        }
-
-    val duration: Duration?
-        get() = durationMs?.milliseconds
-
     override fun toString() = album.toString()
 }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -16,6 +17,27 @@ import java.util.UUID
 abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel() {
     val trackDownloadProgressMap = repos.youtube.trackDownloadProgressMap
 
+    fun enqueueAlbum(album: Album, context: Context) = enqueueAlbums(listOf(album), context)
+
+    fun enqueueAlbumPojos(pojos: List<AbstractAlbumPojo>, context: Context) =
+        enqueueAlbums(pojos.map { it.album }, context)
+
+    fun enqueueAlbums(albums: List<Album>, context: Context) = viewModelScope.launch {
+        repos.player.insertNext(repos.room.listAlbumTrackPojos(albums.map { it.albumId }))
+        SnackbarEngine.addInfo(
+            context.resources.getQuantityString(R.plurals.x_albums_enqueued_next, albums.size, albums.size)
+        )
+    }
+
+    fun enqueueTrackPojo(pojo: AbstractTrackPojo, context: Context) = enqueueTrackPojos(listOf(pojo), context)
+
+    fun enqueueTrackPojos(pojos: List<AbstractTrackPojo>, context: Context) {
+        repos.player.insertNext(pojos)
+        SnackbarEngine.addInfo(
+            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
+        )
+    }
+
     suspend fun getTrackMetadata(track: Track): TrackMetadata? {
         if (track.metadata != null) return track.metadata
         val youtubeMetadata = track.youtubeVideo?.metadata ?: repos.youtube.getBestMetadata(track)
@@ -24,18 +46,10 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
 
     fun playAlbum(album: Album) = playAlbums(listOf(album))
 
-    fun playAlbumNext(album: Album, context: Context) = playAlbumsNext(listOf(album), context)
+    fun playAlbumPojos(pojos: List<AbstractAlbumPojo>) = playAlbums(pojos.map { it.album })
 
     fun playAlbums(albums: List<Album>) = viewModelScope.launch {
-        val pojos = repos.room.listAlbumTrackPojos(albums.map { it.albumId })
-        repos.player.replaceAndPlay(pojos)
-    }
-
-    fun playAlbumsNext(albums: List<Album>, context: Context) = viewModelScope.launch {
-        repos.player.insertNext(repos.room.listAlbumTrackPojos(albums.map { it.albumId }))
-        SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_albums_enqueued_next, albums.size, albums.size)
-        )
+        repos.player.replaceAndPlay(repos.room.listAlbumTrackPojos(albums.map { it.albumId }))
     }
 
     fun playPlaylist(playlistId: UUID, startTrackId: UUID? = null) = viewModelScope.launch {
@@ -47,16 +61,8 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
 
     fun playTrackPojo(pojo: AbstractTrackPojo) = repos.player.insertNextAndPlay(pojo)
 
-    fun playTrackPojoNext(pojo: AbstractTrackPojo, context: Context) = playTrackPojosNext(listOf(pojo), context)
-
-    fun playTrackPojos(pojos: List<AbstractTrackPojo>) = repos.player.replaceAndPlay(pojos)
-
-    fun playTrackPojosNext(pojos: List<AbstractTrackPojo>, context: Context) {
-        repos.player.insertNext(pojos)
-        SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
-        )
-    }
+    fun playTrackPojos(pojos: List<AbstractTrackPojo>, startIndex: Int? = 0) =
+        repos.player.replaceAndPlay(pojos, startIndex)
 
     fun removeAlbumFromLibrary(album: Album) = viewModelScope.launch {
         repos.room.deleteAlbumWithTracks(album)

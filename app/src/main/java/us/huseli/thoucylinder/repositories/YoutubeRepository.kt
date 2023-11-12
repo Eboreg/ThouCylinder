@@ -16,15 +16,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import us.huseli.retaintheme.zipBy
-import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.DOWNLOAD_CHUNK_SIZE
 import us.huseli.thoucylinder.Constants.HEADER_ANDROID_SDK_VERSION
-import us.huseli.thoucylinder.Constants.HEADER_USER_AGENT
 import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_NAME
 import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_VERSION
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_EXCLUDE
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_FILTER
+import us.huseli.thoucylinder.Constants.YOUTUBE_HEADER_USER_AGENT
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
@@ -32,13 +30,11 @@ import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
-import us.huseli.thoucylinder.dataclasses.YoutubePlaylistItem
 import us.huseli.thoucylinder.dataclasses.YoutubeThumbnail
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.parseContentRange
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.yquery
 import java.io.File
@@ -66,7 +62,6 @@ class YoutubeRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gson: Gson = GsonBuilder().create()
     private val metadataCache = mutableMapOf<String, YoutubeMetadataList>()
-    private val playlistTrackCache = mutableMapOf<String, List<Track>>()
     private val responseType = object : TypeToken<Map<String, *>>() {}
 
     val albumDownloadProgressMap = _albumDownloadProgressMap.asStateFlow()
@@ -124,12 +119,14 @@ class YoutubeRepository @Inject constructor(
         return tempFile
     }
 
-    suspend fun ensureVideoMetadata(track: Track): Track =
-        if (track.youtubeVideo != null && track.youtubeVideo.metadata == null)
-            track.copy(youtubeVideo = track.youtubeVideo.copy(metadata = getBestMetadata(track.youtubeVideo.id)))
+    suspend fun ensureVideoMetadata(track: Track, forceReload: Boolean = false): Track =
+        if (track.youtubeVideo != null && (track.youtubeVideo.metadata == null || forceReload))
+            track.copy(
+                youtubeVideo = track.youtubeVideo.copy(metadata = getBestMetadata(track.youtubeVideo.id, forceReload))
+            )
         else track
 
-    suspend fun getAlbumSearchResult(query: String): List<AlbumPojo> {
+    suspend fun getAlbumSearchResult(query: String): List<AlbumWithTracksPojo> {
         val scrapedAlbums = mutableListOf<Album>()
         val encodedQuery = withContext(Dispatchers.IO) { URLEncoder.encode(query, "UTF-8") }
         val body = Request(
@@ -209,18 +206,11 @@ class YoutubeRepository @Inject constructor(
                 }
             }
 
-            // We need to get playlists using both methods (this and via the regular API) because this one is the only
-            // one that gives us "subtitle" (for secondaryContents), which may contain artist name, and the API gives
-            // us thumbnails (of reasonable sizes) and a video count. (Also, search via API costs a bunch of credits.)
-            val apiPojos = listPlaylistDetails(scrapedAlbums.mapNotNull { it.youtubePlaylist?.id })
-            return scrapedAlbums
-                .zipBy(apiPojos) { a, b -> a.youtubePlaylist?.id == b.album.youtubePlaylist?.id }
-                .map { (scrapedAlbum, apiPojo) ->
-                    AlbumPojo(
-                        album = scrapedAlbum.copy(youtubePlaylist = apiPojo.album.youtubePlaylist),
-                        trackCount = apiPojo.trackCount,
-                    )
+            return scrapedAlbums.mapNotNull { scrapedAlbum ->
+                scrapedAlbum.youtubePlaylist?.id?.let { getAlbumWithTracksFromPlaylist(it) }?.let { pojo ->
+                    pojo.copy(album = pojo.album.copy(artist = pojo.album.artist ?: scrapedAlbum.artist))
                 }
+            }
         }
         return emptyList()
     }
@@ -233,7 +223,7 @@ class YoutubeRepository @Inject constructor(
         val requestData: MutableMap<String, Any> = mutableMapOf(
             "context" to mapOf(
                 "client" to mapOf(
-                    "userAgent" to HEADER_USER_AGENT,
+                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
                     "hl" to "en",
                     "clientName" to "WEB",
                     "clientVersion" to "2.20231003.02.02",
@@ -247,7 +237,7 @@ class YoutubeRepository @Inject constructor(
         val response = Request(
             urlString = "https://www.youtube.com/youtubei/v1/search",
             headers = mapOf(
-                "User-Agent" to HEADER_USER_AGENT,
+                "User-Agent" to YOUTUBE_HEADER_USER_AGENT,
                 "content-type" to "application/json",
                 "X-YouTube-Client-Name" to "WEB",
                 "X-YouTube-Client-Version" to "2.20231003.02.02",
@@ -291,20 +281,6 @@ class YoutubeRepository @Inject constructor(
         )
     }
 
-    suspend fun populateAlbumTracks(album: Album, withMetadata: Boolean): AlbumWithTracksPojo {
-        return album.youtubePlaylist?.let { playlist ->
-            AlbumWithTracksPojo(
-                album = album,
-                tracks = listPlaylistTracks(
-                    playlist = playlist,
-                    withMetadata = withMetadata,
-                    albumId = album.albumId,
-                    isInLibrary = false,
-                ),
-            )
-        } ?: AlbumWithTracksPojo(album = album)
-    }
-
     @OptIn(ExperimentalPagingApi::class)
     fun searchTracks(query: String): Pager<Int, Track> {
         _isSearchingTracks.value = true
@@ -335,20 +311,97 @@ class YoutubeRepository @Inject constructor(
 
     /** PRIVATE METHODS ******************************************************/
 
-    private suspend fun getBestMetadata(videoId: String): YoutubeMetadata? =
-        try {
-            getMetadataList(videoId).getBest(
-                mimeTypeFilter = VIDEO_MIMETYPE_FILTER,
-                mimeTypeExclude = VIDEO_MIMETYPE_EXCLUDE,
+    private suspend fun getAlbumWithTracksFromPlaylist(playlistId: String): AlbumWithTracksPojo? {
+        val gson: Gson = GsonBuilder().create()
+        val requestData: MutableMap<String, Any> = mutableMapOf(
+            "context" to mapOf(
+                "client" to mapOf(
+                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
+                    "hl" to "en",
+                    "clientName" to "WEB",
+                    "clientVersion" to "2.20231003.02.02",
+                )
+            ),
+            "browseId" to "VL$playlistId",
+        )
+        val requestBody = gson.toJson(requestData)
+        val response = Request(
+            urlString = "https://www.youtube.com/youtubei/v1/browse",
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME,
+                "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION,
+                "Origin" to "https://www.youtube.com",
+            ),
+            method = Request.Method.POST,
+            body = requestBody.toByteArray(Charsets.UTF_8),
+        ).getJson()
+        val title = response.yquery<String>("metadata.playlistMetadataRenderer.albumName")
+            ?: response.yquery<String>("header.playlistHeaderRenderer.title.simpleText")
+        val videoCount = response.yquery<Collection<Map<*, *>>>("header.playlistHeaderRenderer.numVideosText.runs")
+            ?.firstOrNull()?.get("text") as? String
+        val artist = response.yquery<String>("header.playlistHeaderRenderer.subtitle.simpleText")
+            ?.substringBeforeLast(" • Album")
+
+        if (title != null) {
+            val thumbnailRenderer = response.yquery<Collection<Map<*, *>>>("sidebar.playlistSidebarRenderer.items")
+                ?.firstOrNull()
+                ?.yquery<Map<*, *>>("playlistSidebarPrimaryInfoRenderer.thumbnailRenderer")
+            val thumbnail =
+                thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistCustomThumbnailRenderer.thumbnail.thumbnails")
+                    ?.let { getThumbnail(it) }
+                    ?: thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistVideoThumbnailRenderer.thumbnail.thumbnails")
+                        ?.let { getThumbnail(it) }
+            val playlist = YoutubePlaylist(
+                id = playlistId,
+                title = title,
+                artist = artist,
+                videoCount = videoCount?.toInt() ?: 0,
+                thumbnail = thumbnail,
             )
-        } catch (e: Exception) {
-            Log.e("YoutubeRepository", "getBestMetadata: $e", e)
-            null
+            val tracks = mutableListOf<Track>()
+            val album = playlist.toAlbum(isInLibrary = false)
+
+            response.yquery<Collection<Map<*, *>>>("contents.twoColumnBrowseResultsRenderer.tabs")
+                ?.firstOrNull()
+                ?.yquery<Collection<Map<*, *>>>("tabRenderer.content.sectionListRenderer.contents")
+                ?.firstOrNull()
+                ?.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents")
+                ?.firstOrNull()
+                ?.yquery<Collection<Map<*, *>>>("playlistVideoListRenderer.contents")
+                ?.forEachIndexed { index, video ->
+                    val videoId = video.yquery<String>("playlistVideoRenderer.videoId")
+                    val videoTitle = video.yquery<Collection<Map<*, *>>>("playlistVideoRenderer.title.runs")
+                        ?.firstOrNull()?.get("text") as? String
+
+                    if (videoId != null && videoTitle != null) {
+                        tracks.add(
+                            YoutubeVideo(id = videoId, title = videoTitle).toTrack(
+                                isInLibrary = false,
+                                albumId = album.albumId,
+                                albumPosition = index + 1,
+                            )
+                        )
+                    }
+                }
+            return AlbumWithTracksPojo(album = album, tracks = tracks)
         }
+        return null
+    }
+
+    private suspend fun getBestMetadata(videoId: String, forceReload: Boolean = false): YoutubeMetadata? = try {
+        getMetadataList(videoId, forceReload).getBest(
+            mimeTypeFilter = VIDEO_MIMETYPE_FILTER,
+            mimeTypeExclude = VIDEO_MIMETYPE_EXCLUDE,
+        )
+    } catch (e: Exception) {
+        Log.e("YoutubeRepository", "getBestMetadata: $e", e)
+        null
+    }
 
     @Suppress("UNCHECKED_CAST")
-    private suspend fun getMetadataList(videoId: String): YoutubeMetadataList {
-        metadataCache[videoId]?.let { return it }
+    private suspend fun getMetadataList(videoId: String, forceReload: Boolean = false): YoutubeMetadataList {
+        metadataCache[videoId]?.let { if (!forceReload) return it }
 
         val gson: Gson = GsonBuilder().create()
         val data: Map<String, *> = mapOf(
@@ -357,7 +410,7 @@ class YoutubeRepository @Inject constructor(
                     "clientName" to "ANDROID",
                     "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION,
                     "androidSdkVersion" to HEADER_ANDROID_SDK_VERSION,
-                    "userAgent" to HEADER_USER_AGENT,
+                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
                     "hl" to "en",
                     "timeZone" to "UTC",
                     "utcOffsetMinutes" to 0,
@@ -377,7 +430,7 @@ class YoutubeRepository @Inject constructor(
         val response = Request(
             urlString = "https://www.youtube.com/youtubei/v1/player",
             headers = mapOf(
-                "User-Agent" to HEADER_USER_AGENT,
+                "User-Agent" to YOUTUBE_HEADER_USER_AGENT,
                 "content-type" to "application/json",
                 "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME,
                 "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION,
@@ -435,148 +488,5 @@ class YoutubeRepository @Inject constructor(
             }
         }
         return best
-    }
-
-    /**
-     * Fetches playlist details (including video counts but _not_ video details) from API.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun listPlaylistDetails(playlistIds: Collection<String>): List<AlbumPojo> {
-        val pojos = mutableListOf<AlbumPojo>()
-
-        if (playlistIds.isEmpty()) return pojos
-
-        playlistIds.toSet().chunked(50).forEach { chunk ->
-            val urlString = "https://youtube.googleapis.com/youtube/v3/playlists?part=snippet" +
-                "&part=contentDetails&maxResults=50" +
-                "&id=${chunk.joinToString(",")}&key=${BuildConfig.youtubeApiKey}"
-            var finished = false
-            var pageToken: String? = null
-
-            while (!finished) {
-                val response = Request(urlString + (pageToken?.let { "&pageToken=$it" } ?: "")).getJson()
-                val items = response["items"] as? Collection<Map<*, *>>
-
-                pageToken = response["nextPageToken"] as? String
-                finished = pageToken == null
-                items?.forEach { item ->
-                    val playlistId = item["id"] as? String
-                    val snippet = item["snippet"] as? Map<*, *>
-                    val title = snippet?.get("title") as? String
-                    val videoCount = item.yquery<Double>("contentDetails.itemCount")
-                    val thumbnails = snippet?.get("thumbnails") as? Map<*, *>
-                    val thumbnailSections = thumbnails?.values as? Collection<Map<*, *>>
-
-                    if (playlistId != null && title != null && videoCount != null && videoCount > 0) {
-                        val playlist = YoutubePlaylist(
-                            id = playlistId,
-                            title = title,
-                            videoCount = videoCount.toInt(),
-                            thumbnail = thumbnailSections?.let { getThumbnail(it) },
-                        )
-
-                        pojos.add(playlist.toAlbumPojo(isInLibrary = false))
-                    }
-                }
-            }
-        }
-
-        return pojos
-    }
-
-    /**
-     * Gets list of items (videos) belonging to a playlist, including their positions. Does not get video details;
-     * that must be done via listVideoDetails().
-     */
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun listPlaylistItems(playlistId: String): List<YoutubePlaylistItem> {
-        val urlString = "https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet" +
-            "&part=contentDetails&maxResults=50&playlistId=$playlistId&key=${BuildConfig.youtubeApiKey}"
-        var finished = false
-        var pageToken: String? = null
-        val playlistItems = mutableListOf<YoutubePlaylistItem>()
-
-        while (!finished) {
-            val response = Request(urlString + (pageToken?.let { "&pageToken=$it" } ?: "")).getJson()
-            val items = response["items"] as? Collection<Map<*, *>>
-
-            pageToken = response["nextPageToken"] as? String
-            finished = pageToken == null
-            items?.forEach { item ->
-                val playlistItemId = item["id"] as? String
-                val videoId = (item["contentDetails"] as? Map<*, *>)?.get("videoId") as? String
-                val position = (item["snippet"] as? Map<*, *>)?.get("position") as? Double
-
-                if (playlistItemId != null && videoId != null && position != null) {
-                    playlistItems.add(
-                        YoutubePlaylistItem(
-                            id = playlistItemId,
-                            videoId = videoId,
-                            position = position.toInt() + 1,
-                        )
-                    )
-                }
-            }
-        }
-
-        return playlistItems
-    }
-
-    private suspend fun listPlaylistTracks(
-        playlist: YoutubePlaylist,
-        withMetadata: Boolean,
-        isInLibrary: Boolean,
-        albumId: UUID,
-    ): List<Track> {
-        playlistTrackCache[playlist.id]?.let { return it }
-
-        val items = listPlaylistItems(playlist.id)
-        val videos = listVideoDetails(videoIds = items.map { it.videoId }, withMetadata = withMetadata)
-
-        return items
-            .sortedBy { it.position }
-            .mapNotNull { item ->
-                videos.find { it.id == item.videoId }
-                    ?.toTrack(isInLibrary = isInLibrary, albumPosition = item.position, albumId = albumId)
-            }
-            .also { playlistTrackCache[playlist.id] = it }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun listVideoDetails(videoIds: Collection<String>, withMetadata: Boolean): List<YoutubeVideo> {
-        /** Batch get details for videos with the given IDs. */
-        val videos = mutableListOf<YoutubeVideo>()
-
-        if (videoIds.isEmpty()) return videos
-
-        // Make sure all ids are unique and then divide into chunks of 50 (max number the API accepts):
-        videoIds.toSet().chunked(50).forEach { chunk ->
-            val urlString = "https://youtube.googleapis.com/youtube/v3/videos?part=contentDetails&part=snippet" +
-                "&id=${chunk.joinToString(",")}&key=${BuildConfig.youtubeApiKey}"
-            val response = Request(urlString).getJson()
-            val items = response["items"] as? Collection<Map<*, *>>
-
-            items?.forEach { item ->
-                val videoId = item["id"] as? String
-                val snippet = item["snippet"] as? Map<*, *>
-                val title = snippet?.get("title") as? String
-                val thumbnails = snippet?.get("thumbnails") as? Map<*, *>
-                val thumbnail = (thumbnails?.values as? Collection<Map<*, *>>)?.let { getThumbnail(it) }
-
-                if (videoId != null && title != null) {
-                    val metadata = if (withMetadata) getBestMetadata(videoId) else null
-                    videos.add(
-                        YoutubeVideo(
-                            id = videoId,
-                            title = title,
-                            thumbnail = thumbnail,
-                            metadata = metadata,
-                        )
-                    )
-                }
-            }
-        }
-
-        return videos
     }
 }

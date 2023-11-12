@@ -75,7 +75,7 @@ fun PlaylistScreen(
                 )
                 IconButton(
                     onClick = { appCallbacks.onDeletePlaylistClick(playlist) },
-                    content = { Icon(Icons.Sharp.Delete, stringResource(R.string.delete_playlist), tint = colors.Red) },
+                    content = { Icon(Icons.Sharp.Delete, stringResource(R.string.remove_playlist), tint = colors.Red) },
                 )
                 IconButton(
                     onClick = { viewModel.playPlaylist() },
@@ -98,14 +98,14 @@ fun PlaylistScreen(
                         if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
                         else viewModel.playPlaylist(startAt = pojo)
                     },
-                    onPlayNextClick = { viewModel.playTrackPojoNext(pojo, context) },
+                    onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
                     onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
                 )
             },
             trackSelectionCallbacks = TrackSelectionCallbacks(
                 onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
                 onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
+                onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
                 onUnselectAllClick = { viewModel.unselectAllTracks() },
             ),
             extraTrackSelectionButtons = {

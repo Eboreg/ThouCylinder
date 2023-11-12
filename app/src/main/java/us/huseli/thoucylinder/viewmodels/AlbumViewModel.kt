@@ -14,9 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
-import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
@@ -46,33 +44,27 @@ class AlbumViewModel @Inject constructor(
         }
     }
 
-    /**
-     * On-demand fetch of track metadata, because we only want to load it when it is actually going to be used.
-     * Does not save anything to DB yet.
-     */
+    fun enqueueAlbum(context: Context) {
+        _albumPojo.value?.also { pojo -> enqueueTrackPojos(pojo.trackPojos, context) }
+    }
+
     fun loadTrackMetadata(track: Track) {
+        /**
+         * On-demand fetch of track metadata, because we only want to load it
+         * when it is actually going to be used. Does not save anything to DB
+         * yet.
+         */
         if (track.metadata == null) viewModelScope.launch {
             _albumPojo.value = _albumPojo.value?.let { pojo ->
-                pojo.copy(
-                    tracks = pojo.tracks.map { if (it.trackId == track.trackId) ensureTrackMetadata(track) else it },
-                )
+                val tracks = pojo.tracks.map { if (it.trackId == track.trackId) ensureTrackMetadata(track) else it }
+                pojo.copy(tracks = tracks)
             }
         }
     }
 
     fun playAlbum(startAt: Track? = null) {
         _albumPojo.value?.also { pojo ->
-            repos.player.replaceAndPlay(
-                trackPojos = pojo.trackPojos,
-                startIndex = startAt?.let { pojo.indexOfTrack(it) },
-            )
-        }
-    }
-
-    fun playAlbumNext(context: Context) {
-        _albumPojo.value?.also { pojo ->
-            repos.player.insertNext(trackPojos = pojo.trackPojos)
-            SnackbarEngine.addInfo(context.getString(R.string.album_enqueued_next))
+            playTrackPojos(pojo.trackPojos, startAt?.let { pojo.indexOfTrack(it) })
         }
     }
 }

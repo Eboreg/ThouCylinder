@@ -57,6 +57,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.SearchViewModel
+import java.io.File
 import java.util.UUID
 
 @Composable
@@ -80,6 +81,7 @@ fun App(
     var addDownloadedAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
     var addAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
     var editAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
+    var deleteAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.importNewMediaStoreAlbums(context = context)
@@ -130,7 +132,7 @@ fun App(
         onDeletePlaylistClick = { pojo ->
             viewModel.deletePlaylist(pojo) {
                 SnackbarEngine.addInfo(
-                    message = context.getString(R.string.the_playlist_was_deleted),
+                    message = context.getString(R.string.the_playlist_was_removed),
                     actionLabel = context.getString(R.string.undo),
                     onActionPerformed = {
                         viewModel.undoDeletePlaylist { pojo ->
@@ -144,11 +146,21 @@ fun App(
                 )
             }
         },
-        onDownloadAlbumClick = { album -> addDownloadedAlbumDialogAlbum = album },
+        onDownloadAlbumClick = { album ->
+            if (album.isInLibrary) {
+                viewModel.downloadAndSaveAlbum(
+                    album = album,
+                    onError = { track, throwable ->
+                        SnackbarEngine.addError("Error on downloading $track: $throwable")
+                    }
+                )
+            } else addDownloadedAlbumDialogAlbum = album
+        },
         onDownloadTrackClick = { track -> viewModel.downloadTrack(track) },
         onEditAlbumClick = { album -> editAlbumDialogAlbum = album },
         onPlaylistClick = onPlaylistClick,
         onShowTrackInfoClick = { pojo -> infoDialogTrackPojo = pojo },
+        onDeleteAlbumClick = { album -> deleteAlbumDialogAlbum = album },
     )
 
     val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
@@ -162,10 +174,12 @@ fun App(
     infoDialogTrackPojo?.also { pojo ->
         var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
         var album by rememberSaveable { mutableStateOf(pojo.album) }
+        var localFile by rememberSaveable { mutableStateOf<File?>(null) }
 
         LaunchedEffect(Unit) {
             if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
             album = pojo.album ?: viewModel.getTrackAlbum(pojo.track)
+            localFile = pojo.track.mediaStoreData?.getFile(context)
         }
 
         TrackInfoDialog(
@@ -175,6 +189,7 @@ fun App(
             albumTitle = album?.title,
             albumArtist = album?.artist,
             year = pojo.track.year ?: album?.year,
+            localPath = localFile?.path,
             onClose = { infoDialogTrackPojo = null },
         )
     }
@@ -258,6 +273,21 @@ fun App(
                 viewModel.saveAlbumWithTracks(it)
                 viewModel.tagAlbumTracks(it)
             }
+        )
+    }
+
+    deleteAlbumDialogAlbum?.also { album ->
+        DeleteAlbumDialog(
+            album = album,
+            onCancel = { deleteAlbumDialogAlbum = null },
+            onDeleteAlbumAndFilesClick = {
+                deleteAlbumDialogAlbum = null
+                viewModel.deleteAlbumAndFiles(album)
+            },
+            onDeleteFilesClick = {
+                deleteAlbumDialogAlbum = null
+                viewModel.deleteTrackFiles(album)
+            },
         )
     }
 

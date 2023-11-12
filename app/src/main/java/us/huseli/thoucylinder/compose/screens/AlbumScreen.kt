@@ -68,7 +68,7 @@ fun AlbumScreen(
                 callbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
                     onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                    onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
+                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
                     onUnselectAllClick = { viewModel.unselectAllTracks() },
                 )
             )
@@ -148,7 +148,7 @@ fun AlbumScreen(
                                             album = pojo.album,
                                             appCallbacks = appCallbacks,
                                             onPlayClick = { viewModel.playAlbum() },
-                                            onPlayNextClick = { viewModel.playAlbumNext(context) },
+                                            onEnqueueClick = { viewModel.enqueueAlbum(context) },
                                             onRemoveFromLibraryClick = {
                                                 viewModel.removeAlbumFromLibrary(pojo.album)
                                                 appCallbacks.onBackClick()
@@ -201,7 +201,7 @@ fun AlbumScreen(
                                 if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(trackPojo)
                                 else viewModel.playAlbum(startAt = trackPojo.track)
                             },
-                            onPlayNextClick = { viewModel.playAlbumNext(context) },
+                            onEnqueueClick = { viewModel.enqueueAlbum(context) },
                             onLongClick = { viewModel.selectTracksFromLastSelected(to = trackPojo) },
                         ),
                     )

@@ -44,8 +44,8 @@ fun SelectedTracksButtons(
                     text = stringResource(R.string.play),
                 )
                 SmallOutlinedButton(
-                    onClick = callbacks.onPlayNextClick,
-                    text = stringResource(R.string.play_next),
+                    onClick = callbacks.onEnqueueClick,
+                    text = stringResource(R.string.enqueue),
                 )
                 SmallOutlinedButton(
                     onClick = callbacks.onAddToPlaylistClick,

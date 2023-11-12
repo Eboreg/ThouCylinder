@@ -25,8 +25,8 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
-import us.huseli.thoucylinder.getMediaStoreFileNullable
-import us.huseli.thoucylinder.toBitmap
+import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
+import us.huseli.retaintheme.toBitmap
 import java.io.File
 
 @Composable

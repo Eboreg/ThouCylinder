@@ -47,6 +47,7 @@ interface YoutubeSearchDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplaceToken(token: YoutubeSearchToken)
 
+    @Transaction
     suspend fun insertTracksForQuery(query: String, tracks: List<Track>) {
         _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
         tracks.forEach { track -> _insertQueryTrack(query, track.trackId) }

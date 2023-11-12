@@ -28,15 +28,15 @@ import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 
 @Composable
 fun AlbumGrid(
-    albums: List<AlbumPojo>,
-    albumCallbacks: (Album) -> AlbumCallbacks,
+    pojos: List<AbstractAlbumPojo>,
+    albumCallbacks: (AbstractAlbumPojo) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
     showArtist: Boolean = true,
@@ -44,14 +44,14 @@ fun AlbumGrid(
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val isSelected: (AlbumPojo) -> Boolean = { selectedAlbums.contains(it.album) }
+    val isSelected: (AbstractAlbumPojo) -> Boolean = { selectedAlbums.contains(it.album) }
 
     SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
-        things = albums,
-        onClick = { pojo -> albumCallbacks(pojo.album).onAlbumClick?.invoke() },
-        onLongClick = { pojo -> albumCallbacks(pojo.album).onAlbumLongClick?.invoke() },
+        things = pojos,
+        onClick = { pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
+        onLongClick = { pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         key = { it.album.albumId },
@@ -107,7 +107,7 @@ fun AlbumGrid(
             AlbumContextMenuWithButton(
                 isLocal = pojo.album.isLocal,
                 isInLibrary = pojo.album.isInLibrary,
-                callbacks = albumCallbacks(pojo.album),
+                callbacks = albumCallbacks(pojo),
             )
         }
     }

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
 import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.BookmarkBorder
+import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.InterpreterMode
@@ -102,10 +103,10 @@ fun AlbumContextMenu(
         }
 
         DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.play_next)) },
+            text = { Text(text = stringResource(R.string.enqueue)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
             onClick = {
-                callbacks.onPlayNextClick()
+                callbacks.onEnqueueClick()
                 onDismissRequest()
             }
         )
@@ -140,6 +141,15 @@ fun AlbumContextMenu(
                 },
             )
         }
+
+        DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.delete_album)) },
+            leadingIcon = { Icon(Icons.Sharp.Delete, null) },
+            onClick = {
+                callbacks.onDeleteClick()
+                onDismissRequest()
+            }
+        )
     }
 }
 

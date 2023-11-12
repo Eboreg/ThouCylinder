@@ -20,13 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.abstr.toQueueTrackPojos
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.pojos.reindexed
+import us.huseli.thoucylinder.dataclasses.pojos.toMediaItems
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -38,33 +38,39 @@ class PlayerRepository @Inject constructor(
     private val queueDao: QueueDao,
 ) : Player.Listener {
     enum class PlaybackState { STOPPED, PLAYING, PAUSED }
+    enum class LastAction { PLAY, STOP, PAUSE }
 
-    private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+    private val listeners = mutableListOf<PlayerRepositoryListener>()
+    private val mutex = Mutex()
     private val player: ExoPlayer = ExoPlayer.Builder(context).build()
+    private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var positionPollJob: Job? = null
-    private val mutex = Mutex()
 
     private val nextItemIndex: Int
         get() = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
 
-    private val _currentPositionMs = MutableStateFlow(0L)
-    private val _isShuffleEnabled = MutableStateFlow(false)
-    private val _isRepeatEnabled = MutableStateFlow(false)
-    private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
-    private val _currentPojo = MutableStateFlow<QueueTrackPojo?>(null)
     private val _canGotoNext = MutableStateFlow(player.hasNextMediaItem())
     private val _canPlay = MutableStateFlow(player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+    private val _currentPojo = MutableStateFlow<QueueTrackPojo?>(null)
+    private val _currentPositionMs = MutableStateFlow(0L)
+    private val _isRepeatEnabled = MutableStateFlow(false)
+    private val _isShuffleEnabled = MutableStateFlow(false)
+    private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
     private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
+    private var _lastAction = LastAction.STOP
 
-    val currentPositionMs = _currentPositionMs.asStateFlow()
-    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
-    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
-    val playbackState = _playbackState.asStateFlow()
-    val currentPojo = _currentPojo.asStateFlow()
     val canGotoNext = _canGotoNext.asStateFlow()
     val canPlay = _canPlay.asStateFlow()
+    val currentPojo = _currentPojo.asStateFlow()
+    val currentPositionMs = _currentPositionMs.asStateFlow()
+    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
+    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
+    val playbackState = _playbackState.asStateFlow()
     val queue = _queue.asStateFlow()
+
+    val lastAction: LastAction
+        get() = _lastAction
 
     init {
         player.addListener(this)
@@ -105,6 +111,8 @@ class PlayerRepository @Inject constructor(
         }
     }
 
+    fun addListener(listener: PlayerRepositoryListener) = listeners.add(listener)
+
     fun insertNext(trackPojos: List<AbstractTrackPojo>) = insertTracksAt(trackPojos, nextItemIndex)
 
     fun insertNextAndPlay(pojo: AbstractTrackPojo) {
@@ -112,9 +120,8 @@ class PlayerRepository @Inject constructor(
         val mediaItems = insertTracksAt(listOf(pojo), index)
 
         if (mediaItems.isNotEmpty()) {
-            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(index, 0L)
-            player.play()
+            play()
         }
     }
 
@@ -125,17 +132,25 @@ class PlayerRepository @Inject constructor(
 
     fun moveNextAndPlay(pojos: List<QueueTrackPojo>) {
         moveNext(pojos)
-        if (player.playbackState == Player.STATE_IDLE) player.prepare()
         player.seekTo(nextItemIndex, 0L)
-        player.play()
+        play()
     }
 
     fun onMoveTrackFinished(from: Int, to: Int) = player.moveMediaItem(from, to)
 
+    fun play(index: Int? = null) {
+        _lastAction = LastAction.PLAY
+        if (player.playbackState == Player.STATE_IDLE) player.prepare()
+        if (index != null) player.seekTo(index, 0L)
+        player.play()
+    }
+
     fun playOrPauseCurrent() {
         /** Plays/pauses the current item, if any. */
-        if (player.isPlaying) player.pause()
-        else player.play()
+        if (player.isPlaying) {
+            _lastAction = LastAction.PAUSE
+            player.pause()
+        } else play()
     }
 
     fun removeFromQueue(queueTracks: List<QueueTrackPojo>) {
@@ -148,16 +163,15 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun replaceAndPlay(trackPojos: List<AbstractTrackPojo>, startIndex: Int? = null) {
+    fun replaceAndPlay(trackPojos: List<AbstractTrackPojo>, startIndex: Int? = 0) {
         /** Clear queue, add tracks, play. */
         val pojos = trackPojos.toQueueTrackPojos()
 
         player.clearMediaItems()
         if (pojos.isNotEmpty()) {
             player.addMediaItems(pojos.map { it.toMediaItem() })
-            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(max(startIndex ?: 0, 0), 0L)
-            player.play()
+            play()
         }
     }
 
@@ -165,9 +179,8 @@ class PlayerRepository @Inject constructor(
 
     fun skipTo(index: Int) {
         if (player.mediaItemCount > index) {
-            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.seekTo(index, 0L)
-            player.play()
+            play()
         }
     }
 
@@ -197,13 +210,20 @@ class PlayerRepository @Inject constructor(
         player.shuffleModeEnabled = !player.shuffleModeEnabled
     }
 
+    fun updateTrack(pojo: QueueTrackPojo) {
+        player.removeMediaItem(pojo.position)
+        player.addMediaItem(pojo.position, pojo.toMediaItem())
+        if (pojo.position <= player.currentMediaItemIndex && _playbackState.value != PlaybackState.PLAYING)
+            player.seekTo(player.currentMediaItemIndex - 1, 0L)
+    }
+
     /** PRIVATE METHODS ******************************************************/
+
     private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? =
         mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
 
     private fun insertTracksAt(trackPojos: List<AbstractTrackPojo>, index: Int): List<MediaItem> {
-        val mediaItems =
-            trackPojos.mapIndexedNotNull { idx, pojo -> pojo.toQueueTrackPojo(idx + index)?.toMediaItem() }
+        val mediaItems = trackPojos.toQueueTrackPojos(startIndex = index).toMediaItems()
 
         if (mediaItems.isNotEmpty()) player.addMediaItems(index, mediaItems)
         return mediaItems
@@ -214,12 +234,14 @@ class PlayerRepository @Inject constructor(
     }
 
     /** OVERRIDDEN METHODS ***************************************************/
+
     override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
         _canGotoNext.value = availableCommands.contains(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
         _canPlay.value = availableCommands.contains(Player.COMMAND_PLAY_PAUSE)
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
+        if (isPlaying) Log.i(javaClass.simpleName, "Playing: ${player.currentMediaItem?.localConfiguration?.uri}")
         _playbackState.value =
             if (isPlaying) PlaybackState.PLAYING
             else if (player.playbackState == Player.STATE_READY && !player.playWhenReady) PlaybackState.PAUSED
@@ -278,6 +300,6 @@ class PlayerRepository @Inject constructor(
     }
 
     override fun onPlayerError(error: PlaybackException) {
-        SnackbarEngine.addError(error.toString())
+        listeners.forEach { it.onPlayerError(error, _currentPojo.value, _lastAction) }
     }
 }

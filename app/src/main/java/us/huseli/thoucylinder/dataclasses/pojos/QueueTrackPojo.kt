@@ -40,3 +40,5 @@ fun List<QueueTrackPojo>.reindexed(): List<QueueTrackPojo> = mapIndexed { index,
 
 fun List<QueueTrackPojo>.plus(item: QueueTrackPojo, index: Int): List<QueueTrackPojo> =
     toMutableList().apply { add(index, item) }.toList()
+
+fun List<QueueTrackPojo>.toMediaItems(): List<MediaItem> = map { it.toMediaItem() }

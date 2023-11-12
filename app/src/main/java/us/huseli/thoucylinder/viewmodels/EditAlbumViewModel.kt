@@ -17,7 +17,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.toBitmap
+import us.huseli.retaintheme.toBitmap
 import javax.inject.Inject
 
 @HiltViewModel

@@ -28,7 +28,7 @@ import java.util.UUID
 @Dao
 interface AlbumDao {
     /** Pseudo-private methods ***********************************************/
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun _insertAlbums(vararg albums: Album)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -111,7 +111,8 @@ interface AlbumDao {
 
     suspend fun insertAlbum(album: Album) = _insertAlbums(album.copy(isInLibrary = true))
 
-    suspend fun insertTempAlbum(album: Album) = _insertAlbums(album.copy(isInLibrary = false))
+    suspend fun insertTempAlbums(albums: List<Album>) =
+        _insertAlbums(*albums.map { it.copy(isInLibrary = false) }.toTypedArray())
 
     @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>

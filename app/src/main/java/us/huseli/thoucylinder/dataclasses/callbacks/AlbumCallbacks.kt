@@ -13,8 +13,9 @@ data class AlbumCallbacks(
     val onDownloadClick: () -> Unit,
     val onEditClick: () -> Unit,
     val onPlayClick: () -> Unit,
-    val onPlayNextClick: () -> Unit,
+    val onEnqueueClick: () -> Unit,
     val onRemoveFromLibraryClick: () -> Unit,
+    val onDeleteClick: () -> Unit,
 ) {
     companion object {
         fun fromAppCallbacks(
@@ -25,7 +26,7 @@ data class AlbumCallbacks(
             onAlbumLongClick: (() -> Unit)? = null,
             onCancelDownloadClick: (() -> Unit)? = null,
             onPlayClick: () -> Unit,
-            onPlayNextClick: () -> Unit,
+            onEnqueueClick: () -> Unit,
             onRemoveFromLibraryClick: () -> Unit,
         ) = AlbumCallbacks(
             onAddToLibraryClick = { appCallbacks.onAddAlbumToLibraryClick(album) },
@@ -38,8 +39,9 @@ data class AlbumCallbacks(
             onDownloadClick = { appCallbacks.onDownloadAlbumClick(album) },
             onEditClick = { appCallbacks.onEditAlbumClick(album) },
             onPlayClick = onPlayClick,
-            onPlayNextClick = onPlayNextClick,
+            onEnqueueClick = onEnqueueClick,
             onRemoveFromLibraryClick = onRemoveFromLibraryClick,
+            onDeleteClick = { appCallbacks.onDeleteAlbumClick(album) },
         )
     }
 }

@@ -62,12 +62,12 @@ fun TrackContextMenu(
             }
         )
 
-        callbacks.onPlayNextClick?.also { onPlayNextClick ->
+        callbacks.onEnqueueClick?.also { onEnqueueClick ->
             DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.play_next)) },
+                text = { Text(text = stringResource(R.string.enqueue)) },
                 leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
                 onClick = {
-                    onPlayNextClick()
+                    onEnqueueClick()
                     onDismissRequest()
                 }
             )

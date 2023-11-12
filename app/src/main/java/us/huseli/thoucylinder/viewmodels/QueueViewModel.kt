@@ -37,6 +37,13 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
         }
     }
 
+    fun enqueueQueueTracks(pojos: List<QueueTrackPojo>, context: Context) {
+        repos.player.moveNext(pojos)
+        SnackbarEngine.addInfo(
+            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
+        )
+    }
+
     fun onMoveTrack(from: Int, to: Int) {
         /**
          * Only does visual move while reordering, does not store anything. Call onMoveTrackFinished() when reorder
@@ -50,13 +57,6 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
     fun playQueueTracks(pojos: List<QueueTrackPojo>) = repos.player.moveNextAndPlay(pojos)
-
-    fun playQueueTracksNext(pojos: List<QueueTrackPojo>, context: Context) {
-        repos.player.moveNext(pojos)
-        SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
-        )
-    }
 
     fun removeFromQueue(queueTracks: List<QueueTrackPojo>) = repos.player.removeFromQueue(queueTracks)
 

@@ -128,7 +128,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.3.1")
+    implementation("com.github.Eboreg:RetainTheme:2.4.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

@@ -11,7 +11,7 @@ import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.sumOfOrNull
+import us.huseli.retaintheme.sumOfOrNull
 
 data class AlbumWithTracksPojo(
     @Embedded override val album: Album,

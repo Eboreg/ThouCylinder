@@ -33,12 +33,12 @@ import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.TrackGrid
 import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
 
@@ -88,17 +88,17 @@ fun ArtistScreen(
         Column {
             when (listType) {
                 ListType.ALBUMS -> {
-                    val albumCallbacks = { album: Album ->
+                    val albumCallbacks = { pojo: AbstractAlbumPojo ->
                         AlbumCallbacks.fromAppCallbacks(
-                            album = album,
+                            album = pojo.album,
                             appCallbacks = appCallbacks,
-                            onPlayClick = { viewModel.playAlbum(album) },
-                            onPlayNextClick = { viewModel.playAlbumNext(album, context) },
-                            onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(album) },
-                            onAlbumLongClick = { viewModel.selectAlbumsFromLastSelected(album) },
+                            onPlayClick = { viewModel.playAlbum(pojo.album) },
+                            onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
+                            onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(pojo.album) },
+                            onAlbumLongClick = { viewModel.selectAlbumsFromLastSelected(pojo.album) },
                             onAlbumClick = {
-                                if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(album)
-                                else appCallbacks.onAlbumClick(album.albumId)
+                                if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(pojo.album)
+                                else appCallbacks.onAlbumClick(pojo.album.albumId)
                             },
                         )
                     }
@@ -106,7 +106,7 @@ fun ArtistScreen(
                         albums = selectedAlbums,
                         appCallbacks = appCallbacks,
                         onPlayClick = { viewModel.playAlbums(selectedAlbums) },
-                        onPlayNextClick = { viewModel.playAlbumsNext(selectedAlbums, context) },
+                        onEnqueueClick = { viewModel.enqueueAlbums(selectedAlbums, context) },
                         onUnselectAllClick = { viewModel.unselectAllAlbums() },
                         onSelectAllClick = { viewModel.selectAlbums(albumPojos.map { it.album }) },
                     )
@@ -123,7 +123,7 @@ fun ArtistScreen(
                             },
                         )
                         DisplayType.GRID -> AlbumGrid(
-                            albums = albumPojos,
+                            pojos = albumPojos,
                             albumCallbacks = albumCallbacks,
                             albumSelectionCallbacks = albumSelectionCallbacks,
                             selectedAlbums = selectedAlbums,
@@ -143,14 +143,14 @@ fun ArtistScreen(
                                 if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
                                 else viewModel.playTrackPojo(pojo)
                             },
-                            onPlayNextClick = { viewModel.playTrackPojoNext(pojo, context) },
+                            onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
                             onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
                         )
                     }
                     val trackSelectionCallbacks = TrackSelectionCallbacks(
                         onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
                         onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                        onPlayNextClick = { viewModel.playTrackPojosNext(selectedTracks, context) },
+                        onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
                         onUnselectAllClick = { viewModel.unselectAllTracks() },
                     )
 

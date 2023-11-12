@@ -7,14 +7,13 @@ import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
-import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
-import us.huseli.thoucylinder.getMediaStoreFileNullable
+import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
 import java.io.File
 import java.util.UUID
 
@@ -43,54 +42,24 @@ data class Track(
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
     @Embedded("Track_mediaStoreData_") val mediaStoreData: MediaStoreData? = null,
-    @Ignore val tempTrackData: TempTrackData? = null,
 ) : Comparable<Track> {
-    constructor(
-        trackId: UUID,
-        title: String,
-        isInLibrary: Boolean,
-        artist: String?,
-        albumId: UUID?,
-        albumPosition: Int?,
-        discNumber: Int?,
-        year: Int?,
-        metadata: TrackMetadata?,
-        youtubeVideo: YoutubeVideo?,
-        image: MediaStoreImage?,
-        mediaStoreData: MediaStoreData?,
-    ) : this(
-        trackId = trackId,
-        title = title,
-        isInLibrary = isInLibrary,
-        artist = artist,
-        albumId = albumId,
-        albumPosition = albumPosition,
-        discNumber = discNumber,
-        year = year,
-        metadata = metadata,
-        youtubeVideo = youtubeVideo,
-        image = image,
-        mediaStoreData = mediaStoreData,
-        tempTrackData = null,
-    )
-
-    val playUri: Uri?
-        get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
+    private val albumPositionNonNull: Int
+        get() = albumPosition ?: 0
 
     val discNumberNonNull: Int
         get() = discNumber ?: 1
 
-    private val albumPositionNonNull: Int
-        get() = albumPosition ?: 0
+    val isDownloadable: Boolean
+        get() = !isDownloaded && isOnYoutube
+
+    val isDownloaded: Boolean
+        get() = mediaStoreData != null
 
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
-    val isDownloaded: Boolean
-        get() = mediaStoreData != null || tempTrackData != null
-
-    val isDownloadable: Boolean
-        get() = !isDownloaded && isOnYoutube
+    val playUri: Uri?
+        get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
 
     fun generateBasename(): String {
         var name = ""
@@ -125,11 +94,6 @@ data class Track(
 
     override fun toString(): String = toString(showAlbumPosition = true, showArtist = true)
 }
-
-
-data class TempTrackData(
-    val localFile: File,
-)
 
 
 data class MediaStoreData(

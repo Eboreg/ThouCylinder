@@ -9,7 +9,6 @@ import android.os.Parcelable
 import android.provider.MediaStore
 import android.util.Size
 import androidx.compose.ui.unit.dp
-import androidx.core.database.getStringOrNull
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
@@ -18,11 +17,10 @@ import us.huseli.thoucylinder.Constants.IMAGE_SUBDIR_ALBUM
 import us.huseli.thoucylinder.Constants.IMAGE_SUBDIR_TRACK
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.getMediaStoreFileNullable
 import us.huseli.thoucylinder.getReadWriteImageCollection
-import us.huseli.thoucylinder.scaleToMaxSize
-import us.huseli.thoucylinder.substringMax
-import us.huseli.thoucylinder.toBitmap
+import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.retaintheme.substringMax
+import us.huseli.retaintheme.toBitmap
 import java.io.File
 import java.util.UUID
 
@@ -33,13 +31,19 @@ data class MediaStoreImage(
     val size: Size,
     val thumbnailUri: Uri? = null,
 ) : Parcelable {
+    fun delete(context: Context) {
+        /** Deletes both mediastore entry and physical file. */
+        context.deleteMediaStoreUriAndFile(uri)
+        thumbnailUri?.also { context.deleteMediaStoreUriAndFile(it) }
+    }
+
     fun ensureThumbnail(context: Context): MediaStoreImage {
         if (thumbnailUri == null) {
-            getRelativePathAndFilename(context)?.also { (relativePath, filename) ->
-                val uri = getThumbnailBitmap(context)?.let { bitmap ->
-                    thumbnailFromBitmap(bitmap, relativePath, filename, context)
+            context.getMediaStoreEntry(uri)?.also { entry ->
+                val thumbnailUri = getThumbnailBitmap(context)?.let { bitmap ->
+                    thumbnailFromBitmap(bitmap, entry.relativePath, entry.filename, context)
                 }
-                return copy(thumbnailUri = uri)
+                return copy(thumbnailUri = thumbnailUri)
             }
         }
         return this
@@ -49,28 +53,9 @@ data class MediaStoreImage(
 
     fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
 
-    fun getRelativePathAndFilename(context: Context): Pair<String, String>? = getRelativePathAndFilename(uri, context)
-
     fun getThumbnailBitmap(context: Context): Bitmap? =
         thumbnailUri?.let { context.getMediaStoreFileNullable(it)?.toBitmap() }
             ?: getBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)
-
-    fun getThumbnailRelativePathAndFilename(context: Context): Pair<String, String>? =
-        thumbnailUri?.let { getRelativePathAndFilename(it, context) }
-
-    private fun getRelativePathAndFilename(uri: Uri, context: Context): Pair<String, String>? {
-        val projection = arrayOf(MediaStore.Images.Media.RELATIVE_PATH, MediaStore.Images.Media.DISPLAY_NAME)
-        context.contentResolver.query(uri, projection, null, null)!!.use { cursor ->
-            val relativePathIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
-            val displayNameIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            if (cursor.moveToNext()) {
-                val relativePath = cursor.getStringOrNull(relativePathIdx)
-                val filename = cursor.getStringOrNull(displayNameIdx)
-                if (relativePath != null && filename != null) return relativePath to filename
-            }
-        }
-        return null
-    }
 
     companion object {
         private val albumRelativePath = "${Environment.DIRECTORY_PICTURES}/$IMAGE_SUBDIR_ALBUM"

@@ -15,12 +15,13 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.min
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -33,8 +34,10 @@ class SearchViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     private val _filteredQuery = _query.filter { it.length >= 3 }.distinctUntilChanged()
     private val _localAlbums = MutableStateFlow<List<AlbumPojo>>(emptyList())
-    private val _youtubeAlbums = MutableStateFlow<List<AlbumPojo>>(emptyList())
+    private val _youtubeAlbums = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
     private val _youtubeTracks = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
+    private val _selectedYoutubeAlbumPojos = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
+    private val _selectedLocalAlbumPojos = MutableStateFlow<List<AlbumPojo>>(emptyList())
 
     val localAlbumPojos = _filteredQuery.flatMapLatest { query ->
         _isSearchingLocalAlbums.value = true
@@ -48,9 +51,10 @@ class SearchViewModel @Inject constructor(
         }
     }.distinctUntilChanged()
 
+    val selectedLocalAlbumPojos = _selectedLocalAlbumPojos.asStateFlow()
     val youtubeAlbums = _youtubeAlbums.asStateFlow()
     val youtubeTracksPaging = _youtubeTracks.asStateFlow()
-    val selectedYoutubeAlbums = repos.room.getSelectedAlbumFlow("${javaClass.simpleName}-youtube")
+    val selectedYoutubeAlbumPojos = _selectedYoutubeAlbumPojos.asStateFlow()
     val selectedYoutubeTracks = repos.room.getSelectedTrackFlow("${javaClass.simpleName}-youtube")
     val isSearchingYoutubeTracks = repos.youtube.isSearchingTracks
     val isSearchingYoutubeAlbums = _isSearchingYoutubeAlbums.asStateFlow()
@@ -59,20 +63,6 @@ class SearchViewModel @Inject constructor(
 
     suspend fun ensureVideoMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
         pojos.map { pojo -> pojo.copy(track = repos.youtube.ensureVideoMetadata(pojo.track)) }
-
-    suspend fun populateTempAlbums(albums: List<Album>): List<AlbumWithTracksPojo> {
-        val pojos = mutableListOf<AlbumWithTracksPojo>()
-        albums.forEach { album ->
-            if (!repos.room.albumExists(album.albumId)) {
-                val pojo = repos.youtube.populateAlbumTracks(album = album, withMetadata = true)
-                repos.room.insertTempAlbumWithTracks(pojo)
-                pojos.add(pojo)
-            } else {
-                pojos.add(repos.room.getAlbumWithTracks(album.albumId)!!)
-            }
-        }
-        return pojos
-    }
 
     fun search(query: String) {
         if (query != _query.value) {
@@ -83,14 +73,14 @@ class SearchViewModel @Inject constructor(
                 _isSearchingYoutubeAlbums.value = true
 
                 viewModelScope.launch {
-                    _youtubeAlbums.value = repos.youtube.getAlbumSearchResult(query)
+                    val pojos = repos.youtube.getAlbumSearchResult(query)
+                    repos.room.insertTempAlbumsWithTracks(pojos)
+                    _youtubeAlbums.value = pojos
                     _isSearchingYoutubeAlbums.value = false
                 }
                 viewModelScope.launch {
                     repos.youtube.searchTracks(query).flow.map { pagingData ->
-                        pagingData.map {
-                            TrackPojo(track = it, album = null)
-                        }
+                        pagingData.map { TrackPojo(track = it, album = null) }
                     }.cachedIn(viewModelScope).collectLatest {
                         _youtubeTracks.value = it
                     }
@@ -99,18 +89,68 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun selectLocalAlbumsFromLastSelected(to: Album) =
-        selectAlbumsFromLastSelected(albums = _localAlbums.value.map { it.album }, to = to)
+    fun selectAllLocalAlbums() {
+        _selectedLocalAlbumPojos.value = _localAlbums.value
+    }
 
-    fun selectYoutubeAlbumsFromLastSelected(to: Album) =
-        selectAlbumsFromLastSelected(albums = _youtubeAlbums.value.map { it.album }, to = to)
+    fun selectAllYoutubeAlbums() {
+        _selectedYoutubeAlbumPojos.value = _youtubeAlbums.value
+    }
 
-    fun toggleSelectedYoutube(album: Album) = repos.room.toggleAlbumSelected("${javaClass.simpleName}-youtube", album)
+    fun selectLocalAlbumsFromLastSelected(to: AlbumPojo) {
+        val pojos = _localAlbums.value
+        val lastSelected = _selectedLocalAlbumPojos.value.lastOrNull()
+
+        if (lastSelected != null) {
+            val thisIdx = pojos.indexOf(to)
+            val lastSelectedIdx = pojos.indexOf(lastSelected)
+            val currentIds = _selectedLocalAlbumPojos.value.map { it.album.albumId }
+            val selection = pojos.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1)
+
+            _selectedLocalAlbumPojos.value += selection.filter { !currentIds.contains(it.album.albumId) }
+        } else {
+            _selectedLocalAlbumPojos.value = listOf(to)
+        }
+    }
+
+    fun selectYoutubeAlbumsFromLastSelected(to: AlbumWithTracksPojo) {
+        val pojos = _youtubeAlbums.value
+        val lastSelected = _selectedYoutubeAlbumPojos.value.lastOrNull()
+
+        if (lastSelected != null) {
+            val thisIdx = pojos.indexOf(to)
+            val lastSelectedIdx = pojos.indexOf(lastSelected)
+            val currentIds = _selectedYoutubeAlbumPojos.value.map { it.album.albumId }
+            val selection = pojos.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1)
+
+            _selectedYoutubeAlbumPojos.value += selection.filter { !currentIds.contains(it.album.albumId) }
+        } else {
+            _selectedYoutubeAlbumPojos.value = listOf(to)
+        }
+    }
+
+    fun toggleSelectedLocal(pojo: AlbumPojo) {
+        if (_selectedLocalAlbumPojos.value.contains(pojo))
+            _selectedLocalAlbumPojos.value -= pojo
+        else _selectedLocalAlbumPojos.value += pojo
+    }
+
+    fun toggleSelectedYoutube(pojo: AlbumWithTracksPojo) {
+        if (_selectedYoutubeAlbumPojos.value.contains(pojo))
+            _selectedYoutubeAlbumPojos.value -= pojo
+        else _selectedYoutubeAlbumPojos.value += pojo
+    }
 
     fun toggleSelectedYoutube(track: TrackPojo) =
         repos.room.toggleTrackSelected("${javaClass.simpleName}-youtube", track)
 
-    fun unselectAllYoutubeAlbums() = repos.room.unselectAllAlbums("${javaClass.simpleName}-youtube")
+    fun unselectAllLocalAlbums() {
+        _selectedLocalAlbumPojos.value = emptyList()
+    }
+
+    fun unselectAllYoutubeAlbums() {
+        _selectedYoutubeAlbumPojos.value = emptyList()
+    }
 
     fun unselectAllYoutubeTracks() = repos.room.unselectAllTracks("${javaClass.simpleName}-youtube")
 }

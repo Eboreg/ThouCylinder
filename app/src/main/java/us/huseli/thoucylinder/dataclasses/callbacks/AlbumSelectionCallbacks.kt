@@ -6,7 +6,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 data class AlbumSelectionCallbacks(
     val onAddToPlaylistClick: () -> Unit,
     val onPlayClick: () -> Unit,
-    val onPlayNextClick: () -> Unit,
+    val onEnqueueClick: () -> Unit,
     val onSelectAllClick: (() -> Unit)? = null,
     val onUnselectAllClick: () -> Unit,
 ) {
@@ -14,13 +14,13 @@ data class AlbumSelectionCallbacks(
         albums: List<Album>,
         appCallbacks: AppCallbacks,
         onPlayClick: () -> Unit,
-        onPlayNextClick: () -> Unit,
+        onEnqueueClick: () -> Unit,
         onSelectAllClick: (() -> Unit)? = null,
         onUnselectAllClick: () -> Unit,
     ) : this(
         onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(albums = albums)) },
         onPlayClick = onPlayClick,
-        onPlayNextClick = onPlayNextClick,
+        onEnqueueClick = onEnqueueClick,
         onSelectAllClick = onSelectAllClick,
         onUnselectAllClick = onUnselectAllClick,
     )

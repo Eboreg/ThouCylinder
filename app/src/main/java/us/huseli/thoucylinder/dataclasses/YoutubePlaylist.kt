@@ -21,15 +21,12 @@ data class YoutubePlaylist(
     suspend fun saveMediaStoreImage(context: Context): MediaStoreImage? =
         thumbnail?.url?.let { MediaStoreImage.fromUrl(url = it, playlist = this, context = context) }
 
-    fun toAlbumPojo(isInLibrary: Boolean) = AlbumPojo(
-        album = Album(
-            title = title,
-            isInLibrary = isInLibrary,
-            isLocal = false,
-            artist = artist,
-            youtubePlaylist = this,
-        ),
-        trackCount = videoCount,
+    fun toAlbum(isInLibrary: Boolean) = Album(
+        title = title,
+        isInLibrary = isInLibrary,
+        isLocal = false,
+        artist = artist,
+        youtubePlaylist = this,
     )
 
     override fun toString() = "${artist?.let { "$it - $title" } ?: title} ($videoCount videos)"

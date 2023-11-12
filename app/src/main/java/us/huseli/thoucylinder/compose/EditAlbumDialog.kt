@@ -90,7 +90,7 @@ fun EditAlbumDialog(
         onCancel()
     }
 
-    LaunchedEffect(initialAlbumPojo) {
+    LaunchedEffect(initialAlbumPojo.album.albumId) {
         viewModel.setAlbum(initialAlbumPojo, context)
     }
 

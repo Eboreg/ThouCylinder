@@ -6,7 +6,6 @@ import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import java.io.File
 import java.time.Instant
 import java.util.UUID
 
@@ -29,14 +28,6 @@ object Converters {
     @TypeConverter
     @JvmStatic
     fun stringToUuid(value: String?): UUID? = value?.let { UUID.fromString(it) }
-
-    @TypeConverter
-    @JvmStatic
-    fun fileToString(value: File?): String? = value?.toString()
-
-    @TypeConverter
-    @JvmStatic
-    fun stringToFile(value: String?): File? = value?.let { File(it) }
 
     @TypeConverter
     @JvmStatic

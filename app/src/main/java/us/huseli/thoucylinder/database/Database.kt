@@ -36,7 +36,7 @@ import java.util.concurrent.Executors
         AlbumStyle::class,
     ],
     exportSchema = false,
-    version = 47,
+    version = 50,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

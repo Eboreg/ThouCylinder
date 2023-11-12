@@ -9,7 +9,7 @@ class TrackCallbacks(
     val onArtistClick: (() -> Unit)? = null,
     val onDownloadClick: () -> Unit,
     val onLongClick: (() -> Unit)? = null,
-    val onPlayNextClick: (() -> Unit)? = null,
+    val onEnqueueClick: (() -> Unit)? = null,
     val onShowInfoClick: () -> Unit,
     val onTrackClick: (() -> Unit)? = null,
 ) {
@@ -21,7 +21,7 @@ class TrackCallbacks(
             onAlbumClick: (() -> Unit)? = null,
             onArtistClick: (() -> Unit)? = null,
             onLongClick: (() -> Unit)? = null,
-            onPlayNextClick: (() -> Unit)? = null,
+            onEnqueueClick: (() -> Unit)? = null,
             onTrackClick: (() -> Unit)? = null,
         ) = TrackCallbacks(
             onAddToPlaylistClick = onAddToPlaylistClick
@@ -30,7 +30,7 @@ class TrackCallbacks(
             onArtistClick = onArtistClick ?: pojo.artist?.let { { appCallbacks.onArtistClick(it) } },
             onDownloadClick = { appCallbacks.onDownloadTrackClick(pojo.track) },
             onLongClick = onLongClick,
-            onPlayNextClick = onPlayNextClick,
+            onEnqueueClick = onEnqueueClick,
             onShowInfoClick = { appCallbacks.onShowTrackInfoClick(pojo) },
             onTrackClick = onTrackClick,
         )

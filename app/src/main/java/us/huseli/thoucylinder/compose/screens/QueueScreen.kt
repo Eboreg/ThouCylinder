@@ -57,7 +57,7 @@ fun QueueScreen(
             callbacks = TrackSelectionCallbacks(
                 onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(queueTracks = selectedTracks)) },
                 onPlayClick = { viewModel.playQueueTracks(selectedTracks) },
-                onPlayNextClick = { viewModel.playQueueTracksNext(selectedTracks, context) },
+                onEnqueueClick = { viewModel.enqueueQueueTracks(selectedTracks, context) },
                 onUnselectAllClick = { viewModel.unselectAllQueueTracks() },
             ),
             extraButtons = {

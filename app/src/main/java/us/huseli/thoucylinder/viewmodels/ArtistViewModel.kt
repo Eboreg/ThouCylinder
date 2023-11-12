@@ -45,15 +45,15 @@ class ArtistViewModel @Inject constructor(
         }
     }
 
+    fun selectAlbumsFromLastSelected(to: Album) = viewModelScope.launch {
+        selectAlbumsFromLastSelected(albums = _albumPojos.value.map { it.album }, to = to)
+    }
+
     fun setDisplayType(value: DisplayType) {
         _displayType.value = value
     }
 
     fun setListType(value: ListType) {
         _listType.value = value
-    }
-
-    fun selectAlbumsFromLastSelected(to: Album) = viewModelScope.launch {
-        selectAlbumsFromLastSelected(albums = _albumPojos.value.map { it.album }, to = to)
     }
 }

@@ -6,7 +6,6 @@ import android.os.Parcelable
 import androidx.room.Embedded
 import kotlinx.parcelize.Parcelize
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 
 @Parcelize
 data class YoutubePlaylist(

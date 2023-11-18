@@ -4,7 +4,6 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.core.net.toUri
 import kotlinx.parcelize.Parcelize
-import java.time.Instant
 
 @Parcelize
 data class YoutubeMetadata(
@@ -39,17 +38,14 @@ data class YoutubeMetadata(
         durationMs = durationMs,
     )
 
-    val quality: Long
-        get() = bitrate.toLong() * sampleRate.toLong()
-
     val fileExtension: String
         get() = (codecs.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
 
+    val quality: Long
+        get() = bitrate.toLong() * sampleRate.toLong()
+
     val uri: Uri
         get() = url.toUri()
-
-    val expiresAt: Instant?
-        get() = uri.getQueryParameter("expire")?.toLong()?.let { Instant.ofEpochSecond(it) }
 
     fun toTrackMetadata() = TrackMetadata(
         durationMs = durationMs ?: 0L,

@@ -20,6 +20,7 @@ data class AppCallbacks(
     val onDownloadTrackClick: (Track) -> Unit,
     val onEditAlbumClick: (Album) -> Unit,
     val onPlaylistClick: (UUID) -> Unit,
+    val onRemoveAlbumFromLibraryClick: (Album) -> Unit,
     val onShowTrackInfoClick: (AbstractTrackPojo) -> Unit,
     val onDeleteAlbumClick: (Album) -> Unit,
 )

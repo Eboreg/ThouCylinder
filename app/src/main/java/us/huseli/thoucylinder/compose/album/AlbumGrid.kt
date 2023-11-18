@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +61,7 @@ fun AlbumGrid(
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
             LaunchedEffect(Unit) {
-                imageBitmap.value = pojo.album.getFullImage(context)?.asImageBitmap()
+                imageBitmap.value = pojo.getFullImage(context)?.asImageBitmap()
             }
 
             Thumbnail(

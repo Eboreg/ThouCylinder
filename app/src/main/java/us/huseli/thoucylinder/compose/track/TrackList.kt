@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,8 +12,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -54,7 +52,7 @@ fun <T : AbstractTrackPojo> TrackList(
             listSize = trackPojos.itemCount,
             modifier = Modifier.padding(horizontal = 10.dp),
         ) {
-            val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
+            val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
 
             LazyColumn(
                 state = listState,
@@ -64,20 +62,19 @@ fun <T : AbstractTrackPojo> TrackList(
                 items(count = trackPojos.itemCount) { index ->
                     trackPojos[index]?.let { pojo ->
                         val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
-                        var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
 
                         LaunchedEffect(pojo.track.trackId) {
                             thumbnail.value = pojo.getThumbnail(context)
-                            if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
+                            viewModel.ensureTrackMetadata(pojo.track, commit = true)
                         }
 
                         TrackListRow(
                             title = pojo.track.title,
                             isDownloadable = pojo.track.isDownloadable,
                             modifier = modifier,
-                            downloadProgress = downloadProgressMap[pojo.track.trackId],
+                            progressData = progressDataMap[pojo.track.trackId],
                             thumbnail = thumbnail.value,
-                            duration = metadata?.duration,
+                            duration = pojo.track.metadata?.duration,
                             artist = if (showArtist) pojo.artist else null,
                             callbacks = trackCallbacks(pojo),
                             isSelected = selectedTracks.contains(pojo),

@@ -2,6 +2,7 @@
 
 package us.huseli.thoucylinder.database
 
+import android.net.Uri
 import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
@@ -60,6 +61,15 @@ interface TrackDao {
 
     suspend fun insertTempTracks(tracks: List<Track>) =
         _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
+
+    @Query(
+        """
+        SELECT Track_image_uri FROM Track WHERE Track_image_uri IS NOT NULL
+        UNION
+        SELECT Track_image_thumbnailUri FROM Track WHERE Track_image_thumbnailUri IS NOT NULL
+        """
+    )
+    suspend fun listImageUris(): List<Uri>
 
     @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
     suspend fun listTracks(): List<Track>

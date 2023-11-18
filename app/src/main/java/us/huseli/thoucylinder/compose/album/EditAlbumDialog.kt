@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.clickable
@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.DiscogsMasterDropdown
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage

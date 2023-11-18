@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,13 +26,13 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.AlbumGrid
-import us.huseli.thoucylinder.compose.AlbumList
+import us.huseli.thoucylinder.compose.album.AlbumGrid
+import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.compose.TrackGrid
-import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.compose.track.TrackGrid
+import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
@@ -66,7 +66,7 @@ fun ArtistScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
-                    content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
+                    content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) }
                 )
                 Text(
                     text = artist,
@@ -94,7 +94,6 @@ fun ArtistScreen(
                             appCallbacks = appCallbacks,
                             onPlayClick = { viewModel.playAlbum(pojo.album) },
                             onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
-                            onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(pojo.album) },
                             onAlbumLongClick = { viewModel.selectAlbumsFromLastSelected(pojo.album) },
                             onAlbumClick = {
                                 if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(pojo.album)

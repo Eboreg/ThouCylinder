@@ -1,8 +1,9 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
-import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
+import androidx.compose.material.icons.sharp.Bookmark
+import androidx.compose.material.icons.sharp.PlaylistAdd
+import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
@@ -41,46 +42,15 @@ fun AlbumContextMenu(
         expanded = expanded,
     ) {
         if (!isLocal && !light) {
-            /**
-             * For some completely inexplicable reason, the app crashes with "index out of bounds" if album is
-             * removed from library while in album list. Apparently the lazy list logic tries to look ahead based on
-             * a list where the album still exists, even though it has been removed. D-:
-             * Maybe related (though I don't run the same compose versions):
-             * https://issuetracker.google.com/issues/307592542
-             * https://issuetracker.google.com/issues/306301019
-             * https://stackoverflow.com/questions/77357872/why-is-android-compose-lazycolumn-now-failing-with-indexoutofbounds-exception-fo
-             */
-            /*
-            if (isInLibrary) {
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.remove_from_library)) },
-                    leadingIcon = { Icon(Icons.Sharp.Bookmark, null) },
-                    onClick = {
-                        callbacks.onRemoveFromLibraryClick()
-                        onDismissRequest()
-                    },
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.add_to_library)) },
-                    leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
-                    onClick = {
-                        callbacks.onAddToLibraryClick()
-                        onDismissRequest()
-                    },
-                )
-            }
-             */
-            if (!isInLibrary) {
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.add_to_library)) },
-                    leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
-                    onClick = {
-                        callbacks.onAddToLibraryClick()
-                        onDismissRequest()
-                    },
-                )
-            }
+            if (!isInLibrary) DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.add_to_library)) },
+                leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
+                onClick = {
+                    callbacks.onAddToLibraryClick()
+                    onDismissRequest()
+                },
+            )
+
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.download)) },
                 leadingIcon = { Icon(Icons.Sharp.Download, null) },
@@ -91,40 +61,36 @@ fun AlbumContextMenu(
             )
         }
 
-        if (!light) {
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.play)) },
-                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
-                onClick = {
-                    callbacks.onPlayClick()
-                    onDismissRequest()
-                }
-            )
-        }
+        if (!light) DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.play)) },
+            leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
+            onClick = {
+                callbacks.onPlayClick()
+                onDismissRequest()
+            }
+        )
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.enqueue)) },
-            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+            leadingIcon = { Icon(Icons.Sharp.PlaylistPlay, null) },
             onClick = {
                 callbacks.onEnqueueClick()
                 onDismissRequest()
             }
         )
 
-        if (isInLibrary) {
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.edit)) },
-                leadingIcon = { Icon(Icons.Sharp.Edit, null) },
-                onClick = {
-                    callbacks.onEditClick()
-                    onDismissRequest()
-                },
-            )
-        }
+        if (isInLibrary) DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.edit)) },
+            leadingIcon = { Icon(Icons.Sharp.Edit, null) },
+            onClick = {
+                callbacks.onEditClick()
+                onDismissRequest()
+            },
+        )
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
-            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
+            leadingIcon = { Icon(Icons.Sharp.PlaylistAdd, null) },
             onClick = {
                 callbacks.onAddToPlaylistClick()
                 onDismissRequest()
@@ -142,7 +108,16 @@ fun AlbumContextMenu(
             )
         }
 
-        DropdownMenuItem(
+        if (!light && !isLocal && isInLibrary) DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.remove_from_library)) },
+            leadingIcon = { Icon(Icons.Sharp.Bookmark, null) },
+            onClick = {
+                callbacks.onRemoveFromLibraryClick()
+                onDismissRequest()
+            },
+        )
+
+        if (isLocal) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.delete_album)) },
             leadingIcon = { Icon(Icons.Sharp.Delete, null) },
             onClick = {

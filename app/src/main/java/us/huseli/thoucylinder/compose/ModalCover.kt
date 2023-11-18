@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,13 +58,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.track.TrackContextMenu
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.getAverageColor
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import kotlin.math.absoluteValue
@@ -94,6 +99,8 @@ fun BoxWithConstraintsScope.ModalCover(
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var isExpanding by rememberSaveable { mutableStateOf(false) }
     var isCollapsing by rememberSaveable { mutableStateOf(false) }
+    val baseBackgroundColor = BottomAppBarDefaults.containerColor
+    var backgroundColor by remember { mutableStateOf(baseBackgroundColor) }
 
     val animationSpec = tween<Dp>(150)
     val boxHeight by animateDpAsState(
@@ -122,8 +129,18 @@ fun BoxWithConstraintsScope.ModalCover(
         imageBitmap.value = pojo.getFullImage(context)
     }
 
+    LaunchedEffect(imageBitmap.value) {
+        withContext(Dispatchers.IO) {
+            backgroundColor = imageBitmap.value
+                ?.getAverageColor()
+                ?.copy(alpha = 0.3f)
+                ?.compositeOver(baseBackgroundColor)
+                ?: baseBackgroundColor
+        }
+    }
+
     Surface(
-        color = BottomAppBarDefaults.containerColor,
+        color = backgroundColor,
         tonalElevation = tonalElevation,
         modifier = modifier
             .height(boxHeight)

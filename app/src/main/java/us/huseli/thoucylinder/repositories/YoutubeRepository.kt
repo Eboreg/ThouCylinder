@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.toDuration
 import us.huseli.thoucylinder.Constants.DOWNLOAD_CHUNK_SIZE
 import us.huseli.thoucylinder.Constants.HEADER_ANDROID_SDK_VERSION
 import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_NAME
@@ -26,7 +27,7 @@ import us.huseli.thoucylinder.Constants.YOUTUBE_HEADER_USER_AGENT
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
@@ -40,6 +41,7 @@ import us.huseli.thoucylinder.yquery
 import java.io.File
 import java.net.URLEncoder
 import java.util.UUID
+import java.util.regex.Pattern
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -55,17 +57,17 @@ class YoutubeRepository @Inject constructor(
         val nextToken: String? = null,
     )
 
-    private val _albumDownloadProgressMap = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
+    private val _albumProgressDataMap = MutableStateFlow<Map<UUID, ProgressData>>(emptyMap())
     private val _isSearchingTracks = MutableStateFlow(false)
-    private val _trackDownloadProgressMap = MutableStateFlow<Map<UUID, DownloadProgress>>(emptyMap())
+    private val _trackProgressDataMap = MutableStateFlow<Map<UUID, ProgressData>>(emptyMap())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gson: Gson = GsonBuilder().create()
     private val metadataCache = mutableMapOf<String, YoutubeMetadataList>()
     private val responseType = object : TypeToken<Map<String, *>>() {}
 
-    val albumDownloadProgressMap = _albumDownloadProgressMap.asStateFlow()
-    val trackDownloadProgressMap = _trackDownloadProgressMap.asStateFlow()
+    val albumProgressDataMap = _albumProgressDataMap.asStateFlow()
+    val trackProgressDataMap = _trackProgressDataMap.asStateFlow()
     val isSearchingTracks = _isSearchingTracks.asStateFlow()
 
     init {
@@ -74,17 +76,17 @@ class YoutubeRepository @Inject constructor(
         }
     }
 
-    suspend fun downloadVideo(video: YoutubeVideo, progressCallback: (DownloadProgress) -> Unit): File {
+    suspend fun downloadVideo(video: YoutubeVideo, progressCallback: (ProgressData) -> Unit): File {
         /** Used both for downloading individual tracks/videos and albums/playlists. */
         val metadata = getBestMetadata(video.id) ?: throw Exception("Could not get metadata for $video")
         val tempFile = File(context.cacheDir, "${video.id}.${metadata.fileExtension}")
-        val downloadProgress = DownloadProgress(
+        val progressData = ProgressData(
             item = video.title,
-            status = DownloadProgress.Status.DOWNLOADING,
+            status = ProgressData.Status.DOWNLOADING,
             progress = 0.0,
         )
 
-        progressCallback(downloadProgress)
+        progressCallback(progressData)
 
         withContext(Dispatchers.IO) {
             tempFile.outputStream().use { outputStream ->
@@ -104,7 +106,7 @@ class YoutubeRepository @Inject constructor(
                     conn.getInputStream().use { outputStream.write(it.readBytes()) }
                     if (contentLength != null) {
                         progressCallback(
-                            downloadProgress.copy(
+                            progressData.copy(
                                 progress = min((DOWNLOAD_CHUNK_SIZE + rangeStart).toDouble() / contentLength, 1.0)
                             )
                         )
@@ -118,13 +120,6 @@ class YoutubeRepository @Inject constructor(
 
         return tempFile
     }
-
-    suspend fun ensureVideoMetadata(track: Track, forceReload: Boolean = false): Track =
-        if (track.youtubeVideo != null && (track.youtubeVideo.metadata == null || forceReload))
-            track.copy(
-                youtubeVideo = track.youtubeVideo.copy(metadata = getBestMetadata(track.youtubeVideo.id, forceReload))
-            )
-        else track
 
     suspend fun getAlbumSearchResult(query: String): List<AlbumWithTracksPojo> {
         val scrapedAlbums = mutableListOf<Album>()
@@ -158,7 +153,8 @@ class YoutubeRepository @Inject constructor(
                                 ?.last()
 
                         if (listTitle != null && playlistId != null) {
-                            val title = artist?.let { listTitle.replace(Regex("^$it - "), "") } ?: listTitle
+                            val title =
+                                artist?.let { listTitle.replace(Regex(Pattern.quote("^$it - ")), "") } ?: listTitle
 
                             scrapedAlbums.add(
                                 Album(
@@ -215,8 +211,8 @@ class YoutubeRepository @Inject constructor(
         return emptyList()
     }
 
-    suspend fun getBestMetadata(track: Track): YoutubeMetadata? =
-        track.youtubeVideo?.id?.let { getBestMetadata(it) }
+    suspend fun getBestMetadata(track: Track, forceReload: Boolean = false): YoutubeMetadata? =
+        track.youtubeVideo?.id?.let { getBestMetadata(it, forceReload = forceReload) }
 
     suspend fun getTrackSearchResult(query: String, continuationToken: String? = null): TrackSearchResult {
         val gson: Gson = GsonBuilder().create()
@@ -263,9 +259,15 @@ class YoutubeRepository @Inject constructor(
                     ?.firstOrNull()?.get("text") as? String
                 val thumbnail = itemContent.yquery<Collection<Map<*, *>>>("videoRenderer.thumbnail.thumbnails")
                     ?.let { getThumbnail(it) }
+                val lengthText = itemContent.yquery<String>("videoRenderer.lengthText.simpleText")
 
                 if (videoId != null && title != null) {
-                    val video = YoutubeVideo(id = videoId, title = title, thumbnail = thumbnail)
+                    val video = YoutubeVideo(
+                        id = videoId,
+                        title = title,
+                        thumbnail = thumbnail,
+                        durationMs = lengthText?.toDuration()?.inWholeMilliseconds,
+                    )
                     tracks.add(video.toTrack(isInLibrary = false))
                 }
             }
@@ -295,18 +297,14 @@ class YoutubeRepository @Inject constructor(
         )
     }
 
-    fun setAlbumDownloadProgress(albumId: UUID, progress: DownloadProgress?) {
-        if (progress != null)
-            _albumDownloadProgressMap.value += albumId to progress
-        else
-            _albumDownloadProgressMap.value -= albumId
+    fun setAlbumProgress(albumId: UUID, progress: ProgressData?) {
+        if (progress != null) _albumProgressDataMap.value += albumId to progress
+        else _albumProgressDataMap.value -= albumId
     }
 
-    fun setTrackDownloadProgress(trackId: UUID, progress: DownloadProgress?) {
-        if (progress != null)
-            _trackDownloadProgressMap.value += trackId to progress
-        else
-            _trackDownloadProgressMap.value -= trackId
+    fun setTrackProgress(trackId: UUID, progress: ProgressData?) {
+        if (progress != null) _trackProgressDataMap.value += trackId to progress
+        else _trackProgressDataMap.value -= trackId
     }
 
     /** PRIVATE METHODS ******************************************************/
@@ -356,7 +354,7 @@ class YoutubeRepository @Inject constructor(
                 id = playlistId,
                 title = title,
                 artist = artist,
-                videoCount = videoCount?.toInt() ?: 0,
+                videoCount = videoCount?.replace(Regex("[^0-9]"), "")?.takeIf { it.isNotBlank() }?.toInt() ?: 0,
                 thumbnail = thumbnail,
             )
             val tracks = mutableListOf<Track>()
@@ -373,10 +371,15 @@ class YoutubeRepository @Inject constructor(
                     val videoId = video.yquery<String>("playlistVideoRenderer.videoId")
                     val videoTitle = video.yquery<Collection<Map<*, *>>>("playlistVideoRenderer.title.runs")
                         ?.firstOrNull()?.get("text") as? String
+                    val lengthSeconds = video.yquery<String>("playlistVideoRenderer.lengthSeconds")
 
                     if (videoId != null && videoTitle != null) {
                         tracks.add(
-                            YoutubeVideo(id = videoId, title = videoTitle).toTrack(
+                            YoutubeVideo(
+                                id = videoId,
+                                title = videoTitle,
+                                durationMs = lengthSeconds?.toLong()?.times(1000),
+                            ).toTrack(
                                 isInLibrary = false,
                                 albumId = album.albumId,
                                 albumPosition = index + 1,

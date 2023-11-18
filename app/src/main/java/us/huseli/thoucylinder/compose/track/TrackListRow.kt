@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -31,7 +31,7 @@ import org.burnoutcrew.reorderable.detectReorder
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import kotlin.time.Duration
 
@@ -48,7 +48,8 @@ fun TrackListRow(
     modifier: Modifier = Modifier,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
-    downloadProgress: DownloadProgress? = null,
+    progressData: ProgressData? = null,
+    extraContextMenuItems: (@Composable () -> Unit)? = null,
 ) {
     Card(
         colors = CardDefaults.outlinedCardColors(
@@ -98,7 +99,11 @@ fun TrackListRow(
                     )
                 }
 
-                TrackContextMenuWithButton(isDownloadable = isDownloadable, callbacks = callbacks)
+                TrackContextMenuWithButton(
+                    isDownloadable = isDownloadable,
+                    callbacks = callbacks,
+                    extraItems = extraContextMenuItems,
+                )
 
                 if (reorderableState != null) {
                     Icon(
@@ -110,13 +115,13 @@ fun TrackListRow(
             }
         }
 
-        if (downloadProgress != null) {
-            val statusText = stringResource(downloadProgress.status.stringId)
+        if (progressData != null) {
+            val statusText = stringResource(progressData.status.stringId)
 
             Column(modifier = Modifier.padding(bottom = 5.dp)) {
                 Text(text = "$statusText …")
                 LinearProgressIndicator(
-                    progress = downloadProgress.progress.toFloat(),
+                    progress = progressData.progress.toFloat(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

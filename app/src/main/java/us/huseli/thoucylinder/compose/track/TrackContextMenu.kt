@@ -1,8 +1,8 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
-import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
+import androidx.compose.material.icons.sharp.PlaylistAdd
+import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Info
@@ -35,6 +35,7 @@ fun TrackContextMenu(
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
+    extraItems: (@Composable () -> Unit)? = null,
 ) {
     DropdownMenu(
         modifier = modifier,
@@ -55,7 +56,7 @@ fun TrackContextMenu(
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
-            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
+            leadingIcon = { Icon(Icons.Sharp.PlaylistAdd, null) },
             onClick = {
                 callbacks.onAddToPlaylistClick()
                 onDismissRequest()
@@ -65,7 +66,7 @@ fun TrackContextMenu(
         callbacks.onEnqueueClick?.also { onEnqueueClick ->
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.enqueue)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+                leadingIcon = { Icon(Icons.Sharp.PlaylistPlay, null) },
                 onClick = {
                     onEnqueueClick()
                     onDismissRequest()
@@ -105,6 +106,8 @@ fun TrackContextMenu(
                 onDismissRequest()
             },
         )
+
+        extraItems?.invoke()
     }
 }
 
@@ -116,6 +119,7 @@ fun TrackContextMenuWithButton(
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
+    extraItems: (@Composable () -> Unit)? = null,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -124,7 +128,6 @@ fun TrackContextMenuWithButton(
         onClick = { isMenuShown = !isMenuShown },
         content = {
             Icon(Icons.Sharp.MoreVert, null)
-            // Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.height(20.dp))
             TrackContextMenu(
                 callbacks = callbacks,
                 onDismissRequest = { isMenuShown = false },
@@ -132,6 +135,7 @@ fun TrackContextMenuWithButton(
                 offset = offset,
                 isDownloadable = isDownloadable,
                 hideAlbum = hideAlbum,
+                extraItems = extraItems,
             )
         }
     )

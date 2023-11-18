@@ -27,7 +27,7 @@ data class AlbumCallbacks(
             onCancelDownloadClick: (() -> Unit)? = null,
             onPlayClick: () -> Unit,
             onEnqueueClick: () -> Unit,
-            onRemoveFromLibraryClick: () -> Unit,
+            onRemoveFromLibraryClick: (() -> Unit)? = null,
         ) = AlbumCallbacks(
             onAddToLibraryClick = { appCallbacks.onAddAlbumToLibraryClick(album) },
             onAddToPlaylistClick = onAddToPlaylistClick
@@ -40,7 +40,8 @@ data class AlbumCallbacks(
             onEditClick = { appCallbacks.onEditAlbumClick(album) },
             onPlayClick = onPlayClick,
             onEnqueueClick = onEnqueueClick,
-            onRemoveFromLibraryClick = onRemoveFromLibraryClick,
+            onRemoveFromLibraryClick = onRemoveFromLibraryClick
+                ?: { appCallbacks.onRemoveAlbumFromLibraryClick(album) },
             onDeleteClick = { appCallbacks.onDeleteAlbumClick(album) },
         )
     }

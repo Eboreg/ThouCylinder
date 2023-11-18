@@ -61,8 +61,8 @@ class SearchViewModel @Inject constructor(
     val isSearchingLocalAlbums = _isSearchingLocalAlbums.asStateFlow()
     val isSearchingLocalTracks = _isSearchingLocalTracks.asStateFlow()
 
-    suspend fun ensureVideoMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
-        pojos.map { pojo -> pojo.copy(track = repos.youtube.ensureVideoMetadata(pojo.track)) }
+    suspend fun ensureTrackMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
+        pojos.map { pojo -> pojo.copy(track = ensureTrackMetadata(pojo.track, commit = true)) }
 
     fun search(query: String) {
         if (query != _query.value) {

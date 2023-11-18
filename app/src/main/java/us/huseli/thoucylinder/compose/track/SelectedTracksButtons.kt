@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -22,33 +22,23 @@ import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.SelectedItemsActionSection
-import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SelectedAlbumsButtons(
-    albumCount: Int,
+fun SelectedTracksButtons(
+    trackCount: Int,
     tonalElevation: Dp = 2.dp,
-    callbacks: AlbumSelectionCallbacks,
+    callbacks: TrackSelectionCallbacks,
     extraButtons: (@Composable () -> Unit)? = null,
 ) {
-    SelectedItemsActionSection(visible = albumCount > 0, tonalElevation = tonalElevation) {
+    SelectedItemsActionSection(visible = trackCount > 0, tonalElevation = tonalElevation) {
         Text(
-            pluralStringResource(R.plurals.x_selected_albums, albumCount, albumCount),
+            pluralStringResource(R.plurals.x_selected_tracks, trackCount, trackCount),
             style = MaterialTheme.typography.bodySmall,
         )
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                callbacks.onSelectAllClick?.also { onSelectAllClick ->
-                    SmallOutlinedButton(
-                        onClick = onSelectAllClick,
-                        text = stringResource(R.string.select_all),
-                    )
-                }
-                SmallOutlinedButton(
-                    onClick = callbacks.onAddToPlaylistClick,
-                    text = stringResource(R.string.add_to_playlist),
-                )
                 SmallOutlinedButton(
                     onClick = callbacks.onPlayClick,
                     text = stringResource(R.string.play),
@@ -56,6 +46,10 @@ fun SelectedAlbumsButtons(
                 SmallOutlinedButton(
                     onClick = callbacks.onEnqueueClick,
                     text = stringResource(R.string.enqueue),
+                )
+                SmallOutlinedButton(
+                    onClick = callbacks.onAddToPlaylistClick,
+                    text = stringResource(R.string.add_to_playlist),
                 )
                 extraButtons?.invoke()
             }

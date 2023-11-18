@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,11 +35,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.AlbumBadges
-import us.huseli.thoucylinder.compose.AlbumButtons
-import us.huseli.thoucylinder.compose.AlbumTrackRow
-import us.huseli.thoucylinder.compose.AlbumTrackRowData
-import us.huseli.thoucylinder.compose.SelectedTracksButtons
+import us.huseli.thoucylinder.compose.album.AlbumBadges
+import us.huseli.thoucylinder.compose.album.AlbumButtons
+import us.huseli.thoucylinder.compose.album.AlbumTrackRow
+import us.huseli.thoucylinder.compose.album.AlbumTrackRowData
+import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
@@ -56,8 +56,8 @@ fun AlbumScreen(
 ) {
     val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
-    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle(null)
-    val trackDownloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
+    val progressData by viewModel.progressData.collectAsStateWithLifecycle(null)
+    val trackProgressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
     val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -76,21 +76,27 @@ fun AlbumScreen(
             LazyColumn(modifier = modifier.padding(horizontal = 10.dp)) {
                 item {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(
                             onClick = appCallbacks.onBackClick,
-                            content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                            content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                             modifier = Modifier.width(40.dp),
                         )
-                        if (pojo.album.isOnYoutube) {
+                        if (pojo.isOnYoutube) {
                             LargeIconBadge {
                                 Icon(painterResource(R.drawable.youtube), null, modifier = Modifier.height(20.dp))
                                 Text(text = stringResource(R.string.youtube))
                             }
                         }
-                        if (pojo.album.isLocal) {
+                        if (pojo.isFromSpotify) {
+                            LargeIconBadge {
+                                Icon(painterResource(R.drawable.spotify), null, modifier = Modifier.height(16.dp))
+                                Text(text = stringResource(R.string.spotify))
+                            }
+                        }
+                        if (pojo.isLocal) {
                             LargeIconBadge {
                                 Icon(painterResource(R.drawable.hard_drive), null, modifier = Modifier.height(20.dp))
                                 Text(text = stringResource(R.string.local))
@@ -143,14 +149,14 @@ fun AlbumScreen(
                                         isLocal = pojo.album.isLocal,
                                         isInLibrary = pojo.album.isInLibrary,
                                         modifier = Modifier.align(Alignment.Bottom),
-                                        isDownloading = downloadProgress != null,
+                                        isDownloading = progressData != null,
                                         callbacks = AlbumCallbacks.fromAppCallbacks(
                                             album = pojo.album,
                                             appCallbacks = appCallbacks,
                                             onPlayClick = { viewModel.playAlbum() },
                                             onEnqueueClick = { viewModel.enqueueAlbum(context) },
                                             onRemoveFromLibraryClick = {
-                                                viewModel.removeAlbumFromLibrary(pojo.album)
+                                                appCallbacks.onRemoveAlbumFromLibraryClick(pojo.album)
                                                 appCallbacks.onBackClick()
                                             },
                                         )
@@ -161,7 +167,7 @@ fun AlbumScreen(
                     }
                 }
 
-                downloadProgress?.let { progress ->
+                progressData?.let { progress ->
                     item {
                         val statusText = stringResource(progress.status.stringId)
 
@@ -186,10 +192,10 @@ fun AlbumScreen(
                             title = trackPojo.track.title,
                             isDownloadable = trackPojo.track.isDownloadable,
                             artist = trackPojo.artist,
-                            duration = trackPojo.track.metadata?.duration,
+                            duration = trackPojo.track.duration,
                             albumPosition = trackPojo.track.albumPosition,
                             discNumber = trackPojo.track.discNumber,
-                            downloadProgress = trackDownloadProgressMap[trackPojo.trackId],
+                            progressData = trackProgressDataMap[trackPojo.trackId],
                             showArtist = trackPojo.artist != pojo.album.artist,
                             showDiscNumber = pojo.discCount > 1,
                             isSelected = selectedTracks.contains(trackPojo),

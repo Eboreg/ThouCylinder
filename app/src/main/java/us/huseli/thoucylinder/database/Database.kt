@@ -15,6 +15,12 @@ import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumArtist
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumGenre
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
@@ -34,9 +40,15 @@ import java.util.concurrent.Executors
         QueueTrack::class,
         AlbumGenre::class,
         AlbumStyle::class,
+        SpotifyAlbum::class,
+        SpotifyAlbumArtist::class,
+        SpotifyAlbumGenre::class,
+        SpotifyArtist::class,
+        SpotifyTrack::class,
+        SpotifyTrackArtist::class,
     ],
     exportSchema = false,
-    version = 50,
+    version = 60,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -46,6 +58,7 @@ abstract class Database : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
+    abstract fun spotifyDao(): SpotifyDao
 
     companion object {
         private val MIGRATION_46_47 = object : Migration(46, 47) {
@@ -65,7 +78,7 @@ abstract class Database : RoomDatabase() {
             if (BuildConfig.DEBUG) {
                 class Callback : QueryCallback {
                     override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
-                        Log.i("Database", "$sqlQuery, bindArgs=$bindArgs")
+                        Log.i("Database", "$sqlQuery\nbindArgs=$bindArgs")
                     }
                 }
 

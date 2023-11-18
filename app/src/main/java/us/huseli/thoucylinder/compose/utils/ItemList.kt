@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,20 +38,27 @@ fun <T> ItemList(
     onLongClick: ((T) -> Unit)? = null,
     cardModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    padding: PaddingValues = PaddingValues(horizontal = 10.dp),
+    showNumericBarAtItemCount: Int = 20,
     onEmpty: (@Composable () -> Unit)? = null,
+    leadingItem: (@Composable LazyItemScope.() -> Unit)? = null,
+    trailingItem: (@Composable LazyItemScope.() -> Unit)? = null,
+    stickyHeaderContent: (@Composable LazyItemScope.() -> Unit)? = null,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
     ListWithNumericBar(
         listState = listState,
         listSize = things.size,
-        minItems = 20,
-        modifier = modifier.padding(horizontal = 10.dp),
+        minItems = showNumericBarAtItemCount,
+        modifier = modifier.padding(padding),
     ) {
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(gap),
             contentPadding = contentPadding,
         ) {
+            leadingItem?.also { item { it() } }
+            stickyHeaderContent?.also { stickyHeader { it() } }
             items(things, key = key) { thing ->
                 val containerColor =
                     if (isSelected(thing)) MaterialTheme.colorScheme.primaryContainer
@@ -71,6 +79,7 @@ fun <T> ItemList(
                     content = { cardContent(thing) },
                 )
             }
+            trailingItem?.also { item { it() } }
         }
     }
 

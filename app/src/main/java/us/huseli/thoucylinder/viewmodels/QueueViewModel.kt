@@ -3,9 +3,13 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
@@ -21,7 +25,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
     private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
 
-    val playerCurrentPojo: StateFlow<QueueTrackPojo?> = repos.player.currentPojo
+    val playerCurrentPojo: Flow<QueueTrackPojo?> = repos.player.currentPojo.filterNotNull().distinctUntilChanged()
     val playerPlaybackState: StateFlow<PlayerRepository.PlaybackState> = repos.player.playbackState
     val playerCurrentPositionMs: StateFlow<Long> = repos.player.currentPositionMs
     val playerCanGotoNext: StateFlow<Boolean> = repos.player.canGotoNext
@@ -29,7 +33,9 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     val playerIsRepeatEnabled = repos.player.isRepeatEnabled
     val playerIsShuffleEnabled = repos.player.isShuffleEnabled
     val queue = _queue.asStateFlow()
-    val selectedQueueTracks: StateFlow<List<QueueTrackPojo>> = _selectedQueueTracks.asStateFlow()
+    val selectedQueueTracks: Flow<List<QueueTrackPojo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
+        selected.filter { queue.contains(it) }
+    }
 
     init {
         viewModelScope.launch {
@@ -58,7 +64,12 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
 
     fun playQueueTracks(pojos: List<QueueTrackPojo>) = repos.player.moveNextAndPlay(pojos)
 
-    fun removeFromQueue(queueTracks: List<QueueTrackPojo>) = repos.player.removeFromQueue(queueTracks)
+    fun removeFromQueue(pojo: QueueTrackPojo) = removeFromQueue(listOf(pojo))
+
+    fun removeFromQueue(pojos: List<QueueTrackPojo>) {
+        repos.player.removeFromQueue(pojos)
+        _selectedQueueTracks.value -= pojos
+    }
 
     fun seekTo(positionMs: Long) = repos.player.seekTo(positionMs)
 

@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

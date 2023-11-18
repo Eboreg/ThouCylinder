@@ -2,6 +2,7 @@ package us.huseli.thoucylinder
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -15,7 +16,7 @@ import java.net.URL
 import java.net.URLConnection
 
 class Request(
-    urlString: String,
+    private val urlString: String,
     private val headers: Map<String, String> = emptyMap(),
     private val method: Method = Method.GET,
     private val body: ByteArray? = null,
@@ -37,6 +38,7 @@ class Request(
         withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
 
     suspend fun openConnection(): URLConnection = withContext(Dispatchers.IO) {
+        Log.i("Request", "${method.value} $urlString")
         url.openConnection().apply {
             if (BuildConfig.DEBUG) {
                 connectTimeout = 0

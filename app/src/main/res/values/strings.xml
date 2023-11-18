@@ -1,3 +1,4 @@
+<!--suppress ALL -->
 <resources>
     <string name="add_album_to_library">Add album to library</string>
     <string name="add_playlist">Add playlist</string>
@@ -18,6 +19,7 @@
     <string name="converting">Converting</string>
     <string name="create_new_playlist">Create new playlist</string>
     <string name="debug">Debug</string>
+    <string name="delete_album">Delete album</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading</string>
     <string name="edit">Edit</string>
@@ -27,19 +29,31 @@
     <string name="go_to_album">Go to album</string>
     <string name="go_to_artist">Go to artist</string>
     <string name="go_to_playlist">Go to playlist</string>
+    <string name="import_str">Import</string>
+    <string name="importing">Importing</string>
+    <string name="importing_local_albums">Importing local albums ...</string>
+    <string name="importing_local_artists">Importing local artists ...</string>
+    <string name="importing_local_tracks">Importing local tracks ...</string>
     <string name="is_downloaded">Is downloaded</string>
     <string name="is_on_youtube">Is on Youtube</string>
     <string name="library">Library</string>
+    <string name="loading_albums">Loading albums ...</string>
+    <string name="loading_artists">Loading artists ...</string>
     <string name="loading_ellipsis">Loading …</string>
+    <string name="loading_playlists">Loading playlists ...</string>
     <string name="loading_scream">LOADING!!!</string>
+    <string name="loading_tracks">Loading tracks ...</string>
     <string name="local">Local</string>
     <string name="local_file">Local file</string>
+    <string name="matching">Matching</string>
     <string name="mime_type">MIME type</string>
     <string name="moving">Moving</string>
     <string name="name">Name</string>
     <string name="next">Next</string>
     <string name="no_albums_found">No albums found.</string>
+    <string name="no_artists_found">No artists found.</string>
     <string name="no_discogs_masters_found">No Discogs masters found.</string>
+    <string name="no_playlists_found">No playlists found.</string>
     <string name="no_tracks_found">No tracks found.</string>
     <string name="none">None</string>
     <string name="only_delete_files">Only delete files</string>
@@ -52,7 +66,9 @@
     <string name="remove_album">Remove album</string>
     <string name="remove_album_and_delete_files">Remove album and delete files</string>
     <string name="remove_from_library">Remove from library</string>
+    <string name="remove_from_queue">Remove from queue</string>
     <string name="remove_playlist">Remove playlist</string>
+    <string name="removed_album_from_library">Removed %1$s from the library.</string>
     <string name="sample_rate">Sample rate</string>
     <string name="save">Save</string>
     <string name="search">Search</string>
@@ -61,6 +77,9 @@
     <string name="select_cover_art">Select cover art</string>
     <string name="select_discogs_com_master">Select discogs.com master</string>
     <string name="selection_was_added_to_playlist">Selection was added to playlist.</string>
+    <string name="spotify">Spotify</string>
+    <string name="spotify_import_help_1">Press the button above to authorize this application with Spotify (if needed) and fetch your saved albums from there. After this, you will get to select which albums to import.</string>
+    <string name="spotify_import_help_2">For each selected album, attempts will be made to match it with a Youtube playlist. If a sufficiently good match is found, it will be added to your library as an album. However, it will not be automatically downloaded.</string>
     <string name="the_playlist_was_removed">The playlist was removed.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
     <string name="this_playlist_is_empty">This playlist is empty. :(</string>
@@ -73,7 +92,6 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="year">Year</string>
     <string name="youtube">Youtube</string>
-    <string name="delete_album">Delete album</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>

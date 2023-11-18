@@ -8,6 +8,7 @@ import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMaster
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResults
+import us.huseli.thoucylinder.getApiUserAgent
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,7 +42,7 @@ class DiscogsRepository @Inject constructor() {
         }
         val url = "https://api.discogs.com/${path.trimStart('/')}?$paramString"
         val headers = mapOf(
-            "User-Agent" to "ThouCylinder/${BuildConfig.VERSION_NAME}",
+            "User-Agent" to getApiUserAgent(),
             "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",
         )
 

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.BottomAppBarDefaults
@@ -32,7 +32,7 @@ import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
@@ -64,7 +64,7 @@ fun PlaylistScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
-                    content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                    content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                 )
                 Text(
                     text = playlist.name,

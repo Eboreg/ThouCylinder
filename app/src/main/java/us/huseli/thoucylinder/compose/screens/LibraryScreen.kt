@@ -29,16 +29,16 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.AlbumGrid
-import us.huseli.thoucylinder.compose.AlbumList
+import us.huseli.thoucylinder.compose.album.AlbumGrid
+import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.ArtistGrid
 import us.huseli.thoucylinder.compose.ArtistList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.PlaylistList
-import us.huseli.thoucylinder.compose.TrackGrid
-import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.compose.track.TrackGrid
+import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
@@ -57,15 +57,9 @@ fun LibraryScreen(
     appCallbacks: AppCallbacks,
 ) {
     val context = LocalContext.current
-    val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
-    val tracksPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
-    val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
-    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
-    val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
-    val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle()
-    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+    val isImportingLocalMedia by viewModel.isImportingLocalMedia.collectAsStateWithLifecycle()
     val availableDisplayTypes =
         if (listType == ListType.PLAYLISTS) listOf(DisplayType.LIST)
         else listOf(DisplayType.LIST, DisplayType.GRID)
@@ -81,13 +75,15 @@ fun LibraryScreen(
 
         when (listType) {
             ListType.ALBUMS -> {
+                val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle()
+                val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
+                val isLoadingAlbums by viewModel.isLoadingAlbums.collectAsStateWithLifecycle()
                 val albumCallbacks = { pojo: AbstractAlbumPojo ->
                     AlbumCallbacks.fromAppCallbacks(
                         album = pojo.album,
                         appCallbacks = appCallbacks,
                         onPlayClick = { viewModel.playAlbum(pojo.album) },
                         onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
-                        onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(pojo.album) },
                         onAlbumLongClick = { viewModel.selectAlbumsFromLastSelected(pojo.album) },
                         onAlbumClick = {
                             if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(pojo.album)
@@ -103,6 +99,16 @@ fun LibraryScreen(
                     onUnselectAllClick = { viewModel.unselectAllAlbums() },
                     onSelectAllClick = { viewModel.selectAlbums(albumPojos.map { it.album }) },
                 )
+                val onEmpty = @Composable {
+                    Text(
+                        stringResource(
+                            if (isImportingLocalMedia) R.string.importing_local_albums
+                            else if (isLoadingAlbums) R.string.loading_albums
+                            else R.string.no_albums_found
+                        ),
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
 
                 when (displayType) {
                     DisplayType.LIST -> AlbumList(
@@ -111,22 +117,21 @@ fun LibraryScreen(
                         albumSelectionCallbacks = albumSelectionCallbacks,
                         selectedAlbums = selectedAlbums,
                         listState = rememberLazyListState(),
-                        onEmpty = {
-                            Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
-                        },
+                        onEmpty = onEmpty,
                     )
                     DisplayType.GRID -> AlbumGrid(
                         pojos = albumPojos,
                         albumCallbacks = albumCallbacks,
                         selectedAlbums = selectedAlbums,
                         albumSelectionCallbacks = albumSelectionCallbacks,
-                        onEmpty = {
-                            Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
-                        },
+                        onEmpty = onEmpty,
                     )
                 }
             }
             ListType.TRACKS -> {
+                val trackPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
+                val isLoadingTracks by viewModel.isLoadingTracks.collectAsStateWithLifecycle()
+                val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
                 val trackCallbacks = { pojo: TrackPojo ->
                     TrackCallbacks.fromAppCallbacks(
                         pojo = pojo,
@@ -145,51 +150,85 @@ fun LibraryScreen(
                     onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
                     onUnselectAllClick = { viewModel.unselectAllTracks() },
                 )
+                val onEmpty = @Composable {
+                    Text(
+                        stringResource(
+                            if (isImportingLocalMedia) R.string.importing_local_tracks
+                            else if (isLoadingTracks) R.string.loading_tracks
+                            else R.string.no_tracks_found
+                        ),
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
 
                 when (displayType) {
                     DisplayType.LIST -> TrackList(
-                        trackPojos = tracksPojos,
+                        trackPojos = trackPojos,
                         selectedTracks = selectedTracks,
                         viewModel = viewModel,
                         listState = trackListState,
                         trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
-                        onEmpty = {
-                            Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
-                        },
+                        onEmpty = onEmpty,
                     )
                     DisplayType.GRID -> TrackGrid(
-                        trackPojos = tracksPojos,
+                        trackPojos = trackPojos,
                         viewModel = viewModel,
                         gridState = trackGridState,
                         trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
                         selectedTracks = selectedTracks,
-                        onEmpty = {
-                            Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
-                        },
+                        onEmpty = onEmpty,
                     )
                 }
             }
-            ListType.ARTISTS -> when (displayType) {
-                DisplayType.LIST -> ArtistList(
-                    artists = artistPojos,
-                    images = artistImages,
-                    onArtistClick = appCallbacks.onArtistClick,
-                )
-                DisplayType.GRID -> ArtistGrid(
-                    artists = artistPojos,
-                    images = artistImages,
-                    onArtistClick = appCallbacks.onArtistClick,
-                )
+            ListType.ARTISTS -> {
+                val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
+                val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
+                val isLoadingArtists by viewModel.isLoadingArtists.collectAsStateWithLifecycle()
+                val onEmpty = @Composable {
+                    Text(
+                        stringResource(
+                            if (isImportingLocalMedia) R.string.importing_local_artists
+                            else if (isLoadingArtists) R.string.loading_artists
+                            else R.string.no_artists_found
+                        ),
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+
+                when (displayType) {
+                    DisplayType.LIST -> ArtistList(
+                        artists = artistPojos,
+                        images = artistImages,
+                        onArtistClick = appCallbacks.onArtistClick,
+                        onEmpty = onEmpty,
+                    )
+                    DisplayType.GRID -> ArtistGrid(
+                        artists = artistPojos,
+                        images = artistImages,
+                        onArtistClick = appCallbacks.onArtistClick,
+                        onEmpty = onEmpty,
+                    )
+                }
             }
             ListType.PLAYLISTS -> {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+                    val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
+                    val onEmpty = @Composable {
+                        Text(
+                            text = stringResource(if (isLoadingPlaylists) R.string.loading_playlists else R.string.no_playlists_found),
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+
                     PlaylistList(
                         playlists = playlists,
                         viewModel = viewModel,
                         onPlaylistClick = { appCallbacks.onPlaylistClick(it.playlistId) },
                         onPlaylistPlayClick = { viewModel.playPlaylist(it.playlistId) },
+                        onEmpty = onEmpty,
                     )
 
                     FloatingActionButton(

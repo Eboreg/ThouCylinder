@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
-import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.repositories.Repositories
@@ -31,10 +31,10 @@ class AlbumViewModel @Inject constructor(
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
 
-    val albumArt: Flow<ImageBitmap?> = _albumPojo.map { it?.album?.getFullImage(context)?.asImageBitmap() }
+    val albumArt: Flow<ImageBitmap?> = _albumPojo.map { it?.getFullImage(context)?.asImageBitmap() }
     val albumPojo = _albumPojo.asStateFlow()
-    val downloadProgress: Flow<DownloadProgress?> =
-        repos.youtube.albumDownloadProgressMap.map { it[_albumId] }.distinctUntilChanged()
+    val progressData: Flow<ProgressData?> =
+        repos.youtube.albumProgressDataMap.map { it[_albumId] }.distinctUntilChanged()
 
     init {
         viewModelScope.launch {
@@ -50,13 +50,14 @@ class AlbumViewModel @Inject constructor(
 
     fun loadTrackMetadata(track: Track) {
         /**
-         * On-demand fetch of track metadata, because we only want to load it
-         * when it is actually going to be used. Does not save anything to DB
-         * yet.
+         * On-demand fetch (and save, if necessary) of track metadata, because
+         * we only want to load it when it is actually going to be used.
          */
         if (track.metadata == null) viewModelScope.launch {
             _albumPojo.value = _albumPojo.value?.let { pojo ->
-                val tracks = pojo.tracks.map { if (it.trackId == track.trackId) ensureTrackMetadata(track) else it }
+                val tracks = pojo.tracks.map {
+                    if (it.trackId == track.trackId) ensureTrackMetadata(track, commit = true) else it
+                }
                 pojo.copy(tracks = tracks)
             }
         }
@@ -64,7 +65,7 @@ class AlbumViewModel @Inject constructor(
 
     fun playAlbum(startAt: Track? = null) {
         _albumPojo.value?.also { pojo ->
-            playTrackPojos(pojo.trackPojos, startAt?.let { pojo.indexOfTrack(it) })
+            playTrackPojos(pojo.trackPojos, startAt?.let { pojo.indexOfTrack(it) } ?: 0)
         }
     }
 }

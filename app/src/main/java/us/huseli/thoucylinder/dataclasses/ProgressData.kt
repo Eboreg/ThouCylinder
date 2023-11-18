@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.dataclasses
 import androidx.annotation.StringRes
 import us.huseli.thoucylinder.R
 
-data class DownloadProgress(
+data class ProgressData(
     val item: String,
     val progress: Double,
     val status: Status,
@@ -12,5 +12,7 @@ data class DownloadProgress(
         DOWNLOADING(R.string.downloading),
         CONVERTING(R.string.converting),
         MOVING(R.string.moving),
+        MATCHING(R.string.matching),
+        IMPORTING(R.string.importing),
     }
 }

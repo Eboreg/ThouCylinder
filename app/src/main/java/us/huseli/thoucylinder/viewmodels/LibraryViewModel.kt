@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.repositories.Repositories
 import java.io.File
@@ -28,15 +28,25 @@ class LibraryViewModel @Inject constructor(
 ) : AbstractSelectViewModel("LibraryViewModel", repos) {
     private val _artistImages = MutableStateFlow<Map<String, File>>(emptyMap())
     private val _displayType = MutableStateFlow(DisplayType.LIST)
+    private val _isLoadingAlbums = MutableStateFlow(true)
+    private val _isLoadingArtists = MutableStateFlow(true)
+    private val _isLoadingPlaylists = MutableStateFlow(true)
+    private val _isLoadingTracks = MutableStateFlow(true)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
 
-    val albumPojos = repos.room.albumPojos
+    val albumPojos = repos.room.albumPojos.onCompletion { _isLoadingAlbums.value = false }
     val artistImages = _artistImages.asStateFlow()
-    val artistPojos: Flow<List<ArtistPojo>> = repos.room.artistPojos
+    val artistPojos = repos.room.artistPojos.onCompletion { _isLoadingArtists.value = false }
     val displayType = _displayType.asStateFlow()
+    val isImportingLocalMedia = repos.mediaStore.isImportingLocalMedia
+    val isLoadingAlbums = _isLoadingAlbums.asStateFlow()
+    val isLoadingArtists = _isLoadingArtists.asStateFlow()
+    val isLoadingPlaylists = _isLoadingPlaylists.asStateFlow()
+    val isLoadingTracks = _isLoadingTracks.asStateFlow()
     val listType = _listType.asStateFlow()
-    val pagingTrackPojos: Flow<PagingData<TrackPojo>> = repos.room.trackPojoPager.flow.cachedIn(viewModelScope)
-    val playlists = repos.room.playlists
+    val pagingTrackPojos: Flow<PagingData<TrackPojo>> =
+        repos.room.trackPojoPager.flow.cachedIn(viewModelScope).onCompletion { _isLoadingTracks.value = false }
+    val playlists = repos.room.playlists.onCompletion { _isLoadingPlaylists.value = false }
 
     init {
         viewModelScope.launch { _artistImages.value = repos.mediaStore.collectArtistImages() }

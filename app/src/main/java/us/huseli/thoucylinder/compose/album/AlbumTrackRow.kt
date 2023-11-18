@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -21,7 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
-import us.huseli.thoucylinder.dataclasses.DownloadProgress
+import us.huseli.thoucylinder.compose.track.TrackContextMenuWithButton
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import kotlin.time.Duration
 
@@ -32,7 +33,7 @@ data class AlbumTrackRowData(
     val duration: Duration? = null,
     val albumPosition: Int? = null,
     val discNumber: Int? = null,
-    val downloadProgress: DownloadProgress? = null,
+    val progressData: ProgressData? = null,
     val showArtist: Boolean = true,
     val showDiscNumber: Boolean = false,
     val isSelected: Boolean = false,
@@ -99,7 +100,7 @@ fun AlbumTrackRow(
                 )
             }
 
-            data.downloadProgress?.also { progress ->
+            data.progressData?.also { progress ->
                 val statusText = stringResource(progress.status.stringId)
 
                 Column(modifier = Modifier.padding(bottom = 5.dp)) {

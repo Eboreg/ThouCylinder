@@ -32,6 +32,7 @@ import java.io.File
 fun ArtistList(
     artists: List<ArtistPojo>,
     images: Map<String, File>,
+    onEmpty: (@Composable () -> Unit)? = null,
     onArtistClick: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -40,6 +41,7 @@ fun ArtistList(
         things = artists,
         onClick = onArtistClick?.let { { onArtistClick(it.name) } },
         key = { it.name },
+        onEmpty = onEmpty,
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 

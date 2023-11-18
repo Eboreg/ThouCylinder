@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ fun Thumbnail(
     borderWidth: Dp? = 1.dp,
     placeholderPadding: PaddingValues = PaddingValues(10.dp),
     placeholderIcon: ImageVector? = null,
+    placeholderIconTint: Color? = null,
 ) {
     Surface(
         shape = shape,
@@ -47,6 +49,7 @@ fun Thumbnail(
                 imageVector = placeholderIcon,
                 contentDescription = null,
                 modifier = Modifier.padding(placeholderPadding).fillMaxSize(),
+                tint = placeholderIconTint ?: LocalContentColor.current,
             )
         }
     }

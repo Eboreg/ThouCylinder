@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
+import android.net.Uri
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.room.withTransaction
@@ -21,26 +22,31 @@ import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
+import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import us.huseli.thoucylinder.dataclasses.pojos.toPlaylistTracks
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-
 @Singleton
 class RoomRepository @Inject constructor(
     private val database: Database,
     @ApplicationContext private val context: Context,
 ) {
+    data class UndeleteAlbum(val albumPojo: AlbumWithTracksPojo, val spotifyPojo: SpotifyAlbumPojo?)
+
     private val trackDao = database.trackDao()
     private val albumDao = database.albumDao()
     private val playlistDao = database.playlistDao()
     private val artistDao = database.artistDao()
+    private val spotifyDao = database.spotifyDao()
 
     // Keys = ViewModel class name:
     private val _selectedAlbums = mutableMapOf<String, MutableStateFlow<List<Album>>>()
     private val _selectedTracks = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
+
+    private val _undeleteAlbums = mutableMapOf<UUID, UndeleteAlbum>()
 
     val albumPojos: Flow<List<AlbumPojo>> = albumDao.flowAlbumPojos()
     val artistPojos = artistDao.flowArtistPojos()
@@ -71,7 +77,10 @@ class RoomRepository @Inject constructor(
     suspend fun deleteAlbums(albums: Collection<Album>) = albumDao.deleteAlbums(*albums.toTypedArray())
 
     suspend fun deleteAlbumWithTracks(album: Album) = database.withTransaction {
-        albumDao.deleteTracks(album.albumId)
+        albumDao.getAlbumWithTracks(album.albumId)?.also {
+            _undeleteAlbums[album.albumId] = UndeleteAlbum(it, spotifyDao.getSpotifyAlbumPojo(it.album.albumId))
+        }
+        trackDao.deleteTracksByAlbumId(album.albumId)
         deleteAlbums(listOf(album))
     }
 
@@ -128,6 +137,8 @@ class RoomRepository @Inject constructor(
 
     suspend fun listAlbumTrackPojos(albumIds: List<UUID>): List<TrackPojo> = albumDao.listTrackPojos(albumIds)
 
+    suspend fun listImageUris(): Set<Uri> = (albumDao.listImageUris() + trackDao.listImageUris()).toSet()
+
     suspend fun listPlaylistAlbums(playlistId: UUID): List<Album> = playlistDao.listAlbums(playlistId)
 
     suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrackPojo> = playlistDao.listTracks(playlistId)
@@ -138,9 +149,9 @@ class RoomRepository @Inject constructor(
         to: PlaylistTrackPojo,
     ): List<PlaylistTrackPojo> = playlistDao.listTracksBetween(playlistId, from, to)
 
-    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo) = trackDao.listTracksBetween(from, to)
-
     suspend fun listTracks(): List<Track> = trackDao.listTracks()
+
+    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo) = trackDao.listTracksBetween(from, to)
 
     fun pageTracksByArtist(artist: String): Pager<Int, TrackPojo> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracksByArtist(artist) }
@@ -154,8 +165,9 @@ class RoomRepository @Inject constructor(
     }
 
     suspend fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = database.withTransaction {
-        val albumArt = pojo.album.albumArt ?: pojo.album.youtubePlaylist?.saveMediaStoreImage(context)
-        val album = pojo.album.copy(albumArt = albumArt?.ensureThumbnail(context))
+        /** Does not save pojo.spotifyAlbum! Do that in SpotifyRepository. */
+        val albumArt = pojo.saveMediaStoreImage(context)
+        val album = pojo.album.copy(albumArt = albumArt)
 
         if (albumDao.albumExists(album.albumId)) {
             albumDao.updateAlbums(album)
@@ -168,7 +180,7 @@ class RoomRepository @Inject constructor(
             pojo.tracks.map { track ->
                 track.copy(
                     albumId = album.albumId,
-                    image = (track.image ?: track.youtubeVideo?.saveMediaStoreImage(context))?.ensureThumbnail(context),
+                    image = (track.image ?: track.youtubeVideo?.saveMediaStoreImage(context)),
                 )
             }
         )
@@ -213,6 +225,14 @@ class RoomRepository @Inject constructor(
         }
     }
 
+    suspend fun undeleteAlbumWithTracks(album: Album) {
+        _undeleteAlbums.remove(album.albumId)?.also { pojos ->
+            albumDao.insertAlbum(pojos.albumPojo.album)
+            trackDao.insertTracks(pojos.albumPojo.tracks)
+            pojos.spotifyPojo?.also { spotifyDao.upsertSpotifyAlbumPojo(it) }
+        }
+    }
+
     fun unselectAllAlbums(selectionKey: String) {
         _selectedAlbums[selectionKey]?.also { it.value = emptyList() }
     }
@@ -225,9 +245,9 @@ class RoomRepository @Inject constructor(
 
     suspend fun updateAlbums(albums: Collection<Album>) = albumDao.updateAlbums(*albums.toTypedArray())
 
-    suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
-
     suspend fun updateTrack(track: Track) = trackDao.updateTracks(track)
+
+    suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
 
     private suspend fun getTracksFromSelection(selection: Selection): List<Track> {
         val tracks = mutableListOf<Track>()

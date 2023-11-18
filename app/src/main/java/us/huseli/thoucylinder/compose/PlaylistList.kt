@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.QueueMusic
+import androidx.compose.material.icons.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +36,7 @@ fun PlaylistList(
     viewModel: LibraryViewModel,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
+    onEmpty: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
@@ -44,6 +45,7 @@ fun PlaylistList(
         onClick = onPlaylistClick,
         cardHeight = 60.dp,
         key = { it.playlistId },
+        onEmpty = onEmpty,
     ) { playlist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -58,7 +60,7 @@ fun PlaylistList(
             Thumbnail(
                 image = imageBitmap.value,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholderIcon = Icons.AutoMirrored.Sharp.QueueMusic,
+                placeholderIcon = Icons.Sharp.QueueMusic,
             )
 
             Column(

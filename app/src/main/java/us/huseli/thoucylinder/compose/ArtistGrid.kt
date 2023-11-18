@@ -34,6 +34,7 @@ fun ArtistGrid(
     artists: List<ArtistPojo>,
     images: Map<String, File>,
     onArtistClick: (String) -> Unit,
+    onEmpty: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     val context = LocalContext.current
@@ -43,6 +44,7 @@ fun ArtistGrid(
         onClick = { onArtistClick(it.name) },
         contentPadding = contentPadding,
         key = { it.name },
+        onEmpty = onEmpty,
     ) { artist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 

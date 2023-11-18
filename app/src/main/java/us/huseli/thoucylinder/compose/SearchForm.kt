@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.input.ImeAction
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchForm(
     modifier: Modifier = Modifier,

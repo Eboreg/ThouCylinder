@@ -35,7 +35,10 @@ data class MediaStoreEntry(
                 }
             }
         }
-        context.contentResolver.delete(contentUri, null, null)
+        try {
+            context.contentResolver.delete(contentUri, null, null)
+        } catch (_: Exception) {
+        }
     }
 }
 

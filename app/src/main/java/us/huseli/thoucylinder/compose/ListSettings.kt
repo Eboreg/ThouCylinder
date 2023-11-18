@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ViewList
+import androidx.compose.material.icons.sharp.ViewList
 import androidx.compose.material.icons.sharp.GridView
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -124,7 +124,7 @@ fun ListDisplayTypeButton(
         content = {
             when (current) {
                 DisplayType.LIST -> Icon(Icons.Sharp.GridView, null)
-                DisplayType.GRID -> Icon(Icons.AutoMirrored.Sharp.ViewList, null)
+                DisplayType.GRID -> Icon(Icons.Sharp.ViewList, null)
             }
         }
     )

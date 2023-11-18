@@ -1,7 +1,11 @@
 package us.huseli.thoucylinder.dataclasses.abstr
 
+import android.content.Context
+import android.graphics.Bitmap
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -14,9 +18,19 @@ abstract class AbstractAlbumPojo {
     abstract val durationMs: Long?
     abstract val minYear: Int?
     abstract val maxYear: Int?
+    abstract val spotifyAlbum: SpotifyAlbum?
 
     val duration: Duration?
         get() = durationMs?.milliseconds
+
+    val isFromSpotify: Boolean
+        get() = spotifyAlbum != null
+
+    val isLocal: Boolean
+        get() = album.isLocal
+
+    val isOnYoutube: Boolean
+        get() = album.isOnYoutube
 
     private val years: Pair<Int, Int>?
         get() {
@@ -34,4 +48,16 @@ abstract class AbstractAlbumPojo {
             if (min == max) min.toString()
             else "$min–$max"
         }
+
+    suspend fun getFullImage(context: Context): Bitmap? = album.albumArt?.getBitmap(context)
+        ?: spotifyAlbum?.fullImage?.getBitmap()
+        ?: album.youtubePlaylist?.getBitmap()
+
+    suspend fun getThumbnail(context: Context): Bitmap? = album.albumArt?.getThumbnailBitmap(context)
+        ?: spotifyAlbum?.thumbnail?.getBitmap()
+        ?: album.youtubePlaylist?.getBitmap()
+
+    suspend fun saveMediaStoreImage(context: Context) = album.albumArt
+        ?: spotifyAlbum?.fullImage?.url?.let { MediaStoreImage.fromUrl(it, album, context) }
+        ?: album.youtubePlaylist?.thumbnail?.url?.let { MediaStoreImage.fromUrl(it, album, context) }
 }

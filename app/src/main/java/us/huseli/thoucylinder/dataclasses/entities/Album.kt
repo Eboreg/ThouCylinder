@@ -9,6 +9,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
+import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
@@ -33,6 +34,26 @@ data class Album(
 
     suspend fun getFullImage(context: Context): Bitmap? =
         albumArt?.getBitmap(context) ?: youtubePlaylist?.getBitmap()
+
+    fun getLevenshteinDistance(other: Album): Int {
+        val levenshtein = LevenshteinDistance()
+        val distances = mutableListOf<Int>()
+
+        distances.add(levenshtein.apply(title.lowercase(), other.title.lowercase()))
+        if (artist != null) {
+            distances.add(levenshtein.apply("$artist - $title".lowercase(), other.title.lowercase()))
+            if (other.artist != null) distances.add(
+                levenshtein.apply(
+                    "$artist - $title".lowercase(),
+                    "${other.artist} - ${other.title}".lowercase()
+                )
+            )
+        }
+        if (other.artist != null)
+            distances.add(levenshtein.apply(title.lowercase(), "${other.artist} - ${other.title}".lowercase()))
+
+        return distances.min()
+    }
 
     fun getMediaStoreSubdir(): String =
         artist?.let { "${artist.sanitizeFilename()}/${title.sanitizeFilename()}" } ?: title.sanitizeFilename()

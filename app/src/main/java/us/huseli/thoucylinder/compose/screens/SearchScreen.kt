@@ -26,15 +26,15 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchType
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.AlbumGrid
-import us.huseli.thoucylinder.compose.AlbumList
+import us.huseli.thoucylinder.compose.album.AlbumGrid
+import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListDisplayTypeButton
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.ListTypeChips
 import us.huseli.thoucylinder.compose.SearchForm
-import us.huseli.thoucylinder.compose.TrackGrid
-import us.huseli.thoucylinder.compose.TrackList
+import us.huseli.thoucylinder.compose.track.TrackGrid
+import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
@@ -75,7 +75,7 @@ fun SearchScreen(
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
 
     val withTempTracks: (List<TrackPojo>, (List<TrackPojo>) -> Unit) -> (() -> Unit) = { pojos, callback ->
-        { scope.launch { callback(viewModel.ensureVideoMetadata(pojos)) } }
+        { scope.launch { callback(viewModel.ensureTrackMetadata(pojos)) } }
     }
 
     val withTempTrack: (TrackPojo, (TrackPojo) -> Unit) -> (() -> Unit) = { track, callback ->
@@ -147,7 +147,6 @@ fun SearchScreen(
                                 appCallbacks = appCallbacks,
                                 onPlayClick = { viewModel.playAlbum(pojo.album) },
                                 onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
-                                onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(pojo.album) },
                                 onAlbumLongClick = { viewModel.selectLocalAlbumsFromLastSelected(pojo as AlbumPojo) },
                                 onAlbumClick = {
                                     if (selectedLocalAlbumPojos.isNotEmpty())
@@ -215,12 +214,16 @@ fun SearchScreen(
                                     viewModel.enqueueTrackPojos((pojo as AlbumWithTracksPojo).trackPojos, context)
                                 },
                                 onAddToPlaylistClick = {
-                                    appCallbacks.onAddToPlaylistClick(Selection(tracks = (pojo as AlbumWithTracksPojo).tracks))
+                                    appCallbacks.onAddToPlaylistClick(
+                                        Selection(tracks = (pojo as AlbumWithTracksPojo).tracks)
+                                    )
                                 },
-                                onRemoveFromLibraryClick = { viewModel.removeAlbumFromLibrary(pojo.album) },
-                                onAlbumLongClick = { viewModel.selectYoutubeAlbumsFromLastSelected(pojo as AlbumWithTracksPojo) },
+                                onAlbumLongClick = {
+                                    viewModel.selectYoutubeAlbumsFromLastSelected(pojo as AlbumWithTracksPojo)
+                                },
                                 onAlbumClick = {
-                                    if (selectedYoutubeAlbumPojos.isNotEmpty()) viewModel.toggleSelectedYoutube(pojo as AlbumWithTracksPojo)
+                                    if (selectedYoutubeAlbumPojos.isNotEmpty())
+                                        viewModel.toggleSelectedYoutube(pojo as AlbumWithTracksPojo)
                                     else appCallbacks.onAlbumClick(pojo.album.albumId)
                                 },
                             )
@@ -237,7 +240,9 @@ fun SearchScreen(
                             },
                             onUnselectAllClick = { viewModel.unselectAllYoutubeAlbums() },
                             onAddToPlaylistClick = {
-                                appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedYoutubeAlbumPojos.flatMap { it.tracks }))
+                                appCallbacks.onAddToPlaylistClick(
+                                    Selection(tracks = selectedYoutubeAlbumPojos.flatMap { it.tracks })
+                                )
                             },
                             onSelectAllClick = { viewModel.selectAllYoutubeAlbums() },
                         ),

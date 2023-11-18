@@ -26,12 +26,16 @@ android {
         val youtubeApiKey = secretsProperties["youtubeApiKey"] as String
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
+        val spotifyClientId = secretsProperties["spotifyClientId"] as String
+        val spotifyClientSecret = secretsProperties["spotifyClientSecret"] as String
 
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "0.2.0"
+        manifestPlaceholders["redirectSchemeName"] = "klaatu"
+        manifestPlaceholders["redirectHostName"] = "thoucylinder"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -42,6 +46,8 @@ android {
         buildConfigField("String", "youtubeApiKey", "\"$youtubeApiKey\"")
         buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
+        buildConfigField("String", "spotifyClientId", "\"$spotifyClientId\"")
+        buildConfigField("String", "spotifyClientSecret", "\"$spotifyClientSecret\"")
     }
 
     buildTypes {
@@ -86,7 +92,6 @@ android {
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.6.0"
 val daggerVersion = "2.48.1"
-val composeVersion = "1.5.4"
 val media3Version = "1.1.1"
 val pagingVersion = "3.3.0-alpha02"
 
@@ -95,24 +100,25 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Compose:
-    implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.ui:ui-graphics:$composeVersion")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation(platform("androidx.compose:compose-bom:2023.10.01"))
 
     // Material:
-    implementation("androidx.compose.material3:material3:1.1.2")
-    implementation("androidx.compose.material:material-icons-extended:1.6.0-alpha08")
-    // implementation("androidx.compose.material:material-icons-extended:$composeVersion")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Compose related:
+    implementation("androidx.activity:activity-compose:1.8.0")
+    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.paging:paging-compose-android:$pagingVersion")
 
     // Lifecycle:
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
 
     // Hilt:
     implementation("com.google.dagger:hilt-android:$daggerVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
     kapt("com.google.dagger:hilt-compiler:$daggerVersion")
 
     // Media:
@@ -128,7 +134,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.4.0")
+    implementation("com.github.Eboreg:RetainTheme:2.5.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
@@ -143,9 +149,14 @@ dependencies {
     // Paging:
     // https://developer.android.com/topic/libraries/architecture/paging/v3-overview
     implementation("androidx.paging:paging-common-ktx:$pagingVersion")
-    implementation("androidx.paging:paging-compose-android:$pagingVersion")
     implementation("androidx.room:room-paging:$roomVersion")
 
     // Reorder:
     implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
+
+    // Spotify:
+    implementation("com.spotify.android:auth:2.1.0")
+
+    // Levenshtein string distance:
+    implementation("org.apache.commons:commons-text:1.11.0")
 }

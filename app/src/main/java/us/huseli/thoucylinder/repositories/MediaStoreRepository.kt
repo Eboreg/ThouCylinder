@@ -13,10 +13,14 @@ import androidx.core.database.getStringOrNull
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.thoucylinder.MediaStoreFormatException
-import us.huseli.thoucylinder.dataclasses.DownloadProgress
 import us.huseli.thoucylinder.dataclasses.ID3Data
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.deleteMediaStoreUriAndFile
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.MediaStoreData
@@ -26,11 +30,12 @@ import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
 import us.huseli.thoucylinder.dataclasses.getMediaStoreEntries
 import us.huseli.thoucylinder.dataclasses.getMediaStoreEntry
 import us.huseli.thoucylinder.dataclasses.getMediaStoreFile
+import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.escapeQuotes
-import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
 import us.huseli.thoucylinder.getReadOnlyImageCollection
 import us.huseli.thoucylinder.getReadWriteAudioCollection
+import us.huseli.thoucylinder.getReadWriteImageCollection
 import java.io.File
 import java.io.FileNotFoundException
 import javax.inject.Inject
@@ -38,6 +43,14 @@ import javax.inject.Singleton
 
 @Singleton
 class MediaStoreRepository @Inject constructor(@ApplicationContext private val context: Context) {
+    private val _isImportingLocalMedia = MutableStateFlow(true)
+
+    val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
+
+    fun setIsImporting(value: Boolean) {
+        _isImportingLocalMedia.value = value
+    }
+
     /** IMAGE RELATED METHODS ************************************************/
 
     fun collectAlbumImages(pojo: AlbumWithTracksPojo): Set<File> {
@@ -55,19 +68,14 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
     }
 
     fun collectArtistImages(): Map<String, File> {
-        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-        val selectionArgs = arrayOf("artist.%")
-
         return context.getMediaStoreEntries(
             collection = getReadOnlyImageCollection(),
-            selection = selection,
-            selectionArgs = selectionArgs,
+            selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?",
+            selectionArgs = arrayOf("artist.%"),
         ).associate { image ->
             image.relativePath.trim('/').split('/').last().lowercase() to image.file
         }
     }
-
-    /** AUDIO RELATED METHODS ************************************************/
 
     fun deleteImages(pojo: AlbumWithTracksPojo) {
         deleteImagesByAlbums(listOf(pojo.album))
@@ -77,6 +85,20 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
     fun deleteImagesByAlbums(albums: Collection<Album>) = albums.forEach { it.albumArt?.delete(context) }
 
     fun deleteImagesByTracks(tracks: Collection<Track>) = tracks.forEach { it.image?.delete(context) }
+
+    fun deleteOrphanImages(except: Collection<Uri>) {
+        context.getMediaStoreEntries(
+            collection = getReadWriteImageCollection(),
+            selection = "${MediaStore.Images.Media.RELATIVE_PATH} = ? OR ${MediaStore.Images.Media.RELATIVE_PATH} = ?",
+            selectionArgs = arrayOf(MediaStoreImage.albumRelativePath, MediaStoreImage.trackRelativePath),
+        ).forEach { entry ->
+            if (!except.contains(entry.contentUri)) {
+                entry.deleteWithEmptyParentDirs(context)
+            }
+        }
+    }
+
+    /** AUDIO RELATED METHODS ************************************************/
 
     fun deleteTracks(tracks: Collection<Track>) = tracks
         .mapNotNull { it.mediaStoreData?.uri }
@@ -219,15 +241,15 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
             }
     }
 
-    fun moveTaggedTrackToMediaStore(
+    suspend fun moveTaggedTrackToMediaStore(
         track: Track,
         tempFile: File,
         relativePath: String,
-        album: Album? = null,
-        progressCallback: (DownloadProgress) -> Unit,
+        albumPojo: AbstractAlbumPojo? = null,
+        progressCallback: (ProgressData) -> Unit,
     ): Track {
         val getFilename = { extension: String -> "${track.generateBasename()}.$extension" }
-        val progress = DownloadProgress(status = DownloadProgress.Status.MOVING, progress = 0.0, item = track.title)
+        val progress = ProgressData(status = ProgressData.Status.MOVING, progress = 0.0, item = track.title)
 
         progressCallback(progress)
 
@@ -238,7 +260,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                 filename = getFilename(tempFile.extension),
             ).also { progressCallback(progress.copy(progress = 1.0)) }
         } catch (e: MediaStoreFormatException) {
-            progressCallback(progress.copy(status = DownloadProgress.Status.CONVERTING))
+            progressCallback(progress.copy(status = ProgressData.Status.CONVERTING))
 
             val convertedFile = File(tempFile.path.substringBeforeLast('.') + ".opus")
             val session = FFmpegKit.execute("-i ${tempFile.path} -vn ${convertedFile.path}")
@@ -258,18 +280,23 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         val mediaStoreFile = context.getMediaStoreFile(mediaStoreUri)
         val metadata = mediaStoreFile.extractTrackMetadata()
 
-        context.contentResolver.update(mediaStoreUri, getTrackContentValues(track, metadata, album), null, null)
-        tagTrack(track = track, localFile = mediaStoreFile, album = album)
+        context.contentResolver.update(
+            mediaStoreUri,
+            getTrackContentValues(track, metadata, albumPojo?.album),
+            null,
+            null,
+        )
+        tagTrack(track = track, localFile = mediaStoreFile, albumPojo = albumPojo)
 
         return track.copy(
             metadata = metadata,
             isInLibrary = true,
             mediaStoreData = MediaStoreData(uri = mediaStoreUri, relativePath = relativePath),
-            albumId = album?.albumId,
+            albumId = albumPojo?.album?.albumId,
         )
     }
 
-    fun tagAlbumTracks(pojo: AlbumWithTracksPojo) {
+    suspend fun tagAlbumTracks(pojo: AlbumWithTracksPojo) {
         pojo.tracks.forEach { track ->
             val trackFile = track.mediaStoreData?.getFile(context)
 
@@ -277,7 +304,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                 if (!trackFile.canWrite())
                     Log.e(this::class.simpleName, "tagAlbumTracks: Cannot write to $trackFile")
                 else
-                    tagTrack(track = track, localFile = trackFile, album = pojo.album)
+                    tagTrack(track = track, localFile = trackFile, albumPojo = pojo)
             }
             track.mediaStoreData?.uri?.also { uri ->
                 val contentValues = getTrackContentValues(track, track.metadata, pojo.album)
@@ -351,15 +378,15 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         return contentUri
     }
 
-    private fun tagTrack(track: Track, localFile: File, album: Album? = null) {
+    private suspend fun tagTrack(track: Track, localFile: File, albumPojo: AbstractAlbumPojo? = null) {
         val tmpFile = File(context.cacheDir, "${localFile.nameWithoutExtension}.tmp.${localFile.extension}")
         val tags = mutableMapOf("title" to track.title)
 
-        (track.artist ?: album?.artist)?.let { tags["artist"] = it }
-        album?.artist?.let { tags["album_artist"] = it }
-        album?.title?.let { tags["album"] = it }
+        (track.artist ?: albumPojo?.album?.artist)?.let { tags["artist"] = it }
+        albumPojo?.album?.artist?.let { tags["album_artist"] = it }
+        albumPojo?.album?.title?.let { tags["album"] = it }
         track.albumPosition?.let { tags["track"] = it.toString() }
-        (track.year ?: album?.year)?.let { tags["date"] = it.toString() }
+        (track.year ?: albumPojo?.album?.year)?.let { tags["date"] = it.toString() }
 
         val tagCommands = tags
             .map { (key, value) -> "-metadata \"$key=${value.escapeQuotes()}\"" }
@@ -372,7 +399,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
             tmpFile.delete()
         }
 
-        (track.image ?: album?.albumArt)?.getFile(context)?.let { imageFile ->
+        (track.image ?: albumPojo?.saveMediaStoreImage(context))?.getFile(context)?.let { imageFile ->
             // This does not work on Opus files yet, but there is a ticket about it somewhere:
             val imageSession = FFmpegKit.execute(
                 "-i \"${localFile.path}\" -i \"${imageFile.path}\" -map 0 -map 1:0 -y " +

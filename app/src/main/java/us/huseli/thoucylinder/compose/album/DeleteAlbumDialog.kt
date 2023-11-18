@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -25,14 +25,9 @@ fun DeleteAlbumDialog(
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
         title = { Text(text = "Delete $album") },
         confirmButton = {
-            if (album.isLocal) {
-                TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album_and_delete_files)) }
-                if (album.isOnYoutube) {
-                    TextButton(onClick = onDeleteFilesClick) { Text(stringResource(R.string.only_delete_files)) }
-                }
-            } else if (album.isOnYoutube) {
-                TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album)) }
-            }
+            TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album_and_delete_files)) }
+            if (album.isOnYoutube)
+                TextButton(onClick = onDeleteFilesClick) { Text(stringResource(R.string.only_delete_files)) }
         },
         text = { Text(text = stringResource(R.string.what_do_you_want_to_do)) },
     )

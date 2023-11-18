@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -61,7 +61,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
+    val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
 
     SelectedTracksButtons(trackCount = selectedTracks.size, callbacks = trackSelectionCallbacks)
 
@@ -93,7 +93,8 @@ fun <T : AbstractTrackPojo> TrackGrid(
 
                         LaunchedEffect(Unit) {
                             imageBitmap.value = pojo.getFullImage(context)
-                            if (metadata == null) metadata = viewModel.getTrackMetadata(track)
+                            if (metadata == null)
+                                metadata = viewModel.ensureTrackMetadata(track, commit = true).metadata
                         }
 
                         Thumbnail(image = imageBitmap.value, borderWidth = null)
@@ -135,7 +136,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
                         )
                     }
 
-                    downloadProgressMap[track.trackId]?.let { progress ->
+                    progressDataMap[track.trackId]?.let { progress ->
                         val statusText = stringResource(progress.status.stringId)
 
                         Column(modifier = Modifier.padding(bottom = 5.dp)) {

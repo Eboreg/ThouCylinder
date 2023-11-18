@@ -6,8 +6,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.Delete
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,8 +34,8 @@ import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.SelectedTracksButtons
-import us.huseli.thoucylinder.compose.TrackListRow
+import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
+import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
@@ -43,7 +48,7 @@ fun QueueScreen(
     appCallbacks: AppCallbacks,
 ) {
     val context = LocalContext.current
-    val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle()
+    val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle(emptyList())
     val queue by viewModel.queue.collectAsStateWithLifecycle()
 
     val reorderableState = rememberReorderableLazyListState(
@@ -68,8 +73,8 @@ fun QueueScreen(
             },
         )
 
-        val downloadProgressMap by viewModel.trackDownloadProgressMap.collectAsStateWithLifecycle()
-        val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+        val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
+        val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
 
         ListWithNumericBar(listState = reorderableState.listState, listSize = queue.size) {
             LazyColumn(
@@ -84,7 +89,8 @@ fun QueueScreen(
 
                     LaunchedEffect(pojo.track.trackId) {
                         thumbnail.value = pojo.getThumbnail(context)
-                        if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
+                        if (metadata == null)
+                            metadata = viewModel.ensureTrackMetadata(pojo.track, commit = true).metadata
                     }
 
                     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
@@ -99,7 +105,7 @@ fun QueueScreen(
                             TrackListRow(
                                 title = pojo.track.title,
                                 isDownloadable = pojo.track.isDownloadable,
-                                downloadProgress = downloadProgressMap[pojo.track.trackId],
+                                progressData = progressDataMap[pojo.track.trackId],
                                 thumbnail = thumbnail.value,
                                 containerColor = containerColor,
                                 reorderableState = reorderableState,
@@ -117,6 +123,13 @@ fun QueueScreen(
                                     onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = pojo) },
                                 ),
                                 isSelected = selectedTracks.contains(pojo),
+                                extraContextMenuItems = {
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.remove_from_queue)) },
+                                        leadingIcon = { Icon(Icons.Sharp.Delete, null) },
+                                        onClick = { viewModel.removeFromQueue(pojo) },
+                                    )
+                                },
                             )
                         }
                     }

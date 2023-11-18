@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -66,7 +66,7 @@ fun AlbumList(
             ).joinToString(" • ").takeIf { it.isNotBlank() }
 
             LaunchedEffect(pojo.album.albumId) {
-                imageBitmap.value = pojo.album.getThumbnail(context)?.asImageBitmap()
+                imageBitmap.value = pojo.getThumbnail(context)?.asImageBitmap()
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -76,6 +76,7 @@ fun AlbumList(
                     placeholderIcon = Icons.Sharp.Album,
                     borderWidth = if (isSelected(pojo)) null else 1.dp,
                 )
+
                 Column(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp).fillMaxHeight().weight(1f),
                     verticalArrangement = Arrangement.SpaceEvenly,

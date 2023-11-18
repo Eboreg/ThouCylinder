@@ -3,19 +3,28 @@
 package us.huseli.thoucylinder.database
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import java.util.UUID
 
 @Dao
 interface QueueDao {
-    @Query("DELETE FROM QueueTrack")
-    suspend fun _clearQueue()
-
     @Insert
     suspend fun _insertQueueTracks(vararg queueTracks: QueueTrack)
+
+    @Query("SELECT QueueTrack_queueTrackId FROM QueueTrack")
+    suspend fun _listQueueTrackIds(): List<UUID>
+
+    @Update
+    suspend fun _updateQueueTracks(vararg queueTracks: QueueTrack)
+
+    @Delete
+    suspend fun deleteQueueTracks(vararg queueTracks: QueueTrack)
 
     @Query(
         """
@@ -30,8 +39,11 @@ interface QueueDao {
     suspend fun getQueue(): List<QueueTrackPojo>
 
     @Transaction
-    suspend fun setQueue(queue: List<QueueTrackPojo>) {
-        _clearQueue()
-        _insertQueueTracks(*queue.map { it.queueTrack }.toTypedArray())
+    suspend fun upsertQueueTracks(vararg queueTracks: QueueTrack) {
+        val ids = _listQueueTrackIds()
+        queueTracks.partition { ids.contains(it.queueTrackId) }.also { (toUpdate, toInsert) ->
+            _updateQueueTracks(*toUpdate.toTypedArray())
+            _insertQueueTracks(*toInsert.toTypedArray())
+        }
     }
 }

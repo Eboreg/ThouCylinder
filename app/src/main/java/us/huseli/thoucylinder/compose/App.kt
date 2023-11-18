@@ -5,8 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.QueueMusic
+import androidx.compose.material.icons.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.BugReport
+import androidx.compose.material.icons.sharp.ImportExport
 import androidx.compose.material.icons.sharp.LibraryMusic
 import androidx.compose.material.icons.sharp.Search
 import androidx.compose.material3.Icon
@@ -36,19 +37,24 @@ import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.DebugDestination
+import us.huseli.thoucylinder.ImportDestination
 import us.huseli.thoucylinder.LibraryDestination
 import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchDestination
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
+import us.huseli.thoucylinder.compose.album.EditAlbumDialog
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.DebugScreen
+import us.huseli.thoucylinder.compose.screens.ImportScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
+import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
@@ -69,8 +75,7 @@ fun App(
     queueViewModel: QueueViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
-    val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle()
+    val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
 
     var activeScreen by rememberSaveable { mutableStateOf<String?>("library") }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
@@ -84,15 +89,14 @@ fun App(
     var deleteAlbumDialogAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
 
     LaunchedEffect(Unit) {
-        viewModel.importNewMediaStoreAlbums(context = context)
-        viewModel.deleteOrphanTracksAndAlbums()
-        viewModel.deleteTempTracksAndAlbums()
+        viewModel.doStartupTasks(context)
     }
 
     val mainMenuItems = mutableListOf(
         MainMenuItem("search", Icons.Sharp.Search, stringResource(R.string.search)),
         MainMenuItem("library", Icons.Sharp.LibraryMusic, stringResource(R.string.library)),
-        MainMenuItem("queue", Icons.AutoMirrored.Sharp.QueueMusic, stringResource(R.string.queue)),
+        MainMenuItem("queue", Icons.Sharp.QueueMusic, stringResource(R.string.queue)),
+        MainMenuItem("import", Icons.Sharp.ImportExport, stringResource(R.string.import_str)),
     )
     if (BuildConfig.DEBUG)
         mainMenuItems.add(MainMenuItem("debug", Icons.Sharp.BugReport, stringResource(R.string.debug)))
@@ -102,6 +106,7 @@ fun App(
             "search" -> navController.navigate(SearchDestination.route)
             "library" -> navController.navigate(LibraryDestination.route)
             "queue" -> navController.navigate(QueueDestination.route)
+            "import" -> navController.navigate(ImportDestination.route)
             "debug" -> navController.navigate(DebugDestination.route)
         }
         isCoverExpanded = false
@@ -161,6 +166,14 @@ fun App(
         onPlaylistClick = onPlaylistClick,
         onShowTrackInfoClick = { pojo -> infoDialogTrackPojo = pojo },
         onDeleteAlbumClick = { album -> deleteAlbumDialogAlbum = album },
+        onRemoveAlbumFromLibraryClick = { album ->
+            viewModel.removeAlbumFromLibrary(album)
+            SnackbarEngine.addInfo(
+                message = context.getString(R.string.removed_album_from_library, album.title),
+                actionLabel = context.getString(R.string.undo),
+                onActionPerformed = { viewModel.undoRemoveAlbumFromLibrary(album) },
+            )
+        }
     )
 
     val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
@@ -177,7 +190,7 @@ fun App(
         var localFile by rememberSaveable { mutableStateOf<File?>(null) }
 
         LaunchedEffect(Unit) {
-            if (metadata == null) metadata = viewModel.getTrackMetadata(pojo.track)
+            if (metadata == null) metadata = viewModel.ensureTrackMetadata(pojo.track, commit = true).metadata
             album = pojo.album ?: viewModel.getTrackAlbum(pojo.track)
             localFile = pojo.track.mediaStoreData?.getFile(context)
         }
@@ -196,6 +209,8 @@ fun App(
 
     if (isAddToPlaylistDialogOpen) {
         addToPlaylistSelection?.also { selection ->
+            val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+
             AddToPlaylistDialog(
                 playlists = playlists,
                 onSelect = { playlist ->
@@ -359,6 +374,11 @@ fun App(
                 ) {
                     activeScreen = null
                     PlaylistScreen(appCallbacks = appCallbacks)
+                }
+
+                composable(route = ImportDestination.route) {
+                    activeScreen = "import"
+                    ImportScreen()
                 }
 
                 if (BuildConfig.DEBUG) {

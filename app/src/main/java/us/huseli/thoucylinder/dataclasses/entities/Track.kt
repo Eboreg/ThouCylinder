@@ -9,6 +9,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
@@ -16,6 +17,7 @@ import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
 import java.io.File
 import java.util.UUID
+import kotlin.time.Duration
 
 @Entity(
     foreignKeys = [
@@ -49,6 +51,9 @@ data class Track(
     val discNumberNonNull: Int
         get() = discNumber ?: 1
 
+    val duration: Duration?
+        get() = metadata?.duration ?: youtubeVideo?.duration
+
     val isDownloadable: Boolean
         get() = !isDownloaded && isOnYoutube
 
@@ -59,7 +64,7 @@ data class Track(
         get() = youtubeVideo != null
 
     val playUri: Uri?
-        get() = mediaStoreData?.uri ?: youtubeVideo?.metadata?.uri
+        get() = mediaStoreData?.uri ?: youtubeVideo?.uri
 
     fun generateBasename(): String {
         var name = ""
@@ -71,6 +76,35 @@ data class Track(
     }
 
     suspend fun getFullImage(context: Context): Bitmap? = image?.getBitmap(context) ?: youtubeVideo?.getBitmap()
+
+    fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
+        val levenshtein = LevenshteinDistance()
+        val distances = mutableListOf<Int>()
+
+        distances.add(levenshtein.apply(title.lowercase(), other.title.lowercase()))
+        if (albumArtist != null) {
+            distances.add(levenshtein.apply("$albumArtist - $title".lowercase(), other.title.lowercase()))
+            if (other.artist != null) distances.add(
+                levenshtein.apply(
+                    "$albumArtist - $title".lowercase(),
+                    "${other.artist} ${other.title}".lowercase(),
+                )
+            )
+        }
+        if (artist != null) {
+            distances.add(levenshtein.apply("$artist - $title".lowercase(), other.title.lowercase()))
+            if (other.artist != null) distances.add(
+                levenshtein.apply(
+                    "$artist - $title".lowercase(),
+                    "${other.artist} - ${other.title}".lowercase(),
+                )
+            )
+        }
+        if (other.artist != null)
+            distances.add(levenshtein.apply(title.lowercase(), "${other.artist} - ${other.title}".lowercase()))
+
+        return distances.min()
+    }
 
     suspend fun getThumbnail(context: Context): Bitmap? =
         image?.getThumbnailBitmap(context) ?: youtubeVideo?.getBitmap()

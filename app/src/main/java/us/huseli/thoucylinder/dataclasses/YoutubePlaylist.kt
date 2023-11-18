@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.dataclasses
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.os.Parcelable
 import androidx.room.Embedded
@@ -16,9 +15,6 @@ data class YoutubePlaylist(
     val videoCount: Int = 0,
 ) : Parcelable {
     suspend fun getBitmap(): Bitmap? = thumbnail?.getBitmap()
-
-    suspend fun saveMediaStoreImage(context: Context): MediaStoreImage? =
-        thumbnail?.url?.let { MediaStoreImage.fromUrl(url = it, playlist = this, context = context) }
 
     fun toAlbum(isInLibrary: Boolean) = Album(
         title = title,

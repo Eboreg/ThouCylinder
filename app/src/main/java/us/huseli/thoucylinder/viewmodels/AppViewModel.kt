@@ -59,10 +59,136 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
         }
     }
 
-    fun deleteOrphanTracksAndAlbums() = viewModelScope.launch {
-        val allTracks = repos.room.listTracks()
-        val albums = repos.room.listAlbums()
-        val albumMultimap = albums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
+    fun deletePlaylist(pojo: PlaylistPojo, onFinish: (() -> Unit)? = null) = viewModelScope.launch {
+        deletedPlaylist = pojo
+        deletedPlaylistTracks = repos.room.listPlaylistTracks(pojo.playlistId)
+        repos.room.deletePlaylist(pojo.toPlaylist())
+        onFinish?.invoke()
+    }
+
+    fun deleteTrackFiles(album: Album) = viewModelScope.launch {
+        repos.room.getAlbumWithTracks(album.albumId)?.also { pojo ->
+            repos.mediaStore.deleteTracks(pojo.tracks)
+            repos.room.updateTracks(pojo.tracks.map { it.copy(mediaStoreData = null) })
+            repos.room.updateAlbum(pojo.album.copy(isLocal = false))
+        }
+    }
+
+    fun doStartupTasks(context: Context) = viewModelScope.launch {
+        val existingTracks = repos.room.listTracks()
+        importNewMediaStoreAlbums(context, existingTracks)
+        deleteOrphanTracksAndAlbums(existingTracks)
+        repos.mediaStore.deleteOrphanImages(except = repos.room.listImageUris())
+        repos.room.deleteTempTracksAndAlbums()
+    }
+
+    fun downloadAndSaveAlbum(album: Album, onError: (Track, Throwable) -> Unit) = viewModelScope.launch {
+        repos.room.getAlbumWithTracks(album.albumId)?.also { downloadAndSaveAlbum(it, onError) }
+    }
+
+    fun downloadAndSaveAlbum(pojo: AlbumWithTracksPojo, onError: (Track, Throwable) -> Unit) {
+        albumDownloadJobs[pojo.album.albumId] = viewModelScope.launch {
+            val tracks = mutableListOf<Track>()
+
+            try {
+                pojo.tracks.map { ensureTrackMetadata(it, commit = false) }.forEachIndexed { index, track ->
+                    try {
+                        val tempFile = repos.youtube.downloadVideo(
+                            video = track.youtubeVideo!!,
+                            progressCallback = { progressData ->
+                                repos.youtube.setAlbumProgress(
+                                    pojo.album.albumId,
+                                    progressData.copy(
+                                        progress = (index + (progressData.progress * 0.9)) / pojo.tracks.size
+                                    )
+                                )
+                            }
+                        )
+                        tracks.add(
+                            repos.mediaStore.moveTaggedTrackToMediaStore(
+                                track = track,
+                                tempFile = tempFile,
+                                relativePath = "${Environment.DIRECTORY_MUSIC}/${pojo.album.getMediaStoreSubdir()}",
+                                albumPojo = pojo,
+                                progressCallback = { progressData ->
+                                    repos.youtube.setAlbumProgress(
+                                        pojo.album.albumId,
+                                        progressData.copy(
+                                            progress = (index + progressData.progress) / pojo.tracks.size
+                                        )
+                                    )
+                                },
+                            )
+                        )
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        onError(track, e)
+                    }
+                }
+
+                repos.room.saveAlbumWithTracks(pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true)))
+            } finally {
+                repos.youtube.setAlbumProgress(pojo.album.albumId, null)
+                albumDownloadJobs -= pojo.album.albumId
+            }
+        }
+    }
+
+    fun downloadTrack(track: Track) = viewModelScope.launch {
+        try {
+            var newTrack = ensureTrackMetadata(track, commit = false)
+            val tempFile = repos.youtube.downloadVideo(
+                video = newTrack.youtubeVideo!!,
+                progressCallback = {
+                    repos.youtube.setTrackProgress(track.trackId, it.copy(progress = it.progress * 0.8))
+                },
+            )
+            newTrack = repos.mediaStore.moveTaggedTrackToMediaStore(
+                track = newTrack,
+                tempFile = tempFile,
+                relativePath = Environment.DIRECTORY_MUSIC,
+                progressCallback = {
+                    repos.youtube.setTrackProgress(track.trackId, it.copy(progress = it.progress * 0.8))
+                }
+            )
+            withContext(Dispatchers.Main) { repos.room.insertTrack(newTrack) }
+        } finally {
+            repos.youtube.setTrackProgress(track.trackId, null)
+        }
+    }
+
+    suspend fun getTrackAlbum(track: Track): Album? = repos.room.getTrackAlbum(track)
+
+    fun removeAlbumFromLibrary(album: Album) = viewModelScope.launch {
+        repos.room.deleteAlbumWithTracks(album)
+    }
+
+    fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch {
+        repos.room.saveAlbumWithTracks(ensureTrackMetadata(pojo, commit = false))
+    }
+
+    fun tagAlbumTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch {
+        repos.mediaStore.tagAlbumTracks(ensureTrackMetadata(pojo, commit = true))
+    }
+
+    fun undoDeletePlaylist(onFinish: (PlaylistPojo) -> Unit) = viewModelScope.launch {
+        deletedPlaylist?.also { pojo ->
+            repos.room.insertPlaylist(pojo, deletedPlaylistTracks)
+            deletedPlaylist = null
+            deletedPlaylistTracks = emptyList()
+            onFinish(pojo)
+        }
+    }
+
+    fun undoRemoveAlbumFromLibrary(album: Album) = viewModelScope.launch {
+        repos.room.undeleteAlbumWithTracks(album)
+    }
+
+    /** PRIVATE METHODS ******************************************************/
+
+    private suspend fun deleteOrphanTracksAndAlbums(allTracks: List<Track>) {
+        val allAlbums = repos.room.listAlbums()
+        val albumMultimap = allAlbums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
         // Collect tracks that have no existing media files:
         val orphanTracks = repos.mediaStore.listOrphanTracks(allTracks)
         // Separate those that have Youtube connection from those that don't:
@@ -80,107 +206,21 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
         repos.mediaStore.deleteImagesByAlbums(realOrphanAlbums)
         repos.room.deleteTracks(realOrphanTracks)
         repos.room.deleteAlbums(realOrphanAlbums)
-        // Update the Youtube-only tracks and albums:
-        repos.room.updateAlbums(youtubeOnlyAlbums.map { it.copy(isLocal = false) })
-        repos.room.updateTracks(youtubeOnlyTracks.map { it.copy(mediaStoreData = null) })
-    }
-
-    fun deletePlaylist(pojo: PlaylistPojo, onFinish: (() -> Unit)? = null) = viewModelScope.launch {
-        deletedPlaylist = pojo
-        deletedPlaylistTracks = repos.room.listPlaylistTracks(pojo.playlistId)
-        repos.room.deletePlaylist(pojo.toPlaylist())
-        onFinish?.invoke()
-    }
-
-    fun deleteTempTracksAndAlbums() = viewModelScope.launch { repos.room.deleteTempTracksAndAlbums() }
-
-    fun deleteTrackFiles(album: Album) = viewModelScope.launch {
-        repos.room.getAlbumWithTracks(album.albumId)?.also { pojo ->
-            repos.mediaStore.deleteTracks(pojo.tracks)
-            repos.room.updateTracks(pojo.tracks.map { it.copy(mediaStoreData = null) })
-            repos.room.updateAlbum(pojo.album.copy(isLocal = false))
+        // Update the Youtube-only tracks and albums if needed:
+        youtubeOnlyAlbums.filter { it.isLocal }.takeIf { it.isNotEmpty() }?.also { albums ->
+            repos.room.updateAlbums(albums.map { it.copy(isLocal = false) })
+        }
+        youtubeOnlyTracks.filter { it.mediaStoreData != null }.takeIf { it.isNotEmpty() }?.also { tracks ->
+            repos.room.updateTracks(tracks.map { it.copy(mediaStoreData = null) })
         }
     }
 
-    fun downloadAndSaveAlbum(album: Album, onError: (Track, Throwable) -> Unit) = viewModelScope.launch {
-        repos.room.getAlbumWithTracks(album.albumId)?.also { downloadAndSaveAlbum(it, onError) }
-    }
+    private suspend fun ensureTrackMetadata(pojo: AlbumWithTracksPojo, commit: Boolean): AlbumWithTracksPojo =
+        pojo.copy(tracks = pojo.tracks.map { track -> ensureTrackMetadata(track, commit = commit) })
 
-    fun downloadAndSaveAlbum(pojo: AlbumWithTracksPojo, onError: (Track, Throwable) -> Unit) {
-        albumDownloadJobs[pojo.album.albumId] = viewModelScope.launch {
-            val tracks = mutableListOf<Track>()
+    private suspend fun importNewMediaStoreAlbums(context: Context, existingTracks: List<Track>) {
+        repos.mediaStore.setIsImporting(true)
 
-            try {
-                pojo.tracks.map { repos.youtube.ensureVideoMetadata(it) }.forEachIndexed { index, track ->
-                    try {
-                        val tempFile = repos.youtube.downloadVideo(
-                            video = track.youtubeVideo!!,
-                            progressCallback = { downloadProgress ->
-                                repos.youtube.setAlbumDownloadProgress(
-                                    pojo.album.albumId,
-                                    downloadProgress.copy(
-                                        progress = (index + (downloadProgress.progress * 0.9)) / pojo.tracks.size
-                                    )
-                                )
-                            }
-                        )
-                        tracks.add(
-                            repos.mediaStore.moveTaggedTrackToMediaStore(
-                                track = track,
-                                tempFile = tempFile,
-                                relativePath = "${Environment.DIRECTORY_MUSIC}/${pojo.album.getMediaStoreSubdir()}",
-                                album = pojo.album,
-                                progressCallback = { downloadProgress ->
-                                    repos.youtube.setAlbumDownloadProgress(
-                                        pojo.album.albumId,
-                                        downloadProgress.copy(
-                                            progress = (index + downloadProgress.progress) / pojo.tracks.size
-                                        )
-                                    )
-                                },
-                            )
-                        )
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        onError(track, e)
-                    }
-                }
-
-                repos.room.saveAlbumWithTracks(pojo.copy(tracks = tracks, album = pojo.album.copy(isLocal = true)))
-            } finally {
-                repos.youtube.setAlbumDownloadProgress(pojo.album.albumId, null)
-                albumDownloadJobs -= pojo.album.albumId
-            }
-        }
-    }
-
-    fun downloadTrack(track: Track) = viewModelScope.launch {
-        try {
-            var newTrack = repos.youtube.ensureVideoMetadata(track)
-            val tempFile = repos.youtube.downloadVideo(
-                video = newTrack.youtubeVideo!!,
-                progressCallback = {
-                    repos.youtube.setTrackDownloadProgress(track.trackId, it.copy(progress = it.progress * 0.8))
-                },
-            )
-            newTrack = repos.mediaStore.moveTaggedTrackToMediaStore(
-                track = newTrack,
-                tempFile = tempFile,
-                relativePath = Environment.DIRECTORY_MUSIC,
-                progressCallback = {
-                    repos.youtube.setTrackDownloadProgress(track.trackId, it.copy(progress = it.progress * 0.8))
-                }
-            )
-            withContext(Dispatchers.Main) { repos.room.insertTrack(newTrack) }
-        } finally {
-            repos.youtube.setTrackDownloadProgress(track.trackId, null)
-        }
-    }
-
-    suspend fun getTrackAlbum(track: Track): Album? = repos.room.getTrackAlbum(track)
-
-    fun importNewMediaStoreAlbums(context: Context) = viewModelScope.launch {
-        val existingTracks = repos.room.listTracks()
         val newAlbums = repos.mediaStore.listNewMediaStoreAlbums(existingTracks)
 
         newAlbums.forEach { pojo ->
@@ -193,48 +233,30 @@ class AppViewModel @Inject constructor(private val repos: Repositories) : Abstra
 
             repos.room.saveAlbumWithTracks(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage)))
         }
+
+        repos.mediaStore.setIsImporting(false)
     }
 
-    fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch {
-        repos.room.saveAlbumWithTracks(ensureTrackMetadata(pojo))
-    }
-
-    fun tagAlbumTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch {
-        repos.mediaStore.tagAlbumTracks(ensureTrackMetadata(pojo))
-    }
-
-    fun undoDeletePlaylist(onFinish: (PlaylistPojo) -> Unit) = viewModelScope.launch {
-        deletedPlaylist?.also { pojo ->
-            repos.room.insertPlaylist(pojo, deletedPlaylistTracks)
-            deletedPlaylist = null
-            deletedPlaylistTracks = emptyList()
-            onFinish(pojo)
-        }
-    }
-
-    private suspend fun ensureTrackMetadata(pojo: AlbumWithTracksPojo): AlbumWithTracksPojo = pojo.copy(
-        tracks = pojo.tracks.map { track -> ensureTrackMetadata(track) }
-    )
+    /** OVERRIDDEN METHODS ***************************************************/
 
     override fun onPlayerError(
         error: PlaybackException,
         currentPojo: QueueTrackPojo?,
         lastAction: PlayerRepository.LastAction,
     ) = viewModelScope.launch {
-        val metadataIsOld = currentPojo?.track?.youtubeVideo?.metadata?.expiresAt?.isBefore(Instant.now())
+        val metadataIsOld = currentPojo?.track?.youtubeVideo?.expiresAt?.isBefore(Instant.now())
 
         if (
             error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
             currentPojo != null &&
             (currentPojo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
         ) {
-            val track = repos.youtube.ensureVideoMetadata(currentPojo.track, forceReload = true)
+            val track = ensureTrackMetadata(currentPojo.track, commit = true, forceReload = true)
             val playUri = track.playUri
 
-            if (playUri != null && track.playUri != currentPojo.uri) {
-                repos.room.updateTrack(track)
+            if (playUri != null && playUri != currentPojo.uri) {
                 repos.player.updateTrack(currentPojo.copy(track = track, uri = playUri))
-                if (repos.player.lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentPojo.position)
+                if (lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentPojo.position)
             }
         } else SnackbarEngine.addError(error.toString())
     }

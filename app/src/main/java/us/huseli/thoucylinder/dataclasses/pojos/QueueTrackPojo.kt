@@ -35,10 +35,12 @@ data class QueueTrackPojo(
         31 * (31 * (31 * track.trackId.hashCode()) + uri.hashCode()) + queueTrackId.hashCode()
 }
 
-
 fun List<QueueTrackPojo>.reindexed(): List<QueueTrackPojo> = mapIndexed { index, pojo -> pojo.copy(position = index) }
 
 fun List<QueueTrackPojo>.plus(item: QueueTrackPojo, index: Int): List<QueueTrackPojo> =
     toMutableList().apply { add(index, item) }.toList()
 
 fun List<QueueTrackPojo>.toMediaItems(): List<MediaItem> = map { it.toMediaItem() }
+
+fun List<QueueTrackPojo>.containsWithPosition(other: QueueTrackPojo): Boolean =
+    any { it == other && it.position == other.position }

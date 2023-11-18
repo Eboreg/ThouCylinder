@@ -79,7 +79,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
             track.copy(artist = track.artist ?: pojo.album.artist)
         }
         viewModelScope.launch {
-            val bitmap = pojo.album.getFullImage(context)
+            val bitmap = pojo.getFullImage(context)
             if (bitmap != null) _bitmaps.value = listOf(bitmap)
         }
     }
@@ -112,7 +112,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         val bitmaps = mutableListOf<Bitmap>()
 
         _albumPojo.value?.also { pojo ->
-            pojo.album.getFullImage(context)?.also { bitmaps.add(it) }
+            pojo.getFullImage(context)?.also { bitmaps.add(it) }
 
             repos.mediaStore.collectAlbumImages(pojo).forEach { file ->
                 file.toBitmap()?.also { bitmaps.add(it) }

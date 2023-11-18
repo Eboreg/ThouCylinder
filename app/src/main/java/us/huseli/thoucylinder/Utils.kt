@@ -4,7 +4,16 @@ import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import org.json.JSONObject
+import java.time.Instant
+import kotlin.math.max
+import kotlin.math.roundToInt
+
+
+fun getApiUserAgent() = "ThouCylinder/${BuildConfig.VERSION_NAME} ( https://github.com/Eboreg/ThouCylinder )"
 
 
 fun String.escapeQuotes() = replace("\"", "\\\"")
@@ -84,3 +93,34 @@ fun JSONObject.getIntOrNull(name: String): Int? =
 
 
 fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble(name) else null
+
+
+fun Long.toInstant(): Instant = Instant.ofEpochSecond(this)
+
+
+fun ImageBitmap.getAverageColor(): Color {
+    val pixelMap = toPixelMap()
+    var redSum = 0f
+    var greenSum = 0f
+    var blueSum = 0f
+    val stepX = max((1f / (100f / pixelMap.width)).roundToInt(), 1)
+    val stepY = max((1f / (100f / pixelMap.height)).roundToInt(), 1)
+    var sampleCount = 0
+
+    for (x in 0 until pixelMap.width step stepX) {
+        for (y in 0 until pixelMap.height step stepY) {
+            pixelMap[x, y].also {
+                redSum += it.red
+                greenSum += it.green
+                blueSum += it.blue
+            }
+            sampleCount++
+        }
+    }
+
+    return Color(
+        red = redSum / sampleCount,
+        green = greenSum / sampleCount,
+        blue = blueSum / sampleCount,
+    )
+}

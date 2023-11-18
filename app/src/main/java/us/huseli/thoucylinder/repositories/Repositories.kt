@@ -10,4 +10,5 @@ class Repositories @Inject constructor(
     val mediaStore: MediaStoreRepository,
     val player: PlayerRepository,
     val youtube: YoutubeRepository,
+    val spotify: SpotifyRepository,
 )

@@ -11,6 +11,7 @@ import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.database.ArtistDao
 import us.huseli.thoucylinder.database.PlaylistDao
 import us.huseli.thoucylinder.database.QueueDao
+import us.huseli.thoucylinder.database.SpotifyDao
 import us.huseli.thoucylinder.database.TrackDao
 import us.huseli.thoucylinder.database.YoutubeSearchDao
 import javax.inject.Singleton
@@ -39,4 +40,7 @@ class DatabaseModule {
 
     @Provides
     fun provideQueueDao(database: Database): QueueDao = database.queueDao()
+
+    @Provides
+    fun provideSpotifyDao(database: Database): SpotifyDao = database.spotifyDao()
 }

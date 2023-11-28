@@ -17,7 +17,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.thoucylinder.Constants.PREF_AUTO_IMPORT_LOCAL_MUSIC
-import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_DIRECTORY
+import us.huseli.thoucylinder.Constants.PREF_MUSIC_IMPORT_DIRECTORY
 import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.dataclasses.ID3Data
@@ -53,7 +53,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         else null
     )
     private val _isImportingLocalMedia = MutableStateFlow(false)
-    private val _musicImportRelativePath = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_DIRECTORY, null))
+    private val _musicImportRelativePath = MutableStateFlow(preferences.getString(PREF_MUSIC_IMPORT_DIRECTORY, null))
 
     val autoImportLocalMusic = _autoImportLocalMusic.asStateFlow()
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
@@ -70,7 +70,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
 
     fun setMusicImportRelativePath(value: String) {
         _musicImportRelativePath.value = value
-        preferences.edit().putString(PREF_LOCAL_MUSIC_DIRECTORY, value).apply()
+        preferences.edit().putString(PREF_MUSIC_IMPORT_DIRECTORY, value).apply()
     }
 
     /** IMAGE RELATED METHODS ************************************************/
@@ -439,7 +439,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
-            PREF_LOCAL_MUSIC_DIRECTORY -> preferences.getString(PREF_LOCAL_MUSIC_DIRECTORY, null)?.also {
+            PREF_MUSIC_IMPORT_DIRECTORY -> preferences.getString(PREF_MUSIC_IMPORT_DIRECTORY, null)?.also {
                 _musicImportRelativePath.value = it
             }
             PREF_AUTO_IMPORT_LOCAL_MUSIC -> _autoImportLocalMusic.value = preferences.getBoolean(key, false)

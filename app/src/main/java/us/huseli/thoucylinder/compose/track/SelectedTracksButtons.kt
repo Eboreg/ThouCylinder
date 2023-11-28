@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.utils.SelectedItemsActionSection
+import us.huseli.thoucylinder.compose.utils.AnimatedSection
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -32,7 +32,7 @@ fun SelectedTracksButtons(
     callbacks: TrackSelectionCallbacks,
     extraButtons: (@Composable () -> Unit)? = null,
 ) {
-    SelectedItemsActionSection(visible = trackCount > 0, tonalElevation = tonalElevation) {
+    AnimatedSection(visible = trackCount > 0, tonalElevation = tonalElevation) {
         Text(
             pluralStringResource(R.plurals.x_selected_tracks, trackCount, trackCount),
             style = MaterialTheme.typography.bodySmall,

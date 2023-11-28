@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -25,7 +25,7 @@ import kotlin.time.Duration
             entity = Album::class,
             parentColumns = ["Album_albumId"],
             childColumns = ["Track_albumId"],
-            onDelete = ForeignKey.RESTRICT,
+            onDelete = ForeignKey.CASCADE,
             onUpdate = ForeignKey.CASCADE,
         )
     ],
@@ -75,7 +75,8 @@ data class Track(
         return name.sanitizeFilename()
     }
 
-    suspend fun getFullImage(context: Context): Bitmap? = image?.getBitmap(context) ?: youtubeVideo?.getBitmap()
+    suspend fun getFullImage(context: Context): ImageBitmap? =
+        image?.getImageBitmap(context) ?: youtubeVideo?.getImageBitmap()
 
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
@@ -106,8 +107,8 @@ data class Track(
         return distances.min()
     }
 
-    suspend fun getThumbnail(context: Context): Bitmap? =
-        image?.getThumbnailBitmap(context) ?: youtubeVideo?.getBitmap()
+    suspend fun getThumbnail(context: Context): ImageBitmap? =
+        image?.getThumbnailImageBitmap(context) ?: youtubeVideo?.getImageBitmap()
 
     fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""

@@ -44,8 +44,7 @@ class RoomRepository @Inject constructor(
 
     // Keys = ViewModel class name:
     private val _selectedAlbums = mutableMapOf<String, MutableStateFlow<List<Album>>>()
-    private val _selectedTracks = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
-
+    private val _selectedTrackPojos = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
     private val _undeleteAlbums = mutableMapOf<UUID, UndeleteAlbum>()
 
     val albumPojos: Flow<List<AlbumPojo>> = albumDao.flowAlbumPojos()
@@ -109,9 +108,9 @@ class RoomRepository @Inject constructor(
             _selectedAlbums[viewModelClass] = it
         }
 
-    fun getSelectedTrackFlow(viewModelClass: String): StateFlow<List<TrackPojo>> =
-        _selectedTracks[viewModelClass] ?: MutableStateFlow<List<TrackPojo>>(emptyList()).also {
-            _selectedTracks[viewModelClass] = it
+    fun getSelectedTrackPojoFlow(viewModelClass: String): StateFlow<List<TrackPojo>> =
+        _selectedTrackPojos[viewModelClass] ?: MutableStateFlow<List<TrackPojo>>(emptyList()).also {
+            _selectedTrackPojos[viewModelClass] = it
         }
 
     suspend fun getTrackAlbum(track: Track): Album? = track.albumId?.let { albumDao.getAlbum(it) }
@@ -121,17 +120,15 @@ class RoomRepository @Inject constructor(
         if (selection != null) addSelectionToPlaylist(selection, playlist, 0)
     }
 
-    suspend fun insertPlaylist(pojo: PlaylistPojo, tracks: List<PlaylistTrackPojo>) = database.withTransaction {
+    suspend fun insertPlaylist(pojo: PlaylistPojo, trackPojos: List<PlaylistTrackPojo>) = database.withTransaction {
         playlistDao.insertPlaylist(pojo.toPlaylist())
-        playlistDao.insertTracks(*tracks.map { it.toPlaylistTrack() }.toTypedArray())
+        playlistDao.insertTracks(*trackPojos.map { it.toPlaylistTrack() }.toTypedArray())
     }
 
     suspend fun insertTempAlbumsWithTracks(pojos: List<AlbumWithTracksPojo>) {
         albumDao.insertTempAlbums(pojos.map { it.album })
         trackDao.insertTempTracks(pojos.flatMap { it.tracks })
     }
-
-    suspend fun insertTrack(track: Track) = trackDao.insertTracks(listOf(track))
 
     suspend fun listAlbums(): List<Album> = albumDao.listAlbums()
 
@@ -151,17 +148,23 @@ class RoomRepository @Inject constructor(
 
     suspend fun listTracks(): List<Track> = trackDao.listTracks()
 
-    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo) = trackDao.listTracksBetween(from, to)
+    suspend fun listTrackPojosBetween(from: AbstractTrackPojo, to: AbstractTrackPojo) =
+        trackDao.listTrackPojosBetween(from, to)
 
-    fun pageTracksByArtist(artist: String): Pager<Int, TrackPojo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTracksByArtist(artist) }
+    fun pageTrackPojosByArtist(artist: String): Pager<Int, TrackPojo> =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojosByArtist(artist) }
 
-    fun pageTracksByPlaylistId(playlistId: UUID): Pager<Int, PlaylistTrackPojo> =
+    fun pageTrackPojosByPlaylistId(playlistId: UUID): Pager<Int, PlaylistTrackPojo> =
         Pager(config = PagingConfig(pageSize = 100)) { playlistDao.pageTracks(playlistId) }
 
     suspend fun removePlaylistTracks(pojos: List<PlaylistTrackPojo>) = database.withTransaction {
         playlistDao.deletePlaylistTracks(*pojos.toPlaylistTracks().toTypedArray())
         pojos.map { it.playlist.playlistId }.toSet().forEach { playlistId -> playlistDao.touchPlaylist(playlistId) }
+    }
+
+    suspend fun saveAlbum(album: Album) = database.withTransaction {
+        if (albumDao.albumExists(album.albumId)) albumDao.updateAlbums(album)
+        else albumDao.insertAlbum(album)
     }
 
     suspend fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = database.withTransaction {
@@ -188,10 +191,10 @@ class RoomRepository @Inject constructor(
         if (pojo.styles.isNotEmpty()) albumDao.insertAlbumStyles(pojo)
     }
 
-    fun searchAlbums(query: String): Flow<List<AlbumPojo>> = albumDao.searchAlbums(query)
+    fun searchAlbumPojos(query: String): Flow<List<AlbumPojo>> = albumDao.searchAlbumPojos(query)
 
-    fun searchTracks(query: String): Pager<Int, TrackPojo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.searchTracks(query) }
+    fun searchTrackPojos(query: String): Pager<Int, TrackPojo> =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.searchTrackPojos(query) }
 
     fun selectAlbums(selectionKey: String, albums: List<Album>) {
         _selectedAlbums[selectionKey]?.also {
@@ -200,8 +203,8 @@ class RoomRepository @Inject constructor(
         }
     }
 
-    fun selectTracks(selectionKey: String, tracks: List<TrackPojo>) {
-        _selectedTracks[selectionKey]?.also {
+    fun selectTrackPojos(selectionKey: String, tracks: List<TrackPojo>) {
+        _selectedTrackPojos[selectionKey]?.also {
             val currentIds = it.value.map { track -> track.trackId }
             it.value += tracks.filter { track -> !currentIds.contains(track.trackId) }
         }
@@ -216,8 +219,8 @@ class RoomRepository @Inject constructor(
         }
     }
 
-    fun toggleTrackSelected(selectionKey: String, track: TrackPojo) {
-        _selectedTracks[selectionKey]?.also {
+    fun toggleTrackPojoSelected(selectionKey: String, track: TrackPojo) {
+        _selectedTrackPojos[selectionKey]?.also {
             if (it.value.contains(track))
                 it.value -= track
             else
@@ -237,8 +240,8 @@ class RoomRepository @Inject constructor(
         _selectedAlbums[selectionKey]?.also { it.value = emptyList() }
     }
 
-    fun unselectAllTracks(selectionKey: String) {
-        _selectedTracks[selectionKey]?.also { it.value = emptyList() }
+    fun unselectAllTrackPojos(selectionKey: String) {
+        _selectedTrackPojos[selectionKey]?.also { it.value = emptyList() }
     }
 
     suspend fun updateAlbum(album: Album) = albumDao.updateAlbums(album)

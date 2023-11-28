@@ -18,8 +18,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -73,7 +71,7 @@ fun QueueScreen(
             },
         )
 
-        val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
+        val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
         val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
 
         ListWithNumericBar(listState = reorderableState.listState, listSize = queue.size) {
@@ -85,12 +83,10 @@ fun QueueScreen(
             ) {
                 itemsIndexed(queue, key = { _, pojo -> pojo.queueTrackId }) { pojoIdx, pojo ->
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
-                    var metadata by rememberSaveable { mutableStateOf(pojo.track.metadata) }
 
                     LaunchedEffect(pojo.track.trackId) {
-                        thumbnail.value = pojo.getThumbnail(context)
-                        if (metadata == null)
-                            metadata = viewModel.ensureTrackMetadata(pojo.track, commit = true).metadata
+                        thumbnail.value = viewModel.getTrackThumbnail(pojo.track, pojo.album, context)
+                        viewModel.ensureTrackMetadata(pojo.track, commit = true)
                     }
 
                     ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
@@ -105,12 +101,12 @@ fun QueueScreen(
                             TrackListRow(
                                 title = pojo.track.title,
                                 isDownloadable = pojo.track.isDownloadable,
-                                progressData = progressDataMap[pojo.track.trackId],
+                                downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
                                 thumbnail = thumbnail.value,
                                 containerColor = containerColor,
                                 reorderableState = reorderableState,
                                 artist = pojo.artist,
-                                duration = metadata?.duration,
+                                duration = pojo.track.metadata?.duration,
                                 callbacks = TrackCallbacks.fromAppCallbacks(
                                     pojo = pojo,
                                     appCallbacks = appCallbacks,

@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
@@ -25,7 +24,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val repos: Repositories,
-) : AbstractSelectViewModel("LibraryViewModel", repos) {
+) : AbstractAlbumListViewModel("LibraryViewModel", repos) {
     private val _artistImages = MutableStateFlow<Map<String, File>>(emptyMap())
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _isLoadingAlbums = MutableStateFlow(true)
@@ -56,7 +55,7 @@ class LibraryViewModel @Inject constructor(
 
     suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? =
         repos.room.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
-            album.getThumbnail(context)?.asImageBitmap()
+            album.getThumbnail(context)
         }
 
     fun selectAlbumsFromLastSelected(to: Album) = viewModelScope.launch {

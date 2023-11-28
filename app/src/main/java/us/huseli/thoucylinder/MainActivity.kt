@@ -1,14 +1,10 @@
 package us.huseli.thoucylinder
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.spotify.sdk.android.auth.AuthorizationResponse
@@ -24,35 +20,18 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        // TODO: What does this do?
-        val contract = ActivityResultContracts.RequestMultiplePermissions()
-        val requestPermissionLauncher = registerForActivityResult(contract) { }
+        if (BuildConfig.DEBUG) {
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
+                    .detectLeakedClosableObjects()
+                    .build()
+            )
+        }
 
-        val permissions =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_MEDIA_AUDIO,
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                )
-            else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-
-        requestPermissionLauncher.launch(permissions)
-
-        StrictMode.setVmPolicy(
-            StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
-                .detectLeakedClosableObjects()
-                .build()
-        )
-
-        try {
-            setContent {
-                ThouCylinderTheme {
-                    App()
-                }
+        setContent {
+            ThouCylinderTheme {
+                App()
             }
-        } catch (e: Exception) {
-            Log.e(javaClass.simpleName, e.toString(), e)
         }
     }
 

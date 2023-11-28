@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose.album
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -110,7 +110,7 @@ fun EditAlbumDialog(
                 scope.launch {
                     pojo?.also { pojo ->
                         val mediaStoreImage = bitmap?.let {
-                            MediaStoreImage.fromBitmap(bitmap, pojo.album, context)
+                            MediaStoreImage.fromBitmap(bitmap.asAndroidBitmap(), pojo.album, context)
                         }
                         val tracks = pojo.tracks.map { track -> track.copy(image = mediaStoreImage) }
                         onSave(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage), tracks = tracks))
@@ -206,11 +206,11 @@ fun EditAlbumDialogDetails(
 fun EditAlbumDialogAlbumArt(
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel,
-    onSelect: (Bitmap?) -> Unit,
+    onSelect: (ImageBitmap?) -> Unit,
     onCancel: () -> Unit,
     onPreviousClick: () -> Unit,
 ) {
-    val bitmaps by viewModel.bitmaps.collectAsStateWithLifecycle()
+    val bitmaps by viewModel.imageBitmaps.collectAsStateWithLifecycle()
 
     AlertDialog(
         modifier = modifier.padding(10.dp),
@@ -241,7 +241,7 @@ fun EditAlbumDialogAlbumArt(
                         modifier = Modifier.clickable { onSelect(bitmap) }.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Thumbnail(image = bitmap.asImageBitmap())
+                        Thumbnail(image = bitmap)
                         Text(text = "${bitmap.width}x${bitmap.height}")
                     }
                 }

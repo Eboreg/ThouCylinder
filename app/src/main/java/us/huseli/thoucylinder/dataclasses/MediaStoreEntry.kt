@@ -16,7 +16,7 @@ data class MediaStoreEntry(
     val contentUri: Uri,
 ) {
     private val parentDirNames: List<String>
-        get() = relativePath.trim('/').split('/').drop(1)
+        get() = relativePath.trim('/').split('/').drop(1).reversed()
 
     fun deleteWithEmptyParentDirs(context: Context) {
         if (file.isFile && file.canWrite()) {

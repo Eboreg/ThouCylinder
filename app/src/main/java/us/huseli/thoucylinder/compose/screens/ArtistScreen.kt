@@ -51,10 +51,6 @@ fun ArtistScreen(
     val artist = viewModel.artist
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
-    val tracks: LazyPagingItems<TrackPojo> = viewModel.tracks.collectAsLazyPagingItems()
-    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle()
-    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle(emptyList())
-    val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -88,6 +84,9 @@ fun ArtistScreen(
         Column {
             when (listType) {
                 ListType.ALBUMS -> {
+                    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle()
+                    val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle(emptyList())
+                    val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
                     val albumCallbacks = { pojo: AbstractAlbumPojo ->
                         AlbumCallbacks.fromAppCallbacks(
                             album = pojo.album,
@@ -120,6 +119,7 @@ fun ArtistScreen(
                             onEmpty = {
                                 Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                             },
+                            albumDownloadTasks = albumDownloadTasks,
                         )
                         DisplayType.GRID -> AlbumGrid(
                             pojos = albumPojos,
@@ -130,48 +130,54 @@ fun ArtistScreen(
                             onEmpty = {
                                 Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                             },
+                            albumDownloadTasks = albumDownloadTasks,
                         )
                     }
                 }
                 ListType.TRACKS -> {
+                    val trackPojos: LazyPagingItems<TrackPojo> = viewModel.trackPojos.collectAsLazyPagingItems()
+                    val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle(emptyList())
                     val trackCallbacks = { pojo: TrackPojo ->
                         TrackCallbacks.fromAppCallbacks(
                             pojo = pojo,
                             appCallbacks = appCallbacks,
                             onTrackClick = {
-                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                                if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
                                 else viewModel.playTrackPojo(pojo)
                             },
                             onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
-                            onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
+                            onLongClick = { viewModel.selectTrackPojosFromLastSelected(to = pojo) },
                         )
                     }
                     val trackSelectionCallbacks = TrackSelectionCallbacks(
-                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
-                        onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                        onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
-                        onUnselectAllClick = { viewModel.unselectAllTracks() },
+                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTrackPojos)) },
+                        onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
+                        onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
+                        onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
                     )
+                    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
 
                     when (displayType) {
                         DisplayType.LIST -> TrackList(
-                            trackPojos = tracks,
+                            trackPojos = trackPojos,
                             viewModel = viewModel,
                             showArtist = false,
-                            selectedTracks = selectedTracks,
+                            selectedTrackPojos = selectedTrackPojos,
                             trackCallbacks = trackCallbacks,
+                            trackDownloadTasks = trackDownloadTasks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
                             onEmpty = {
                                 Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                             },
                         )
                         DisplayType.GRID -> TrackGrid(
-                            trackPojos = tracks,
+                            trackPojos = trackPojos,
                             viewModel = viewModel,
                             showArtist = false,
                             trackCallbacks = trackCallbacks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
-                            selectedTracks = selectedTracks,
+                            selectedTrackPojos = selectedTrackPojos,
+                            trackDownloadTasks = trackDownloadTasks,
                             onEmpty = {
                                 Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                             },

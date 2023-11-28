@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.DragHandle
 import androidx.compose.material.icons.sharp.MusicNote
@@ -23,16 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.burnoutcrew.reorderable.ReorderableLazyListState
 import org.burnoutcrew.reorderable.detectReorder
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.getDownloadProgress
 import kotlin.time.Duration
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -48,9 +49,11 @@ fun TrackListRow(
     modifier: Modifier = Modifier,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
-    progressData: ProgressData? = null,
+    downloadTask: TrackDownloadTask? = null,
     extraContextMenuItems: (@Composable () -> Unit)? = null,
 ) {
+    val (downloadProgress, downloadIsActive) = getDownloadProgress(downloadTask)
+
     Card(
         colors = CardDefaults.outlinedCardColors(
             containerColor = containerColor
@@ -70,60 +73,58 @@ fun TrackListRow(
                 borderWidth = if (isSelected) null else 1.dp,
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxHeight().padding(vertical = 5.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = title,
-                        maxLines = if (artist == null) 2 else 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = ThouCylinderTheme.typographyExtended.listSmallHeader,
-                    )
-                    if (artist != null) {
+            Column(modifier = Modifier.fillMaxHeight()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 5.dp, bottom = if (downloadIsActive) 3.dp else 5.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
-                            text = artist,
-                            maxLines = 1,
+                            text = title,
+                            maxLines = if (artist == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                            style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                        )
+                        if (artist != null) {
+                            Text(
+                                text = artist,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                            )
+                        }
+                    }
+
+                    if (duration != null) {
+                        Text(
+                            text = duration.sensibleFormat(),
+                            modifier = Modifier.padding(start = 5.dp),
+                            style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                        )
+                    }
+
+                    TrackContextMenuWithButton(
+                        isDownloadable = isDownloadable,
+                        callbacks = callbacks,
+                        extraItems = extraContextMenuItems,
+                        modifier = Modifier.size(35.dp),
+                    )
+
+                    if (reorderableState != null) {
+                        Icon(
+                            Icons.Sharp.DragHandle,
+                            null,
+                            modifier = Modifier.detectReorder(reorderableState).height(18.dp).padding(end = 10.dp),
                         )
                     }
                 }
 
-                if (duration != null) {
-                    Text(
-                        text = duration.sensibleFormat(),
-                        modifier = Modifier.padding(start = 5.dp),
-                        style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                if (downloadIsActive) {
+                    LinearProgressIndicator(
+                        progress = downloadProgress?.toFloat() ?: 0f,
+                        modifier = Modifier.fillMaxWidth().height(2.dp),
                     )
                 }
-
-                TrackContextMenuWithButton(
-                    isDownloadable = isDownloadable,
-                    callbacks = callbacks,
-                    extraItems = extraContextMenuItems,
-                )
-
-                if (reorderableState != null) {
-                    Icon(
-                        Icons.Sharp.DragHandle,
-                        null,
-                        modifier = Modifier.detectReorder(reorderableState).height(18.dp).padding(end = 10.dp),
-                    )
-                }
-            }
-        }
-
-        if (progressData != null) {
-            val statusText = stringResource(progressData.status.stringId)
-
-            Column(modifier = Modifier.padding(bottom = 5.dp)) {
-                Text(text = "$statusText …")
-                LinearProgressIndicator(
-                    progress = progressData.progress.toFloat(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
     }

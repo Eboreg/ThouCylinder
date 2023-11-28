@@ -3,6 +3,8 @@ package us.huseli.thoucylinder
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -28,6 +30,8 @@ class Request(
 
     suspend fun getBitmap(): Bitmap? =
         withContext(Dispatchers.IO) { getInputStream().use { BitmapFactory.decodeStream(it) } }
+
+    suspend fun getImageBitmap(): ImageBitmap? = getBitmap()?.asImageBitmap()
 
     suspend fun getJson(): Map<String, *> = getString().let {
         val gson: Gson = GsonBuilder().create()

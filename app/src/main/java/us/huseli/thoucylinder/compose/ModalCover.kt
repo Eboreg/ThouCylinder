@@ -111,7 +111,7 @@ fun BoxWithConstraintsScope.ModalCover(
             isCollapsing = false
         },
     )
-    val thumbnailPadding by animateDpAsState(if (isExpanded) 60.dp else 10.dp, animationSpec)
+    val thumbnailPadding by animateDpAsState(if (isExpanded) 60.dp else 5.dp, animationSpec)
     val tonalElevation by animateDpAsState(if (isExpanded) 0.dp else 3.dp, animationSpec)
     val topRowHeight by animateDpAsState(if (isExpanded) 50.dp else 0.dp, animationSpec)
 
@@ -191,7 +191,7 @@ fun BoxWithConstraintsScope.ModalCover(
                     )
 
                     if (!isExpanded || isExpanding || isCollapsing) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.weight(1f).padding(start = 5.dp)) {
                             Text(
                                 text = pojo.track.title,
                                 maxLines = 1,

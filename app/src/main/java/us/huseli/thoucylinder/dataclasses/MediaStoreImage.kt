@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Environment
 import android.os.Parcelable
 import android.provider.MediaStore
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.dpToPx
@@ -32,13 +34,15 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
         context.deleteMediaStoreUriAndFile(thumbnailUri)
     }
 
-    fun getBitmap(context: Context): Bitmap? = context.getMediaStoreFileNullable(uri)?.toBitmap()
-
     fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
 
-    fun getThumbnailBitmap(context: Context): Bitmap? =
-        context.getMediaStoreFileNullable(thumbnailUri)?.toBitmap()
-            ?: getBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)
+    fun getImageBitmap(context: Context): ImageBitmap? = getBitmap(context)?.asImageBitmap()
+
+    fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
+        context.getMediaStoreFileNullable(thumbnailUri)?.toBitmap()?.asImageBitmap()
+            ?: getBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
+
+    private fun getBitmap(context: Context): Bitmap? = context.getMediaStoreFileNullable(uri)?.toBitmap()
 
     companion object {
         val albumRelativePath = "${Environment.DIRECTORY_PICTURES}/$IMAGE_SUBDIR_ALBUM/"

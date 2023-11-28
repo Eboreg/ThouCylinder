@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.CheckCircle
+import androidx.compose.material.icons.sharp.MusicNote
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -28,8 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -41,17 +41,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
+import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T : AbstractTrackPojo> TrackGrid(
     trackPojos: LazyPagingItems<T>,
-    selectedTracks: List<T>,
+    selectedTrackPojos: List<T>,
+    trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: AbstractBaseViewModel,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
@@ -61,9 +64,8 @@ fun <T : AbstractTrackPojo> TrackGrid(
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
 
-    SelectedTracksButtons(trackCount = selectedTracks.size, callbacks = trackSelectionCallbacks)
+    SelectedTracksButtons(trackCount = selectedTrackPojos.size, callbacks = trackSelectionCallbacks)
 
     LazyVerticalGrid(
         state = gridState,
@@ -76,7 +78,8 @@ fun <T : AbstractTrackPojo> TrackGrid(
         items(count = trackPojos.itemCount) { index ->
             trackPojos[index]?.also { pojo ->
                 val track = pojo.track
-                val isSelected = selectedTracks.contains(pojo)
+                val isSelected = selectedTrackPojos.contains(pojo)
+                val (downloadProgress, downloadIsActive) = getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
 
                 OutlinedCard(
                     shape = MaterialTheme.shapes.extraSmall,
@@ -89,15 +92,17 @@ fun <T : AbstractTrackPojo> TrackGrid(
                 ) {
                     Box(modifier = Modifier.aspectRatio(1f)) {
                         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-                        var metadata by rememberSaveable { mutableStateOf(track.metadata) }
 
                         LaunchedEffect(Unit) {
                             imageBitmap.value = pojo.getFullImage(context)
-                            if (metadata == null)
-                                metadata = viewModel.ensureTrackMetadata(track, commit = true).metadata
+                            viewModel.ensureTrackMetadata(track, commit = true)
                         }
 
-                        Thumbnail(image = imageBitmap.value, borderWidth = null)
+                        Thumbnail(
+                            image = imageBitmap.value,
+                            borderWidth = null,
+                            placeholderIcon = Icons.Sharp.MusicNote,
+                        )
 
                         if (isSelected) {
                             Icon(
@@ -109,8 +114,25 @@ fun <T : AbstractTrackPojo> TrackGrid(
                         }
                     }
 
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.padding(5.dp).weight(1f)) {
+                    if (downloadIsActive) {
+                        LinearProgressIndicator(
+                            progress = downloadProgress?.toFloat() ?: 0f,
+                            modifier = Modifier.fillMaxWidth().height(2.dp),
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = if (downloadIsActive) 3.dp else 5.dp,
+                                bottom = 5.dp,
+                                start = 5.dp,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
                             val titleLines = if (artist != null) 1 else 2
 
@@ -136,13 +158,15 @@ fun <T : AbstractTrackPojo> TrackGrid(
                         )
                     }
 
-                    progressDataMap[track.trackId]?.let { progress ->
-                        val statusText = stringResource(progress.status.stringId)
+                    trackDownloadTasks.find { it.track == track }?.also { download ->
+                        val status by download.downloadStatus.collectAsStateWithLifecycle()
+                        val progress by download.downloadProgress.collectAsStateWithLifecycle()
+                        val statusText = stringResource(status.stringId)
 
                         Column(modifier = Modifier.padding(bottom = 5.dp)) {
                             Text(text = "$statusText …")
                             LinearProgressIndicator(
-                                progress = progress.progress.toFloat(),
+                                progress = progress.toFloat(),
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }

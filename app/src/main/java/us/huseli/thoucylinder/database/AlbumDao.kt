@@ -41,7 +41,9 @@ interface AlbumDao {
         """
         SELECT a.*, 
             SUM(COALESCE(Track_metadata_durationMs, Track_youtubeVideo_durationMs, Track_youtubeVideo_metadata_durationMs)) AS durationMs,
-            MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount
+            MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount,
+            EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NOT NULL) AND 
+            EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NULL) AS isPartiallyDownloaded
         FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId 
         WHERE Album_isInLibrary = 1
         GROUP BY Album_albumId
@@ -95,7 +97,7 @@ interface AlbumDao {
     suspend fun _listStyles(albumId: UUID): List<Style>
 
     @RawQuery(observedEntities = [Album::class, Track::class])
-    fun _searchAlbums(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
+    fun _searchAlbumPojos(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
 
     @Update
     suspend fun _updateAlbums(vararg albums: Album)
@@ -197,15 +199,17 @@ interface AlbumDao {
     @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
     suspend fun listTracks(albumId: UUID): List<Track>
 
-    fun searchAlbums(query: String): Flow<List<AlbumPojo>> {
+    fun searchAlbumPojos(query: String): Flow<List<AlbumPojo>> {
         val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
             .joinToString(" OR ") { "Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'" }
 
-        return _searchAlbums(
+        return _searchAlbumPojos(
             SimpleSQLiteQuery(
                 """
                 SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear,
-                    MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount
+                    MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount,
+                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NOT NULL) AND 
+                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NULL) AS isPartiallyDownloaded
                 FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId
                 WHERE ($terms) AND Album_isInLibrary = 1
                 GROUP BY Album_albumId

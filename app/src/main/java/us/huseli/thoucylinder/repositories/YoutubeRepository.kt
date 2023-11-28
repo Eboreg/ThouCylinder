@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
-import android.util.Log
 import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.toDuration
+import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.DOWNLOAD_CHUNK_SIZE
 import us.huseli.thoucylinder.Constants.HEADER_ANDROID_SDK_VERSION
 import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_NAME
@@ -24,10 +24,10 @@ import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_VERSION
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_EXCLUDE
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_FILTER
 import us.huseli.thoucylinder.Constants.YOUTUBE_HEADER_USER_AGENT
+import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
@@ -40,7 +40,6 @@ import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.yquery
 import java.io.File
 import java.net.URLEncoder
-import java.util.UUID
 import java.util.regex.Pattern
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,17 +56,15 @@ class YoutubeRepository @Inject constructor(
         val nextToken: String? = null,
     )
 
-    private val _albumProgressDataMap = MutableStateFlow<Map<UUID, ProgressData>>(emptyMap())
+    private val _albumDownloadTasks = MutableStateFlow<List<AlbumDownloadTask>>(emptyList())
     private val _isSearchingTracks = MutableStateFlow(false)
-    private val _trackProgressDataMap = MutableStateFlow<Map<UUID, ProgressData>>(emptyMap())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gson: Gson = GsonBuilder().create()
     private val metadataCache = mutableMapOf<String, YoutubeMetadataList>()
     private val responseType = object : TypeToken<Map<String, *>>() {}
 
-    val albumProgressDataMap = _albumProgressDataMap.asStateFlow()
-    val trackProgressDataMap = _trackProgressDataMap.asStateFlow()
+    val albumDownloadTasks = _albumDownloadTasks.asStateFlow()
     val isSearchingTracks = _isSearchingTracks.asStateFlow()
 
     init {
@@ -76,17 +73,20 @@ class YoutubeRepository @Inject constructor(
         }
     }
 
-    suspend fun downloadVideo(video: YoutubeVideo, progressCallback: (ProgressData) -> Unit): File {
+    fun addAlbumDownloadTask(value: AlbumDownloadTask) {
+        _albumDownloadTasks.value += value
+    }
+
+    suspend fun downloadVideo(
+        video: YoutubeVideo,
+        progressCallback: (Double) -> Unit,
+        statusCallback: (DownloadStatus) -> Unit,
+    ): File {
         /** Used both for downloading individual tracks/videos and albums/playlists. */
         val metadata = getBestMetadata(video.id) ?: throw Exception("Could not get metadata for $video")
         val tempFile = File(context.cacheDir, "${video.id}.${metadata.fileExtension}")
-        val progressData = ProgressData(
-            item = video.title,
-            status = ProgressData.Status.DOWNLOADING,
-            progress = 0.0,
-        )
 
-        progressCallback(progressData)
+        statusCallback(DownloadStatus.DOWNLOADING)
 
         withContext(Dispatchers.IO) {
             tempFile.outputStream().use { outputStream ->
@@ -105,16 +105,13 @@ class YoutubeRepository @Inject constructor(
                         contentLength = contentRange?.size ?: conn.getHeaderField("Content-Length")?.toInt()
                     conn.getInputStream().use { outputStream.write(it.readBytes()) }
                     if (contentLength != null) {
-                        progressCallback(
-                            progressData.copy(
-                                progress = min((DOWNLOAD_CHUNK_SIZE + rangeStart).toDouble() / contentLength, 1.0)
-                            )
-                        )
+                        progressCallback(min((DOWNLOAD_CHUNK_SIZE + rangeStart).toDouble() / contentLength, 1.0))
                     }
                     if (contentRange?.size != null && contentRange.size - contentRange.rangeEnd > 1)
                         rangeStart = contentRange.rangeEnd + 1
                     else finished = true
                 }
+                progressCallback(1.0)
             }
         }
 
@@ -297,16 +294,6 @@ class YoutubeRepository @Inject constructor(
         )
     }
 
-    fun setAlbumProgress(albumId: UUID, progress: ProgressData?) {
-        if (progress != null) _albumProgressDataMap.value += albumId to progress
-        else _albumProgressDataMap.value -= albumId
-    }
-
-    fun setTrackProgress(trackId: UUID, progress: ProgressData?) {
-        if (progress != null) _trackProgressDataMap.value += trackId to progress
-        else _trackProgressDataMap.value -= trackId
-    }
-
     /** PRIVATE METHODS ******************************************************/
 
     private suspend fun getAlbumWithTracksFromPlaylist(playlistId: String): AlbumWithTracksPojo? {
@@ -392,15 +379,11 @@ class YoutubeRepository @Inject constructor(
         return null
     }
 
-    private suspend fun getBestMetadata(videoId: String, forceReload: Boolean = false): YoutubeMetadata? = try {
+    private suspend fun getBestMetadata(videoId: String, forceReload: Boolean = false): YoutubeMetadata? =
         getMetadataList(videoId, forceReload).getBest(
             mimeTypeFilter = VIDEO_MIMETYPE_FILTER,
             mimeTypeExclude = VIDEO_MIMETYPE_EXCLUDE,
         )
-    } catch (e: Exception) {
-        Log.e("YoutubeRepository", "getBestMetadata: $e", e)
-        null
-    }
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun getMetadataList(videoId: String, forceReload: Boolean = false): YoutubeMetadataList {

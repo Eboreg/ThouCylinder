@@ -75,6 +75,7 @@ fun LibraryScreen(
 
         when (listType) {
             ListType.ALBUMS -> {
+                val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
                 val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle()
                 val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
                 val isLoadingAlbums by viewModel.isLoadingAlbums.collectAsStateWithLifecycle()
@@ -99,11 +100,11 @@ fun LibraryScreen(
                     onUnselectAllClick = { viewModel.unselectAllAlbums() },
                     onSelectAllClick = { viewModel.selectAlbums(albumPojos.map { it.album }) },
                 )
-                val onEmpty = @Composable {
+                val onEmpty: @Composable (Boolean, Boolean) -> Unit = { isImporting, isLoading ->
                     Text(
                         stringResource(
-                            if (isImportingLocalMedia) R.string.importing_local_albums
-                            else if (isLoadingAlbums) R.string.loading_albums
+                            if (isImporting) R.string.importing_local_albums
+                            else if (isLoading) R.string.loading_albums
                             else R.string.no_albums_found
                         ),
                         modifier = Modifier.padding(10.dp)
@@ -117,44 +118,47 @@ fun LibraryScreen(
                         albumSelectionCallbacks = albumSelectionCallbacks,
                         selectedAlbums = selectedAlbums,
                         listState = rememberLazyListState(),
-                        onEmpty = onEmpty,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingAlbums) },
+                        albumDownloadTasks = albumDownloadTasks,
                     )
                     DisplayType.GRID -> AlbumGrid(
                         pojos = albumPojos,
                         albumCallbacks = albumCallbacks,
                         selectedAlbums = selectedAlbums,
                         albumSelectionCallbacks = albumSelectionCallbacks,
-                        onEmpty = onEmpty,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingAlbums) },
+                        albumDownloadTasks = albumDownloadTasks,
                     )
                 }
             }
             ListType.TRACKS -> {
                 val trackPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
                 val isLoadingTracks by viewModel.isLoadingTracks.collectAsStateWithLifecycle()
-                val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+                val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle()
+                val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
                 val trackCallbacks = { pojo: TrackPojo ->
                     TrackCallbacks.fromAppCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         onTrackClick = {
-                            if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                            if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
                             else viewModel.playTrackPojo(pojo)
                         },
                         onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
-                        onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
+                        onLongClick = { viewModel.selectTrackPojosFromLastSelected(to = pojo) },
                     )
                 }
                 val trackSelectionCallbacks = TrackSelectionCallbacks(
-                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
-                    onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
-                    onUnselectAllClick = { viewModel.unselectAllTracks() },
+                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTrackPojos)) },
+                    onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
+                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
+                    onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
                 )
-                val onEmpty = @Composable {
+                val onEmpty: @Composable (Boolean, Boolean) -> Unit = { isImporting, isLoading ->
                     Text(
                         stringResource(
-                            if (isImportingLocalMedia) R.string.importing_local_tracks
-                            else if (isLoadingTracks) R.string.loading_tracks
+                            if (isImporting) R.string.importing_local_tracks
+                            else if (isLoading) R.string.loading_tracks
                             else R.string.no_tracks_found
                         ),
                         modifier = Modifier.padding(10.dp),
@@ -164,12 +168,13 @@ fun LibraryScreen(
                 when (displayType) {
                     DisplayType.LIST -> TrackList(
                         trackPojos = trackPojos,
-                        selectedTracks = selectedTracks,
+                        selectedTrackPojos = selectedTrackPojos,
                         viewModel = viewModel,
                         listState = trackListState,
                         trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
-                        onEmpty = onEmpty,
+                        trackDownloadTasks = trackDownloadTasks,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingTracks) },
                     )
                     DisplayType.GRID -> TrackGrid(
                         trackPojos = trackPojos,
@@ -177,8 +182,9 @@ fun LibraryScreen(
                         gridState = trackGridState,
                         trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
-                        selectedTracks = selectedTracks,
-                        onEmpty = onEmpty,
+                        selectedTrackPojos = selectedTrackPojos,
+                        trackDownloadTasks = trackDownloadTasks,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingTracks) },
                     )
                 }
             }
@@ -186,11 +192,11 @@ fun LibraryScreen(
                 val artistImages by viewModel.artistImages.collectAsStateWithLifecycle()
                 val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
                 val isLoadingArtists by viewModel.isLoadingArtists.collectAsStateWithLifecycle()
-                val onEmpty = @Composable {
+                val onEmpty: @Composable (Boolean, Boolean) -> Unit = { isImporting, isLoading ->
                     Text(
                         stringResource(
-                            if (isImportingLocalMedia) R.string.importing_local_artists
-                            else if (isLoadingArtists) R.string.loading_artists
+                            if (isImporting) R.string.importing_local_artists
+                            else if (isLoading) R.string.loading_artists
                             else R.string.no_artists_found
                         ),
                         modifier = Modifier.padding(10.dp),
@@ -202,13 +208,13 @@ fun LibraryScreen(
                         artists = artistPojos,
                         images = artistImages,
                         onArtistClick = appCallbacks.onArtistClick,
-                        onEmpty = onEmpty,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingArtists) },
                     )
                     DisplayType.GRID -> ArtistGrid(
                         artists = artistPojos,
                         images = artistImages,
                         onArtistClick = appCallbacks.onArtistClick,
-                        onEmpty = onEmpty,
+                        onEmpty = { onEmpty(isImportingLocalMedia, isLoadingArtists) },
                     )
                 }
             }
@@ -216,19 +222,18 @@ fun LibraryScreen(
                 Box(modifier = Modifier.fillMaxSize()) {
                     val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
                     val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
-                    val onEmpty = @Composable {
-                        Text(
-                            text = stringResource(if (isLoadingPlaylists) R.string.loading_playlists else R.string.no_playlists_found),
-                            modifier = Modifier.padding(10.dp),
-                        )
-                    }
 
                     PlaylistList(
                         playlists = playlists,
                         viewModel = viewModel,
                         onPlaylistClick = { appCallbacks.onPlaylistClick(it.playlistId) },
                         onPlaylistPlayClick = { viewModel.playPlaylist(it.playlistId) },
-                        onEmpty = onEmpty,
+                        onEmpty = {
+                            Text(
+                                text = stringResource(if (isLoadingPlaylists) R.string.loading_playlists else R.string.no_playlists_found),
+                                modifier = Modifier.padding(10.dp),
+                            )
+                        },
                     )
 
                     FloatingActionButton(

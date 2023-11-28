@@ -45,7 +45,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.ProgressData
+import us.huseli.thoucylinder.dataclasses.ImportProgressData
 import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -180,7 +180,7 @@ fun ImportScreenStickyHeader(
     currentAlbumCount: Int,
     totalAlbumCount: Int,
     isAllSelected: Boolean,
-    progress: ProgressData?,
+    progress: ImportProgressData?,
     onRefreshClick: () -> Unit,
     onImportClick: () -> Unit,
     onPreviousClick: () -> Unit,

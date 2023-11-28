@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,11 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
-import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.repositories.Repositories
@@ -27,19 +25,26 @@ class AlbumViewModel @Inject constructor(
     private val repos: Repositories,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext context: Context,
-) : AbstractSelectViewModel("AlbumViewModel", repos) {
+) : AbstractTrackListViewModel("AlbumViewModel", repos) {
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
+    private val _albumWasDeleted = MutableStateFlow(false)
 
-    val albumArt: Flow<ImageBitmap?> = _albumPojo.map { it?.getFullImage(context)?.asImageBitmap() }
+    val albumArt: Flow<ImageBitmap?> = _albumPojo.map { it?.getFullImage(context) }.distinctUntilChanged()
+    val albumDownloadTask: Flow<AlbumDownloadTask?> = repos.youtube.albumDownloadTasks
+        .map { tasks -> tasks.find { it.album.albumId == _albumId } }
+        .distinctUntilChanged()
     val albumPojo = _albumPojo.asStateFlow()
-    val progressData: Flow<ProgressData?> =
-        repos.youtube.albumProgressDataMap.map { it[_albumId] }.distinctUntilChanged()
+    val albumWasDeleted = _albumWasDeleted.asStateFlow()
+    override val trackDownloadTasks = repos.trackDownloadPool.tasks
+        .map { tasks -> tasks.filter { it.track.albumId == _albumId } }
+        .distinctUntilChanged()
 
     init {
         viewModelScope.launch {
-            repos.room.flowAlbumWithTracks(_albumId).filterNotNull().distinctUntilChanged().collect { pojo ->
-                _albumPojo.value = pojo
+            repos.room.flowAlbumWithTracks(_albumId).distinctUntilChanged().collect { pojo ->
+                if (pojo == null && _albumPojo.value != null) _albumWasDeleted.value = true
+                if (pojo != null) _albumPojo.value = pojo
             }
         }
     }

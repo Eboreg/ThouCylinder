@@ -1,13 +1,15 @@
 package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
-import android.graphics.Bitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import us.huseli.retaintheme.toBitmap
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMasterData
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResultItem
@@ -17,13 +19,12 @@ import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.retaintheme.toBitmap
 import javax.inject.Inject
 
 @HiltViewModel
 class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : ViewModel() {
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
-    private val _bitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
+    private val _imageBitmaps = MutableStateFlow<List<ImageBitmap>>(emptyList())
     private val _initialTracks = MutableStateFlow<List<Track>>(emptyList())
     private val _loading = MutableStateFlow(false)
     private val _loadingSearchResults = MutableStateFlow(true)
@@ -32,7 +33,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
     private val _selectedMasterId = MutableStateFlow<Int?>(null)
 
     val albumPojo = _albumPojo.asStateFlow()
-    val bitmaps = _bitmaps.asStateFlow()
+    val imageBitmaps = _imageBitmaps.asStateFlow()
     val initialTracks = _initialTracks.asStateFlow()
     val loading = _loading.asStateFlow()
     val loadingSearchResults = _loadingSearchResults.asStateFlow()
@@ -80,7 +81,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         }
         viewModelScope.launch {
             val bitmap = pojo.getFullImage(context)
-            if (bitmap != null) _bitmaps.value = listOf(bitmap)
+            if (bitmap != null) _imageBitmaps.value = listOf(bitmap)
         }
     }
 
@@ -109,21 +110,21 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
     }
 
     private fun getImages(master: DiscogsMasterData, context: Context) = viewModelScope.launch {
-        val bitmaps = mutableListOf<Bitmap>()
+        val bitmaps = mutableListOf<ImageBitmap>()
 
         _albumPojo.value?.also { pojo ->
             pojo.getFullImage(context)?.also { bitmaps.add(it) }
 
             repos.mediaStore.collectAlbumImages(pojo).forEach { file ->
-                file.toBitmap()?.also { bitmaps.add(it) }
+                file.toBitmap()?.asImageBitmap()?.also { bitmaps.add(it) }
             }
 
             master.images.filter { it.type == "primary" }.forEach { masterImage ->
-                Request(masterImage.uri).getBitmap()?.also { bitmaps.add(it) }
+                Request(masterImage.uri).getImageBitmap()?.also { bitmaps.add(it) }
             }
         }
 
-        _bitmaps.value = bitmaps
+        _imageBitmaps.value = bitmaps
     }
 
     private fun updateTracksFromMaster(master: DiscogsMasterData) {

@@ -37,7 +37,7 @@ interface TrackDao {
     suspend fun _listTrackPojosBetween(fromTitle: String, toTitle: String): List<TrackPojo>
 
     @RawQuery(observedEntities = [Track::class, Album::class])
-    fun _searchTracks(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
+    fun _searchTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
 
     @Update
     suspend fun _updateTracks(vararg tracks: Track)
@@ -74,7 +74,7 @@ interface TrackDao {
     @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
     suspend fun listTracks(): List<Track>
 
-    suspend fun listTracksBetween(from: AbstractTrackPojo, to: AbstractTrackPojo): List<TrackPojo> {
+    suspend fun listTrackPojosBetween(from: AbstractTrackPojo, to: AbstractTrackPojo): List<TrackPojo> {
         if (from.track.title.lowercase() < to.track.title.lowercase())
             return _listTrackPojosBetween(from.track.title, to.track.title)
         return _listTrackPojosBetween(to.track.title, from.track.title)
@@ -99,15 +99,15 @@ interface TrackDao {
         """
     )
     @Transaction
-    fun pageTracksByArtist(artist: String): PagingSource<Int, TrackPojo>
+    fun pageTrackPojosByArtist(artist: String): PagingSource<Int, TrackPojo>
 
-    fun searchTracks(query: String): PagingSource<Int, TrackPojo> {
+    fun searchTrackPojos(query: String): PagingSource<Int, TrackPojo> {
         val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
             .joinToString(" OR ") {
                 "Track_title LIKE '%$it%' OR Track_artist LIKE '%$it%' OR Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'"
             }
 
-        return _searchTracks(
+        return _searchTrackPojos(
             SimpleSQLiteQuery(
                 """
                 SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId

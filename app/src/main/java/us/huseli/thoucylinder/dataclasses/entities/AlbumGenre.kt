@@ -21,8 +21,8 @@ import java.util.UUID
             entity = Genre::class,
             parentColumns = ["Genre_genreName"],
             childColumns = ["AlbumGenre_genreName"],
-            onDelete = ForeignKey.RESTRICT,
-            onUpdate = ForeignKey.RESTRICT,
+            onDelete = ForeignKey.CASCADE,
+            onUpdate = ForeignKey.CASCADE,
         )
     ],
 )

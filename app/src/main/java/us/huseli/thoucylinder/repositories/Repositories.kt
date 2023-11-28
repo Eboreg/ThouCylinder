@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.repositories
 
+import us.huseli.thoucylinder.TrackDownloadPool
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,4 +12,5 @@ class Repositories @Inject constructor(
     val player: PlayerRepository,
     val youtube: YoutubeRepository,
     val spotify: SpotifyRepository,
+    val trackDownloadPool: TrackDownloadPool,
 )

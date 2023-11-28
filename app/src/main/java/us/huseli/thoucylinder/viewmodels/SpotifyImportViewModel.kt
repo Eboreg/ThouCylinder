@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.app.Activity
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.spotify.sdk.android.auth.AuthorizationResponse
@@ -15,7 +14,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.ProgressData
+import us.huseli.thoucylinder.dataclasses.ImportProgressData
+import us.huseli.thoucylinder.dataclasses.ImportProgressStatus
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
@@ -39,7 +39,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
     private val _selectedPojos = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
     private val _thumbnailCache = mutableMapOf<String, ImageBitmap>()
     private val _totalAlbumCount = MutableStateFlow(0)
-    private val _progress = MutableStateFlow<ProgressData?>(null)
+    private val _progress = MutableStateFlow<ImportProgressData?>(null)
     private val _importedAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
 
@@ -87,8 +87,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
 
     suspend fun getThumbnail(spotifyAlbum: SpotifyAlbum): ImageBitmap? {
         _thumbnailCache[spotifyAlbum.id]?.also { return it }
-        return spotifyAlbum.thumbnail?.getBitmap()
-            ?.asImageBitmap()
+        return spotifyAlbum.thumbnail?.getImageBitmap()
             ?.also { _thumbnailCache[spotifyAlbum.id] = it }
     }
 
@@ -96,19 +95,19 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         val selectedPojos = _selectedPojos.value
 
         selectedPojos.forEachIndexed { index, spotifyPojo ->
-            val progressData = ProgressData(
+            val importProgressData = ImportProgressData(
                 item = spotifyPojo.spotifyAlbum.name,
                 progress = index.toDouble() / selectedPojos.size,
-                status = ProgressData.Status.MATCHING,
+                status = ImportProgressStatus.MATCHING,
             )
-            _progress.value = progressData
+            _progress.value = importProgressData
 
             val match = findAlbumOnYoutube(spotifyPojo)
 
             if (match != null) {
-                _progress.value = progressData.copy(
-                    progress = progressData.progress + (0.5 / selectedPojos.size),
-                    status = ProgressData.Status.IMPORTING,
+                _progress.value = importProgressData.copy(
+                    progress = importProgressData.progress + (0.5 / selectedPojos.size),
+                    status = ImportProgressStatus.IMPORTING,
                 )
 
                 // Main "source of truth" for each track must be Youtube, since
@@ -151,9 +150,9 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
                 repos.room.saveAlbumWithTracks(albumPojo)
                 repos.spotify.saveSpotifyAlbumPojo(spotifyAlbumPojo)
 
-                _progress.value = progressData.copy(
-                    progress = progressData.progress + (1 / selectedPojos.size),
-                    status = ProgressData.Status.IMPORTING,
+                _progress.value = importProgressData.copy(
+                    progress = importProgressData.progress + (1 / selectedPojos.size),
+                    status = ImportProgressStatus.IMPORTING,
                 )
                 _importedAlbumIds.value += spotifyPojo.spotifyAlbum.id
             } else {

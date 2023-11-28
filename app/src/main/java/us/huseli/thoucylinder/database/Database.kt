@@ -48,7 +48,7 @@ import java.util.concurrent.Executors
         SpotifyTrackArtist::class,
     ],
     exportSchema = false,
-    version = 60,
+    version = 61,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

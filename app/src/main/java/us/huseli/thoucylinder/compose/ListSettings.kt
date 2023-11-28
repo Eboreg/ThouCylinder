@@ -47,9 +47,10 @@ fun ListSettingsRow(
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes)
-            }
+                content = {
+                    ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes)
+                },
+            )
             ListDisplayTypeButton(
                 current = displayType,
                 onChange = onDisplayTypeChange,

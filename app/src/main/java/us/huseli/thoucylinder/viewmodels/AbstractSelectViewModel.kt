@@ -13,7 +13,7 @@ abstract class AbstractSelectViewModel(
     private val repos: Repositories,
 ) : AbstractBaseViewModel(repos) {
     val selectedAlbums = repos.room.getSelectedAlbumFlow(selectionKey)
-    val selectedTracks = repos.room.getSelectedTrackFlow(selectionKey)
+    val selectedTrackPojos = repos.room.getSelectedTrackPojoFlow(selectionKey)
 
     fun selectAlbums(albums: List<Album>) = repos.room.selectAlbums(selectionKey, albums)
 
@@ -33,22 +33,22 @@ abstract class AbstractSelectViewModel(
         }
     }
 
-    fun selectTracksFromLastSelected(to: TrackPojo) = viewModelScope.launch {
-        val lastSelected = selectedTracks.value.lastOrNull()
+    fun selectTrackPojosFromLastSelected(to: TrackPojo) = viewModelScope.launch {
+        val lastSelected = selectedTrackPojos.value.lastOrNull()
 
         if (lastSelected != null) {
-            val tracks = repos.room.listTracksBetween(lastSelected, to)
-            repos.room.selectTracks(selectionKey, tracks)
+            val tracks = repos.room.listTrackPojosBetween(lastSelected, to)
+            repos.room.selectTrackPojos(selectionKey, tracks)
         } else {
-            repos.room.selectTracks(selectionKey, listOf(to))
+            repos.room.selectTrackPojos(selectionKey, listOf(to))
         }
     }
 
     fun toggleSelected(album: Album) = repos.room.toggleAlbumSelected(selectionKey, album)
 
-    fun toggleSelected(pojo: TrackPojo) = repos.room.toggleTrackSelected(selectionKey, pojo)
+    fun toggleSelected(pojo: TrackPojo) = repos.room.toggleTrackPojoSelected(selectionKey, pojo)
 
     fun unselectAllAlbums() = repos.room.unselectAllAlbums(selectionKey)
 
-    open fun unselectAllTracks() = repos.room.unselectAllTracks(selectionKey)
+    open fun unselectAllTrackPojos() = repos.room.unselectAllTrackPojos(selectionKey)
 }

@@ -49,6 +49,9 @@ data class AlbumWithTracksPojo(
     override val maxYear: Int?
         get() = tracks.mapNotNull { it.year }.maxOrNull()
 
+    override val isPartiallyDownloaded: Boolean
+        get() = tracks.any { it.isDownloaded } && tracks.any { !it.isDownloaded }
+
     fun getLevenshteinDistance(other: AlbumWithTracksPojo): Double {
         /** N.B. May be misleading if `other` has a different amount of tracks. */
         return album.getLevenshteinDistance(other.album).toDouble().div(tracks.size) +

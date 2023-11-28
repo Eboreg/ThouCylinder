@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder.dataclasses
 
-import android.graphics.Bitmap
 import android.os.Parcelable
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
@@ -17,9 +17,9 @@ data class SpotifyAlbumArt(
     val size: Int
         get() = (height ?: 0) * (width ?: 0)
 
-    suspend fun getBitmap(): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun getImageBitmap(): ImageBitmap? = withContext(Dispatchers.IO) {
         try {
-            Request(url).getBitmap()
+            Request(url).getImageBitmap()
         } catch (_: FileNotFoundException) {
             null
         }

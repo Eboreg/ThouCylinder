@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose.album
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Bookmark
 import androidx.compose.material.icons.sharp.PlaylistAdd
@@ -23,6 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 
@@ -30,6 +33,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 fun AlbumContextMenu(
     isLocal: Boolean,
     isInLibrary: Boolean,
+    isPartiallyDownloaded: Boolean,
     expanded: Boolean,
     modifier: Modifier = Modifier,
     onDismissRequest: () -> Unit,
@@ -41,7 +45,7 @@ fun AlbumContextMenu(
         onDismissRequest = onDismissRequest,
         expanded = expanded,
     ) {
-        if (!isLocal && !light) {
+        if (!light) {
             if (!isInLibrary) DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.add_to_library)) },
                 leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
@@ -51,7 +55,7 @@ fun AlbumContextMenu(
                 },
             )
 
-            DropdownMenuItem(
+            if (!isLocal || isPartiallyDownloaded) DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.download)) },
                 leadingIcon = { Icon(Icons.Sharp.Download, null) },
                 onClick = {
@@ -59,16 +63,16 @@ fun AlbumContextMenu(
                     onDismissRequest()
                 },
             )
-        }
 
-        if (!light) DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.play)) },
-            leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
-            onClick = {
-                callbacks.onPlayClick()
-                onDismissRequest()
-            }
-        )
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play)) },
+                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
+                onClick = {
+                    callbacks.onPlayClick()
+                    onDismissRequest()
+                }
+            )
+        }
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.enqueue)) },
@@ -117,7 +121,7 @@ fun AlbumContextMenu(
             },
         )
 
-        if (isLocal) DropdownMenuItem(
+        if (isLocal || isPartiallyDownloaded) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.delete_album)) },
             leadingIcon = { Icon(Icons.Sharp.Delete, null) },
             onClick = {
@@ -132,9 +136,11 @@ fun AlbumContextMenu(
 fun AlbumContextMenuWithButton(
     isLocal: Boolean,
     isInLibrary: Boolean,
+    isPartiallyDownloaded: Boolean,
     modifier: Modifier = Modifier,
     callbacks: AlbumCallbacks,
     light: Boolean = false,
+    buttonIconSize: Dp = 24.dp,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -142,7 +148,7 @@ fun AlbumContextMenuWithButton(
         modifier = modifier,
         onClick = { isMenuShown = !isMenuShown },
         content = {
-            Icon(Icons.Sharp.MoreVert, null)
+            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(buttonIconSize))
             AlbumContextMenu(
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,
@@ -150,6 +156,7 @@ fun AlbumContextMenuWithButton(
                 onDismissRequest = { isMenuShown = false },
                 callbacks = callbacks,
                 light = light,
+                isPartiallyDownloaded = isPartiallyDownloaded,
             )
         }
     )

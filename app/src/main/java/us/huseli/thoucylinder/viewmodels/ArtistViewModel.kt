@@ -24,7 +24,7 @@ import javax.inject.Inject
 class ArtistViewModel @Inject constructor(
     repos: Repositories,
     savedStateHandle: SavedStateHandle,
-) : AbstractSelectViewModel("ArtistViewModel", repos) {
+) : AbstractAlbumListViewModel("ArtistViewModel", repos) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
     private val _albumPojos = MutableStateFlow<List<AlbumPojo>>(emptyList())
@@ -34,7 +34,8 @@ class ArtistViewModel @Inject constructor(
     val albumPojos = _albumPojos.asStateFlow()
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val tracks: Flow<PagingData<TrackPojo>> = repos.room.pageTracksByArtist(artist).flow.cachedIn(viewModelScope)
+    val trackPojos: Flow<PagingData<TrackPojo>> =
+        repos.room.pageTrackPojosByArtist(artist).flow.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch {

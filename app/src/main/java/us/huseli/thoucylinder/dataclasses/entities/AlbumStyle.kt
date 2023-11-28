@@ -21,8 +21,8 @@ import java.util.UUID
             entity = Style::class,
             parentColumns = ["Style_styleName"],
             childColumns = ["AlbumStyle_styleName"],
-            onDelete = ForeignKey.RESTRICT,
-            onUpdate = ForeignKey.RESTRICT,
+            onDelete = ForeignKey.CASCADE,
+            onUpdate = ForeignKey.CASCADE,
         )
     ],
 )

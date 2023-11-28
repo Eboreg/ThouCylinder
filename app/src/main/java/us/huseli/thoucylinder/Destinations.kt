@@ -19,6 +19,8 @@ object DebugDestination : AbstractSimpleDestination("debug")
 
 object ImportDestination : AbstractSimpleDestination("import")
 
+object DownloadsDestination : AbstractSimpleDestination("downloads")
+
 object AlbumDestination : AbstractDestination() {
     override val routeTemplate = "album/{$NAV_ARG_ALBUM}"
     override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })

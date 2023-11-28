@@ -92,7 +92,7 @@ android {
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.6.0"
 val daggerVersion = "2.48.1"
-val media3Version = "1.1.1"
+val media3Version = "1.2.0"
 val pagingVersion = "3.3.0-alpha02"
 
 dependencies {

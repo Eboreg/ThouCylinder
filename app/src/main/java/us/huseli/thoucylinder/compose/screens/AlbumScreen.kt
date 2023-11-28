@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Album
+import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -33,8 +33,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.album.AlbumBadges
 import us.huseli.thoucylinder.compose.album.AlbumButtons
 import us.huseli.thoucylinder.compose.album.AlbumTrackRow
@@ -46,6 +48,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
+import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
 @Composable
@@ -55,25 +58,34 @@ fun AlbumScreen(
     appCallbacks: AppCallbacks,
 ) {
     val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
+    val (downloadProgress, downloadIsActive) = getDownloadProgress(
+        viewModel.albumDownloadTask.collectAsStateWithLifecycle(null)
+    )
     val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
-    val progressData by viewModel.progressData.collectAsStateWithLifecycle(null)
-    val trackProgressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
-    val selectedTracks by viewModel.selectedTracks.collectAsStateWithLifecycle()
+    val albumWasDeleted by viewModel.albumWasDeleted.collectAsStateWithLifecycle()
+    val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle()
+    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
+
+    if (albumWasDeleted) {
+        SnackbarEngine.addInfo(stringResource(R.string.the_album_was_deleted))
+        appCallbacks.onBackClick()
+    }
 
     albumPojo?.let { pojo ->
         Column {
             SelectedTracksButtons(
-                trackCount = selectedTracks.size,
+                trackCount = selectedTrackPojos.size,
                 callbacks = TrackSelectionCallbacks(
-                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
-                    onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
-                    onUnselectAllClick = { viewModel.unselectAllTracks() },
+                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTrackPojos)) },
+                    onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
+                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
+                    onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
                 )
             )
 
             LazyColumn(modifier = modifier.padding(horizontal = 10.dp)) {
+                // Youtube / Spotify / Local badges:
                 item {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -104,6 +116,8 @@ fun AlbumScreen(
                         }
                     }
                 }
+
+                // Album cover, headlines, buttons, etc:
                 item {
                     var height by remember { mutableStateOf(0.dp) }
 
@@ -149,7 +163,8 @@ fun AlbumScreen(
                                         isLocal = pojo.album.isLocal,
                                         isInLibrary = pojo.album.isInLibrary,
                                         modifier = Modifier.align(Alignment.Bottom),
-                                        isDownloading = progressData != null,
+                                        isDownloading = downloadIsActive,
+                                        isPartiallyDownloaded = pojo.isPartiallyDownloaded,
                                         callbacks = AlbumCallbacks.fromAppCallbacks(
                                             album = pojo.album,
                                             appCallbacks = appCallbacks,
@@ -167,48 +182,52 @@ fun AlbumScreen(
                     }
                 }
 
-                progressData?.let { progress ->
+                if (downloadIsActive) {
                     item {
-                        val statusText = stringResource(progress.status.stringId)
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            progress = downloadProgress?.toFloat() ?: 0f,
+                        )
+                    }
+                }
 
-                        Column {
-                            Text(
-                                text = "$statusText ${progress.item} …",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            LinearProgressIndicator(
-                                modifier = Modifier.fillMaxWidth(),
-                                progress = progress.progress.toFloat(),
-                            )
-                        }
+                if (pojo.isPartiallyDownloaded && !downloadIsActive) {
+                    item {
+                        Text(
+                            text = stringResource(R.string.this_album_is_only_partially_downloaded),
+                            style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                            modifier = Modifier.padding(vertical = 10.dp),
+                        )
                     }
                 }
 
                 items(pojo.trackPojos) { trackPojo ->
-                    viewModel.loadTrackMetadata(trackPojo.track)
+                    val track = trackPojo.track
+
+                    viewModel.loadTrackMetadata(track)
 
                     AlbumTrackRow(
                         data = AlbumTrackRowData(
-                            title = trackPojo.track.title,
-                            isDownloadable = trackPojo.track.isDownloadable,
+                            title = track.title,
+                            isDownloadable = track.isDownloadable,
                             artist = trackPojo.artist,
-                            duration = trackPojo.track.duration,
-                            albumPosition = trackPojo.track.albumPosition,
-                            discNumber = trackPojo.track.discNumber,
-                            progressData = trackProgressDataMap[trackPojo.trackId],
+                            duration = track.duration,
+                            albumPosition = track.albumPosition,
+                            discNumber = track.discNumber,
                             showArtist = trackPojo.artist != pojo.album.artist,
                             showDiscNumber = pojo.discCount > 1,
-                            isSelected = selectedTracks.contains(trackPojo),
+                            isSelected = selectedTrackPojos.contains(trackPojo),
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == track.trackId },
                         ),
                         callbacks = TrackCallbacks.fromAppCallbacks(
                             pojo = trackPojo,
                             appCallbacks = appCallbacks,
                             onTrackClick = {
-                                if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(trackPojo)
-                                else viewModel.playAlbum(startAt = trackPojo.track)
+                                if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(trackPojo)
+                                else viewModel.playAlbum(startAt = track)
                             },
                             onEnqueueClick = { viewModel.enqueueAlbum(context) },
-                            onLongClick = { viewModel.selectTracksFromLastSelected(to = trackPojo) },
+                            onLongClick = { viewModel.selectTrackPojosFromLastSelected(to = trackPojo) },
                         ),
                     )
                 }

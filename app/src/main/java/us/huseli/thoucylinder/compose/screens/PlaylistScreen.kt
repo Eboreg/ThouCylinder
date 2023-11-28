@@ -50,8 +50,9 @@ fun PlaylistScreen(
     val playlist by viewModel.playlist.collectAsStateWithLifecycle(
         PlaylistPojo(playlistId = viewModel.playlistId)
     )
-    val tracks: LazyPagingItems<PlaylistTrackPojo> = viewModel.tracks.collectAsLazyPagingItems()
-    val selectedTracks by viewModel.selectedPlaylistTracks.collectAsStateWithLifecycle()
+    val trackPojos: LazyPagingItems<PlaylistTrackPojo> = viewModel.trackPojos.collectAsLazyPagingItems()
+    val selectedTrackPojos by viewModel.selectedPlaylistTracks.collectAsStateWithLifecycle()
+    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
     val colors = LocalBasicColors.current
 
@@ -85,32 +86,33 @@ fun PlaylistScreen(
         }
 
         TrackList(
-            trackPojos = tracks,
+            trackPojos = trackPojos,
             viewModel = viewModel,
             listState = listState,
-            selectedTracks = selectedTracks,
+            selectedTrackPojos = selectedTrackPojos,
+            trackDownloadTasks = trackDownloadTasks,
             onEmpty = { Text(stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp)) },
             trackCallbacks = { pojo: PlaylistTrackPojo ->
                 TrackCallbacks.fromAppCallbacks(
                     pojo = pojo,
                     appCallbacks = appCallbacks,
                     onTrackClick = {
-                        if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                        if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
                         else viewModel.playPlaylist(startAt = pojo)
                     },
                     onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
-                    onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
+                    onLongClick = { viewModel.selectTrackPojosFromLastSelected(to = pojo) },
                 )
             },
             trackSelectionCallbacks = TrackSelectionCallbacks(
-                onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTracks)) },
-                onPlayClick = { viewModel.playTrackPojos(selectedTracks) },
-                onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTracks, context) },
-                onUnselectAllClick = { viewModel.unselectAllTracks() },
+                onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedTrackPojos)) },
+                onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
+                onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
+                onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
             ),
             extraTrackSelectionButtons = {
                 SmallOutlinedButton(
-                    onClick = { viewModel.removeTracks(selectedTracks) },
+                    onClick = { viewModel.removeTrackPojos(selectedTrackPojos) },
                     text = stringResource(R.string.add_to_playlist),
                 )
             }

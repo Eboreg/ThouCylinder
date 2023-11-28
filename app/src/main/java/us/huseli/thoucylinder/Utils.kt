@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import org.json.JSONObject
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -123,4 +125,22 @@ fun ImageBitmap.getAverageColor(): Color {
         green = greenSum / sampleCount,
         blue = blueSum / sampleCount,
     )
+}
+
+
+fun <T> List<T>.clone(): MutableList<T> = mutableListOf<T>().also { it.addAll(this) }
+
+
+enum class DateTimePrecision { DAY, HOUR, MINUTE, SECOND }
+
+
+fun Instant.isoDateTime(precision: DateTimePrecision = DateTimePrecision.SECOND): String {
+    val pattern = when (precision) {
+        DateTimePrecision.DAY -> "yyyy-MM-dd"
+        DateTimePrecision.HOUR -> "yyyy-MM-dd HH"
+        DateTimePrecision.MINUTE -> "yyyy-MM-dd HH:mm"
+        DateTimePrecision.SECOND -> "yyyy-MM-dd HH:mm:ss"
+    }
+    val formatter = DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault())
+    return formatter.format(this)
 }

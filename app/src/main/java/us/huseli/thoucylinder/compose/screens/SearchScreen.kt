@@ -23,16 +23,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchType
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.album.AlbumGrid
-import us.huseli.thoucylinder.compose.album.AlbumList
+import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListDisplayTypeButton
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.ListTypeChips
 import us.huseli.thoucylinder.compose.SearchForm
+import us.huseli.thoucylinder.compose.album.AlbumGrid
+import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.track.TrackGrid
 import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
@@ -57,29 +59,31 @@ fun SearchScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
     val isSearchingLocalAlbums by viewModel.isSearchingLocalAlbums.collectAsStateWithLifecycle()
     val isSearchingLocalTracks by viewModel.isSearchingLocalTracks.collectAsStateWithLifecycle()
     val isSearchingYoutubeAlbums by viewModel.isSearchingYoutubeAlbums.collectAsStateWithLifecycle()
     val isSearchingYoutubeTracks by viewModel.isSearchingYoutubeTracks.collectAsStateWithLifecycle()
     val localAlbums by viewModel.localAlbumPojos.collectAsStateWithLifecycle(emptyList())
-    val localTracks = viewModel.localTracks.collectAsLazyPagingItems()
+    val localTracks = viewModel.localTrackPojos.collectAsLazyPagingItems()
     val selectedLocalAlbumPojos by viewModel.selectedLocalAlbumPojos.collectAsStateWithLifecycle(emptyList())
-    val selectedLocalTracks by viewModel.selectedTracks.collectAsStateWithLifecycle(emptyList())
+    val selectedLocalTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle(emptyList())
     val selectedYoutubeAlbumPojos by viewModel.selectedYoutubeAlbumPojos.collectAsStateWithLifecycle(emptyList())
-    val selectedYoutubeTracks by viewModel.selectedYoutubeTracks.collectAsStateWithLifecycle(emptyList())
-    val youtubeAlbums by viewModel.youtubeAlbums.collectAsStateWithLifecycle(emptyList())
-    val youtubeTracks = viewModel.youtubeTracksPaging.collectAsLazyPagingItems()
+    val selectedYoutubeTrackPojos by viewModel.selectedYoutubeTrackPojos.collectAsStateWithLifecycle(emptyList())
+    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
+    val youtubeAlbums by viewModel.youtubeAlbumPojos.collectAsStateWithLifecycle(emptyList())
+    val youtubeTracks = viewModel.youtubeTrackPojos.collectAsLazyPagingItems()
 
     var displaySearchType by rememberSaveable { mutableStateOf(SearchType.YOUTUBE) }
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
 
-    val withTempTracks: (List<TrackPojo>, (List<TrackPojo>) -> Unit) -> (() -> Unit) = { pojos, callback ->
+    val withTempTrackPojos: (List<TrackPojo>, (List<TrackPojo>) -> Unit) -> (() -> Unit) = { pojos, callback ->
         { scope.launch { callback(viewModel.ensureTrackMetadata(pojos)) } }
     }
 
-    val withTempTrack: (TrackPojo, (TrackPojo) -> Unit) -> (() -> Unit) = { track, callback ->
-        withTempTracks(listOf(track)) { callback(it.first()) }
+    val withTempTrackPojo: (TrackPojo, (TrackPojo) -> Unit) -> (() -> Unit) = { track, callback ->
+        withTempTrackPojos(listOf(track)) { callback(it.first()) }
     }
 
     val isSearching = when (listType) {
@@ -141,13 +145,14 @@ fun SearchScreen(
                         displayType = displayType,
                         selectedAlbumPojos = selectedLocalAlbumPojos,
                         isSearching = isSearchingLocalAlbums,
+                        albumDownloadTasks = albumDownloadTasks,
                         albumCallbacks = { pojo: AbstractAlbumPojo ->
                             AlbumCallbacks.fromAppCallbacks(
                                 album = pojo.album,
                                 appCallbacks = appCallbacks,
                                 onPlayClick = { viewModel.playAlbum(pojo.album) },
                                 onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
-                                onAlbumLongClick = { viewModel.selectLocalAlbumsFromLastSelected(pojo as AlbumPojo) },
+                                onAlbumLongClick = { viewModel.selectLocalAlbumPojosFromLastSelected(pojo as AlbumPojo) },
                                 onAlbumClick = {
                                     if (selectedLocalAlbumPojos.isNotEmpty())
                                         viewModel.toggleSelectedLocal(pojo as AlbumPojo)
@@ -163,13 +168,13 @@ fun SearchScreen(
                             },
                             onPlayClick = { viewModel.playAlbumPojos(selectedLocalAlbumPojos) },
                             onEnqueueClick = { viewModel.enqueueAlbumPojos(selectedLocalAlbumPojos, context) },
-                            onUnselectAllClick = { viewModel.unselectAllLocalAlbums() },
-                            onSelectAllClick = { viewModel.selectAllLocalAlbums() },
+                            onUnselectAllClick = { viewModel.unselectAllLocalAlbumPojos() },
+                            onSelectAllClick = { viewModel.selectAllLocalAlbumPojos() },
                         ),
                     )
                     ListType.TRACKS -> TrackSearchResults(
                         tracks = localTracks,
-                        selectedTracks = selectedLocalTracks,
+                        selectedTrackPojos = selectedLocalTrackPojos,
                         viewModel = viewModel,
                         displayType = displayType,
                         isSearching = isSearchingLocalTracks,
@@ -182,16 +187,17 @@ fun SearchScreen(
                                     if (selectedLocalAlbumPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
                                     else viewModel.playTrackPojo(pojo)
                                 },
-                                onLongClick = { viewModel.selectTracksFromLastSelected(to = pojo) },
+                                onLongClick = { viewModel.selectTrackPojosFromLastSelected(to = pojo) },
                             )
                         },
+                        trackDownloadTasks = trackDownloadTasks,
                         trackSelectionCallbacks = TrackSelectionCallbacks(
                             onAddToPlaylistClick = {
-                                appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedLocalTracks))
+                                appCallbacks.onAddToPlaylistClick(Selection(trackPojos = selectedLocalTrackPojos))
                             },
-                            onPlayClick = { viewModel.playTrackPojos(selectedLocalTracks) },
-                            onEnqueueClick = { viewModel.enqueueTrackPojos(selectedLocalTracks, context) },
-                            onUnselectAllClick = { viewModel.unselectAllTracks() },
+                            onPlayClick = { viewModel.playTrackPojos(selectedLocalTrackPojos) },
+                            onEnqueueClick = { viewModel.enqueueTrackPojos(selectedLocalTrackPojos, context) },
+                            onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
                         ),
                     )
                     ListType.ARTISTS -> {}
@@ -205,6 +211,7 @@ fun SearchScreen(
                         displayType = displayType,
                         selectedAlbumPojos = selectedYoutubeAlbumPojos,
                         isSearching = isSearchingYoutubeAlbums,
+                        albumDownloadTasks = albumDownloadTasks,
                         albumCallbacks = { pojo: AbstractAlbumPojo ->
                             AlbumCallbacks.fromAppCallbacks(
                                 album = pojo.album,
@@ -219,7 +226,7 @@ fun SearchScreen(
                                     )
                                 },
                                 onAlbumLongClick = {
-                                    viewModel.selectYoutubeAlbumsFromLastSelected(pojo as AlbumWithTracksPojo)
+                                    viewModel.selectYoutubeAlbumPojosFromLastSelected(pojo as AlbumWithTracksPojo)
                                 },
                                 onAlbumClick = {
                                     if (selectedYoutubeAlbumPojos.isNotEmpty())
@@ -238,18 +245,18 @@ fun SearchScreen(
                                     context,
                                 )
                             },
-                            onUnselectAllClick = { viewModel.unselectAllYoutubeAlbums() },
+                            onUnselectAllClick = { viewModel.unselectAllYoutubeAlbumPojos() },
                             onAddToPlaylistClick = {
                                 appCallbacks.onAddToPlaylistClick(
                                     Selection(tracks = selectedYoutubeAlbumPojos.flatMap { it.tracks })
                                 )
                             },
-                            onSelectAllClick = { viewModel.selectAllYoutubeAlbums() },
+                            onSelectAllClick = { viewModel.selectAllYoutubeAlbumPojos() },
                         ),
                     )
                     ListType.TRACKS -> TrackSearchResults(
                         tracks = youtubeTracks,
-                        selectedTracks = selectedYoutubeTracks,
+                        selectedTrackPojos = selectedYoutubeTrackPojos,
                         viewModel = viewModel,
                         displayType = displayType,
                         isSearching = isSearchingYoutubeTracks,
@@ -257,26 +264,27 @@ fun SearchScreen(
                             TrackCallbacks.fromAppCallbacks(
                                 pojo = pojo,
                                 appCallbacks = appCallbacks,
-                                onEnqueueClick = withTempTrack(pojo) { viewModel.enqueueTrackPojo(it, context) },
-                                onAddToPlaylistClick = withTempTrack(pojo) {
+                                onEnqueueClick = withTempTrackPojo(pojo) { viewModel.enqueueTrackPojo(it, context) },
+                                onAddToPlaylistClick = withTempTrackPojo(pojo) {
                                     appCallbacks.onAddToPlaylistClick(Selection(trackPojo = it))
                                 },
                                 onLongClick = { viewModel.toggleSelectedYoutube(pojo) },
-                                onTrackClick = withTempTrack(pojo) {
+                                onTrackClick = withTempTrackPojo(pojo) {
                                     if (selectedYoutubeAlbumPojos.isNotEmpty()) viewModel.toggleSelectedYoutube(it)
                                     else viewModel.playTrackPojo(it)
                                 },
                             )
                         },
+                        trackDownloadTasks = trackDownloadTasks,
                         trackSelectionCallbacks = TrackSelectionCallbacks(
-                            onAddToPlaylistClick = withTempTracks(selectedYoutubeTracks) {
+                            onAddToPlaylistClick = withTempTrackPojos(selectedYoutubeTrackPojos) {
                                 appCallbacks.onAddToPlaylistClick(Selection(trackPojos = it))
                             },
-                            onPlayClick = withTempTracks(selectedYoutubeTracks) { viewModel.playTrackPojos(it) },
-                            onEnqueueClick = withTempTracks(selectedYoutubeTracks) {
+                            onPlayClick = withTempTrackPojos(selectedYoutubeTrackPojos) { viewModel.playTrackPojos(it) },
+                            onEnqueueClick = withTempTrackPojos(selectedYoutubeTrackPojos) {
                                 viewModel.enqueueTrackPojos(it, context)
                             },
-                            onUnselectAllClick = { viewModel.unselectAllYoutubeTracks() },
+                            onUnselectAllClick = { viewModel.unselectAllYoutubeTrackPojos() },
                         ),
                     )
                     ListType.ARTISTS -> {}
@@ -296,6 +304,7 @@ fun AlbumSearchResults(
     displayType: DisplayType,
     isSearching: Boolean,
     selectedAlbumPojos: List<AbstractAlbumPojo>,
+    albumDownloadTasks: List<AlbumDownloadTask>,
 ) {
     when (displayType) {
         DisplayType.LIST -> {
@@ -307,6 +316,7 @@ fun AlbumSearchResults(
                 onEmpty = {
                     if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                 },
+                albumDownloadTasks = albumDownloadTasks,
             )
         }
         DisplayType.GRID -> {
@@ -318,6 +328,7 @@ fun AlbumSearchResults(
                 onEmpty = {
                     if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                 },
+                albumDownloadTasks = albumDownloadTasks,
             )
         }
     }
@@ -328,20 +339,22 @@ fun AlbumSearchResults(
 fun TrackSearchResults(
     displayType: DisplayType,
     isSearching: Boolean,
-    selectedTracks: List<TrackPojo>,
+    selectedTrackPojos: List<TrackPojo>,
     trackCallbacks: (TrackPojo) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     tracks: LazyPagingItems<TrackPojo>,
+    trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: SearchViewModel,
 ) {
     when (displayType) {
         DisplayType.LIST -> {
             TrackList(
                 trackPojos = tracks,
-                selectedTracks = selectedTracks,
+                selectedTrackPojos = selectedTrackPojos,
                 viewModel = viewModel,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
+                trackDownloadTasks = trackDownloadTasks,
                 onEmpty = {
                     if (!isSearching)
                         Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
@@ -354,7 +367,8 @@ fun TrackSearchResults(
                 viewModel = viewModel,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
-                selectedTracks = selectedTracks,
+                selectedTrackPojos = selectedTrackPojos,
+                trackDownloadTasks = trackDownloadTasks,
                 onEmpty = {
                     if (!isSearching)
                         Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))

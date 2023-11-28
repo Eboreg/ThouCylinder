@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.os.Parcelable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -32,8 +32,8 @@ data class Album(
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
 
-    suspend fun getFullImage(context: Context): Bitmap? =
-        albumArt?.getBitmap(context) ?: youtubePlaylist?.getBitmap()
+    suspend fun getFullImage(context: Context): ImageBitmap? =
+        albumArt?.getImageBitmap(context) ?: youtubePlaylist?.getImageBitmap()
 
     fun getLevenshteinDistance(other: Album): Int {
         val levenshtein = LevenshteinDistance()
@@ -58,8 +58,8 @@ data class Album(
     fun getMediaStoreSubdir(): String =
         artist?.let { "${artist.sanitizeFilename()}/${title.sanitizeFilename()}" } ?: title.sanitizeFilename()
 
-    suspend fun getThumbnail(context: Context): Bitmap? =
-        albumArt?.getThumbnailBitmap(context) ?: youtubePlaylist?.getBitmap()
+    suspend fun getThumbnail(context: Context): ImageBitmap? =
+        albumArt?.getThumbnailImageBitmap(context) ?: youtubePlaylist?.getImageBitmap()
 
     override fun toString(): String = artist?.let { "$it - $title" } ?: title
 }

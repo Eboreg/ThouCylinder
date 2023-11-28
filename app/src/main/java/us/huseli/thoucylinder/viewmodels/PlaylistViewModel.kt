@@ -21,7 +21,7 @@ import javax.inject.Inject
 class PlaylistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repos: Repositories,
-) : AbstractSelectViewModel("PlaylistViewModel", repos) {
+) : AbstractTrackListViewModel("PlaylistViewModel", repos) {
     private val _selectedPlaylistTracks = MutableStateFlow<List<PlaylistTrackPojo>>(emptyList())
 
     val playlistId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_PLAYLIST)!!)
@@ -29,21 +29,21 @@ class PlaylistViewModel @Inject constructor(
     val playlist: Flow<PlaylistPojo> =
         repos.room.playlists.map { playlists -> playlists.find { it.playlistId == playlistId }!! }
     val selectedPlaylistTracks = _selectedPlaylistTracks.asStateFlow()
-    val tracks: Flow<PagingData<PlaylistTrackPojo>> =
-        repos.room.pageTracksByPlaylistId(playlistId).flow.cachedIn(viewModelScope)
+    val trackPojos: Flow<PagingData<PlaylistTrackPojo>> =
+        repos.room.pageTrackPojosByPlaylistId(playlistId).flow.cachedIn(viewModelScope)
 
     fun playPlaylist(startAt: PlaylistTrackPojo? = null) = playPlaylist(playlistId, startAt?.trackId)
 
-    fun removeTracks(pojos: List<PlaylistTrackPojo>) = viewModelScope.launch {
+    fun removeTrackPojos(pojos: List<PlaylistTrackPojo>) = viewModelScope.launch {
         repos.room.removePlaylistTracks(pojos)
     }
 
-    fun selectTracksFromLastSelected(to: PlaylistTrackPojo) = viewModelScope.launch {
+    fun selectTrackPojosFromLastSelected(to: PlaylistTrackPojo) = viewModelScope.launch {
         val lastSelected = _selectedPlaylistTracks.value.lastOrNull()
 
         if (lastSelected != null)
-            selectTracks(repos.room.listPlaylistTracksBetween(playlistId, lastSelected, to))
-        else selectTracks(listOf(to))
+            selectTrackPojos(repos.room.listPlaylistTracksBetween(playlistId, lastSelected, to))
+        else selectTrackPojos(listOf(to))
     }
 
     fun toggleSelected(pojo: PlaylistTrackPojo) {
@@ -53,11 +53,11 @@ class PlaylistViewModel @Inject constructor(
             _selectedPlaylistTracks.value += pojo
     }
 
-    override fun unselectAllTracks() {
+    override fun unselectAllTrackPojos() {
         _selectedPlaylistTracks.value = emptyList()
     }
 
-    private fun selectTracks(tracks: List<PlaylistTrackPojo>) {
+    private fun selectTrackPojos(tracks: List<PlaylistTrackPojo>) {
         val currentIds = _selectedPlaylistTracks.value.map { track -> track.trackId }
         _selectedPlaylistTracks.value += tracks.filter { track -> !currentIds.contains(track.trackId) }
     }

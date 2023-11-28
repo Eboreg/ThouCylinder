@@ -1,9 +1,9 @@
 package us.huseli.thoucylinder.dataclasses
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Parcelable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.core.net.toUri
 import androidx.room.Embedded
 import kotlinx.parcelize.Parcelize
@@ -31,7 +31,7 @@ data class YoutubeVideo(
     val uri: Uri?
         get() = metadata?.uri ?: url?.toUri()
 
-    suspend fun getBitmap(): Bitmap? = thumbnail?.getBitmap()
+    suspend fun getImageBitmap(): ImageBitmap? = thumbnail?.getImageBitmap()
 
     suspend fun saveMediaStoreImage(context: Context): MediaStoreImage? =
         thumbnail?.url?.let { MediaStoreImage.fromUrl(url = it, video = this, context = context) }

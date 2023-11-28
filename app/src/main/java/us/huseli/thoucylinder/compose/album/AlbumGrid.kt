@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,11 +22,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
+import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
@@ -32,6 +34,7 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.getDownloadProgress
 
 @Composable
 fun AlbumGrid(
@@ -41,6 +44,7 @@ fun AlbumGrid(
     selectedAlbums: List<Album>,
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
+    albumDownloadTasks: List<AlbumDownloadTask>,
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -57,11 +61,13 @@ fun AlbumGrid(
         key = { it.album.albumId },
         isSelected = isSelected,
     ) { pojo ->
+        val (downloadProgress, downloadIsActive) = getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
+
         Box(modifier = Modifier.aspectRatio(1f)) {
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
             LaunchedEffect(Unit) {
-                imageBitmap.value = pojo.getFullImage(context)?.asImageBitmap()
+                imageBitmap.value = pojo.getFullImage(context)
             }
 
             Thumbnail(
@@ -80,8 +86,21 @@ fun AlbumGrid(
             }
         }
 
+        if (downloadIsActive) {
+            LinearProgressIndicator(
+                progress = downloadProgress?.toFloat() ?: 0f,
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+            )
+        }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    top = if (downloadIsActive) 3.dp else 5.dp,
+                    bottom = 5.dp,
+                    start = 5.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.padding(5.dp).weight(1f)) {
@@ -107,6 +126,7 @@ fun AlbumGrid(
             AlbumContextMenuWithButton(
                 isLocal = pojo.album.isLocal,
                 isInLibrary = pojo.album.isInLibrary,
+                isPartiallyDownloaded = pojo.isPartiallyDownloaded,
                 callbacks = albumCallbacks(pojo),
             )
         }

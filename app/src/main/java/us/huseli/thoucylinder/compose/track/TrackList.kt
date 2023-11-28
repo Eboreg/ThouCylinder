@@ -9,26 +9,26 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.compose.ListWithNumericBar
+import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
+import us.huseli.thoucylinder.viewmodels.AbstractTrackListViewModel
 
 @Composable
 fun <T : AbstractTrackPojo> TrackList(
     trackPojos: LazyPagingItems<out T>,
-    viewModel: AbstractBaseViewModel,
-    selectedTracks: List<T>,
+    viewModel: AbstractTrackListViewModel,
+    selectedTrackPojos: List<T>,
+    trackDownloadTasks: List<TrackDownloadTask>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     showArtist: Boolean = true,
@@ -42,7 +42,7 @@ fun <T : AbstractTrackPojo> TrackList(
 
     Column {
         SelectedTracksButtons(
-            trackCount = selectedTracks.size,
+            trackCount = selectedTrackPojos.size,
             callbacks = trackSelectionCallbacks,
             extraButtons = extraTrackSelectionButtons,
         )
@@ -52,8 +52,6 @@ fun <T : AbstractTrackPojo> TrackList(
             listSize = trackPojos.itemCount,
             modifier = Modifier.padding(horizontal = 10.dp),
         ) {
-            val progressDataMap by viewModel.trackProgressDataMap.collectAsStateWithLifecycle()
-
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -64,7 +62,7 @@ fun <T : AbstractTrackPojo> TrackList(
                         val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
                         LaunchedEffect(pojo.track.trackId) {
-                            thumbnail.value = pojo.getThumbnail(context)
+                            thumbnail.value = viewModel.getTrackThumbnail(pojo.track, pojo.album, context)
                             viewModel.ensureTrackMetadata(pojo.track, commit = true)
                         }
 
@@ -72,12 +70,12 @@ fun <T : AbstractTrackPojo> TrackList(
                             title = pojo.track.title,
                             isDownloadable = pojo.track.isDownloadable,
                             modifier = modifier,
-                            progressData = progressDataMap[pojo.track.trackId],
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
                             thumbnail = thumbnail.value,
                             duration = pojo.track.metadata?.duration,
                             artist = if (showArtist) pojo.artist else null,
                             callbacks = trackCallbacks(pojo),
-                            isSelected = selectedTracks.contains(pojo),
+                            isSelected = selectedTrackPojos.contains(pojo),
                         )
                     }
                 }

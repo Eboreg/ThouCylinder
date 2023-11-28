@@ -196,7 +196,11 @@ class TrackDownloadPool @Inject constructor() {
     }
 }
 
-class AlbumDownloadTask(val album: Album, private val trackTasks: List<TrackDownloadTask>) : AbstractDownloadTask() {
+class AlbumDownloadTask(
+    val album: Album,
+    private val trackTasks: List<TrackDownloadTask>,
+    private val onFinish: (hasErrors: Boolean) -> Unit = {},
+) : AbstractDownloadTask() {
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val states = combine(trackTasks.map { it.state }) { it }.distinctUntilChanged()
     private val _state = MutableStateFlow(DownloadTaskState.CREATED)
@@ -213,7 +217,13 @@ class AlbumDownloadTask(val album: Album, private val trackTasks: List<TrackDown
             }.collect { _state.value = DownloadTaskState.RUNNING }
 
             states.collect { states ->
-                if (states.all { it == DownloadTaskState.FINISHED }) _state.value = DownloadTaskState.FINISHED
+                if (states.all { it == DownloadTaskState.FINISHED }) {
+                    _state.value = DownloadTaskState.FINISHED
+                    onFinish(false)
+                } else if (states.all { it == DownloadTaskState.FINISHED || it == DownloadTaskState.ERROR }) {
+                    _state.value = DownloadTaskState.FINISHED
+                    onFinish(true)
+                }
             }
         }
     }

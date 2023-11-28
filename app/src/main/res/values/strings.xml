@@ -104,6 +104,8 @@
     <string name="starting">Starting</string>
     <string name="downloads">Downloads</string>
     <string name="the_album_was_deleted">The album was deleted.</string>
+    <string name="album_was_downloaded_with_errors">%1$s was downloaded with errors.</string>
+    <string name="album_was_downloaded">%1$s was downloaded.</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>

@@ -217,9 +217,18 @@ fun App(
                     viewModel.saveAlbumWithTracks(pojo)
                     viewModel.downloadAndSaveAlbumPojo(
                         pojo = pojo,
-                        onTrackDownloadError = { track, throwable ->
+                        onTrackError = { track, throwable ->
                             SnackbarEngine.addError("Error on downloading $track: $throwable")
-                        }
+                        },
+                        onFinish = { hasErrors ->
+                            SnackbarEngine.addInfo(
+                                message = if (hasErrors)
+                                    context.getString(R.string.album_was_downloaded_with_errors, pojo)
+                                else context.getString(R.string.album_was_downloaded, pojo),
+                                actionLabel = context.getString(R.string.go_to_album),
+                                onActionPerformed = { appCallbacks.onAlbumClick(pojo.album.albumId) },
+                            )
+                        },
                     )
                 },
             )
@@ -227,7 +236,7 @@ fun App(
             addDownloadedAlbumDialogAlbum = null
             viewModel.downloadAndSaveAlbum(
                 album = album,
-                onTrackDownloadError = { track, throwable ->
+                onTrackError = { track, throwable ->
                     SnackbarEngine.addError("Error on downloading $track: $throwable")
                 }
             )

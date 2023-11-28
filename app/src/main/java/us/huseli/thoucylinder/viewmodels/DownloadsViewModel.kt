@@ -22,18 +22,20 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
 
     fun downloadAndSaveAlbum(
         album: Album,
-        onTrackDownloadError: (Track, Throwable) -> Unit,
-        onTrackDownloadFinish: (Track) -> Unit = {},
+        onFinish: (hasErrors: Boolean) -> Unit = {},
+        onTrackError: (Track, Throwable) -> Unit,
+        onTrackFinish: (Track) -> Unit = {},
     ) = viewModelScope.launch {
         repos.room.getAlbumWithTracks(album.albumId)?.also {
-            downloadAndSaveAlbumPojo(it, onTrackDownloadError, onTrackDownloadFinish)
+            downloadAndSaveAlbumPojo(it, onFinish, onTrackError, onTrackFinish)
         }
     }
 
     fun downloadAndSaveAlbumPojo(
         pojo: AlbumWithTracksPojo,
-        onTrackDownloadError: (Track, Throwable) -> Unit = { _, _ -> },
-        onTrackDownloadFinish: (Track) -> Unit = {},
+        onFinish: (hasErrors: Boolean) -> Unit = {},
+        onTrackError: (Track, Throwable) -> Unit = { _, _ -> },
+        onTrackFinish: (Track) -> Unit = {},
     ) = viewModelScope.launch {
         val tracks = pojo.tracks.filter { !it.isDownloaded }.map { ensureTrackMetadata(it, commit = false) }
         val trackTasks = tracks.map { track ->
@@ -41,11 +43,11 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
                 track = track,
                 repos = repos,
                 albumPojo = pojo,
-                onError = { onTrackDownloadError(track, it) },
-                onFinish = onTrackDownloadFinish,
+                onError = { onTrackError(track, it) },
+                onFinish = onTrackFinish,
             )
         }
-        val task = AlbumDownloadTask(pojo.album, trackTasks)
+        val task = AlbumDownloadTask(pojo.album, trackTasks, onFinish)
 
         repos.youtube.addAlbumDownloadTask(task)
         if (!pojo.album.isLocal) repos.room.saveAlbum(pojo.album.copy(isLocal = true))

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Cancel
 import androidx.compose.material.icons.sharp.CheckCircle
@@ -95,13 +96,13 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
             }
 
             Box {
-                val iconModifier = Modifier.align(Alignment.Center)
+                val iconModifier = Modifier.align(Alignment.Center).size(30.dp)
 
                 CircularProgressIndicator(
                     progress = progress.toFloat(),
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    strokeWidth = 1.dp,
+                    modifier = Modifier.padding(vertical = 10.dp).size(30.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
                 )
 
                 when (state) {
@@ -109,19 +110,19 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                         imageVector = Icons.Sharp.Download,
                         contentDescription = null,
                         modifier = iconModifier.clickable { task.start() },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
                     )
                     DownloadTaskState.FINISHED -> Icon(
                         imageVector = Icons.Sharp.CheckCircle,
                         contentDescription = null,
                         modifier = iconModifier,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
                     )
                     else -> Icon(
                         imageVector = Icons.Sharp.Cancel,
                         contentDescription = null,
                         modifier = iconModifier.clickable { task.cancel() },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
                     )
                 }
             }

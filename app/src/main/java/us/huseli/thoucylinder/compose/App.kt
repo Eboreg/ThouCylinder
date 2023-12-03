@@ -30,6 +30,7 @@ import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchDestination
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
 import us.huseli.thoucylinder.compose.album.EditAlbumDialog
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
@@ -41,6 +42,7 @@ import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SearchScreen
+import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
@@ -206,7 +208,18 @@ fun App(
     }
 
     addDownloadedAlbumDialogAlbum?.also { album ->
+        val onFinish = { album1: Album, hasErrors: Boolean ->
+            SnackbarEngine.addInfo(
+                message = if (hasErrors)
+                    context.getString(R.string.album_was_downloaded_with_errors, album1)
+                else context.getString(R.string.album_was_downloaded, album1),
+                actionLabel = context.getString(R.string.go_to_album),
+                onActionPerformed = { appCallbacks.onAlbumClick(album1.albumId) },
+            )
+        }
+
         AskMusicDownloadPermissions()
+
         if (!album.isInLibrary) {
             EditAlbumDialog(
                 initialAlbum = album,
@@ -220,15 +233,7 @@ fun App(
                         onTrackError = { track, throwable ->
                             SnackbarEngine.addError("Error on downloading $track: $throwable")
                         },
-                        onFinish = { hasErrors ->
-                            SnackbarEngine.addInfo(
-                                message = if (hasErrors)
-                                    context.getString(R.string.album_was_downloaded_with_errors, pojo)
-                                else context.getString(R.string.album_was_downloaded, pojo),
-                                actionLabel = context.getString(R.string.go_to_album),
-                                onActionPerformed = { appCallbacks.onAlbumClick(pojo.album.albumId) },
-                            )
-                        },
+                        onFinish = { hasErrors -> onFinish(pojo.album, hasErrors) },
                     )
                 },
             )
@@ -238,7 +243,8 @@ fun App(
                 album = album,
                 onTrackError = { track, throwable ->
                     SnackbarEngine.addError("Error on downloading $track: $throwable")
-                }
+                },
+                onFinish = { hasErrors -> onFinish(album, hasErrors) },
             )
         }
     }
@@ -338,6 +344,11 @@ fun App(
             composable(route = DownloadsDestination.route) {
                 activeScreen = "downloads"
                 DownloadsScreen()
+            }
+
+            composable(route = SettingsDestination.route) {
+                activeScreen = "settings"
+                SettingsScreen(appCallbacks = appCallbacks)
             }
         }
 

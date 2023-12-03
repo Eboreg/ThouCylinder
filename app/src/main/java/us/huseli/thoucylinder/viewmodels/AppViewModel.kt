@@ -6,9 +6,7 @@ import androidx.media3.common.PlaybackException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.retaintheme.toBitmap
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -30,8 +28,7 @@ class AppViewModel @Inject constructor(
     private var deletedPlaylistTracks: List<PlaylistTrackPojo> = emptyList()
 
     val playlists = repos.room.playlists
-    val autoImportLocalMusic = repos.mediaStore.autoImportLocalMusic
-    val musicImportRelativePath = repos.mediaStore.musicImportRelativePath
+    val autoImportLocalMusic = repos.settings.autoImportLocalMusic
 
     init {
         repos.player.addListener(this)
@@ -73,9 +70,7 @@ class AppViewModel @Inject constructor(
         val existingTracks = repos.room.listTracks()
 
         if (autoImportLocalMusic.value == true) {
-            musicImportRelativePath.value?.also { relativePath ->
-                importNewMediaStoreAlbums(context, relativePath, existingTracks)
-            }
+            importNewMediaStoreAlbums(context, existingTracks)
         }
         deleteOrphanTracksAndAlbums(existingTracks)
         repos.mediaStore.deleteOrphanImages(except = repos.room.listImageUris())
@@ -83,30 +78,6 @@ class AppViewModel @Inject constructor(
     }
 
     suspend fun getTrackAlbum(track: Track): Album? = repos.room.getTrackAlbum(track)
-
-    fun importNewMediaStoreAlbums(
-        context: Context,
-        relativePath: String,
-        existingTracks: List<Track>? = null,
-    ) = viewModelScope.launch {
-        repos.mediaStore.setIsImporting(true)
-
-        val newAlbums =
-            repos.mediaStore.listNewMediaStoreAlbums(existingTracks ?: repos.room.listTracks(), relativePath)
-
-        newAlbums.forEach { pojo ->
-            val bestBitmap = repos.mediaStore.collectAlbumImages(pojo)
-                .mapNotNull { it.toBitmap() }
-                .maxByOrNull { it.width * it.height }
-            val mediaStoreImage = bestBitmap?.let {
-                MediaStoreImage.fromBitmap(bitmap = it, album = pojo.album, context = context)
-            }
-
-            repos.room.saveAlbumWithTracks(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage)))
-        }
-
-        repos.mediaStore.setIsImporting(false)
-    }
 
     fun removeAlbumFromLibrary(album: Album) = viewModelScope.launch {
         repos.room.deleteAlbumWithTracks(album)
@@ -116,9 +87,9 @@ class AppViewModel @Inject constructor(
         repos.room.saveAlbumWithTracks(ensureTrackMetadata(pojo, commit = false))
     }
 
-    fun setAutoImportLocalMusic(value: Boolean) = repos.mediaStore.setAutoImportLocalMusic(value)
+    fun setAutoImportLocalMusic(value: Boolean) = repos.settings.setAutoImportLocalMusic(value)
 
-    fun setMusicImportRelativePath(value: String) = repos.mediaStore.setMusicImportRelativePath(value)
+    fun setMusicImportDirectory(value: String) = repos.settings.setMusicImportDirectory(value)
 
     fun tagAlbumTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch {
         repos.mediaStore.tagAlbumTracks(ensureTrackMetadata(pojo, commit = true))

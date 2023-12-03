@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import us.huseli.retaintheme.toBitmap
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -47,6 +49,26 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         getTrackThumbnail(track = track, album = albumPojo?.album, context = context)
             ?: albumPojo?.spotifyAlbum?.thumbnail?.getImageBitmap()
                 ?.also { _albumThumbnailCache += albumPojo.album.albumId to it }
+
+    fun importNewMediaStoreAlbums(context: Context, existingTracks: List<Track>? = null) = viewModelScope.launch {
+        repos.mediaStore.setIsImporting(true)
+
+        val newAlbums =
+            repos.mediaStore.listNewMediaStoreAlbums(existingTracks ?: repos.room.listTracks())
+
+        newAlbums.forEach { pojo ->
+            val bestBitmap = repos.mediaStore.collectAlbumImages(pojo)
+                .mapNotNull { it.toBitmap() }
+                .maxByOrNull { it.width * it.height }
+            val mediaStoreImage = bestBitmap?.let {
+                MediaStoreImage.fromBitmap(bitmap = it, album = pojo.album, context = context)
+            }
+
+            repos.room.saveAlbumWithTracks(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage)))
+        }
+
+        repos.mediaStore.setIsImporting(false)
+    }
 
     fun playPlaylist(playlistId: UUID, startTrackId: UUID? = null) = viewModelScope.launch {
         val pojos = getQueueTrackPojos(repos.room.listPlaylistTracks(playlistId))

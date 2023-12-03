@@ -13,6 +13,7 @@ import androidx.compose.material.icons.sharp.Cancel
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.MusicNote
+import androidx.compose.material.icons.sharp.Pending
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -114,6 +115,12 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     )
                     DownloadTaskState.FINISHED -> Icon(
                         imageVector = Icons.Sharp.CheckCircle,
+                        contentDescription = null,
+                        modifier = iconModifier,
+                        tint = MaterialTheme.colorScheme.primaryContainer,
+                    )
+                    DownloadTaskState.CREATED -> Icon(
+                        imageVector = Icons.Sharp.Pending,
                         contentDescription = null,
                         modifier = iconModifier,
                         tint = MaterialTheme.colorScheme.primaryContainer,

@@ -36,7 +36,7 @@ class AlbumViewModel @Inject constructor(
         .distinctUntilChanged()
     val albumPojo = _albumPojo.asStateFlow()
     val albumWasDeleted = _albumWasDeleted.asStateFlow()
-    override val trackDownloadTasks = repos.trackDownloadPool.tasks
+    override val trackDownloadTasks = repos.trackDownload.tasks
         .map { tasks -> tasks.filter { it.track.albumId == _albumId } }
         .distinctUntilChanged()
 

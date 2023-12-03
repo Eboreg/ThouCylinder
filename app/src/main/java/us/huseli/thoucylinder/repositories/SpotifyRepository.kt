@@ -42,6 +42,10 @@ class SpotifyRepository @Inject constructor(
 
     val isAuthorized: Flow<Boolean> = _accessTokenExpires.map { it?.let { it > Instant.now() } == true }
 
+    init {
+        preferences.registerOnSharedPreferenceChangeListener(this)
+    }
+
     fun authorize(activity: Activity) {
         if (!isAuthorized()) {
             val request = AuthorizationRequest.Builder(

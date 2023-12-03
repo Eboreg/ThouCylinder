@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 open class DownloadsViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
-    val trackDownloadTasks = repos.trackDownloadPool.tasks
+    val trackDownloadTasks = repos.trackDownload.tasks
 
     fun cancelAlbumDownload(albumId: UUID) {
         repos.youtube.albumDownloadTasks.value.find { it.album.albumId == albumId }?.cancel()
@@ -39,7 +39,7 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
     ) = viewModelScope.launch {
         val tracks = pojo.tracks.filter { !it.isDownloaded }.map { ensureTrackMetadata(it, commit = false) }
         val trackTasks = tracks.map { track ->
-            repos.trackDownloadPool.addTask(
+            repos.trackDownload.addTask(
                 track = track,
                 repos = repos,
                 albumPojo = pojo,
@@ -54,7 +54,7 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
     }
 
     fun downloadTrack(track: Track, albumPojo: AbstractAlbumPojo? = null) = viewModelScope.launch {
-        repos.trackDownloadPool.addTask(
+        repos.trackDownload.addTask(
             track = ensureTrackMetadata(track, commit = false),
             albumPojo = albumPojo,
             repos = repos,

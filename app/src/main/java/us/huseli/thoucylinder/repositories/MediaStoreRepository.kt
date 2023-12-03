@@ -3,21 +3,17 @@ package us.huseli.thoucylinder.repositories
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.database.getIntOrNull
 import androidx.core.database.getStringOrNull
-import androidx.preference.PreferenceManager
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import us.huseli.thoucylinder.Constants.PREF_AUTO_IMPORT_LOCAL_MUSIC
-import us.huseli.thoucylinder.Constants.PREF_MUSIC_IMPORT_DIRECTORY
 import us.huseli.thoucylinder.DownloadStatus
 import us.huseli.thoucylinder.MediaStoreFormatException
 import us.huseli.thoucylinder.dataclasses.ID3Data
@@ -45,32 +41,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MediaStoreRepository @Inject constructor(@ApplicationContext private val context: Context) : SharedPreferences.OnSharedPreferenceChangeListener {
-    private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val _autoImportLocalMusic: MutableStateFlow<Boolean?> = MutableStateFlow(
-        if (preferences.contains(PREF_AUTO_IMPORT_LOCAL_MUSIC))
-            preferences.getBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, false)
-        else null
-    )
+class MediaStoreRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val settingsRepo: SettingsRepository,
+) {
     private val _isImportingLocalMedia = MutableStateFlow(false)
-    private val _musicImportRelativePath = MutableStateFlow(preferences.getString(PREF_MUSIC_IMPORT_DIRECTORY, null))
 
-    val autoImportLocalMusic = _autoImportLocalMusic.asStateFlow()
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
-    val musicImportRelativePath = _musicImportRelativePath.asStateFlow()
 
     fun setIsImporting(value: Boolean) {
         _isImportingLocalMedia.value = value
-    }
-
-    fun setAutoImportLocalMusic(value: Boolean) {
-        _autoImportLocalMusic.value = value
-        preferences.edit().putBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, value).apply()
-    }
-
-    fun setMusicImportRelativePath(value: String) {
-        _musicImportRelativePath.value = value
-        preferences.edit().putString(PREF_MUSIC_IMPORT_DIRECTORY, value).apply()
     }
 
     /** IMAGE RELATED METHODS ************************************************/
@@ -127,7 +107,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         .mapNotNull { context.getMediaStoreEntry(it) }
         .forEach { it.deleteWithEmptyParentDirs(context) }
 
-    fun listNewMediaStoreAlbums(existingTracks: Collection<Track>, relativePath: String): List<AlbumWithTracksPojo> {
+    fun listNewMediaStoreAlbums(existingTracks: Collection<Track>): List<AlbumWithTracksPojo> {
         val audioCollection = getReadWriteAudioCollection()
         val projection = arrayOf(
             MediaStore.Audio.Media.RELATIVE_PATH,
@@ -142,14 +122,20 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
             MediaStore.Audio.Media.YEAR,
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.VOLUME_NAME,
         )
-        val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
-        val selectionArgs = arrayOf("$relativePath%")
+        val volume = settingsRepo.musicImportVolume.value
+        val relativePath = settingsRepo.musicImportDirectory.value
+        val selection =
+            if (volume != null) "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ? AND ${MediaStore.Audio.Media.VOLUME_NAME} LIKE ?"
+            else "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+        val selectionArgs =
+            if (volume != null) arrayOf("$relativePath%", volume)
+            else arrayOf("$relativePath%")
         val mediaStoreUris = existingTracks.mapNotNull { it.mediaStoreData?.uri }
         val albums = mutableListOf<Album>()
         val tracks = mutableListOf<Track>()
 
-        // context.contentResolver.query(audioCollection, projection, null, null)?.use { cursor ->
         context.contentResolver.query(audioCollection, projection, selection, selectionArgs, null)?.use { cursor ->
             val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             val mimeTypeIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
@@ -191,7 +177,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                         val ff = FFprobeKit.getMediaInformation(file.path)?.mediaInformation
                         val id3 = ff?.extractID3Data() ?: ID3Data()
                         val lastPathSegments = itemRelativePath
-                            .replace(Regex("^${_musicImportRelativePath.value}/(.*?)/?$"), "$1")
+                            .replace(Regex("^${relativePath}/(.*?)/?$"), "$1")
                             .trim('/').split("/").last().split(" - ", limit = 2)
                         val pathArtist = lastPathSegments.takeIf { it.size > 1 }?.get(0)
                         val pathTitle = lastPathSegments.last().takeIf { it.isNotBlank() }
@@ -285,22 +271,27 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
                 filename = getFilename(tempFile.extension),
             ).also { progressCallback(1.0) }
         } catch (e: MediaStoreFormatException) {
-            statusCallback(DownloadStatus.CONVERTING)
+            if (!tempFile.path.endsWith(".opus")) {
+                statusCallback(DownloadStatus.CONVERTING)
 
-            val convertedFile = File(tempFile.path.substringBeforeLast('.') + ".opus")
-            val session = FFmpegKit.execute("-i ${tempFile.path} -vn ${convertedFile.path}")
+                val convertedFile = File(tempFile.path.substringBeforeLast('.') + ".opus")
+                val ffmpegCommand = "-y -i ${tempFile.path} -vn ${convertedFile.path}"
 
-            tempFile.delete()
-            if (!session.returnCode.isValueSuccess) {
-                convertedFile.delete()
-                throw Exception("FFMPEG conversion of $track failed")
-            }
-            progressCallback(0.5)
-            moveTempFileToMediaStore(
-                tempFile = convertedFile,
-                relativePath = relativePath,
-                filename = getFilename("opus"),
-            ).also { progressCallback(1.0) }
+                Log.i(javaClass.simpleName, "moveTaggedTrackToMediaStore: ffmpegCommand=$ffmpegCommand")
+                val session = FFmpegKit.execute(ffmpegCommand)
+
+                tempFile.delete()
+                if (!session.returnCode.isValueSuccess) {
+                    convertedFile.delete()
+                    throw Exception("FFMPEG conversion of $track failed")
+                }
+                progressCallback(0.5)
+                moveTempFileToMediaStore(
+                    tempFile = convertedFile,
+                    relativePath = relativePath,
+                    filename = getFilename("opus"),
+                ).also { progressCallback(1.0) }
+            } else throw e
         }
         val mediaStoreFile = context.getMediaStoreFile(mediaStoreUri)
         val metadata = mediaStoreFile.extractTrackMetadata()
@@ -375,7 +366,7 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         val contentUri = try {
             context.contentResolver.insert(getReadWriteAudioCollection(), contentValues)
         } catch (e: IllegalArgumentException) {
-            throw MediaStoreFormatException(filename)
+            throw MediaStoreFormatException(filename, cause = e)
         }
 
         if (contentUri != null) {
@@ -416,9 +407,10 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
         val tagCommands = tags
             .map { (key, value) -> "-metadata \"$key=${value.escapeQuotes()}\"" }
             .joinToString(" ")
-        val tagSession = FFmpegKit.execute(
+        val ffmpegCommand =
             "-i \"${localFile.path}\" -map 0 -y -codec copy -write_id3v2 1 $tagCommands \"${tmpFile.path}\""
-        )
+        Log.i(javaClass.simpleName, "tagTrack: ffmpegCommand=$ffmpegCommand")
+        val tagSession = FFmpegKit.execute(ffmpegCommand)
         if (tagSession.returnCode.isValueSuccess) {
             tmpFile.copyTo(localFile, overwrite = true)
             tmpFile.delete()
@@ -426,23 +418,15 @@ class MediaStoreRepository @Inject constructor(@ApplicationContext private val c
 
         (track.image ?: albumPojo?.saveMediaStoreImage(context))?.getFile(context)?.let { imageFile ->
             // This does not work on Opus files yet, but there is a ticket about it somewhere:
-            val imageSession = FFmpegKit.execute(
-                "-i \"${localFile.path}\" -i \"${imageFile.path}\" -map 0 -map 1:0 -y " +
-                    "-codec copy \"${tmpFile.path}\""
-            )
+            val ffmpegCommand2 = "-i \"${localFile.path}\" -i \"${imageFile.path}\" -map 0 -map 1:0 -y " +
+                "-codec copy \"${tmpFile.path}\""
+            val imageSession = FFmpegKit.execute(ffmpegCommand2)
+
+            Log.i(javaClass.simpleName, "tagTrack: ffmpegCommand2=$ffmpegCommand2")
             if (imageSession.returnCode.isValueSuccess) {
                 tmpFile.copyTo(localFile, overwrite = true)
                 tmpFile.delete()
             }
-        }
-    }
-
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        when (key) {
-            PREF_MUSIC_IMPORT_DIRECTORY -> preferences.getString(PREF_MUSIC_IMPORT_DIRECTORY, null)?.also {
-                _musicImportRelativePath.value = it
-            }
-            PREF_AUTO_IMPORT_LOCAL_MUSIC -> _autoImportLocalMusic.value = preferences.getBoolean(key, false)
         }
     }
 }

@@ -16,12 +16,14 @@ object Constants {
     const val PREF_AUTO_IMPORT_LOCAL_MUSIC = "autoImportLocalMusic"
     const val PREF_CURRENT_TRACK_POSITION = "currentTrackPosition"
     const val PREF_MUSIC_IMPORT_DIRECTORY = "localMusicDirectory"
+    const val PREF_MUSIC_IMPORT_VOLUME = "localMusicVolume"
     const val PREF_MUSIC_DOWNLOAD_DIRECTORY = "musicDownloadDirectory"
     const val PREF_QUEUE_INDEX = "queueIndex"
     const val PREF_SPOTIFY_ACCESS_TOKEN = "spotifyAccessToken"
     const val PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES = "spotifyAccessTokenExpires"
     const val URL_CONNECT_TIMEOUT = 4_050
     const val URL_READ_TIMEOUT = 10_000
+    val VALID_FILENAME_REGEX = Regex("^[^\\\\\\x00-\\x1f\"*:<>?|\\x7f]*$")
     val VIDEO_MIMETYPE_FILTER = Regex("^audio/.*$")
     val VIDEO_MIMETYPE_EXCLUDE = null
     const val YOUTUBE_HEADER_USER_AGENT = "com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip"

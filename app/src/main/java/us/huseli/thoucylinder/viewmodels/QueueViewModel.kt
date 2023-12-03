@@ -36,7 +36,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     val selectedQueueTracks: Flow<List<QueueTrackPojo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
         selected.filter { queue.contains(it) }
     }
-    val trackDownloadTasks = repos.trackDownloadPool.tasks
+    val trackDownloadTasks = repos.trackDownload.tasks
 
     init {
         viewModelScope.launch {

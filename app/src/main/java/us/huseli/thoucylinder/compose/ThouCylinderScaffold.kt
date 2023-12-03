@@ -15,6 +15,7 @@ import androidx.compose.material.icons.sharp.LibraryMusic
 import androidx.compose.material.icons.sharp.Menu
 import androidx.compose.material.icons.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.Search
+import androidx.compose.material.icons.sharp.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
@@ -47,6 +48,7 @@ import us.huseli.thoucylinder.LibraryDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SearchDestination
+import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.clone
 
 @Composable
@@ -68,6 +70,7 @@ fun ThouCylinderScaffold(
             "debug" -> navController.navigate(DebugDestination.route)
             "menu" -> scope.launch { drawerState.open() }
             "downloads" -> navController.navigate(DownloadsDestination.route)
+            "settings" -> navController.navigate(SettingsDestination.route)
         }
         isCoverExpanded = false
     }
@@ -83,6 +86,7 @@ fun ThouCylinderScaffold(
 
     val drawerItems = baseMenuItems.clone()
     drawerItems.add(MainMenuItem("downloads", Icons.Sharp.Download, stringResource(R.string.downloads)))
+    drawerItems.add(MainMenuItem("settings", Icons.Sharp.Settings, stringResource(R.string.settings)))
     if (BuildConfig.DEBUG)
         drawerItems.add(MainMenuItem("debug", Icons.Sharp.BugReport, stringResource(R.string.debug)))
 

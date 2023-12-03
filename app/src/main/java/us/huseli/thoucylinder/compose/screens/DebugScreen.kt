@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.compose.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.ThouCylinderTheme
 
 @Composable
 fun DebugScreen() {
@@ -95,6 +97,57 @@ fun DebugScreen() {
         }
         Row {
             ColorSample(Modifier.weight(0.5f), "tertiaryContainer", MaterialTheme.colorScheme.tertiaryContainer)
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("displayLarge", style = MaterialTheme.typography.displayLarge)
+            Text("displayMedium", style = MaterialTheme.typography.displayMedium)
+            Text("displaySmall", style = MaterialTheme.typography.displaySmall)
+            Text("headlineLarge", style = MaterialTheme.typography.headlineLarge)
+            Text("headlineMedium", style = MaterialTheme.typography.headlineMedium)
+            Text("headlineSmall", style = MaterialTheme.typography.headlineSmall)
+            Text("MaterialTheme.typography.titleLarge", style = MaterialTheme.typography.titleLarge)
+            Text("MaterialTheme.typography.titleMedium", style = MaterialTheme.typography.titleMedium)
+            Text("MaterialTheme.typography.titleSmall", style = MaterialTheme.typography.titleSmall)
+            Text("MaterialTheme.typography.bodyLarge", style = MaterialTheme.typography.bodyLarge)
+            Text("MaterialTheme.typography.bodyMedium", style = MaterialTheme.typography.bodyMedium)
+            Text("MaterialTheme.typography.bodySmall", style = MaterialTheme.typography.bodySmall)
+            Text("MaterialTheme.typography.labelLarge", style = MaterialTheme.typography.labelLarge)
+            Text("MaterialTheme.typography.labelMedium", style = MaterialTheme.typography.labelMedium)
+            Text("MaterialTheme.typography.labelSmall", style = MaterialTheme.typography.labelSmall)
+            Text(
+                "ThouCylinderTheme...listNormalHeader",
+                style = ThouCylinderTheme.typographyExtended.listNormalHeader,
+            )
+            Text(
+                "ThouCylinderTheme...listNormalTitle",
+                style = ThouCylinderTheme.typographyExtended.listNormalTitle,
+            )
+            Text(
+                "ThouCylinderTheme...listNormalTitleSecondary",
+                style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
+            )
+            Text(
+                "ThouCylinderTheme...listNormalSubtitle",
+                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+            )
+            Text(
+                "ThouCylinderTheme...listNormalSubtitleSecondary",
+                style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+            )
+            Text(
+                "ThouCylinderTheme...listSmallHeader",
+                style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+            )
+            Text(
+                "ThouCylinderTheme...listSmallTitle",
+                style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+            )
+            Text(
+                "ThouCylinderTheme...listSmallTitleSecondary",
+                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+            )
+            Text(text = "Default text")
         }
     }
 }

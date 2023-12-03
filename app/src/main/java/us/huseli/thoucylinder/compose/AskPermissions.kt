@@ -46,14 +46,11 @@ fun AskMusicDownloadPermissions() {
 fun AskMusicImportPermissions(viewModel: AppViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val autoImportLocalMusic by viewModel.autoImportLocalMusic.collectAsStateWithLifecycle()
-    val musicImportRelativePath by viewModel.musicImportRelativePath.collectAsStateWithLifecycle()
     var isDialogShown by rememberSaveable { mutableStateOf(autoImportLocalMusic == null) }
     val requestPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             if (it[Manifest.permission.READ_EXTERNAL_STORAGE] == true || it[Manifest.permission.READ_MEDIA_AUDIO] == true) {
-                musicImportRelativePath?.also { relativePath ->
-                    viewModel.importNewMediaStoreAlbums(context, relativePath)
-                }
+                viewModel.importNewMediaStoreAlbums(context)
             }
         }
     val permissions =
@@ -69,7 +66,7 @@ fun AskMusicImportPermissions(viewModel: AppViewModel = hiltViewModel()) {
             val relativePath = DocumentsContract.getTreeDocumentId(uri).substringAfterLast(':')
 
             viewModel.setAutoImportLocalMusic(true)
-            viewModel.setMusicImportRelativePath(relativePath)
+            viewModel.setMusicImportDirectory(relativePath)
             context.contentResolver.takePersistableUriPermission(
                 uri,
                 Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION,

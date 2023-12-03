@@ -12,7 +12,7 @@ abstract class AbstractTrackListViewModel(
     selectionKey: String,
     private val repos: Repositories,
 ) : AbstractSelectViewModel(selectionKey, repos) {
-    open val trackDownloadTasks = repos.trackDownloadPool.tasks
+    open val trackDownloadTasks = repos.trackDownload.tasks
 
     fun enqueueTrackPojo(pojo: AbstractTrackPojo, context: Context) = enqueueTrackPojos(listOf(pojo), context)
 

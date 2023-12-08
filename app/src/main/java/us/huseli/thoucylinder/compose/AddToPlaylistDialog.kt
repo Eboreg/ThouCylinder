@@ -72,6 +72,8 @@ fun AddToPlaylistDialog(
                     }
                 }
 
+                if (playlists.isEmpty()) Text(text = stringResource(R.string.no_playlists_found))
+
                 Row(modifier = Modifier.align(Alignment.End)) {
                     TextButton(
                         onClick = onCancel,

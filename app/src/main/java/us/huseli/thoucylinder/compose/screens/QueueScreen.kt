@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -48,6 +49,8 @@ fun QueueScreen(
     val context = LocalContext.current
     val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle(emptyList())
     val queue by viewModel.queue.collectAsStateWithLifecycle()
+    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
+    val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -71,8 +74,9 @@ fun QueueScreen(
             },
         )
 
-        val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-        val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
+        if (queue.isEmpty()) {
+            Text(text = stringResource(R.string.the_queue_is_empty), modifier = Modifier.padding(10.dp))
+        }
 
         ListWithNumericBar(listState = reorderableState.listState, listSize = queue.size) {
             LazyColumn(

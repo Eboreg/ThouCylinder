@@ -38,7 +38,7 @@ fun TrackInfoDialog(
 ) {
     AlertDialog(
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraSmall,
+        shape = MaterialTheme.shapes.small,
         onDismissRequest = onClose,
         dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
         confirmButton = {},

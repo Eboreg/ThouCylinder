@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.compose.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.sharp.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,19 +24,21 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
-import us.huseli.thoucylinder.BuildConfig
+import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Selection
-import us.huseli.thoucylinder.compose.album.AlbumGrid
-import us.huseli.thoucylinder.compose.album.AlbumList
+import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.ArtistGrid
 import us.huseli.thoucylinder.compose.ArtistList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.PlaylistList
+import us.huseli.thoucylinder.compose.album.AlbumGrid
+import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.track.TrackGrid
 import us.huseli.thoucylinder.compose.track.TrackList
+import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
@@ -75,6 +75,9 @@ fun LibraryScreen(
 
         when (listType) {
             ListType.ALBUMS -> {
+                val searchTerm by viewModel.albumSearchTerm.collectAsStateWithLifecycle()
+                val sortParameter by viewModel.albumSortParameter.collectAsStateWithLifecycle()
+                val sortOrder by viewModel.albumSortOrder.collectAsStateWithLifecycle()
                 val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
                 val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle()
                 val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
@@ -111,6 +114,16 @@ fun LibraryScreen(
                     )
                 }
 
+                ListActions(
+                    initialSearchTerm = searchTerm,
+                    sortParameter = sortParameter,
+                    sortOrder = sortOrder,
+                    sortParameters = AlbumSortParameter.withLabels(context),
+                    sortDialogTitle = stringResource(R.string.album_order),
+                    onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
+                    onSearch = { viewModel.setAlbumSearchTerm(it) },
+                )
+
                 when (displayType) {
                     DisplayType.LIST -> AlbumList(
                         pojos = albumPojos,
@@ -132,6 +145,9 @@ fun LibraryScreen(
                 }
             }
             ListType.TRACKS -> {
+                val searchTerm by viewModel.trackSearchTerm.collectAsStateWithLifecycle()
+                val sortParameter by viewModel.trackSortParameter.collectAsStateWithLifecycle()
+                val sortOrder by viewModel.trackSortOrder.collectAsStateWithLifecycle()
                 val trackPojos = viewModel.pagingTrackPojos.collectAsLazyPagingItems()
                 val isLoadingTracks by viewModel.isLoadingTracks.collectAsStateWithLifecycle()
                 val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle()
@@ -164,6 +180,16 @@ fun LibraryScreen(
                         modifier = Modifier.padding(10.dp),
                     )
                 }
+
+                ListActions(
+                    initialSearchTerm = searchTerm,
+                    sortParameter = sortParameter,
+                    sortOrder = sortOrder,
+                    sortParameters = TrackSortParameter.withLabels(context),
+                    sortDialogTitle = stringResource(R.string.track_order),
+                    onSort = { param, order -> viewModel.setTrackSorting(param, order) },
+                    onSearch = { viewModel.setTrackSearchTerm(it) },
+                )
 
                 when (displayType) {
                     DisplayType.LIST -> TrackList(
@@ -243,15 +269,6 @@ fun LibraryScreen(
                         content = { Icon(Icons.Sharp.Add, stringResource(R.string.add_playlist)) },
                     )
                 }
-            }
-        }
-
-        if (BuildConfig.DEBUG) {
-            Row {
-                TextButton(
-                    onClick = { viewModel.deleteAll() },
-                    content = { Text(text = "Delete all") }
-                )
             }
         }
     }

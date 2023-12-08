@@ -2,6 +2,7 @@
 
 package us.huseli.thoucylinder.database
 
+import android.database.DatabaseUtils
 import android.net.Uri
 import androidx.paging.PagingSource
 import androidx.room.Dao
@@ -14,6 +15,8 @@ import androidx.room.Transaction
 import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -37,15 +40,13 @@ interface TrackDao {
     suspend fun _listTrackPojosBetween(fromTitle: String, toTitle: String): List<TrackPojo>
 
     @RawQuery(observedEntities = [Track::class, Album::class])
+    fun _pageTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
+
+    @RawQuery(observedEntities = [Track::class, Album::class])
     fun _searchTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
 
     @Update
     suspend fun _updateTracks(vararg tracks: Track)
-
-    /** Public methods *******************************************************/
-
-    @Query("DELETE FROM Track")
-    suspend fun clearTracks()
 
     @Delete
     suspend fun deleteTracks(vararg tracks: Track)
@@ -80,14 +81,32 @@ interface TrackDao {
         return _listTrackPojosBetween(to.track.title, from.track.title)
     }
 
-    @Transaction
-    @Query(
-        """
-        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId 
-        WHERE Track_isInLibrary = 1 ORDER BY LOWER(Track_title)
-        """
-    )
-    fun pageTrackPojos(): PagingSource<Int, TrackPojo>
+    fun pageTrackPojos(
+        sortParameter: TrackSortParameter,
+        sortOrder: SortOrder,
+        searchTerm: String,
+    ): PagingSource<Int, TrackPojo> {
+        val searchQuery = searchTerm
+            .lowercase()
+            .split(Regex(" +"))
+            .takeIf { it.isNotEmpty() }
+            ?.map { DatabaseUtils.sqlEscapeString("%$it%") }
+            ?.joinToString(" AND ") { term ->
+                "(LOWER(Track_title) LIKE $term OR LOWER(Album_title) LIKE $term OR " +
+                    "LOWER(Track_artist) LIKE $term OR LOWER(Album_artist) LIKE $term OR " +
+                    "Album_year LIKE $term OR Track_year LIKE $term)"
+            }
+
+        return _pageTrackPojos(
+            SimpleSQLiteQuery(
+                """
+                SELECT DISTINCT Track.*, Album.* FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId
+                WHERE Track_isInLibrary = 1 ${searchQuery?.let { "AND $it" } ?: ""}
+                ORDER BY ${sortParameter.sqlColumn} ${if (sortOrder == SortOrder.ASCENDING) "ASC" else "DESC"}
+                """.trimIndent()
+            )
+        )
+    }
 
     @Query(
         """

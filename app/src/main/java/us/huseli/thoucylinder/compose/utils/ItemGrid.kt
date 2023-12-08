@@ -29,6 +29,8 @@ fun <T> ItemGrid(
     onEmpty: (@Composable () -> Unit)? = null,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
+    if (things.isEmpty() && onEmpty != null) onEmpty()
+
     LazyVerticalGrid(
         modifier = modifier.padding(horizontal = 10.dp),
         columns = GridCells.Adaptive(minSize = 160.dp),
@@ -52,6 +54,4 @@ fun <T> ItemGrid(
             )
         }
     }
-
-    if (things.isEmpty() && onEmpty != null) onEmpty()
 }

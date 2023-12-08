@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.compose.DisplayType
@@ -39,8 +38,7 @@ class ArtistViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repos.room.albumPojos
-                .map { pojos -> pojos.filter { pojo -> pojo.album.artist?.lowercase() == artist.lowercase() } }
+            repos.room.flowAlbumPojosByArtist(artist)
                 .distinctUntilChanged()
                 .collect { pojos -> _albumPojos.value = pojos }
         }

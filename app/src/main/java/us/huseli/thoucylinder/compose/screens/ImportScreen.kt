@@ -195,8 +195,12 @@ fun ImportScreenStickyHeader(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background),
                 ) {
-                    SmallButton(onClick = onRefreshClick, text = "Refresh Spotify albums")
-                    SmallButton(onClick = onImportClick, text = "Import selected", enabled = importButtonEnabled)
+                    SmallButton(onClick = onRefreshClick, text = stringResource(R.string.refresh_spotify_albums))
+                    SmallButton(
+                        onClick = onImportClick,
+                        text = stringResource(R.string.import_selected),
+                        enabled = importButtonEnabled,
+                    )
                 }
 
                 Row(
@@ -210,7 +214,7 @@ fun ImportScreenStickyHeader(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (hasPrevious) {
-                            SmallOutlinedButton(onClick = onPreviousClick, text = "Previous")
+                            SmallOutlinedButton(onClick = onPreviousClick, text = stringResource(R.string.previous))
                         }
                         if (currentAlbumCount > 0) {
                             Text(
@@ -219,7 +223,7 @@ fun ImportScreenStickyHeader(
                             )
                         }
                         if (hasNext) {
-                            SmallOutlinedButton(onClick = onNextClick, text = "Next")
+                            SmallOutlinedButton(onClick = onNextClick, text = stringResource(R.string.next))
                         }
                     }
                     Text(text = "Select all", style = ThouCylinderTheme.typographyExtended.listSmallTitle)
@@ -239,10 +243,13 @@ fun ImportScreenStickyHeader(
                 }
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.padding(horizontal = 20.dp),
+            ) {
                 OutlinedButton(
                     onClick = onAuthorizeClick,
-                    content = { Text(text = "Get Spotify albums") },
+                    content = { Text(text = stringResource(R.string.get_spotify_albums)) },
                     shape = MaterialTheme.shapes.extraSmall,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )

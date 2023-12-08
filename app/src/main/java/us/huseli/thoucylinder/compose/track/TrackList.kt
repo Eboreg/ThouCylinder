@@ -47,6 +47,8 @@ fun <T : AbstractTrackPojo> TrackList(
             extraButtons = extraTrackSelectionButtons,
         )
 
+        if (trackPojos.itemCount == 0 && onEmpty != null) onEmpty()
+
         ListWithNumericBar(
             listState = listState,
             listSize = trackPojos.itemCount,
@@ -81,7 +83,5 @@ fun <T : AbstractTrackPojo> TrackList(
                 }
             }
         }
-
-        if (trackPojos.itemCount == 0 && onEmpty != null) onEmpty()
     }
 }

@@ -20,7 +20,7 @@ fun DeleteAlbumDialog(
 ) {
     AlertDialog(
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraSmall,
+        shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
         title = { Text(text = "Delete $album") },

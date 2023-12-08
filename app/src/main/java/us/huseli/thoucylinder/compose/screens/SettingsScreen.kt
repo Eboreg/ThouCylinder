@@ -181,6 +181,7 @@ fun MusicImportDirectoryDialog(
     onSelectDirectoryClick: () -> Unit,
 ) {
     AlertDialog(
+        shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancelClick,
         dismissButton = { TextButton(onClick = onCancelClick, content = { Text(stringResource(R.string.cancel)) }) },
         confirmButton = {
@@ -207,6 +208,7 @@ fun MusicDownloadDirectoryDialog(
     val isValid by rememberSaveable(value) { mutableStateOf(VALID_FILENAME_REGEX.matches(value)) }
 
     AlertDialog(
+        shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancelClick,
         dismissButton = {
             TextButton(onClick = onCancelClick, content = { Text(text = stringResource(R.string.cancel)) })

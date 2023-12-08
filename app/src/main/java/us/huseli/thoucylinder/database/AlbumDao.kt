@@ -2,6 +2,7 @@
 
 package us.huseli.thoucylinder.database
 
+import android.database.DatabaseUtils
 import android.net.Uri
 import androidx.room.Dao
 import androidx.room.Delete
@@ -15,6 +16,8 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import us.huseli.thoucylinder.AlbumSortParameter
+import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
@@ -37,20 +40,42 @@ interface AlbumDao {
     @Query("SELECT * FROM AlbumStyle")
     fun _flowAlbumStyles(): Flow<List<AlbumStyle>>
 
-    @Query(
-        """
-        SELECT a.*, 
-            SUM(COALESCE(Track_metadata_durationMs, Track_youtubeVideo_durationMs, Track_youtubeVideo_metadata_durationMs)) AS durationMs,
-            MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount,
-            EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NOT NULL) AND 
-            EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NULL) AS isPartiallyDownloaded
-        FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId 
-        WHERE Album_isInLibrary = 1
-        GROUP BY Album_albumId
-        ORDER BY LOWER(Album_artist), LOWER(Album_title)
-        """
-    )
-    fun _flowAlbumPojos(): Flow<List<AlbumPojo>>
+    fun _flowAlbumPojos(
+        sortParameter: AlbumSortParameter,
+        sortOrder: SortOrder,
+        artist: String? = null,
+        searchTerm: String? = null,
+    ): Flow<List<AlbumPojo>> {
+        val searchQuery = searchTerm
+            ?.lowercase()
+            ?.split(Regex(" +"))
+            ?.takeIf { it.isNotEmpty() }
+            ?.map { DatabaseUtils.sqlEscapeString("%$it%") }
+            ?.joinToString(" AND ") { term ->
+                "(LOWER(Album_artist) LIKE $term OR LOWER(Album_title) LIKE $term OR Album_year LIKE $term)"
+            }
+
+        return _flowAlbumPojos(
+            SimpleSQLiteQuery(
+                """
+                SELECT Album.*, 
+                    SUM(COALESCE(Track_metadata_durationMs, Track_youtubeVideo_durationMs, Track_youtubeVideo_metadata_durationMs)) AS durationMs,
+                    MIN(Track_year) AS minYear, MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount,
+                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NOT NULL) AND 
+                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NULL) AS isPartiallyDownloaded
+                FROM Album LEFT JOIN Track ON Album_albumId = Track_albumId 
+                WHERE Album_isInLibrary = 1
+                    ${artist?.let { "AND LOWER(Album_artist) = LOWER(\"$it\")" } ?: ""}
+                    ${searchQuery?.let { "AND $it" } ?: ""}                                
+                GROUP BY Album_albumId
+                ORDER BY ${sortParameter.sqlColumn} ${if (sortOrder == SortOrder.ASCENDING) "ASC" else "DESC"}
+                """.trimIndent()
+            )
+        )
+    }
+
+    @RawQuery(observedEntities = [Album::class, Track::class])
+    fun _flowAlbumPojos(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
 
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     @Transaction
@@ -112,30 +137,37 @@ interface AlbumDao {
     @Query("DELETE FROM AlbumStyle WHERE AlbumStyle_albumId = :albumId")
     suspend fun clearAlbumStyles(albumId: UUID)
 
-    @Query("DELETE FROM Album")
-    suspend fun clearAlbums()
-
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
 
     @Query("DELETE FROM Album WHERE Album_isInLibrary = 0")
     suspend fun deleteTempAlbums()
 
-    fun flowAlbumPojos(): Flow<List<AlbumPojo>> =
-        combine(
-            _flowAlbumPojos(),
-            _flowAlbumGenres(),
-            _flowAlbumStyles(),
-            _flowSpotifyAlbums(),
-        ) { pojos, genres, styles, spotifyAlbums ->
-            pojos.map { pojo ->
-                pojo.copy(
-                    genres = genres.filter { it.albumId == pojo.album.albumId }.map { Genre(it.genreName) },
-                    styles = styles.filter { it.albumId == pojo.album.albumId }.map { Style(it.styleName) },
-                    spotifyAlbum = spotifyAlbums.find { it.albumId == pojo.album.albumId },
-                )
-            }
+    fun flowAlbumPojos(
+        sortParameter: AlbumSortParameter,
+        sortOrder: SortOrder,
+        searchTerm: String? = null,
+        artist: String? = null,
+    ): Flow<List<AlbumPojo>> = combine(
+        _flowAlbumPojos(sortParameter = sortParameter, sortOrder = sortOrder, artist = artist, searchTerm = searchTerm),
+        _flowAlbumGenres(),
+        _flowAlbumStyles(),
+        _flowSpotifyAlbums(),
+    ) { pojos, genres, styles, spotifyAlbums ->
+        pojos.map { pojo ->
+            pojo.copy(
+                genres = genres.filter { it.albumId == pojo.album.albumId }.map { Genre(it.genreName) },
+                styles = styles.filter { it.albumId == pojo.album.albumId }.map { Style(it.styleName) },
+                spotifyAlbum = spotifyAlbums.find { it.albumId == pojo.album.albumId },
+            )
         }
+    }
+
+    fun flowAlbumPojosByArtist(artist: String) = flowAlbumPojos(
+        sortParameter = AlbumSortParameter.TITLE,
+        sortOrder = SortOrder.ASCENDING,
+        artist = artist,
+    )
 
     fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?> = combine(
         _flowAlbumWithTracks(albumId),

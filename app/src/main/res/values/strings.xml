@@ -6,6 +6,7 @@
     <string name="add_to_playlist">Add to playlist</string>
     <string name="album">Album</string>
     <string name="album_artist">Album artist</string>
+    <string name="album_order">Album order</string>
     <string name="album_title">Album title</string>
     <string name="album_was_downloaded">%1$s was downloaded.</string>
     <string name="album_was_downloaded_with_errors">%1$s was downloaded with errors.</string>
@@ -13,6 +14,7 @@
     <string name="app_name">ThouCylinder</string>
     <string name="artist">Artist</string>
     <string name="artists">Artists</string>
+    <string name="ascending">Ascending</string>
     <string name="auto_import_local_music">Auto import local music</string>
     <string name="bit_rate">Bit rate</string>
     <string name="cancel">Cancel</string>
@@ -25,6 +27,7 @@
     <string name="current_value">Current value: %1$s</string>
     <string name="debug">Debug</string>
     <string name="delete_album">Delete album</string>
+    <string name="descending">Descending</string>
     <string name="directory_for_music_downloads_from_youtube">Directory for music downloads from Youtube.</string>
     <string name="directory_from_which_to_auto_import_local_music">Directory from which to auto import local music.</string>
     <string name="don_t_import">Don\'t import</string>
@@ -33,14 +36,17 @@
     <string name="download_directory_help_2">Albums will be downloaded to [music download directory]/[artist]/[album]/.</string>
     <string name="downloading">Downloading</string>
     <string name="downloads">Downloads</string>
+    <string name="duration">Duration</string>
     <string name="edit">Edit</string>
     <string name="enqueue">Enqueue</string>
     <string name="file_size">File size</string>
+    <string name="get_spotify_albums">Get Spotify albums</string>
     <string name="go_back">Go back</string>
     <string name="go_to_album">Go to album</string>
     <string name="go_to_artist">Go to artist</string>
     <string name="go_to_playlist">Go to playlist</string>
     <string name="import_local_music">Import local music</string>
+    <string name="import_selected">Import selected</string>
     <string name="import_str">Import</string>
     <string name="importing">Importing</string>
     <string name="importing_local_albums">Importing local albums ...</string>
@@ -77,6 +83,7 @@
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
     <string name="queue">Queue</string>
+    <string name="refresh_spotify_albums">Refresh Spotify albums</string>
     <string name="remove">Remove</string>
     <string name="remove_album">Remove album</string>
     <string name="remove_album_and_delete_files">Remove album and delete files</string>
@@ -95,6 +102,7 @@
     <string name="select_root_directory_to_import_from">If you want this app to auto import local music, you need to select a root directory to import from.</string>
     <string name="selection_was_added_to_playlist">Selection was added to playlist.</string>
     <string name="settings">Settings</string>
+    <string name="sort">Sort</string>
     <string name="spotify">Spotify</string>
     <string name="spotify_import_help_1">Press the button above to authorize this application with Spotify (if needed) and fetch your saved albums from there. After this, you will get to select which albums to import.</string>
     <string name="spotify_import_help_2">For each selected album, attempts will be made to match it with a Youtube playlist. If a sufficiently good match is found, it will be added to your library as an album. However, it will not be automatically downloaded.</string>
@@ -102,10 +110,12 @@
     <string name="the_album_was_deleted">The album was deleted.</string>
     <string name="the_playlist_was_removed">The playlist was removed.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
+    <string name="the_queue_is_empty">The queue is empty.</string>
     <string name="this_album_is_only_partially_downloaded">This album is only partially downloaded. Press the download button to download the rest.</string>
     <string name="this_playlist_is_empty">This playlist is empty. :(</string>
     <string name="title">Title</string>
     <string name="track_information">Track information</string>
+    <string name="track_order">Track order</string>
     <string name="tracks">Tracks</string>
     <string name="undo">Undo</string>
     <string name="unselect_all">Unselect all</string>

@@ -90,7 +90,7 @@ android {
 }
 
 val lifecycleVersion = "2.6.2"
-val roomVersion = "2.6.0"
+val roomVersion = "2.6.1"
 val daggerVersion = "2.48.1"
 val media3Version = "1.2.0"
 val pagingVersion = "3.3.0-alpha02"
@@ -107,7 +107,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Compose related:
-    implementation("androidx.activity:activity-compose:1.8.0")
+    implementation("androidx.activity:activity-compose:1.8.1")
     implementation("androidx.navigation:navigation-compose:2.7.5")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
@@ -134,7 +134,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.5.0")
+    implementation("com.github.Eboreg:RetainTheme:2.7.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

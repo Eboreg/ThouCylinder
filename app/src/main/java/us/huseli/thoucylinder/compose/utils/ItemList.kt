@@ -46,6 +46,8 @@ fun <T> ItemList(
     stickyHeaderContent: (@Composable LazyItemScope.() -> Unit)? = null,
     cardContent: @Composable ColumnScope.(T) -> Unit,
 ) {
+    if (things.isEmpty() && onEmpty != null) onEmpty()
+
     ListWithNumericBar(
         listState = listState,
         listSize = things.size,
@@ -82,6 +84,4 @@ fun <T> ItemList(
             trailingItem?.also { item { it() } }
         }
     }
-
-    if (things.isEmpty() && onEmpty != null) onEmpty()
 }

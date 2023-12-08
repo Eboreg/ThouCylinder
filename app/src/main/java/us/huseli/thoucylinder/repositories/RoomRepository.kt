@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
@@ -47,11 +50,8 @@ class RoomRepository @Inject constructor(
     private val _selectedTrackPojos = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
     private val _undeleteAlbums = mutableMapOf<UUID, UndeleteAlbum>()
 
-    val albumPojos: Flow<List<AlbumPojo>> = albumDao.flowAlbumPojos()
     val artistPojos = artistDao.flowArtistPojos()
     val playlists = playlistDao.flowPojos()
-    val trackPojoPager: Pager<Int, TrackPojo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojos() }
 
     suspend fun addSelectionToPlaylist(
         selection: Selection,
@@ -83,11 +83,6 @@ class RoomRepository @Inject constructor(
         deleteAlbums(listOf(album))
     }
 
-    suspend fun deleteAll() = database.withTransaction {
-        trackDao.clearTracks()
-        albumDao.clearAlbums()
-    }
-
     suspend fun deletePlaylist(playlist: Playlist) = playlistDao.deletePlaylist(playlist)
 
     suspend fun deleteTempTracksAndAlbums() {
@@ -97,8 +92,16 @@ class RoomRepository @Inject constructor(
 
     suspend fun deleteTracks(tracks: List<Track>) = trackDao.deleteTracks(*tracks.toTypedArray())
 
+    fun flowAlbumPojos(sortParameter: AlbumSortParameter, sortOrder: SortOrder, searchTerm: String) =
+        albumDao.flowAlbumPojos(sortParameter = sortParameter, sortOrder = sortOrder, searchTerm = searchTerm)
+
+    fun flowAlbumPojosByArtist(artist: String) = albumDao.flowAlbumPojosByArtist(artist)
+
     fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?> =
         albumDao.flowAlbumWithTracks(albumId).map { pojo -> pojo?.copy(tracks = pojo.tracks.sorted()) }
+
+    fun flowTrackPojoPager(sortParameter: TrackSortParameter, sortOrder: SortOrder, searchTerm: String) =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojos(sortParameter, sortOrder, searchTerm) }
 
     suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo? =
         albumDao.getAlbumWithTracks(albumId)?.let { pojo -> pojo.copy(tracks = pojo.tracks.sorted()) }

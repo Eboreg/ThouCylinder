@@ -21,7 +21,6 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
@@ -68,7 +67,7 @@ class RoomRepository @Inject constructor(
         }
         val unsavedTracks = tracks.filter { !it.isInLibrary }
 
-        trackDao.insertTracks(unsavedTracks)
+        trackDao.insertTracks(*unsavedTracks.map { it.copy(isInLibrary = true) }.toTypedArray())
         playlistDao.insertTracks(*playlistTracks.toTypedArray())
         playlistDao.touchPlaylist(playlist.playlistId)
     }
@@ -129,8 +128,8 @@ class RoomRepository @Inject constructor(
     }
 
     suspend fun insertTempAlbumsWithTracks(pojos: List<AlbumWithTracksPojo>) {
-        albumDao.insertTempAlbums(pojos.map { it.album })
-        trackDao.insertTempTracks(pojos.flatMap { it.tracks })
+        albumDao.insertAlbums(*pojos.map { it.album }.toTypedArray())
+        trackDao.insertTracks(*pojos.flatMap { pojo -> pojo.tracks }.toTypedArray())
     }
 
     suspend fun listAlbums(): List<Album> = albumDao.listAlbums()
@@ -167,7 +166,7 @@ class RoomRepository @Inject constructor(
 
     suspend fun saveAlbum(album: Album) = database.withTransaction {
         if (albumDao.albumExists(album.albumId)) albumDao.updateAlbums(album)
-        else albumDao.insertAlbum(album)
+        else albumDao.insertAlbums(album)
     }
 
     suspend fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = database.withTransaction {
@@ -180,24 +179,20 @@ class RoomRepository @Inject constructor(
             trackDao.deleteTracksByAlbumId(album.albumId)
             albumDao.clearAlbumGenres(album.albumId)
             albumDao.clearAlbumStyles(album.albumId)
-        } else albumDao.insertAlbum(album)
+        } else albumDao.insertAlbums(album)
 
         if (pojo.tracks.isNotEmpty()) trackDao.insertTracks(
-            pojo.tracks.map { track ->
+            *pojo.tracks.map { track ->
                 track.copy(
                     albumId = album.albumId,
                     image = (track.image ?: track.youtubeVideo?.saveMediaStoreImage(context)),
+                    isInLibrary = true,
                 )
-            }
+            }.toTypedArray()
         )
         if (pojo.genres.isNotEmpty()) albumDao.insertAlbumGenres(pojo)
         if (pojo.styles.isNotEmpty()) albumDao.insertAlbumStyles(pojo)
     }
-
-    fun searchAlbumPojos(query: String): Flow<List<AlbumPojo>> = albumDao.searchAlbumPojos(query)
-
-    fun searchTrackPojos(query: String): Pager<Int, TrackPojo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.searchTrackPojos(query) }
 
     fun selectAlbums(selectionKey: String, albums: List<Album>) {
         _selectedAlbums[selectionKey]?.also {
@@ -233,8 +228,8 @@ class RoomRepository @Inject constructor(
 
     suspend fun undeleteAlbumWithTracks(album: Album) {
         _undeleteAlbums.remove(album.albumId)?.also { pojos ->
-            albumDao.insertAlbum(pojos.albumPojo.album)
-            trackDao.insertTracks(pojos.albumPojo.tracks)
+            albumDao.insertAlbums(pojos.albumPojo.album)
+            trackDao.insertTracks(*pojos.albumPojo.tracks.toTypedArray())
             pojos.spotifyPojo?.also { spotifyDao.upsertSpotifyAlbumPojo(it) }
         }
     }

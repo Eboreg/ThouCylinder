@@ -198,7 +198,7 @@ class MediaStoreRepository @Inject constructor(
                             albums.find { it.artist == finalAlbumArtist && it.title == finalAlbumTitle } ?: Album(
                                 title = finalAlbumTitle,
                                 artist = finalAlbumArtist,
-                                isInLibrary = false,
+                                isInLibrary = true,
                                 isLocal = true,
                             ).also { albums.add(it) }
 

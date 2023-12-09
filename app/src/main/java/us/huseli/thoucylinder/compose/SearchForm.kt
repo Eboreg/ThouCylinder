@@ -8,7 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,17 +23,17 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchForm(
     modifier: Modifier = Modifier,
     isSearching: Boolean,
+    initialQuery: String,
     onSearch: (String) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    var query by rememberSaveable { mutableStateOf("") }
+    var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
 
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
@@ -40,7 +42,14 @@ fun SearchForm(
             onValueChange = { query = it },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            label = { OutlinedTextFieldLabel(text = stringResource(R.string.search_query)) },
+            label = {
+                Text(
+                    text = stringResource(R.string.search_youtube),
+                    color = MaterialTheme.colorScheme.outline,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            },
+            textStyle = MaterialTheme.typography.labelLarge,
             keyboardOptions = KeyboardOptions.Default.copy(
                 imeAction = ImeAction.Search,
             ),

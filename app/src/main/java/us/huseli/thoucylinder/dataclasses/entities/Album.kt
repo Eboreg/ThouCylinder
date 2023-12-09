@@ -55,7 +55,7 @@ data class Album(
         return distances.min()
     }
 
-    fun getMediaStoreSubdir(): String =
+    fun getSubdir(): String =
         artist?.let { "${artist.sanitizeFilename()}/${title.sanitizeFilename()}" } ?: title.sanitizeFilename()
 
     suspend fun getThumbnail(context: Context): ImageBitmap? =

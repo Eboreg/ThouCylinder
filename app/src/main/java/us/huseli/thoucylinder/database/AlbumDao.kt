@@ -33,7 +33,7 @@ import java.util.UUID
 
 @Dao
 interface AlbumDao {
-    /** Pseudo-private methods ***********************************************/
+    /** Pseudo-private methods ************************************************/
     @Query("SELECT * FROM AlbumGenre")
     fun _flowAlbumGenres(): Flow<List<AlbumGenre>>
 
@@ -100,9 +100,6 @@ interface AlbumDao {
     @Query("SELECT * FROM SpotifyAlbum WHERE SpotifyAlbum_albumId = :albumId")
     suspend fun _getSpotifyAlbum(albumId: UUID): SpotifyAlbum?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun _insertAlbums(vararg albums: Album)
-
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun _insertAlbumGenres(vararg albumGenres: AlbumGenre)
 
@@ -124,10 +121,7 @@ interface AlbumDao {
     @RawQuery(observedEntities = [Album::class, Track::class])
     fun _searchAlbumPojos(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
 
-    @Update
-    suspend fun _updateAlbums(vararg albums: Album)
-
-    /** Public methods *******************************************************/
+    /** Public methods ********************************************************/
     @Query("SELECT EXISTS(SELECT Album_albumId FROM Album WHERE Album_albumId = :albumId)")
     suspend fun albumExists(albumId: UUID): Boolean
 
@@ -202,10 +196,8 @@ interface AlbumDao {
         }.toTypedArray())
     }
 
-    suspend fun insertAlbum(album: Album) = _insertAlbums(album.copy(isInLibrary = true))
-
-    suspend fun insertTempAlbums(albums: List<Album>) =
-        _insertAlbums(*albums.map { it.copy(isInLibrary = false) }.toTypedArray())
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAlbums(vararg albums: Album)
 
     @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>
@@ -231,26 +223,6 @@ interface AlbumDao {
     @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
     suspend fun listTracks(albumId: UUID): List<Track>
 
-    fun searchAlbumPojos(query: String): Flow<List<AlbumPojo>> {
-        val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
-            .joinToString(" OR ") { "Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'" }
-
-        return _searchAlbumPojos(
-            SimpleSQLiteQuery(
-                """
-                SELECT a.*, SUM(Track_metadata_durationMs) AS durationMs, MIN(Track_year) AS minYear,
-                    MAX(Track_year) AS maxYear, COUNT(Track_trackId) AS trackCount,
-                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NOT NULL) AND 
-                    EXISTS(SELECT * FROM Track WHERE Track_albumId = Album_albumId AND Track_mediaStoreData_uri IS NULL) AS isPartiallyDownloaded
-                FROM Album a LEFT JOIN Track t ON Album_albumId = Track_albumId
-                WHERE ($terms) AND Album_isInLibrary = 1
-                GROUP BY Album_albumId
-                ORDER BY LOWER(Album_artist), LOWER(Album_title)
-                """.trimIndent()
-            )
-        )
-    }
-
-    suspend fun updateAlbums(vararg albums: Album) =
-        _updateAlbums(*albums.map { it.copy(isInLibrary = true) }.toTypedArray())
+    @Update
+    suspend fun updateAlbums(vararg albums: Album)
 }

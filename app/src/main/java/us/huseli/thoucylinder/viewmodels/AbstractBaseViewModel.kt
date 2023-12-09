@@ -53,10 +53,10 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
     fun importNewMediaStoreAlbums(context: Context, existingTracks: List<Track>? = null) = viewModelScope.launch {
         repos.mediaStore.setIsImporting(true)
 
-        val newAlbums =
+        val newAlbumPojos =
             repos.mediaStore.listNewMediaStoreAlbums(existingTracks ?: repos.room.listTracks())
 
-        newAlbums.forEach { pojo ->
+        newAlbumPojos.forEach { pojo ->
             val bestBitmap = repos.mediaStore.collectAlbumImages(pojo)
                 .mapNotNull { it.toBitmap() }
                 .maxByOrNull { it.width * it.height }
@@ -74,6 +74,7 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         val pojos = getQueueTrackPojos(repos.room.listPlaylistTracks(playlistId))
         val startIndex =
             startTrackId?.let { trackId -> pojos.indexOfFirst { it.trackId == trackId }.takeIf { it > -1 } } ?: 0
+
         repos.player.replaceAndPlay(pojos, startIndex = startIndex)
     }
 
@@ -82,11 +83,13 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         startIndex: Int = 0,
     ): List<QueueTrackPojo> {
         var offset = 0
+
         return trackPojos.mapNotNull { pojo -> getQueueTrackPojo(pojo, startIndex + offset)?.also { offset++ } }
     }
 
     protected suspend fun getQueueTrackPojo(trackPojo: AbstractTrackPojo, index: Int): QueueTrackPojo? {
         val track = ensureTrackMetadata(trackPojo.track, commit = true)
+
         return track.playUri?.let { uri ->
             QueueTrackPojo(track = track, uri = uri, position = index, album = trackPojo.album)
         }

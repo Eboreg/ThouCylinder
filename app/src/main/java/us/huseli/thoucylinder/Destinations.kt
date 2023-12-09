@@ -9,37 +9,43 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
 import java.util.UUID
 
-object SearchDestination : AbstractSimpleDestination("search")
+abstract class Destination(override val menuItemId: MenuItemId) :
+    AbstractSimpleDestination<MenuItemId>(menuItemId.route, menuItemId)
 
-object LibraryDestination : AbstractSimpleDestination("library")
+object AddDestination : Destination(MenuItemId.SEARCH_YOUTUBE)
 
-object QueueDestination : AbstractSimpleDestination("queue")
+object LibraryDestination : Destination(MenuItemId.LIBRARY)
 
-object DebugDestination : AbstractSimpleDestination("debug")
+object QueueDestination : Destination(MenuItemId.QUEUE)
 
-object ImportDestination : AbstractSimpleDestination("import")
+object DebugDestination : Destination(MenuItemId.DEBUG)
 
-object DownloadsDestination : AbstractSimpleDestination("downloads")
+object ImportDestination : Destination(MenuItemId.IMPORT)
 
-object SettingsDestination : AbstractSimpleDestination("settings")
+object DownloadsDestination : Destination(MenuItemId.DOWNLOADS)
 
-object AlbumDestination : AbstractDestination() {
+object SettingsDestination : Destination(MenuItemId.SETTINGS)
+
+object AlbumDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "album/{$NAV_ARG_ALBUM}"
     override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
+    override val menuItemId: MenuItemId? = null
 
     fun route(albumId: UUID) = "album/$albumId"
 }
 
-object ArtistDestination : AbstractDestination() {
+object ArtistDestination : AbstractDestination<MenuItemId>() {
     override val arguments = listOf(navArgument(NAV_ARG_ARTIST) { type = NavType.StringType })
     override val routeTemplate = "artist/{$NAV_ARG_ARTIST}"
+    override val menuItemId: MenuItemId? = null
 
     fun route(artist: String) = "artist/$artist"
 }
 
-object PlaylistDestination : AbstractDestination() {
+object PlaylistDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "playlist/{$NAV_ARG_PLAYLIST}"
     override val arguments = listOf(navArgument(NAV_ARG_PLAYLIST) { type = NavType.StringType })
+    override val menuItemId: MenuItemId? = null
 
     fun route(playlistId: UUID) = "playlist/$playlistId"
 }

@@ -5,8 +5,6 @@ import android.content.Context
 @Suppress("unused")
 enum class LoadStatus { NOT_LOADED, LOADING, LOADED, ERROR }
 
-enum class SearchType { LOCAL, YOUTUBE }
-
 enum class SortOrder { ASCENDING, DESCENDING }
 
 interface SortParameter {
@@ -26,7 +24,7 @@ enum class TrackSortParameter : SortParameter {
     },
     ARTIST {
         override val stringRes = R.string.artist
-        override val sqlColumn = "LOWER(Track_artist)"
+        override val sqlColumn = "COALESCE(LOWER(Track_artist), LOWER(Album_artist))"
     },
     ALBUM_ARTIST {
         override val stringRes = R.string.album_artist
@@ -66,4 +64,15 @@ enum class AlbumSortParameter : SortParameter {
         fun withLabels(context: Context): Map<AlbumSortParameter, String> =
             entries.associateWith { context.getString(it.stringRes) }
     }
+}
+
+enum class MenuItemId(val route: String) {
+    SEARCH_YOUTUBE("search-youtube"),
+    LIBRARY("library"),
+    QUEUE("queue"),
+    IMPORT("import"),
+    DEBUG("debug"),
+    DOWNLOADS("downloads"),
+    SETTINGS("settings"),
+    MENU("menu"),
 }

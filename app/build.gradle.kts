@@ -53,7 +53,7 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            isRenderscriptDebuggable = true
+            // isRenderscriptDebuggable = true
             applicationIdSuffix = ".debug"
         }
         release {
@@ -91,7 +91,7 @@ android {
 
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.6.1"
-val daggerVersion = "2.48.1"
+val daggerVersion = "2.49"
 val media3Version = "1.2.0"
 val pagingVersion = "3.3.0-alpha02"
 
@@ -134,7 +134,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:2.7.0")
+    implementation("com.github.Eboreg:RetainTheme:3.1.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

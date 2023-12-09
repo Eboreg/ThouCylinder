@@ -32,7 +32,7 @@ class TrackDownloadRepository @Inject constructor(private val settingsRepo: Sett
         }
     }
 
-    fun addTask(
+    fun downloadTrack(
         track: Track,
         repos: Repositories,
         albumPojo: AbstractAlbumPojo? = null,
@@ -40,7 +40,7 @@ class TrackDownloadRepository @Inject constructor(private val settingsRepo: Sett
         onFinish: (Track) -> Unit = {},
     ): TrackDownloadTask {
         val relativePath =
-            albumPojo?.album?.getMediaStoreSubdir()?.let { "${settingsRepo.musicDownloadDirectory.value}/$it" }
+            albumPojo?.album?.getSubdir()?.let { "${settingsRepo.musicDownloadDirectory.value}/$it" }
                 ?: settingsRepo.musicDownloadDirectory.value
         val task = TrackDownloadTask(
             scope = scope,

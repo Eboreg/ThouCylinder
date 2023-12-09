@@ -28,7 +28,8 @@ import us.huseli.thoucylinder.LibraryDestination
 import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.SearchDestination
+import us.huseli.thoucylinder.MenuItemId
+import us.huseli.thoucylinder.AddDestination
 import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
@@ -41,7 +42,7 @@ import us.huseli.thoucylinder.compose.screens.ImportScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
-import us.huseli.thoucylinder.compose.screens.SearchScreen
+import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
@@ -51,7 +52,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
-import us.huseli.thoucylinder.viewmodels.SearchViewModel
+import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
 import java.io.File
 import java.util.UUID
 
@@ -60,13 +61,13 @@ fun App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     viewModel: AppViewModel = hiltViewModel(),
-    searchViewModel: SearchViewModel = hiltViewModel(),
+    youtubeSearchViewModel: YoutubeSearchViewModel = hiltViewModel(),
     queueViewModel: QueueViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
 
-    var activeScreen by rememberSaveable { mutableStateOf<String?>("library") }
+    var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     var infoDialogTrackPojo by rememberSaveable { mutableStateOf<AbstractTrackPojo?>(null) }
     var isAddToPlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -291,7 +292,7 @@ fun App(
 
     AskMusicImportPermissions(viewModel)
 
-    ThouCylinderScaffold(modifier = modifier, activeScreen = activeScreen, navController = navController) {
+    ThouCylinderScaffold(modifier = modifier, activeMenuItemId = activeMenuItemId, navController = navController) {
         NavHost(
             navController = navController,
             startDestination = LibraryDestination.route,
@@ -299,55 +300,55 @@ fun App(
                 .matchParentSize()
                 .padding(bottom = if (currentPojo != null) 80.dp else 0.dp)
         ) {
-            composable(route = SearchDestination.route) {
-                activeScreen = "search"
-                SearchScreen(viewModel = searchViewModel, appCallbacks = appCallbacks)
+            composable(route = AddDestination.route) {
+                activeMenuItemId = AddDestination.menuItemId
+                YoutubeSearchScreen(viewModel = youtubeSearchViewModel, appCallbacks = appCallbacks)
             }
 
             composable(route = LibraryDestination.route) {
-                activeScreen = "library"
+                activeMenuItemId = LibraryDestination.menuItemId
                 LibraryScreen(appCallbacks = appCallbacks)
             }
 
             composable(route = QueueDestination.route) {
-                activeScreen = "queue"
+                activeMenuItemId = QueueDestination.menuItemId
                 QueueScreen(appCallbacks = appCallbacks)
             }
 
             composable(route = AlbumDestination.routeTemplate, arguments = AlbumDestination.arguments) {
-                activeScreen = null
+                activeMenuItemId = null
                 AlbumScreen(appCallbacks = appCallbacks)
             }
 
             composable(route = ArtistDestination.routeTemplate, arguments = ArtistDestination.arguments) {
-                activeScreen = null
+                activeMenuItemId = null
                 ArtistScreen(appCallbacks = appCallbacks)
             }
 
             composable(route = PlaylistDestination.routeTemplate, arguments = PlaylistDestination.arguments) {
-                activeScreen = null
+                activeMenuItemId = null
                 PlaylistScreen(appCallbacks = appCallbacks)
             }
 
             composable(route = ImportDestination.route) {
-                activeScreen = "import"
+                activeMenuItemId = ImportDestination.menuItemId
                 ImportScreen()
             }
 
             if (BuildConfig.DEBUG) {
                 composable(route = DebugDestination.route) {
-                    activeScreen = "debug"
+                    activeMenuItemId = DebugDestination.menuItemId
                     DebugScreen()
                 }
             }
 
             composable(route = DownloadsDestination.route) {
-                activeScreen = "downloads"
+                activeMenuItemId = DownloadsDestination.menuItemId
                 DownloadsScreen()
             }
 
             composable(route = SettingsDestination.route) {
-                activeScreen = "settings"
+                activeMenuItemId = SettingsDestination.menuItemId
                 SettingsScreen(appCallbacks = appCallbacks)
             }
         }

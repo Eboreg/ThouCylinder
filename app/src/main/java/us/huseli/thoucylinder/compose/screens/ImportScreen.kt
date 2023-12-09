@@ -16,9 +16,9 @@ import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,18 +55,18 @@ fun ImportScreen(
     viewModel: SpotifyImportViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
 ) {
-    val pojos by viewModel.pojos.collectAsStateWithLifecycle(emptyList())
-    val hasPrevious by viewModel.hasPrevious.collectAsStateWithLifecycle(false)
-    val hasNext by viewModel.hasNext.collectAsStateWithLifecycle(false)
-    val offset by viewModel.offset.collectAsStateWithLifecycle(0)
-    val isAllSelected by viewModel.isAllSelected.collectAsStateWithLifecycle(false)
-    val selectedPojos by viewModel.selectedPojos.collectAsStateWithLifecycle()
-    val isAuthorized by viewModel.isAuthorized.collectAsStateWithLifecycle(false)
-    val totalAlbumCount by viewModel.totalAlbumCount.collectAsStateWithLifecycle(initialValue = 0)
-    val progress by viewModel.progress.collectAsStateWithLifecycle()
-    val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
-    val notFoundAlbumIds by viewModel.notFoundAlbumIds.collectAsStateWithLifecycle()
     val activity = LocalContext.current.getActivity()
+    val hasNext by viewModel.hasNext.collectAsStateWithLifecycle(false)
+    val hasPrevious by viewModel.hasPrevious.collectAsStateWithLifecycle(false)
+    val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
+    val isAllSelected by viewModel.isAllSelected.collectAsStateWithLifecycle(false)
+    val isAuthorized by viewModel.isAuthorized.collectAsStateWithLifecycle(false)
+    val notFoundAlbumIds by viewModel.notFoundAlbumIds.collectAsStateWithLifecycle()
+    val offset by viewModel.offset.collectAsStateWithLifecycle(0)
+    val pojos by viewModel.pojos.collectAsStateWithLifecycle(emptyList())
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val selectedPojos by viewModel.selectedPojos.collectAsStateWithLifecycle()
+    val totalAlbumCount by viewModel.totalAlbumCount.collectAsStateWithLifecycle(initialValue = 0)
 
     LaunchedEffect(isAuthorized) {
         if (isAuthorized) viewModel.fetchAlbums(offset)
@@ -247,10 +247,10 @@ fun ImportScreenStickyHeader(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(horizontal = 20.dp),
             ) {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = onAuthorizeClick,
                     content = { Text(text = stringResource(R.string.get_spotify_albums)) },
-                    shape = MaterialTheme.shapes.extraSmall,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 Text(text = stringResource(R.string.spotify_import_help_1))

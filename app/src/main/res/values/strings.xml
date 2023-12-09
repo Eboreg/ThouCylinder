@@ -1,5 +1,6 @@
 <!--suppress ALL -->
 <resources>
+    <string name="add">Add</string>
     <string name="add_album_to_library">Add album to library</string>
     <string name="add_playlist">Add playlist</string>
     <string name="add_to_library">Add to library</string>
@@ -85,7 +86,6 @@
     <string name="queue">Queue</string>
     <string name="refresh_spotify_albums">Refresh Spotify albums</string>
     <string name="remove">Remove</string>
-    <string name="remove_album">Remove album</string>
     <string name="remove_album_and_delete_files">Remove album and delete files</string>
     <string name="remove_from_library">Remove from library</string>
     <string name="remove_from_queue">Remove from queue</string>
@@ -94,7 +94,7 @@
     <string name="sample_rate">Sample rate</string>
     <string name="save">Save</string>
     <string name="search">Search</string>
-    <string name="search_query">Search query</string>
+    <string name="search_youtube">Search Youtube</string>
     <string name="select_all">Select all</string>
     <string name="select_cover_art">Select cover art</string>
     <string name="select_directory">Select directory</string>
@@ -123,6 +123,7 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="year">Year</string>
     <string name="youtube">Youtube</string>
+    <string name="no_downloads_found">No downloads found.</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>

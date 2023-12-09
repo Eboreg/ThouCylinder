@@ -25,11 +25,7 @@ import java.util.UUID
 
 @Dao
 interface TrackDao {
-    /** Pseudo-private methods ***********************************************/
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun _insertTracks(vararg tracks: Track)
-
+    /** Pseudo-private methods ************************************************/
     @Query(
         """
         SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId 
@@ -45,9 +41,7 @@ interface TrackDao {
     @RawQuery(observedEntities = [Track::class, Album::class])
     fun _searchTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
 
-    @Update
-    suspend fun _updateTracks(vararg tracks: Track)
-
+    /** Public methods ********************************************************/
     @Delete
     suspend fun deleteTracks(vararg tracks: Track)
 
@@ -57,11 +51,8 @@ interface TrackDao {
     @Query("DELETE FROM Track WHERE Track_albumId = :albumId")
     suspend fun deleteTracksByAlbumId(albumId: UUID)
 
-    suspend fun insertTracks(tracks: List<Track>) =
-        _insertTracks(*tracks.map { it.copy(isInLibrary = true) }.toTypedArray())
-
-    suspend fun insertTempTracks(tracks: List<Track>) =
-        _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTracks(vararg tracks: Track)
 
     @Query(
         """
@@ -120,22 +111,6 @@ interface TrackDao {
     @Transaction
     fun pageTrackPojosByArtist(artist: String): PagingSource<Int, TrackPojo>
 
-    fun searchTrackPojos(query: String): PagingSource<Int, TrackPojo> {
-        val terms = query.trim().split(Regex("\\s+")).filter { it.length > 2 }
-            .joinToString(" OR ") {
-                "Track_title LIKE '%$it%' OR Track_artist LIKE '%$it%' OR Album_title LIKE '%$it%' OR Album_artist LIKE '%$it%'"
-            }
-
-        return _searchTrackPojos(
-            SimpleSQLiteQuery(
-                """
-                SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
-                WHERE ($terms) AND Track_isInLibrary = 1
-                """.trimIndent()
-            )
-        )
-    }
-
-    suspend fun updateTracks(vararg tracks: Track) =
-        _updateTracks(*tracks.map { it.copy(isInLibrary = true) }.toTypedArray())
+    @Update
+    suspend fun updateTracks(vararg tracks: Track)
 }

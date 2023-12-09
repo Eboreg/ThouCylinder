@@ -103,9 +103,6 @@ class TrackDownloadTask(
     }
 
     private suspend fun run(): Track {
-        // val relativePath = albumPojo?.album?.getMediaStoreSubdir()?.let { "${Environment.DIRECTORY_MUSIC}/$it" }
-        //     ?: Environment.DIRECTORY_MUSIC
-
         setProgress(0.0)
 
         val tempFile = repos.youtube.downloadVideo(
@@ -123,7 +120,7 @@ class TrackDownloadTask(
         )
 
         setProgress(1.0)
-        repos.room.updateTrack(downloadedTrack)
+        repos.room.updateTrack(downloadedTrack.copy(isInLibrary = true))
         return downloadedTrack
     }
 

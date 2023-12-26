@@ -17,92 +17,79 @@ import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.max
-import kotlin.math.min
 
 @Dao
 interface PlaylistDao {
-    @Insert
-    suspend fun _insertPlaylists(vararg playlists: Playlist)
+    @Delete
+    suspend fun deletePlaylist(playlist: Playlist)
 
     @Query(
         """
-        SELECT DISTINCT t.*, a.*, p.*, pt.PlaylistTrack_position FROM Track t
-        JOIN PlaylistTrack pt ON t.Track_trackId = pt.PlaylistTrack_trackId 
-        JOIN Playlist p ON pt.PlaylistTrack_playlistId = p.Playlist_playlistId
-        LEFT JOIN Album a ON Track_albumId = Album_albumId
-        WHERE p.Playlist_playlistId = :playlistId 
-            AND pt.PlaylistTrack_position >= :fromPosition
-            AND pt.PlaylistTrack_position <= :toPosition
-        ORDER BY pt.PlaylistTrack_position
+        DELETE FROM PlaylistTrack
+        WHERE PlaylistTrack_trackId NOT IN (SELECT Track_trackId FROM Track)
+            OR PlaylistTrack_playlistId NOT IN (SELECT Playlist_playlistId FROM Playlist)
         """
     )
-    suspend fun _listTrackPojosBetween(playlistId: UUID, fromPosition: Int, toPosition: Int): List<PlaylistTrackPojo>
-
-    /** Public methods *******************************************************/
-    @Delete
-    suspend fun deletePlaylist(playlist: Playlist)
+    suspend fun deleteOrphanPlaylistTracks()
 
     @Delete
     suspend fun deletePlaylistTracks(vararg tracks: PlaylistTrack)
 
     @Query(
         """
-        SELECT p.*, COUNT(PlaylistTrack_trackId) AS trackCount, SUM(Track_metadata_durationMs) AS totalDurationMs
-        FROM Playlist p 
-            LEFT JOIN PlaylistTrack pt ON Playlist_playlistId = PlaylistTrack_playlistId 
-            LEFT JOIN Track t ON PlaylistTrack_trackId = Track_trackId
+        SELECT Playlist.*, COUNT(PlaylistTrack_trackId) AS trackCount, SUM(Track_metadata_durationMs) AS totalDurationMs
+        FROM Playlist 
+            LEFT JOIN PlaylistTrack ON Playlist_playlistId = PlaylistTrack_playlistId 
+            LEFT JOIN Track ON PlaylistTrack_trackId = Track_trackId
         GROUP BY Playlist_playlistId
         HAVING Playlist_playlistId IS NOT NULL
         """
     )
     fun flowPojos(): Flow<List<PlaylistPojo>>
 
-    suspend fun insertPlaylist(playlist: Playlist) {
-        val now = Instant.now()
-        _insertPlaylists(playlist.copy(created = now, updated = now))
-    }
+    @Insert
+    suspend fun insertPlaylists(vararg playlists: Playlist)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTracks(vararg playlistTracks: PlaylistTrack)
 
     @Query(
         """
-        SELECT DISTINCT a.* FROM Album a
-        JOIN Track t ON t.Track_albumId = a.Album_albumId
-        JOIN PlaylistTrack pt ON pt.PlaylistTrack_trackId = t.Track_trackId 
-        WHERE pt.PlaylistTrack_playlistId = :playlistId
+        SELECT DISTINCT Album.* 
+        FROM Album
+            JOIN Track ON Track_albumId = Album_albumId
+            JOIN PlaylistTrack ON PlaylistTrack_trackId = Track_trackId 
+        WHERE PlaylistTrack_playlistId = :playlistId
         """
     )
     suspend fun listAlbums(playlistId: UUID): List<Album>
 
     @Query(
         """
-        SELECT DISTINCT t.*, a.*, p.*, pt.PlaylistTrack_position FROM Track t
-        JOIN PlaylistTrack pt ON t.Track_trackId = pt.PlaylistTrack_trackId 
-        JOIN Playlist p ON pt.PlaylistTrack_playlistId = p.Playlist_playlistId
-        LEFT JOIN Album a ON Track_albumId = Album_albumId
-        WHERE p.Playlist_playlistId = :playlistId
-        ORDER BY pt.PlaylistTrack_position
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
+        FROM Track
+            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
+            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId
+            LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
+        WHERE Playlist_playlistId = :playlistId
+        ORDER BY PlaylistTrack_position
         """
     )
     suspend fun listTracks(playlistId: UUID): List<PlaylistTrackPojo>
 
-    suspend fun listTracksBetween(
-        playlistId: UUID,
-        from: PlaylistTrackPojo,
-        to: PlaylistTrackPojo,
-    ): List<PlaylistTrackPojo> =
-        _listTrackPojosBetween(playlistId, min(from.position, to.position), max(from.position, to.position))
-
     @Query(
         """
-        SELECT DISTINCT t.*, a.*, p.*, pt.PlaylistTrack_position FROM Track t 
-        JOIN PlaylistTrack pt ON t.Track_trackId = pt.PlaylistTrack_trackId 
-        JOIN Playlist p ON pt.PlaylistTrack_playlistId = p.Playlist_playlistId 
-        LEFT JOIN Album a ON Track_albumId = Album_albumId
-        WHERE p.Playlist_playlistId = :playlistId
-        ORDER BY pt.PlaylistTrack_position
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
+        FROM Track 
+            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
+            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
+            LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
+        WHERE Playlist_playlistId = :playlistId
+        ORDER BY PlaylistTrack_position
         """
     )
     @Transaction

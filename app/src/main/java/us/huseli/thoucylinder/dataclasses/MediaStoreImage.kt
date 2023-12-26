@@ -1,136 +1,64 @@
 package us.huseli.thoucylinder.dataclasses
 
-import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Environment
 import android.os.Parcelable
-import android.provider.MediaStore
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.annotation.WorkerThread
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
+import com.anggrayudi.storage.file.DocumentFileCompat
+import com.anggrayudi.storage.file.openOutputStream
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.dpToPx
-import us.huseli.retaintheme.sanitizeFilename
 import us.huseli.retaintheme.scaleToMaxSize
-import us.huseli.retaintheme.substringMax
-import us.huseli.retaintheme.toBitmap
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
-import us.huseli.thoucylinder.Constants.IMAGE_SUBDIR_ALBUM
-import us.huseli.thoucylinder.Constants.IMAGE_SUBDIR_TRACK
-import us.huseli.thoucylinder.Request
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.getReadWriteImageCollection
-import java.io.File
-import java.util.UUID
+import us.huseli.thoucylinder.deleteWithEmptyParentDirs
+import us.huseli.thoucylinder.toBitmap
 
 @Parcelize
+@WorkerThread
 data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
     fun delete(context: Context) {
-        /** Deletes both mediastore entry and physical file. */
-        context.deleteMediaStoreUriAndFile(uri)
-        context.deleteMediaStoreUriAndFile(thumbnailUri)
+        DocumentFileCompat.fromUri(context, uri)?.deleteWithEmptyParentDirs(context)
+        DocumentFileCompat.fromUri(context, thumbnailUri)?.deleteWithEmptyParentDirs(context)
     }
 
-    fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
+    fun getFullImageBitmap(context: Context): Bitmap? = DocumentFileCompat.fromUri(context, uri)?.toBitmap(context)
 
-    fun getImageBitmap(context: Context): ImageBitmap? = getBitmap(context)?.asImageBitmap()
-
-    fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
-        context.getMediaStoreFileNullable(thumbnailUri)?.toBitmap()?.asImageBitmap()
-            ?: getBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
-
-    private fun getBitmap(context: Context): Bitmap? = context.getMediaStoreFileNullable(uri)?.toBitmap()
+    fun getThumbnailBitmap(context: Context): Bitmap? =
+        DocumentFileCompat.fromUri(context, thumbnailUri)?.toBitmap(context) ?: getFullImageBitmap(context)
 
     companion object {
-        val albumRelativePath = "${Environment.DIRECTORY_PICTURES}/$IMAGE_SUBDIR_ALBUM/"
-        val trackRelativePath = "${Environment.DIRECTORY_PICTURES}/$IMAGE_SUBDIR_TRACK/"
-
-        fun fromBitmap(bitmap: Bitmap, album: Album, context: Context): MediaStoreImage =
-            fromBitmap(
-                bitmap = bitmap,
-                relativePath = albumRelativePath,
-                filename = getFilename(album.title, album.artist, album.albumId),
-                context = context,
-            )
-
-        suspend fun fromUrl(url: String, album: Album, context: Context) = fromUrl(
-            url = url,
-            relativePath = albumRelativePath,
-            filename = getFilename(album.title, album.artist, album.albumId),
-            context = context,
-        )
-
-        suspend fun fromUrl(url: String, video: YoutubeVideo, context: Context) = fromUrl(
-            url = url,
-            relativePath = trackRelativePath,
-            filename = getFilename(video.title),
-            context = context,
-        )
-
-        private fun fromBitmap(
+        fun fromBitmap(
             bitmap: Bitmap,
-            relativePath: String,
-            filename: String,
             context: Context,
+            dirDocumentFile: DocumentFile,
         ): MediaStoreImage {
-            val uri = getContentUri(relativePath, filename, context)
-            val fullBitmap = context.contentResolver.openOutputStream(uri, "w")!!.use { outputStream ->
-                val fullBitmap = bitmap.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)
-                fullBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                fullBitmap
+            dirDocumentFile.findFile("cover.jpg")?.delete()
+            val imageDocumentFile = dirDocumentFile.createFile("image/jpeg", "cover.jpg")
+            checkNotNull(imageDocumentFile)
+
+            val fullBitmap = imageDocumentFile.openOutputStream(context)!!.use { outputStream ->
+                bitmap.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)
+                    .also { it.compress(Bitmap.CompressFormat.JPEG, 85, outputStream) }
             }
-            val thumbnailUri =
-                if (fullBitmap.width <= context.dpToPx(IMAGE_MAX_DP_THUMBNAIL)) uri
-                else thumbnailFromBitmap(bitmap, relativePath, filename, context)
+            val thumbnailDocumentFile = if (fullBitmap.width > context.dpToPx(IMAGE_MAX_DP_THUMBNAIL)) {
+                dirDocumentFile.findFile("cover-thumbnail.jpg")?.delete()
+                dirDocumentFile.createFile("image/jpeg", "cover-thumbnail.jpg")?.also {
+                    it.openOutputStream(context)?.use { outputStream ->
+                        fullBitmap.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context).also { bitmap ->
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+                        }
+                    }
+                }
+            } else null
 
-            return MediaStoreImage(uri = uri, thumbnailUri = thumbnailUri)
-        }
-
-        private suspend fun fromUrl(
-            url: String,
-            relativePath: String,
-            filename: String,
-            context: Context,
-        ): MediaStoreImage {
-            val bitmap = Request(url).getBitmap()?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)
-            return fromBitmap(checkNotNull(bitmap), relativePath, filename, context)
-        }
-
-        private fun getContentUri(relativePath: String, filename: String, context: Context): Uri {
-            val uri = context.contentResolver.insert(
-                getReadWriteImageCollection(),
-                ContentValues().apply {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-                },
+            return MediaStoreImage(
+                uri = imageDocumentFile.uri,
+                thumbnailUri = thumbnailDocumentFile?.uri ?: imageDocumentFile.uri,
             )
-            return checkNotNull(uri)
-        }
-
-        private fun getFilename(title: String, artist: String? = null, id: UUID? = null): String {
-            val basename = ((artist?.let { "$it - " } ?: "") + title).substringMax(0, 200) + "-$id"
-            return "${basename.sanitizeFilename()}.jpg"
-        }
-
-        private fun thumbnailFromBitmap(
-            bitmap: Bitmap,
-            relativePath: String,
-            fullFilename: String,
-            context: Context,
-        ): Uri {
-            val thumbnailFilename = File(fullFilename).let { "${it.nameWithoutExtension}-thumbnail.${it.extension}" }
-            val thumbnailUri = getContentUri(relativePath, thumbnailFilename, context)
-
-            context.contentResolver.openOutputStream(thumbnailUri, "w")!!.use { outputStream ->
-                val thumbnailBitmap = bitmap.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)
-                thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-            }
-
-            return thumbnailUri
         }
     }
 }

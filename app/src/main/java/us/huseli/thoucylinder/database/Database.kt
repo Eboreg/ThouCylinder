@@ -5,13 +5,13 @@ import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
+import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
@@ -46,9 +46,11 @@ import java.util.concurrent.Executors
         SpotifyArtist::class,
         SpotifyTrack::class,
         SpotifyTrackArtist::class,
+        LastFmAlbum::class,
+        LastFmTrack::class,
     ],
     exportSchema = false,
-    version = 61,
+    version = 73,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -59,20 +61,12 @@ abstract class Database : RoomDatabase() {
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
     abstract fun spotifyDao(): SpotifyDao
+    abstract fun lastFmDao(): LastFmDao
 
     companion object {
-        private val MIGRATION_46_47 = object : Migration(46, 47) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_length")
-                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_playlistItemId")
-                db.execSQL("ALTER TABLE Track DROP Track_youtubeVideo_playlistPosition")
-            }
-        }
-
         fun build(context: Context): Database {
             val builder = Room
                 .databaseBuilder(context.applicationContext, Database::class.java, "db.sqlite3")
-                .addMigrations(MIGRATION_46_47)
                 .fallbackToDestructiveMigration()
 
             if (BuildConfig.DEBUG) {

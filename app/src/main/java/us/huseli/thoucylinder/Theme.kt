@@ -1,6 +1,8 @@
 package us.huseli.thoucylinder
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,6 +38,7 @@ object ThouCylinderTheme {
         get() = LocalTypographyExtended.current
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThouCylinderTheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
@@ -105,7 +108,10 @@ fun ThouCylinderTheme(
         ),
     )
 
-    CompositionLocalProvider(LocalTypographyExtended provides typographyExtended) {
+    CompositionLocalProvider(
+        LocalTypographyExtended provides typographyExtended,
+        LocalMinimumInteractiveComponentEnforcement provides false,
+    ) {
         RetainTheme(
             useDarkTheme = useDarkTheme,
             dynamicColor = dynamicColor,

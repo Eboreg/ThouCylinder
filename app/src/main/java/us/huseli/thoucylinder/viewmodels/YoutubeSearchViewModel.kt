@@ -5,36 +5,35 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
-import kotlin.math.max
-import kotlin.math.min
 
 @HiltViewModel
 class YoutubeSearchViewModel @Inject constructor(
-    private val repos: Repositories
+    private val repos: Repositories,
 ) : AbstractAlbumListViewModel("YoutubeSearchViewModel", repos) {
-    private val _isSearchingLocalAlbums = MutableStateFlow(false)
-    private val _isSearchingYoutubeAlbums = MutableStateFlow(false)
+    private val _isSearchingAlbums = MutableStateFlow(false)
     private val _query = MutableStateFlow("")
-    private val _youtubeAlbumPojos = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
-    private val _youtubeTrackPojos = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
-    private val _selectedYoutubeAlbumPojos = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
+    private val _albumPojos = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
+    private val _trackPojos = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
 
-    val youtubeAlbumPojos = _youtubeAlbumPojos.asStateFlow()
-    val youtubeTrackPojos = _youtubeTrackPojos.asStateFlow()
-    val selectedYoutubeAlbumPojos = _selectedYoutubeAlbumPojos.asStateFlow()
-    val selectedYoutubeTrackPojos = repos.room.getSelectedTrackPojoFlow("${javaClass.simpleName}-youtube")
-    val isSearchingYoutubeTracks = repos.youtube.isSearchingTracks
-    val isSearchingYoutubeAlbums = _isSearchingYoutubeAlbums.asStateFlow()
+    val albumPojos = _albumPojos.asStateFlow()
+    val trackPojos = _trackPojos.asStateFlow()
+    val isSearchingTracks = repos.youtube.isSearchingTracks
+    val isSearchingAlbums = _isSearchingAlbums.asStateFlow()
     val query = _query.asStateFlow()
+    val selectedAlbumsWithTracks: Flow<List<AlbumWithTracksPojo>> =
+        combine(selectedAlbums, _albumPojos) { selected, pojos ->
+            pojos.filter { pojo -> selected.map { it.albumId }.contains(pojo.album.albumId) }
+        }
 
     suspend fun ensureTrackMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
         pojos.map { pojo -> pojo.copy(track = ensureTrackMetadata(pojo.track, commit = true)) }
@@ -44,59 +43,22 @@ class YoutubeSearchViewModel @Inject constructor(
             _query.value = query
 
             if (query.length >= 3) {
-                _isSearchingLocalAlbums.value = true
-                _isSearchingYoutubeAlbums.value = true
+                _isSearchingAlbums.value = true
 
                 viewModelScope.launch {
                     val pojos = repos.youtube.getAlbumSearchResult(query)
 
-                    repos.room.insertTempAlbumsWithTracks(pojos)
-                    _youtubeAlbumPojos.value = pojos
-                    _isSearchingYoutubeAlbums.value = false
+                    repos.album.insertAlbums(pojos.map { it.album })
+                    repos.track.insertTracks(pojos.flatMap { it.tracks })
+                    _albumPojos.value = pojos
+                    _isSearchingAlbums.value = false
                 }
                 viewModelScope.launch {
-                    repos.youtube.searchTracks(query).flow.map { pagingData ->
-                        pagingData.map { TrackPojo(track = it, album = null) }
-                    }.cachedIn(viewModelScope).collectLatest {
-                        _youtubeTrackPojos.value = it
+                    repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope).collectLatest { pagingData ->
+                        _trackPojos.value = pagingData.map { TrackPojo(track = it) }
                     }
                 }
             }
         }
     }
-
-    fun selectAllYoutubeAlbumPojos() {
-        _selectedYoutubeAlbumPojos.value = _youtubeAlbumPojos.value
-    }
-
-    fun selectYoutubeAlbumPojosFromLastSelected(to: AlbumWithTracksPojo) {
-        val pojos = _youtubeAlbumPojos.value
-        val lastSelected = _selectedYoutubeAlbumPojos.value.lastOrNull()
-
-        if (lastSelected != null) {
-            val thisIdx = pojos.indexOf(to)
-            val lastSelectedIdx = pojos.indexOf(lastSelected)
-            val currentIds = _selectedYoutubeAlbumPojos.value.map { it.album.albumId }
-            val selection = pojos.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1)
-
-            _selectedYoutubeAlbumPojos.value += selection.filter { !currentIds.contains(it.album.albumId) }
-        } else {
-            _selectedYoutubeAlbumPojos.value = listOf(to)
-        }
-    }
-
-    fun toggleSelectedYoutube(pojo: AlbumWithTracksPojo) {
-        if (_selectedYoutubeAlbumPojos.value.contains(pojo))
-            _selectedYoutubeAlbumPojos.value -= pojo
-        else _selectedYoutubeAlbumPojos.value += pojo
-    }
-
-    fun toggleSelectedYoutube(track: TrackPojo) =
-        repos.room.toggleTrackPojoSelected("${javaClass.simpleName}-youtube", track)
-
-    fun unselectAllYoutubeAlbumPojos() {
-        _selectedYoutubeAlbumPojos.value = emptyList()
-    }
-
-    fun unselectAllYoutubeTrackPojos() = repos.room.unselectAllTrackPojos("${javaClass.simpleName}-youtube")
 }

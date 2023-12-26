@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.sensibleFormat
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
@@ -34,6 +36,7 @@ fun TrackInfoDialog(
     albumArtist: String? = null,
     year: Int? = null,
     localPath: String? = null,
+    isOnSpotify: Boolean? = null,
     onClose: () -> Unit,
 ) {
     AlertDialog(
@@ -50,6 +53,10 @@ fun TrackInfoDialog(
                     TrackInfoTextRow(label = stringResource(R.string.album_artist), value = albumArtist)
                 TrackInfoTextRow(label = stringResource(R.string.year), value = year?.toString() ?: "-")
                 metadata?.also { metadata ->
+                    TrackInfoTextRow(
+                        label = stringResource(R.string.duration),
+                        value = metadata.duration.sensibleFormat(),
+                    )
                     TrackInfoTextRow(label = stringResource(R.string.mime_type), value = metadata.mimeType)
                     TrackInfoTextRow(
                         label = stringResource(R.string.file_size),
@@ -70,6 +77,7 @@ fun TrackInfoDialog(
                 }
                 TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = isDownloaded)
                 TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = isOnYoutube)
+                TrackInfoBooleanRow(label = stringResource(R.string.is_on_spotify), value = isOnSpotify)
                 localPath?.also {
                     Text(text = stringResource(R.string.local_file))
                     Text(text = it, style = ThouCylinderTheme.typographyExtended.listSmallTitle)
@@ -80,14 +88,17 @@ fun TrackInfoDialog(
 }
 
 @Composable
-fun TrackInfoBooleanRow(label: String, value: Boolean) {
+fun TrackInfoBooleanRow(label: String, value: Boolean?) {
     val colors = LocalBasicColors.current
     val iconModifier = Modifier.size(20.dp)
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(text = label, modifier = Modifier.weight(0.4f))
-        if (value) Icon(Icons.Rounded.CheckCircle, null, tint = colors.Green, modifier = iconModifier)
-        else Icon(Icons.Rounded.Cancel, null, tint = colors.Red, modifier = iconModifier)
+        when (value) {
+            true -> Icon(Icons.Rounded.CheckCircle, null, tint = colors.Green, modifier = iconModifier)
+            false -> Icon(Icons.Rounded.Cancel, null, tint = colors.Red, modifier = iconModifier)
+            null -> Text(text = "-", modifier = Modifier.width(20.dp), textAlign = TextAlign.Center)
+        }
     }
 }
 

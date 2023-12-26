@@ -21,25 +21,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.DiscogsMasterDropdown
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
@@ -83,8 +79,6 @@ fun EditAlbumDialog(
     onSave: (AlbumWithTracksPojo) -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val pojo by viewModel.albumPojo.collectAsStateWithLifecycle()
     var step2 by rememberSaveable { mutableStateOf(false) }
     val onCancelClick = {
         viewModel.unsetAlbum()
@@ -106,17 +100,7 @@ fun EditAlbumDialog(
     } else {
         EditAlbumDialogAlbumArt(
             modifier = modifier,
-            onSelect = { bitmap ->
-                scope.launch {
-                    pojo?.also { pojo ->
-                        val mediaStoreImage = bitmap?.let {
-                            MediaStoreImage.fromBitmap(bitmap.asAndroidBitmap(), pojo.album, context)
-                        }
-                        val tracks = pojo.tracks.map { track -> track.copy(image = mediaStoreImage) }
-                        onSave(pojo.copy(album = pojo.album.copy(albumArt = mediaStoreImage), tracks = tracks))
-                    } ?: run(onCancelClick)
-                }
-            },
+            onSelect = { bitmap -> viewModel.save(bitmap, context, onSave) },
             onCancel = onCancelClick,
             onPreviousClick = { step2 = false },
             viewModel = viewModel,

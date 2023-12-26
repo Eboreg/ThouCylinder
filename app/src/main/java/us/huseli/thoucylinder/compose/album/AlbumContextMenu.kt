@@ -3,8 +3,6 @@ package us.huseli.thoucylinder.compose.album
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Bookmark
-import androidx.compose.material.icons.sharp.PlaylistAdd
-import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
@@ -12,6 +10,8 @@ import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material.icons.sharp.PlayArrow
+import androidx.compose.material.icons.sharp.PlaylistAdd
+import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -112,6 +113,28 @@ fun AlbumContextMenu(
             )
         }
 
+        callbacks.onPlayOnYoutubeClick?.also { onPlayOnYoutubeClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play_on_youtube)) },
+                leadingIcon = { Icon(painterResource(R.drawable.youtube), null) },
+                onClick = {
+                    onPlayOnYoutubeClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
+        callbacks.onPlayOnSpotifyClick?.also { onPlayOnSpotifyClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play_on_spotify)) },
+                leadingIcon = { Icon(painterResource(R.drawable.spotify), null) },
+                onClick = {
+                    onPlayOnSpotifyClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
         if (!light && !isLocal && isInLibrary) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.remove_from_library)) },
             leadingIcon = { Icon(Icons.Sharp.Bookmark, null) },
@@ -148,7 +171,6 @@ fun AlbumContextMenuWithButton(
         modifier = modifier,
         onClick = { isMenuShown = !isMenuShown },
         content = {
-            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(buttonIconSize))
             AlbumContextMenu(
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,
@@ -158,6 +180,7 @@ fun AlbumContextMenuWithButton(
                 light = light,
                 isPartiallyDownloaded = isPartiallyDownloaded,
             )
+            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(buttonIconSize))
         }
     )
 }

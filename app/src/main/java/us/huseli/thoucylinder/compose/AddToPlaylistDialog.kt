@@ -45,10 +45,10 @@ fun AddToPlaylistDialog(
                 ItemList(
                     things = playlists,
                     cardHeight = 50.dp,
-                    onClick = { onSelect(it) },
+                    onClick = { _, pojo -> onSelect(pojo) },
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    key = { it.playlistId },
-                ) { playlist ->
+                    key = { _, pojo -> pojo.playlistId },
+                ) { _, playlist ->
                     Surface(tonalElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

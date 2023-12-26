@@ -51,13 +51,17 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         cardHeight = 60.dp,
         gap = 5.dp,
         onEmpty = { Text(stringResource(R.string.no_downloads_found), modifier = Modifier.padding(10.dp)) },
-    ) { task ->
+    ) {_, task ->
         val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
         val progress by task.downloadProgress.collectAsStateWithLifecycle()
         val state by task.state.collectAsStateWithLifecycle()
 
         LaunchedEffect(task.track) {
-            thumbnail.value = viewModel.getTrackThumbnail(task.track, task.albumPojo, context)
+            thumbnail.value = viewModel.getTrackThumbnail(
+                track = task.track,
+                albumPojo = task.albumPojo,
+                context = context,
+            )
         }
 
         Row(
@@ -113,7 +117,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     DownloadTaskState.CANCELLED, DownloadTaskState.ERROR -> Icon(
                         imageVector = Icons.Sharp.Download,
                         contentDescription = null,
-                        modifier = iconModifier.clickable { task.start() },
+                        modifier = iconModifier.clickable { task.start(context) },
                         tint = MaterialTheme.colorScheme.primaryContainer,
                     )
                     DownloadTaskState.FINISHED -> Icon(

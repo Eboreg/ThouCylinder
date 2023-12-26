@@ -4,9 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.ViewList
 import androidx.compose.material.icons.sharp.GridView
+import androidx.compose.material.icons.sharp.ViewList
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,7 +33,7 @@ fun ListSettingsRow(
     onDisplayTypeChange: (DisplayType) -> Unit,
     onListTypeChange: (ListType) -> Unit,
     modifier: Modifier = Modifier,
-    availableDisplayTypes: List<DisplayType> = DisplayType.values().toList(),
+    availableDisplayTypes: List<DisplayType> = DisplayType.entries,
     excludeListTypes: List<ListType> = emptyList(),
     tonalElevation: Dp = 2.dp,
 ) {
@@ -41,7 +42,7 @@ fun ListSettingsRow(
         tonalElevation = tonalElevation,
     ) {
         Row(
-            modifier = modifier.fillMaxWidth().padding(start = 10.dp),
+            modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceAround,
         ) {
             Row(
@@ -108,7 +109,7 @@ fun ListDisplayTypeButton(
     current: DisplayType,
     onChange: (DisplayType) -> Unit,
     modifier: Modifier = Modifier,
-    available: List<DisplayType> = DisplayType.values().toList(),
+    available: List<DisplayType> = DisplayType.entries,
 ) {
     val nextDisplayType = { dt: DisplayType ->
         available.indexOf(dt).let { index ->
@@ -118,14 +119,16 @@ fun ListDisplayTypeButton(
     }
 
     IconButton(
-        modifier = modifier,
+        modifier = modifier.size(32.dp),
         onClick = { onChange(nextDisplayType(current)) },
         enabled = available.size > 1,
         content = {
-            when (current) {
-                DisplayType.LIST -> Icon(Icons.Sharp.GridView, null)
-                DisplayType.GRID -> Icon(Icons.Sharp.ViewList, null)
+            val icon = when (current) {
+                DisplayType.LIST -> Icons.Sharp.GridView
+                DisplayType.GRID -> Icons.Sharp.ViewList
             }
+
+            Icon(icon, null, modifier = Modifier.size(24.dp))
         }
     )
 }

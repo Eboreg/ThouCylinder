@@ -15,9 +15,9 @@ import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.ThouCylinderTheme
 
 @Composable
-fun LargeIconBadge(
+inline fun LargeIconBadge(
     modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
+    crossinline content: @Composable RowScope.() -> Unit,
 ) {
     Surface(
         shape = MaterialTheme.shapes.small,

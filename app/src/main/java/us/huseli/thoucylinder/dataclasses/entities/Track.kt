@@ -2,20 +2,29 @@ package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.anggrayudi.storage.file.DocumentFileCompat
+import com.anggrayudi.storage.file.getAbsolutePath
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.sanitizeFilename
+import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
-import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
-import java.io.File
+import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.nullIfEmpty
 import java.util.UUID
 import kotlin.time.Duration
 
@@ -25,7 +34,7 @@ import kotlin.time.Duration
             entity = Album::class,
             parentColumns = ["Album_albumId"],
             childColumns = ["Track_albumId"],
-            onDelete = ForeignKey.CASCADE,
+            onDelete = ForeignKey.SET_NULL,
             onUpdate = ForeignKey.CASCADE,
         )
     ],
@@ -40,10 +49,10 @@ data class Track(
     @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
     @ColumnInfo("Track_discNumber") val discNumber: Int? = null,
     @ColumnInfo("Track_year") val year: Int? = null,
+    @ColumnInfo("Track_localUri") val localUri: Uri? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
-    @Embedded("Track_mediaStoreData_") val mediaStoreData: MediaStoreData? = null,
 ) : Comparable<Track> {
     private val albumPositionNonNull: Int
         get() = albumPosition ?: 0
@@ -58,25 +67,35 @@ data class Track(
         get() = !isDownloaded && isOnYoutube
 
     val isDownloaded: Boolean
-        get() = mediaStoreData != null
+        get() = localUri != null
 
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
     val playUri: Uri?
-        get() = mediaStoreData?.uri ?: youtubeVideo?.uri
+        get() = localUri ?: youtubeVideo?.metadata?.uri
 
-    fun generateBasename(): String {
+    val youtubeWebUrl: String?
+        get() = youtubeVideo?.let { "https://youtu.be/${it.id}" }
+
+    fun generateBasename(albumArtist: String? = null): String {
+        /** Filename will only include this.artist if it differs from albumArtist. */
         var name = ""
         if (albumPosition != null) name += "${String.format("%02d", albumPosition)} - "
-        if (artist != null) name += "$artist - "
+        if (artist != null && artist != albumArtist) name += "$artist - "
         name += title
 
         return name.sanitizeFilename()
     }
 
+    @WorkerThread
+    fun getDocumentFile(context: Context): DocumentFile? =
+        localUri?.let { DocumentFileCompat.fromUri(context, it) }
+
+    @WorkerThread
     suspend fun getFullImage(context: Context): ImageBitmap? =
-        image?.getImageBitmap(context) ?: youtubeVideo?.getImageBitmap()
+        (image?.getFullImageBitmap(context) ?: youtubeVideo?.fullImage?.url?.getBitmapByUrl())
+            ?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
 
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
@@ -107,8 +126,12 @@ data class Track(
         return distances.min()
     }
 
+    fun getLocalAbsolutePath(context: Context): String? =
+        getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()
+
     suspend fun getThumbnail(context: Context): ImageBitmap? =
-        image?.getThumbnailImageBitmap(context) ?: youtubeVideo?.getImageBitmap()
+        (image?.getThumbnailBitmap(context) ?: youtubeVideo?.thumbnail?.url?.getBitmapByUrl())
+            ?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
 
     fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
         var string = ""
@@ -128,12 +151,4 @@ data class Track(
     }
 
     override fun toString(): String = toString(showAlbumPosition = true, showArtist = true)
-}
-
-
-data class MediaStoreData(
-    val uri: Uri,
-    val relativePath: String,
-) {
-    fun getFile(context: Context): File? = context.getMediaStoreFileNullable(uri)
 }

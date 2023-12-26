@@ -1,10 +1,12 @@
 package us.huseli.thoucylinder.compose.album
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,36 +39,38 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
 
 @Composable
-fun AlbumGrid(
-    pojos: List<AbstractAlbumPojo>,
-    albumCallbacks: (AbstractAlbumPojo) -> AlbumCallbacks,
+fun <T : AbstractAlbumPojo> AlbumGrid(
+    pojos: List<T>,
+    albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     albumDownloadTasks: List<AlbumDownloadTask>,
-    onEmpty: @Composable (() -> Unit)? = null,
+    onEmpty: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val isSelected: (AbstractAlbumPojo) -> Boolean = { selectedAlbums.contains(it.album) }
+    val isSelected: (T) -> Boolean = { selectedAlbums.contains(it.album) }
 
     SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
         things = pojos,
-        onClick = { pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
-        onLongClick = { pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
+        onClick = { _, pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
+        onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
-        key = { it.album.albumId },
+        key = { _, pojo -> pojo.album.albumId },
         isSelected = isSelected,
-    ) { pojo ->
-        val (downloadProgress, downloadIsActive) = getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
+    ) { _, pojo ->
+        val (downloadProgress, downloadIsActive) =
+            getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
+        val callbacks = albumCallbacks(pojo)
 
         Box(modifier = Modifier.aspectRatio(1f)) {
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(Unit) {
+            LaunchedEffect(pojo.album.albumId) {
                 imageBitmap.value = pojo.getFullImage(context)
             }
 
@@ -94,6 +98,7 @@ fun AlbumGrid(
         }
 
         Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
@@ -101,25 +106,29 @@ fun AlbumGrid(
                     bottom = 5.dp,
                     start = 5.dp,
                 ),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.padding(5.dp).weight(1f)) {
-                val artist = pojo.album.artist?.takeIf { it.isNotBlank() && showArtist }
-                val titleLines = if (artist != null) 1 else 2
-
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceEvenly,
+            ) {
                 Text(
                     text = pojo.album.title,
-                    maxLines = titleLines,
+                    maxLines = if (pojo.album.artist != null && showArtist) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                    style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 )
-                if (artist != null) {
-                    Text(
-                        text = artist,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
-                    )
+                if (showArtist) {
+                    pojo.album.artist?.also { artist ->
+                        Text(
+                            text = artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AlbumSmallIcons(pojo = pojo)
                 }
             }
 
@@ -127,7 +136,7 @@ fun AlbumGrid(
                 isLocal = pojo.album.isLocal,
                 isInLibrary = pojo.album.isInLibrary,
                 isPartiallyDownloaded = pojo.isPartiallyDownloaded,
-                callbacks = albumCallbacks(pojo),
+                callbacks = callbacks,
             )
         }
     }

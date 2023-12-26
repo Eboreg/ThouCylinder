@@ -1,8 +1,10 @@
 package us.huseli.thoucylinder
 
+import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,16 +22,21 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
+import java.io.File
+import java.io.FileOutputStream
 import java.time.Instant
 
 enum class DownloadTaskState { CREATED, RUNNING, CANCELLED, FINISHED, ERROR }
 
+@Suppress("unused")
 enum class DownloadStatus(@StringRes val stringId: Int) {
     STARTING(R.string.starting),
     DOWNLOADING(R.string.downloading),
     CONVERTING(R.string.converting),
     MOVING(R.string.moving),
+    TAGGING(R.string.tagging),
+    SAVING(R.string.saving),
 }
 
 abstract class AbstractDownloadTask {
@@ -53,11 +60,11 @@ fun getDownloadProgress(downloadTaskState: State<AbstractDownloadTask?>): Pair<D
 class TrackDownloadTask(
     private val scope: CoroutineScope,
     val track: Track,
-    val relativePath: String,
-    val repos: Repositories,
+    private val dirDocumentFile: DocumentFile,
+    private val repos: Repositories,
     val albumPojo: AbstractAlbumPojo? = null,
-    val onError: (Throwable) -> Unit = {},
-    val onFinish: (Track) -> Unit = {},
+    private val onError: (Throwable) -> Unit = {},
+    private val onFinish: (Track) -> Unit = {},
 ) : AbstractDownloadTask() {
     private var job: Job? = null
     private val _state = MutableStateFlow(DownloadTaskState.CREATED)
@@ -71,6 +78,7 @@ class TrackDownloadTask(
     var started: Instant = Instant.now()
         private set
 
+    @Suppress("MemberVisibilityCanBePrivate")
     var updated: Instant = Instant.now()
         private set
 
@@ -82,13 +90,13 @@ class TrackDownloadTask(
         _state.value = DownloadTaskState.CANCELLED
     }
 
-    fun start() {
+    fun start(context: Context) {
         _state.value = DownloadTaskState.RUNNING
         started = Instant.now()
 
         job = scope.launch {
             try {
-                val track = run()
+                val track = run(context)
                 _state.value = DownloadTaskState.FINISHED
                 onFinish(track)
             } catch (e: CancellationException) {
@@ -102,25 +110,47 @@ class TrackDownloadTask(
         }
     }
 
-    private suspend fun run(): Track {
+    private suspend fun run(context: Context): Track {
+        val youtubeMetadata = repos.youtube.getBestMetadata(track)
+            ?: throw Error("Could not get Youtube metadata for $track")
+        val filename = "${track.generateBasename(albumPojo?.album?.artist)}.${youtubeMetadata.fileExtension}"
+        val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
+
         setProgress(0.0)
-
-        val tempFile = repos.youtube.downloadVideo(
-            video = track.youtubeVideo!!,
-            progressCallback = { setProgress(it * 0.9) },
-            statusCallback = { setStatus(it) },
-        )
-        val downloadedTrack = repos.mediaStore.moveTaggedTrackToMediaStore(
-            track = track,
+        setStatus(DownloadStatus.DOWNLOADING)
+        repos.youtube.downloadVideo(
+            url = youtubeMetadata.url,
             tempFile = tempFile,
-            relativePath = relativePath,
-            albumPojo = albumPojo,
-            progressCallback = { setProgress((it * 0.1) + 0.9) },
-            statusCallback = { setStatus(it) },
+            progressCallback = { setProgress(it * 0.7) },
         )
 
+        setStatus(DownloadStatus.TAGGING)
+        repos.localMedia.tagTrack(track = track, documentFile = DocumentFile.fromFile(tempFile), albumPojo = albumPojo)
+        setProgress(0.8)
+
+        setStatus(DownloadStatus.MOVING)
+        dirDocumentFile.findFile(filename)?.delete()
+        val documentFile = dirDocumentFile.createFile(youtubeMetadata.mimeType, filename)
+            ?: throw Error("DocumentFile.fromTreeUri() returned null")
+
+        context.contentResolver.openFileDescriptor(documentFile.uri, "w")?.use {
+            FileOutputStream(it.fileDescriptor).use { outputStream ->
+                outputStream.write(tempFile.readBytes())
+            }
+            setProgress(0.9)
+        }
+
+        setStatus(DownloadStatus.SAVING)
+        val downloadedTrack = track.copy(
+            isInLibrary = true,
+            albumId = albumPojo?.album?.albumId,
+            metadata = tempFile.extractTrackMetadata(),
+            localUri = documentFile.uri,
+        )
+        repos.track.updateTrack(downloadedTrack)
+        tempFile.delete()
         setProgress(1.0)
-        repos.room.updateTrack(downloadedTrack.copy(isInLibrary = true))
+
         return downloadedTrack
     }
 

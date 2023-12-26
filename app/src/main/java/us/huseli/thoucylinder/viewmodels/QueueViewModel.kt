@@ -13,9 +13,11 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.repositories.PlayerRepository
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.Repositories
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -36,7 +38,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     val selectedQueueTracks: Flow<List<QueueTrackPojo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
         selected.filter { queue.contains(it) }
     }
-    val trackDownloadTasks = repos.trackDownload.tasks
+    val trackDownloadTasks = repos.download.tasks
 
     init {
         viewModelScope.launch {
@@ -50,6 +52,8 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
             context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
         )
     }
+
+    suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum? = repos.spotify.getSpotifyAlbum(albumId)
 
     fun onMoveTrack(from: Int, to: Int) {
         /**
@@ -75,12 +79,10 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     fun seekTo(positionMs: Long) = repos.player.seekTo(positionMs)
 
     fun selectQueueTracksFromLastSelected(to: QueueTrackPojo) = viewModelScope.launch {
-        val lastSelected = _selectedQueueTracks.value.lastOrNull()
+        val lastSelectedIdx = queue.value.indexOf(_selectedQueueTracks.value.lastOrNull())
+        val thisIdx = queue.value.indexOf(to)
 
-        if (lastSelected != null) {
-            val thisIdx = queue.value.indexOf(to)
-            val lastSelectedIdx = queue.value.indexOf(lastSelected)
-
+        if (lastSelectedIdx > -1 && thisIdx > -1) {
             _selectedQueueTracks.value +=
                 queue.value.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1)
         } else {

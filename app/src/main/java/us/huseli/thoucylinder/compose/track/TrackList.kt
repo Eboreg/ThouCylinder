@@ -33,7 +33,7 @@ fun <T : AbstractTrackPojo> TrackList(
     listState: LazyListState = rememberLazyListState(),
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    trackCallbacks: (T) -> TrackCallbacks,
+    trackCallbacks: (Int, T) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
     onEmpty: (@Composable () -> Unit)? = null,
@@ -64,7 +64,11 @@ fun <T : AbstractTrackPojo> TrackList(
                         val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
                         LaunchedEffect(pojo.track.trackId) {
-                            thumbnail.value = viewModel.getTrackThumbnail(pojo.track, pojo.album, context)
+                            thumbnail.value = viewModel.getTrackThumbnail(
+                                track = pojo.track,
+                                album = pojo.album,
+                                context = context,
+                            )
                             viewModel.ensureTrackMetadata(pojo.track, commit = true)
                         }
 
@@ -76,7 +80,7 @@ fun <T : AbstractTrackPojo> TrackList(
                             thumbnail = thumbnail.value,
                             duration = pojo.track.metadata?.duration,
                             artist = if (showArtist) pojo.artist else null,
-                            callbacks = trackCallbacks(pojo),
+                            callbacks = trackCallbacks(index, pojo),
                             isSelected = selectedTrackPojos.contains(pojo),
                         )
                     }

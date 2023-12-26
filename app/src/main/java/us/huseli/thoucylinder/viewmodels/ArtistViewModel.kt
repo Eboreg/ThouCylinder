@@ -11,17 +11,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
+import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
 class ArtistViewModel @Inject constructor(
-    repos: Repositories,
+    private val repos: Repositories,
     savedStateHandle: SavedStateHandle,
 ) : AbstractAlbumListViewModel("ArtistViewModel", repos) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)
@@ -34,18 +33,14 @@ class ArtistViewModel @Inject constructor(
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
     val trackPojos: Flow<PagingData<TrackPojo>> =
-        repos.room.pageTrackPojosByArtist(artist).flow.cachedIn(viewModelScope)
+        repos.track.pageTrackPojosByArtist(artist).flow.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch {
-            repos.room.flowAlbumPojosByArtist(artist)
+            repos.album.flowAlbumPojosByArtist(artist)
                 .distinctUntilChanged()
                 .collect { pojos -> _albumPojos.value = pojos }
         }
-    }
-
-    fun selectAlbumsFromLastSelected(to: Album) = viewModelScope.launch {
-        selectAlbumsFromLastSelected(albums = _albumPojos.value.map { it.album }, to = to)
     }
 
     fun setDisplayType(value: DisplayType) {

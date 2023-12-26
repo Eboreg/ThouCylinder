@@ -67,6 +67,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.track.TrackContextMenu
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.getAverageColor
 import us.huseli.thoucylinder.repositories.PlayerRepository
@@ -87,22 +88,27 @@ fun BoxWithConstraintsScope.ModalCover(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val animationSpec = tween<Dp>(150)
+    val baseBackgroundColor = BottomAppBarDefaults.containerColor
     val playbackState by viewModel.playerPlaybackState.collectAsStateWithLifecycle()
+
     val canGotoNext by viewModel.playerCanGotoNext.collectAsStateWithLifecycle()
     val canPlay by viewModel.playerCanPlay.collectAsStateWithLifecycle()
-    val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-    val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+    val context = LocalContext.current
     val currentPositionMs by viewModel.playerCurrentPositionMs.collectAsStateWithLifecycle()
+    val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+    val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
     val isPlaying = playbackState == PlayerRepository.PlaybackState.PLAYING
+    val thumbnailPadding by animateDpAsState(if (isExpanded) 60.dp else 0.dp, animationSpec)
+    val tonalElevation by animateDpAsState(if (isExpanded) 0.dp else 3.dp, animationSpec)
+    val topRowHeight by animateDpAsState(if (isExpanded) 60.dp else 0.dp, animationSpec)
 
+    var backgroundColor by remember { mutableStateOf(baseBackgroundColor) }
+    var isCollapsing by rememberSaveable { mutableStateOf(false) }
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var isExpanding by rememberSaveable { mutableStateOf(false) }
-    var isCollapsing by rememberSaveable { mutableStateOf(false) }
-    val baseBackgroundColor = BottomAppBarDefaults.containerColor
-    var backgroundColor by remember { mutableStateOf(baseBackgroundColor) }
+    var spotifyAlbum by rememberSaveable { mutableStateOf<SpotifyAlbum?>(null) }
 
-    val animationSpec = tween<Dp>(150)
     val boxHeight by animateDpAsState(
         targetValue = if (isExpanded) maxHeight else 80.dp,
         animationSpec = animationSpec,
@@ -111,9 +117,6 @@ fun BoxWithConstraintsScope.ModalCover(
             isCollapsing = false
         },
     )
-    val thumbnailPadding by animateDpAsState(if (isExpanded) 60.dp else 5.dp, animationSpec)
-    val tonalElevation by animateDpAsState(if (isExpanded) 0.dp else 3.dp, animationSpec)
-    val topRowHeight by animateDpAsState(if (isExpanded) 50.dp else 0.dp, animationSpec)
 
     val expand = {
         isExpanding = true
@@ -125,8 +128,12 @@ fun BoxWithConstraintsScope.ModalCover(
         onCollapse()
     }
 
-    LaunchedEffect(pojo) {
-        imageBitmap.value = pojo.getFullImage(context)
+    LaunchedEffect(pojo.album) {
+        spotifyAlbum = pojo.spotifyAlbum ?: pojo.album?.let { viewModel.getSpotifyAlbum(it.albumId) }
+    }
+
+    LaunchedEffect(pojo, spotifyAlbum) {
+        imageBitmap.value = pojo.getFullImage(context) ?: spotifyAlbum?.getFullImage(context)
     }
 
     LaunchedEffect(imageBitmap.value) {
@@ -153,12 +160,12 @@ fun BoxWithConstraintsScope.ModalCover(
                 onClick = expand,
             )
     ) {
-        Column {
+        Column(modifier = Modifier.padding(top = 5.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(topRowHeight)
-                    .padding(top = 10.dp),
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -180,9 +187,12 @@ fun BoxWithConstraintsScope.ModalCover(
                 }
             }
 
-            Column(modifier = Modifier.weight(1f).padding(vertical = 5.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp).padding(bottom = 5.dp)) {
                 // Row for thumbnail and collapsed content:
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Thumbnail(
                         modifier = Modifier.padding(horizontal = thumbnailPadding),
                         image = imageBitmap.value,
@@ -191,7 +201,7 @@ fun BoxWithConstraintsScope.ModalCover(
                     )
 
                     if (!isExpanded || isExpanding || isCollapsing) {
-                        Column(modifier = Modifier.weight(1f).padding(start = 5.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = pojo.track.title,
                                 maxLines = 1,
@@ -219,9 +229,11 @@ fun BoxWithConstraintsScope.ModalCover(
                                     Icon(
                                         if (isPlaying) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
                                         if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
+                                        modifier = Modifier.size(28.dp),
                                     )
                                 },
                                 enabled = canPlay,
+                                modifier = Modifier.size(48.dp),
                             )
                             IconButton(
                                 onClick = { viewModel.skipToNext() },
@@ -229,9 +241,11 @@ fun BoxWithConstraintsScope.ModalCover(
                                     Icon(
                                         imageVector = Icons.Sharp.SkipNext,
                                         contentDescription = stringResource(R.string.next),
+                                        modifier = Modifier.size(28.dp),
                                     )
                                 },
                                 enabled = canGotoNext,
+                                modifier = Modifier.size(48.dp),
                             )
                         }
                     }
@@ -313,7 +327,7 @@ fun ModalCoverExpandedContent(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
                 text = pojo.track.title,

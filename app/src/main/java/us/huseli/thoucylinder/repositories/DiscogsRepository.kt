@@ -5,10 +5,12 @@ import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.BuildConfig
+import us.huseli.thoucylinder.Constants.DISCOGS_API_BASE_URL
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMaster
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResults
 import us.huseli.thoucylinder.getApiUserAgent
+import us.huseli.thoucylinder.getString
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,12 +42,15 @@ class DiscogsRepository @Inject constructor() {
                 .map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }
                 .joinToString("&")
         }
-        val url = "https://api.discogs.com/${path.trimStart('/')}?$paramString"
+        val url = "$DISCOGS_API_BASE_URL/${path.trimStart('/')}?$paramString"
         val headers = mapOf(
             "User-Agent" to getApiUserAgent(),
             "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",
         )
 
-        return Request(url, headers).getString().replace(Regex("^data\\((.*)\\)$"), "$1")
+        return Request.get(url = url, headers = headers)
+            .connect()
+            .getString()
+            .replace(Regex("^data\\((.*)\\)$"), "$1")
     }
 }

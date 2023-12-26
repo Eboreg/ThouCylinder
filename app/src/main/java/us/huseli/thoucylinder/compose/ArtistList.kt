@@ -3,62 +3,64 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
-import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
-import us.huseli.retaintheme.toBitmap
-import java.io.File
+import us.huseli.thoucylinder.viewmodels.ArtistListViewModel
 
 @Composable
 fun ArtistList(
-    artists: List<ArtistPojo>,
-    images: Map<String, File>,
-    onEmpty: (@Composable () -> Unit)? = null,
+    isImporting: Boolean,
+    viewModel: ArtistListViewModel = hiltViewModel(),
     onArtistClick: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     ItemList(
-        things = artists,
-        onClick = onArtistClick?.let { { onArtistClick(it.name) } },
-        key = { it.name },
-        onEmpty = onEmpty,
-    ) { artist ->
-        val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-
-        LaunchedEffect(Unit) {
-            imageBitmap.value = images[artist.name.lowercase()]?.toBitmap()?.asImageBitmap()
-                ?: artist.firstAlbumArtThumbnail?.let {
-                    context.getMediaStoreFileNullable(it)?.toBitmap()?.asImageBitmap()
-                }
-        }
+        things = artistPojos,
+        onClick = onArtistClick?.let { { _, artist -> onArtistClick(artist.name) } },
+        key = { _, artist -> artist.name },
+        onEmpty = {
+            Text(
+                stringResource(
+                    if (isImporting) R.string.importing_local_artists
+                    else if (isLoading) R.string.loading_artists
+                    else R.string.no_artists_found
+                ),
+                modifier = Modifier.padding(10.dp),
+            )
+        },
+    ) { _, artist ->
+        val imageBitmap by viewModel.flowArtistImage(artist, context).collectAsStateWithLifecycle()
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
-                image = imageBitmap.value,
+                image = imageBitmap,
                 shape = MaterialTheme.shapes.extraSmall,
                 placeholderIcon = Icons.Sharp.InterpreterMode,
             )
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = artist.name,
                     maxLines = 2,

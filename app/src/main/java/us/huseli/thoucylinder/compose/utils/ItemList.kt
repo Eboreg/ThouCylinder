@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,13 +29,13 @@ fun <T> ItemList(
     things: List<T>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
-    cardHeight: Dp? = 80.dp,
+    cardHeight: Dp? = 70.dp,
     gap: Dp = 8.dp,
-    key: ((item: T) -> Any)? = null,
+    key: ((index: Int, item: T) -> Any)? = null,
     border: BorderStroke? = null,
     isSelected: (T) -> Boolean = { false },
-    onClick: ((T) -> Unit)? = null,
-    onLongClick: ((T) -> Unit)? = null,
+    onClick: ((Int, T) -> Unit)? = null,
+    onLongClick: ((Int, T) -> Unit)? = null,
     cardModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     padding: PaddingValues = PaddingValues(horizontal = 10.dp),
@@ -44,7 +44,7 @@ fun <T> ItemList(
     leadingItem: (@Composable LazyItemScope.() -> Unit)? = null,
     trailingItem: (@Composable LazyItemScope.() -> Unit)? = null,
     stickyHeaderContent: (@Composable LazyItemScope.() -> Unit)? = null,
-    cardContent: @Composable ColumnScope.(T) -> Unit,
+    cardContent: @Composable ColumnScope.(Int, T) -> Unit,
 ) {
     if (things.isEmpty() && onEmpty != null) onEmpty()
 
@@ -61,7 +61,8 @@ fun <T> ItemList(
         ) {
             leadingItem?.also { item { it() } }
             stickyHeaderContent?.also { stickyHeader { it() } }
-            items(things, key = key) { thing ->
+
+            itemsIndexed(things, key = key) { index, thing ->
                 val containerColor =
                     if (isSelected(thing)) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surface
@@ -74,13 +75,14 @@ fun <T> ItemList(
                         .let { if (cardHeight != null) it.height(cardHeight) else it }
                         .let {
                             if (onClick != null || onLongClick != null) it.combinedClickable(
-                                onClick = { onClick?.invoke(thing) },
-                                onLongClick = onLongClick?.let { { it(thing) } },
+                                onClick = { onClick?.invoke(index, thing) },
+                                onLongClick = onLongClick?.let { { it(index, thing) } },
                             ) else it
                         },
-                    content = { cardContent(thing) },
+                    content = { cardContent(index, thing) },
                 )
             }
+
             trailingItem?.also { item { it() } }
         }
     }

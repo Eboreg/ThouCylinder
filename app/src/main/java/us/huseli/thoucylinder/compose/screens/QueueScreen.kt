@@ -30,11 +30,11 @@ import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.compose.ListWithNumericBar
-import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.track.TrackListRow
+import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
@@ -89,7 +89,11 @@ fun QueueScreen(
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
                     LaunchedEffect(pojo.track.trackId) {
-                        thumbnail.value = viewModel.getTrackThumbnail(pojo.track, pojo.album, context)
+                        thumbnail.value = viewModel.getTrackThumbnail(
+                            track = pojo.track,
+                            album = pojo.album,
+                            context = context,
+                        )
                         viewModel.ensureTrackMetadata(pojo.track, commit = true)
                     }
 
@@ -114,8 +118,7 @@ fun QueueScreen(
                                 callbacks = TrackCallbacks.fromAppCallbacks(
                                     pojo = pojo,
                                     appCallbacks = appCallbacks,
-                                    onAlbumClick = pojo.album?.albumId?.let { { appCallbacks.onAlbumClick(it) } },
-                                    onArtistClick = pojo.artist?.let { { appCallbacks.onArtistClick(it) } },
+                                    context = context,
                                     onTrackClick = {
                                         if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
                                         else viewModel.skipTo(pojoIdx)

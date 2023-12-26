@@ -16,10 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.compose.SmallOutlinedButton
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
+import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.nullIfBlank
 
 @Composable
 fun EditAlbumTrackSection(
@@ -59,7 +60,7 @@ fun EditAlbumTrackSection(
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         OutlinedTextField(
                             value = artist ?: "",
-                            onValueChange = { value -> artist = value.takeIf { it.isNotBlank() } },
+                            onValueChange = { value -> artist = value.nullIfBlank() },
                             label = { OutlinedTextFieldLabel(text = stringResource(R.string.artist)) },
                             singleLine = true,
                             modifier = Modifier.weight(0.7f).height(60.dp),
@@ -69,13 +70,7 @@ fun EditAlbumTrackSection(
                         )
                         OutlinedTextField(
                             value = year?.toString() ?: "",
-                            onValueChange = {
-                                year = try {
-                                    it.toInt()
-                                } catch (_: NumberFormatException) {
-                                    null
-                                }
-                            },
+                            onValueChange = { year = it.toIntOrNull() },
                             label = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
                             singleLine = true,
                             modifier = Modifier.weight(0.3f).height(60.dp),

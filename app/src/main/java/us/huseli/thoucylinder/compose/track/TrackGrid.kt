@@ -59,7 +59,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    trackCallbacks: (T) -> TrackCallbacks,
+    trackCallbacks: (Int, T) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
@@ -79,13 +79,17 @@ fun <T : AbstractTrackPojo> TrackGrid(
             trackPojos[index]?.also { pojo ->
                 val track = pojo.track
                 val isSelected = selectedTrackPojos.contains(pojo)
-                val (downloadProgress, downloadIsActive) = getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
+                val (downloadProgress, downloadIsActive) =
+                    getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
+                val callbacks = trackCallbacks(index, pojo)
+
+                callbacks.onEach?.invoke()
 
                 OutlinedCard(
                     shape = MaterialTheme.shapes.extraSmall,
                     modifier = Modifier.combinedClickable(
-                        onClick = { trackCallbacks(pojo).onTrackClick?.invoke() },
-                        onLongClick = { trackCallbacks(pojo).onLongClick?.invoke() },
+                        onClick = { callbacks.onTrackClick?.invoke() },
+                        onLongClick = { callbacks.onLongClick?.invoke() },
                     ),
                     border = CardDefaults.outlinedCardBorder()
                         .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
@@ -93,7 +97,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
                     Box(modifier = Modifier.aspectRatio(1f)) {
                         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
-                        LaunchedEffect(Unit) {
+                        LaunchedEffect(track.trackId) {
                             imageBitmap.value = pojo.getFullImage(context)
                             viewModel.ensureTrackMetadata(track, commit = true)
                         }
@@ -154,7 +158,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
 
                         TrackContextMenuWithButton(
                             isDownloadable = track.isDownloadable,
-                            callbacks = trackCallbacks(pojo),
+                            callbacks = callbacks,
                         )
                     }
 

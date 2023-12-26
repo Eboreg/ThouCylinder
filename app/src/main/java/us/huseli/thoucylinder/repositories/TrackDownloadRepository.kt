@@ -1,5 +1,8 @@
 package us.huseli.thoucylinder.repositories
 
+import android.content.Context
+import androidx.documentfile.provider.DocumentFile
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -7,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.DownloadTaskState
+import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -14,7 +18,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class TrackDownloadRepository @Inject constructor(private val settingsRepo: SettingsRepository) {
+class TrackDownloadRepository @Inject constructor(@ApplicationContext private val context: Context) {
     private val _tasks = MutableStateFlow<List<TrackDownloadTask>>(emptyList())
     private val _runningTasks = MutableStateFlow<List<TrackDownloadTask>>(emptyList())
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -26,7 +30,7 @@ class TrackDownloadRepository @Inject constructor(private val settingsRepo: Sett
         scope.launch {
             _runningTasks.collect { runningTasks ->
                 if (runningTasks.size < maxConcurrent) {
-                    _tasks.value.find { it.state.value == DownloadTaskState.CREATED }?.start()
+                    _tasks.value.find { it.state.value == DownloadTaskState.CREATED }?.start(context)
                 }
             }
         }
@@ -35,25 +39,23 @@ class TrackDownloadRepository @Inject constructor(private val settingsRepo: Sett
     fun downloadTrack(
         track: Track,
         repos: Repositories,
+        dirDocumentFile: DocumentFile,
         albumPojo: AbstractAlbumPojo? = null,
         onError: (Throwable) -> Unit = {},
         onFinish: (Track) -> Unit = {},
     ): TrackDownloadTask {
-        val relativePath =
-            albumPojo?.album?.getSubdir()?.let { "${settingsRepo.musicDownloadDirectory.value}/$it" }
-                ?: settingsRepo.musicDownloadDirectory.value
         val task = TrackDownloadTask(
             scope = scope,
             track = track,
             albumPojo = albumPojo,
             repos = repos,
-            relativePath = relativePath,
             onError = onError,
             onFinish = onFinish,
+            dirDocumentFile = dirDocumentFile,
         )
 
         _tasks.value += task
-        if (_runningTasks.value.size < maxConcurrent) task.start()
+        if (_runningTasks.value.size < maxConcurrent) task.start(context)
         scope.launch {
             task.state.collect { state ->
                 if (state == DownloadTaskState.RUNNING) _runningTasks.value += task

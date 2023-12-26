@@ -1,14 +1,19 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -17,7 +22,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.thoucylinder.AddDestination
 import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.BuildConfig
@@ -25,12 +32,10 @@ import us.huseli.thoucylinder.DebugDestination
 import us.huseli.thoucylinder.DownloadsDestination
 import us.huseli.thoucylinder.ImportDestination
 import us.huseli.thoucylinder.LibraryDestination
+import us.huseli.thoucylinder.MenuItemId
 import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.MenuItemId
-import us.huseli.thoucylinder.AddDestination
-import us.huseli.thoucylinder.Selection
 import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
 import us.huseli.thoucylinder.compose.album.EditAlbumDialog
@@ -40,20 +45,22 @@ import us.huseli.thoucylinder.compose.screens.DebugScreen
 import us.huseli.thoucylinder.compose.screens.DownloadsScreen
 import us.huseli.thoucylinder.compose.screens.ImportScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
+import us.huseli.thoucylinder.compose.screens.LocalMusicDownloadUriDialog
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
-import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.compose.screens.SettingsScreen
+import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
-import java.io.File
 import java.util.UUID
 
 @Composable
@@ -63,9 +70,14 @@ fun App(
     viewModel: AppViewModel = hiltViewModel(),
     youtubeSearchViewModel: YoutubeSearchViewModel = hiltViewModel(),
     queueViewModel: QueueViewModel = hiltViewModel(),
+    startDestination: String = LibraryDestination.route,
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val onBackPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val context = LocalContext.current
     val currentPojo by queueViewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
+    val musicDownloadUri by viewModel.musicDownloadUri.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
@@ -81,6 +93,28 @@ fun App(
     LaunchedEffect(Unit) {
         viewModel.doStartupTasks(context)
     }
+
+    /** Weird onBackPressedCallback shit begin */
+    val onBackPressedCallback = remember {
+        object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                isCoverExpanded = false
+            }
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner, onBackPressedDispatcher) {
+        onBackPressedDispatcher?.let { dispatcher ->
+            navController.setLifecycleOwner(lifecycleOwner)
+            navController.setOnBackPressedDispatcher(dispatcher)
+            dispatcher.addCallback(lifecycleOwner, onBackPressedCallback)
+        }
+    }
+
+    LaunchedEffect(isCoverExpanded) {
+        onBackPressedCallback.isEnabled = isCoverExpanded
+    }
+    /** End of weird onBackPressedCallback shit */
 
     val onPlaylistClick = { playlistId: UUID ->
         navController.navigate(PlaylistDestination.route(playlistId))
@@ -101,7 +135,7 @@ fun App(
             navController.navigate(ArtistDestination.route(artist))
             isCoverExpanded = false
         },
-        onBackClick = { navController.popBackStack() },
+        onBackClick = { if (!navController.popBackStack()) navController.navigate(LibraryDestination.route) },
         onCancelAlbumDownloadClick = { viewModel.cancelAlbumDownload(it) },
         onCreatePlaylistClick = { isCreatePlaylistDialogOpen = true },
         onDeletePlaylistClick = { pojo ->
@@ -128,13 +162,13 @@ fun App(
         onShowTrackInfoClick = { pojo -> infoDialogTrackPojo = pojo },
         onDeleteAlbumClick = { album -> deleteAlbumDialogAlbum = album },
         onRemoveAlbumFromLibraryClick = { album ->
-            viewModel.removeAlbumFromLibrary(album)
+            viewModel.markAlbumForDeletion(album)
             SnackbarEngine.addInfo(
                 message = context.getString(R.string.removed_album_from_library, album.title),
                 actionLabel = context.getString(R.string.undo),
-                onActionPerformed = { viewModel.undoRemoveAlbumFromLibrary(album) },
+                onActionPerformed = { viewModel.unmarkAlbumForDeletion(album) },
             )
-        }
+        },
     )
 
     val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
@@ -147,12 +181,12 @@ fun App(
 
     infoDialogTrackPojo?.also { pojo ->
         var album by rememberSaveable { mutableStateOf(pojo.album) }
-        var localFile by rememberSaveable { mutableStateOf<File?>(null) }
+        var localPath by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.ensureTrackMetadata(pojo.track, commit = true)
             album = pojo.album ?: viewModel.getTrackAlbum(pojo.track)
-            localFile = pojo.track.mediaStoreData?.getFile(context)
+            localPath = pojo.track.getLocalAbsolutePath(context)
         }
 
         TrackInfoDialog(
@@ -162,8 +196,9 @@ fun App(
             albumTitle = album?.title,
             albumArtist = album?.artist,
             year = pojo.track.year ?: album?.year,
-            localPath = localFile?.path,
+            localPath = localPath,
             onClose = { infoDialogTrackPojo = null },
+            isOnSpotify = pojo.isOnSpotify,
         )
     }
 
@@ -173,11 +208,11 @@ fun App(
 
             AddToPlaylistDialog(
                 playlists = playlists,
-                onSelect = { playlist ->
-                    viewModel.addSelectionToPlaylist(selection, playlist)
+                onSelect = { playlistPojo ->
+                    viewModel.addSelectionToPlaylist(selection, playlistPojo)
                     isAddToPlaylistDialogOpen = false
                     addToPlaylistSelection = null
-                    displayAddedToPlaylistMessage(playlist.playlistId)
+                    displayAddedToPlaylistMessage(playlistPojo.playlistId)
                 },
                 onCancel = {
                     isAddToPlaylistDialogOpen = false
@@ -194,59 +229,58 @@ fun App(
     if (isCreatePlaylistDialogOpen) {
         CreatePlaylistDialog(
             onSave = { name ->
-                val playlist = Playlist(name = name)
+                val playlistPojo = PlaylistPojo(name = name)
 
                 isCreatePlaylistDialogOpen = false
-                viewModel.createPlaylist(playlist, addToPlaylistSelection)
+                viewModel.createPlaylist(playlistPojo, addToPlaylistSelection)
 
                 if (addToPlaylistSelection != null) {
-                    displayAddedToPlaylistMessage(playlist.playlistId)
+                    displayAddedToPlaylistMessage(playlistPojo.playlistId)
                     addToPlaylistSelection = null
-                } else appCallbacks.onPlaylistClick(playlist.playlistId)
+                } else appCallbacks.onPlaylistClick(playlistPojo.playlistId)
             },
             onCancel = { isCreatePlaylistDialogOpen = false },
         )
     }
 
     addDownloadedAlbumDialogAlbum?.also { album ->
-        val onFinish = { album1: Album, hasErrors: Boolean ->
-            SnackbarEngine.addInfo(
-                message = if (hasErrors)
-                    context.getString(R.string.album_was_downloaded_with_errors, album1)
-                else context.getString(R.string.album_was_downloaded, album1),
-                actionLabel = context.getString(R.string.go_to_album),
-                onActionPerformed = { appCallbacks.onAlbumClick(album1.albumId) },
-            )
-        }
-
-        AskMusicDownloadPermissions()
-
-        if (!album.isInLibrary) {
-            EditAlbumDialog(
-                initialAlbum = album,
-                title = stringResource(R.string.add_album_to_library),
-                onCancel = { addDownloadedAlbumDialogAlbum = null },
-                onSave = { pojo ->
-                    addDownloadedAlbumDialogAlbum = null
-                    viewModel.saveAlbumWithTracks(pojo)
-                    viewModel.downloadAndSaveAlbumPojo(
-                        pojo = pojo,
-                        onTrackError = { track, throwable ->
-                            SnackbarEngine.addError("Error on downloading $track: $throwable")
-                        },
-                        onFinish = { hasErrors -> onFinish(pojo.album, hasErrors) },
-                    )
-                },
-            )
-        } else {
-            addDownloadedAlbumDialogAlbum = null
-            viewModel.downloadAndSaveAlbum(
-                album = album,
+        fun download(pojo: AlbumWithTracksPojo) {
+            viewModel.downloadAlbum(
+                pojo = pojo,
+                context = context,
                 onTrackError = { track, throwable ->
                     SnackbarEngine.addError("Error on downloading $track: $throwable")
                 },
-                onFinish = { hasErrors -> onFinish(album, hasErrors) },
+                onFinish = { hasErrors ->
+                    SnackbarEngine.addInfo(
+                        message = if (hasErrors)
+                            context.getString(R.string.album_was_downloaded_with_errors, pojo.album)
+                        else context.getString(R.string.album_was_downloaded, pojo.album),
+                        actionLabel = context.getString(R.string.go_to_album),
+                        onActionPerformed = { appCallbacks.onAlbumClick(pojo.album.albumId) },
+                    )
+                },
             )
+        }
+
+        if (musicDownloadUri == null) {
+            LocalMusicDownloadUriDialog(onSave = { viewModel.setMusicDownloadUri(it) })
+        } else {
+            if (!album.isInLibrary) {
+                EditAlbumDialog(
+                    initialAlbum = album,
+                    title = stringResource(R.string.add_album_to_library),
+                    onCancel = { addDownloadedAlbumDialogAlbum = null },
+                    onSave = { pojo ->
+                        addDownloadedAlbumDialogAlbum = null
+                        viewModel.saveAlbumWithTracks(pojo)
+                        download(pojo)
+                    },
+                )
+            } else {
+                addDownloadedAlbumDialogAlbum = null
+                scope.launch { viewModel.getAlbumWithTracks(album.albumId)?.also { pojo -> download(pojo) } }
+            }
         }
     }
 
@@ -281,21 +315,32 @@ fun App(
             onCancel = { deleteAlbumDialogAlbum = null },
             onDeleteAlbumAndFilesClick = {
                 deleteAlbumDialogAlbum = null
-                viewModel.deleteAlbumAndFiles(album)
+                viewModel.deleteAlbumAndFiles(album) {
+                    SnackbarEngine.addInfo(context.getString(R.string.the_album_was_deleted))
+                }
             },
             onDeleteFilesClick = {
                 deleteAlbumDialogAlbum = null
-                viewModel.deleteTrackFiles(album)
+                viewModel.deleteLocalFiles(album) {
+                    SnackbarEngine.addInfo(context.getString(R.string.the_albums_local_files_were_deleted))
+                }
             },
         )
     }
 
-    AskMusicImportPermissions(viewModel)
+    AskMusicImportPermissions()
 
-    ThouCylinderScaffold(modifier = modifier, activeMenuItemId = activeMenuItemId, navController = navController) {
+    ThouCylinderScaffold(
+        modifier = modifier,
+        activeMenuItemId = activeMenuItemId,
+        onNavigate = { route ->
+            isCoverExpanded = false
+            navController.navigate(route)
+        },
+    ) {
         NavHost(
             navController = navController,
-            startDestination = LibraryDestination.route,
+            startDestination = startDestination,
             modifier = Modifier
                 .matchParentSize()
                 .padding(bottom = if (currentPojo != null) 80.dp else 0.dp)
@@ -332,7 +377,10 @@ fun App(
 
             composable(route = ImportDestination.route) {
                 activeMenuItemId = ImportDestination.menuItemId
-                ImportScreen()
+                ImportScreen(
+                    onGotoLibraryClick = { navController.navigate(LibraryDestination.route) },
+                    onGotoSettingsClick = { navController.navigate(SettingsDestination.route) },
+                )
             }
 
             if (BuildConfig.DEBUG) {
@@ -360,13 +408,11 @@ fun App(
                 isExpanded = isCoverExpanded,
                 onExpand = { isCoverExpanded = true },
                 onCollapse = { isCoverExpanded = false },
-                trackCallbacks = TrackCallbacks(
-                    onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(track = pojo.track)) },
-                    onDownloadClick = { appCallbacks.onDownloadTrackClick(pojo.track) },
-                    onShowInfoClick = { appCallbacks.onShowTrackInfoClick(pojo) },
-                    onAlbumClick = pojo.album?.albumId?.let { { appCallbacks.onAlbumClick(it) } },
-                    onArtistClick = pojo.artist?.let { { appCallbacks.onArtistClick(it) } },
-                ),
+                trackCallbacks = TrackCallbacks.fromAppCallbacks(
+                    appCallbacks = appCallbacks,
+                    pojo = pojo,
+                    context = context,
+                )
             )
         }
     }

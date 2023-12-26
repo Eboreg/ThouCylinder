@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.Repositories
 
 abstract class AbstractAlbumListViewModel(
     selectionKey: String,
@@ -18,7 +18,7 @@ abstract class AbstractAlbumListViewModel(
 
     fun enqueueAlbums(albums: List<Album>, context: Context) = viewModelScope.launch {
         val pojos =
-            getQueueTrackPojos(repos.room.listAlbumTrackPojos(albums.map { it.albumId }), repos.player.nextItemIndex)
+            getQueueTrackPojos(repos.album.listAlbumTrackPojos(albums.map { it.albumId }), repos.player.nextItemIndex)
 
         if (pojos.isNotEmpty()) {
             repos.player.insertNext(pojos)
@@ -32,7 +32,7 @@ abstract class AbstractAlbumListViewModel(
 
     fun playAlbums(albums: List<Album>) = viewModelScope.launch {
         repos.player.replaceAndPlay(
-            getQueueTrackPojos(repos.room.listAlbumTrackPojos(albums.map { it.albumId }))
+            getQueueTrackPojos(repos.album.listAlbumTrackPojos(albums.map { it.albumId }))
         )
     }
 }

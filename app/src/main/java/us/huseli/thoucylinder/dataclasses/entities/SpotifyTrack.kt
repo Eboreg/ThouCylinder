@@ -6,8 +6,6 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 @Entity(
     foreignKeys = [
@@ -36,10 +34,6 @@ data class SpotifyTrack(
     @ColumnInfo("SpotifyTrack_name") val name: String,
     @ColumnInfo("SpotifyTrack_trackNumber") val trackNumber: Int,
     @ColumnInfo("SpotifyTrack_uri") val uri: String,
-    @ColumnInfo("SpotifyTrack_artists") val artists: List<String>,
     @ColumnInfo("SpotifyTrack_spotifyAlbumId") val albumId: String? = null,
     @ColumnInfo("SpotifyTrack_trackId") val trackId: UUID? = null,
-) {
-    val duration: Duration
-        get() = durationMs.milliseconds
-}
+)

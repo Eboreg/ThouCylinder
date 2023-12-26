@@ -1,6 +1,5 @@
 <!--suppress ALL -->
 <resources>
-    <string name="add">Add</string>
     <string name="add_album_to_library">Add album to library</string>
     <string name="add_playlist">Add playlist</string>
     <string name="add_to_library">Add to library</string>
@@ -22,7 +21,6 @@
     <string name="cancel_download">Cancel download</string>
     <string name="channels">Channels</string>
     <string name="close">Close</string>
-    <string name="contains_invalid_characters">Contains invalid characters.</string>
     <string name="converting">Converting</string>
     <string name="create_new_playlist">Create new playlist</string>
     <string name="current_value">Current value: %1$s</string>
@@ -33,8 +31,7 @@
     <string name="directory_from_which_to_auto_import_local_music">Directory from which to auto import local music.</string>
     <string name="don_t_import">Don\'t import</string>
     <string name="download">Download</string>
-    <string name="download_directory_help_1">Enter the name of a subdirectory of the %1$s directory, or leave empty to use the %1$s directory itself.</string>
-    <string name="download_directory_help_2">Albums will be downloaded to [music download directory]/[artist]/[album]/.</string>
+    <string name="download_directory_help">Albums will be downloaded to [music download directory]/[artist]/[album]/.</string>
     <string name="downloading">Downloading</string>
     <string name="downloads">Downloads</string>
     <string name="duration">Duration</string>
@@ -46,19 +43,21 @@
     <string name="go_to_album">Go to album</string>
     <string name="go_to_artist">Go to artist</string>
     <string name="go_to_playlist">Go to playlist</string>
-    <string name="import_local_music">Import local music</string>
     <string name="import_selected">Import selected</string>
     <string name="import_str">Import</string>
+    <string name="imported">Imported</string>
     <string name="importing">Importing</string>
     <string name="importing_local_albums">Importing local albums ...</string>
     <string name="importing_local_artists">Importing local artists ...</string>
     <string name="importing_local_tracks">Importing local tracks ...</string>
     <string name="is_downloaded">Is downloaded</string>
+    <string name="is_on_spotify">Is on Spotify</string>
     <string name="is_on_youtube">Is on Youtube</string>
     <string name="library">Library</string>
     <string name="loading_albums">Loading albums ...</string>
     <string name="loading_artists">Loading artists ...</string>
     <string name="loading_ellipsis">Loading …</string>
+    <string name="loading_fraction_scream">LOADING (%1$s/%2$s)!!!</string>
     <string name="loading_playlists">Loading playlists ...</string>
     <string name="loading_scream">LOADING!!!</string>
     <string name="loading_tracks">Loading tracks ...</string>
@@ -75,12 +74,16 @@
     <string name="no_albums_found">No albums found.</string>
     <string name="no_artists_found">No artists found.</string>
     <string name="no_discogs_masters_found">No Discogs masters found.</string>
+    <string name="no_downloads_found">No downloads found.</string>
+    <string name="no_match_found">No match found</string>
     <string name="no_playlists_found">No playlists found.</string>
     <string name="no_tracks_found">No tracks found.</string>
     <string name="none">None</string>
     <string name="only_delete_files">Only delete files</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
+    <string name="play_on_spotify">Play on Spotify</string>
+    <string name="play_on_youtube">Play on Youtube</string>
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
     <string name="queue">Queue</string>
@@ -93,9 +96,11 @@
     <string name="removed_album_from_library">Removed %1$s from the library.</string>
     <string name="sample_rate">Sample rate</string>
     <string name="save">Save</string>
+    <string name="saving">Saving</string>
     <string name="search">Search</string>
     <string name="search_youtube">Search Youtube</string>
     <string name="select_all">Select all</string>
+    <string name="select_all_visible">Select all visible</string>
     <string name="select_cover_art">Select cover art</string>
     <string name="select_directory">Select directory</string>
     <string name="select_discogs_com_master">Select discogs.com master</string>
@@ -107,7 +112,9 @@
     <string name="spotify_import_help_1">Press the button above to authorize this application with Spotify (if needed) and fetch your saved albums from there. After this, you will get to select which albums to import.</string>
     <string name="spotify_import_help_2">For each selected album, attempts will be made to match it with a Youtube playlist. If a sufficiently good match is found, it will be added to your library as an album. However, it will not be automatically downloaded.</string>
     <string name="starting">Starting</string>
+    <string name="tagging">Tagging</string>
     <string name="the_album_was_deleted">The album was deleted.</string>
+    <string name="the_albums_local_files_were_deleted">The album\'s local files were deleted.</string>
     <string name="the_playlist_was_removed">The playlist was removed.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
     <string name="the_queue_is_empty">The queue is empty.</string>
@@ -118,12 +125,25 @@
     <string name="track_order">Track order</string>
     <string name="tracks">Tracks</string>
     <string name="undo">Undo</string>
+    <string name="unknown_album">Unknown album</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="unknown_title">Unknown title</string>
     <string name="unselect_all">Unselect all</string>
     <string name="update_album">Update album</string>
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="year">Year</string>
     <string name="youtube">Youtube</string>
-    <string name="no_downloads_found">No downloads found.</string>
+    <string name="last_fm_username">Last.fm username</string>
+    <string name="used_for_importing_your_top_albums">Used for importing your top albums. Will be automatically filled if you enable \"Scrobble to Last.fm\" and authenticate.</string>
+    <string name="enter_username">Enter username</string>
+    <string name="you_need_to_configure_your_last_fm_username_in_the_settings">You need to configure your Last.fm username in the settings.</string>
+    <string name="go_to_settings">Go to settings</string>
+    <string name="go_to_library">Go to library</string>
+    <string name="last_fm">Last.fm</string>
+    <string name="play_count">Play count: %1$s</string>
+    <string name="scrobble_to_last_fm">Scrobble to Last.fm</string>
+    <string name="after_enabling_this_authorize_app_with_last_fm">After enabling this, you will get to authorize this app with Last.fm.</string>
+    <string name="last_fm_authorization_failed">Last.fm authorization failed: %1$s</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>
@@ -132,13 +152,13 @@
         <item quantity="one">The album was enqueued next.</item>
         <item quantity="other">%1$d albums were enqueued next.</item>
     </plurals>
-    <plurals name="x_selected_albums">
-        <item quantity="one">1 selected album</item>
-        <item quantity="other">%1$d selected albums</item>
+    <plurals name="x_albums_imported">
+        <item quantity="one">One album was imported.</item>
+        <item quantity="other">%1$d albums were imported.</item>
     </plurals>
-    <plurals name="x_selected_tracks">
-        <item quantity="one">1 selected track</item>
-        <item quantity="other">%1$d selected tracks</item>
+    <plurals name="x_albums_not_found">
+        <item quantity="one">One album could not be found.</item>
+        <item quantity="other">%1$d albums could not be found.</item>
     </plurals>
     <plurals name="x_tracks">
         <item quantity="one">1 track</item>

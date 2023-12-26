@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +60,7 @@ fun AlbumTrackRow(
         )
     ) {
         Surface(shape = MaterialTheme.shapes.extraSmall, color = surfaceColor) {
-            Column {
+            Column(modifier = modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val position =
                         if (data.showDiscNumber && data.discNumber != null && data.albumPosition != null)
@@ -98,7 +99,7 @@ fun AlbumTrackRow(
                     TrackContextMenuWithButton(
                         isDownloadable = data.isDownloadable,
                         callbacks = callbacks,
-                        modifier = Modifier.padding(start = 10.dp).width(30.dp),
+                        modifier = Modifier.padding(start = 10.dp).size(30.dp),
                         hideAlbum = true,
                     )
                 }
@@ -111,8 +112,15 @@ fun AlbumTrackRow(
                         val progress by downloadTask.downloadProgress.collectAsStateWithLifecycle()
                         val statusText = stringResource(status.stringId)
 
-                        Column(modifier = Modifier.padding(bottom = 5.dp)) {
-                            Text(text = "$statusText ...")
+                        Row(
+                            modifier = Modifier.padding(start = 40.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "$statusText ...",
+                                style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                                modifier = Modifier.width(100.dp),
+                            )
                             LinearProgressIndicator(
                                 progress = progress.toFloat(),
                                 modifier = Modifier.fillMaxWidth(),

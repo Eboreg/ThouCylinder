@@ -65,9 +65,9 @@ fun ObnoxiousProgressIndicator(
             },
     ) {
         var offset by remember { mutableStateOf(IntOffset(0, 0)) }
-        var annotatedText by remember { mutableStateOf(AnnotatedString(text = text)) }
+        var annotatedText by remember(text) { mutableStateOf(AnnotatedString(text = text)) }
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(text) {
             var colorOffset = 0
             while (true) {
                 offset = IntOffset((-wigglePx..wigglePx).random(), (-wigglePx..wigglePx).random())

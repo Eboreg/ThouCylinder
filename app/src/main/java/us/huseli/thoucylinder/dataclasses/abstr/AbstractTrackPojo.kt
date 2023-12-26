@@ -3,18 +3,24 @@ package us.huseli.thoucylinder.dataclasses.abstr
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
 
 abstract class AbstractTrackPojo {
     abstract val track: Track
     abstract val album: Album?
-
-    val trackId: UUID
-        get() = track.trackId
+    abstract val spotifyTrack: SpotifyTrack?
+    abstract val lastFmTrack: LastFmTrack?
 
     val artist: String?
-        get() = track.artist ?: album?.artist
+        get() = track.artist ?: lastFmTrack?.artist?.name ?: album?.artist
+
+    val spotifyWebUrl: String?
+        get() = spotifyTrack?.let { "https://open.spotify.com/track/${it.id}" }
+
+    val isOnSpotify: Boolean
+        get() = spotifyTrack != null
 
     suspend fun getFullImage(context: Context): ImageBitmap? =
         track.getFullImage(context) ?: album?.getFullImage(context)
@@ -23,3 +29,6 @@ abstract class AbstractTrackPojo {
 
     override fun hashCode(): Int = 31 * track.hashCode() + (album?.hashCode() ?: 0)
 }
+
+
+fun Collection<AbstractTrackPojo>.tracks(): List<Track> = map { it.track }

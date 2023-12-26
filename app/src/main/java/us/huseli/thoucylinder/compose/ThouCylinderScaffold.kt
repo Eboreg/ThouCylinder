@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.compose.MenuItem
 import us.huseli.retaintheme.compose.ResponsiveScaffold
@@ -55,7 +54,7 @@ import us.huseli.thoucylinder.clone
 fun ThouCylinderScaffold(
     modifier: Modifier = Modifier,
     activeMenuItemId: MenuItemId?,
-    navController: NavHostController,
+    onNavigate: (route: String) -> Unit,
     content: @Composable BoxWithConstraintsScope.() -> Unit,
 ) {
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
@@ -63,13 +62,13 @@ fun ThouCylinderScaffold(
     val scope = rememberCoroutineScope()
     val onMenuItemClick = { menuItem: MenuItemId ->
         when (menuItem) {
-            MenuItemId.SEARCH_YOUTUBE -> navController.navigate(AddDestination.route)
-            MenuItemId.LIBRARY -> navController.navigate(LibraryDestination.route)
-            MenuItemId.QUEUE -> navController.navigate(QueueDestination.route)
-            MenuItemId.IMPORT -> navController.navigate(ImportDestination.route)
-            MenuItemId.DEBUG -> navController.navigate(DebugDestination.route)
-            MenuItemId.DOWNLOADS -> navController.navigate(DownloadsDestination.route)
-            MenuItemId.SETTINGS -> navController.navigate(SettingsDestination.route)
+            MenuItemId.SEARCH_YOUTUBE -> onNavigate(AddDestination.route)
+            MenuItemId.LIBRARY -> onNavigate(LibraryDestination.route)
+            MenuItemId.QUEUE -> onNavigate(QueueDestination.route)
+            MenuItemId.IMPORT -> onNavigate(ImportDestination.route)
+            MenuItemId.DEBUG -> onNavigate(DebugDestination.route)
+            MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
+            MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
             MenuItemId.MENU -> scope.launch { drawerState.open() }
         }
         isCoverExpanded = false

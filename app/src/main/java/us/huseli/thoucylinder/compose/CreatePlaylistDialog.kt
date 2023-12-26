@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
+import us.huseli.thoucylinder.nullIfBlank
 
 @Composable
 fun CreatePlaylistDialog(
@@ -32,7 +33,7 @@ fun CreatePlaylistDialog(
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
         confirmButton = {
             TextButton(
-                onClick = { name.takeIf { it.isNotBlank() }?.also(onSave) },
+                onClick = { name.nullIfBlank()?.also(onSave) },
                 enabled = name.isNotBlank(),
                 content = { Text(stringResource(R.string.save)) },
             )

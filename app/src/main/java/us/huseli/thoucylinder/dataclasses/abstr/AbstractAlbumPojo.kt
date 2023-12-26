@@ -1,12 +1,19 @@
 package us.huseli.thoucylinder.dataclasses.abstr
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.getBitmapByUrl
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -20,18 +27,19 @@ abstract class AbstractAlbumPojo {
     abstract val maxYear: Int?
     abstract val spotifyAlbum: SpotifyAlbum?
     abstract val isPartiallyDownloaded: Boolean
+    abstract val lastFmAlbum: LastFmAlbum?
 
     val duration: Duration?
         get() = durationMs?.milliseconds
 
-    val isFromSpotify: Boolean
+    val isOnSpotify: Boolean
         get() = spotifyAlbum != null
 
-    val isLocal: Boolean
-        get() = album.isLocal
+    val lastFmWebUrl: String?
+        get() = lastFmAlbum?.url
 
-    val isOnYoutube: Boolean
-        get() = album.isOnYoutube
+    val spotifyWebUrl: String?
+        get() = spotifyAlbum?.let { "https://open.spotify.com/album/${it.id}" }
 
     private val years: Pair<Int, Int>?
         get() {
@@ -50,16 +58,22 @@ abstract class AbstractAlbumPojo {
             else "$min–$max"
         }
 
-    suspend fun getFullImage(context: Context): ImageBitmap? = album.albumArt?.getImageBitmap(context)
-        ?: spotifyAlbum?.fullImage?.getImageBitmap()
-        ?: album.youtubePlaylist?.getImageBitmap()
+    suspend fun getFullImage(context: Context): ImageBitmap? =
+        getFullImageBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
 
     suspend fun getThumbnail(context: Context): ImageBitmap? =
-        album.albumArt?.getThumbnailImageBitmap(context)
-            ?: spotifyAlbum?.thumbnail?.getImageBitmap()
-            ?: album.youtubePlaylist?.getImageBitmap()
+        getThumbnailBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
 
-    suspend fun saveMediaStoreImage(context: Context) = album.albumArt
-        ?: spotifyAlbum?.fullImage?.url?.let { MediaStoreImage.fromUrl(it, album, context) }
-        ?: album.youtubePlaylist?.thumbnail?.url?.let { MediaStoreImage.fromUrl(it, album, context) }
+    private suspend fun getFullImageBitmap(context: Context): Bitmap? =
+        album.albumArt?.getFullImageBitmap(context)
+            ?: spotifyAlbum?.fullImage?.url?.getBitmapByUrl()
+            ?: lastFmAlbum?.fullImageUrl?.getBitmapByUrl()
+            ?: album.youtubePlaylist?.fullImage?.url?.getBitmapByUrl()
+
+    private suspend fun getThumbnailBitmap(context: Context): Bitmap? =
+        album.albumArt?.getThumbnailBitmap(context)
+            ?: spotifyAlbum?.thumbnail?.url?.getBitmapByUrl()
+            ?: spotifyAlbum?.fullImage?.url?.getBitmapByUrl()
+            ?: lastFmAlbum?.thumbnailUrl?.getBitmapByUrl()
+            ?: album.youtubePlaylist?.thumbnail?.url?.getBitmapByUrl()
 }

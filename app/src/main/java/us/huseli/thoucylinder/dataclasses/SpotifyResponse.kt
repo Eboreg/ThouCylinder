@@ -2,17 +2,17 @@
 
 package us.huseli.thoucylinder.dataclasses
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import us.huseli.thoucylinder.Constants.IMAGE_MIN_PX_THUMBNAIL
 import us.huseli.thoucylinder.Request
+import us.huseli.thoucylinder.capitalized
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.SpotifyTrackPojo
+import us.huseli.thoucylinder.getObject
 
 data class SpotifyResponse<T>(
     val href: String,
@@ -48,7 +48,6 @@ data class SpotifyResponseTrack(
         trackNumber = track_number,
         uri = uri,
         albumId = albumId,
-        artists = artists.map { it.name },
     )
 }
 
@@ -69,7 +68,7 @@ data class SpotifyResponseAlbum(
     fun toSpotifyAlbumPojo() = SpotifyAlbumPojo(
         spotifyAlbum = toSpotifyAlbum(),
         artists = artists,
-        genres = genres.map { Genre(it) },
+        genres = genres.map { Genre(it.capitalized()) },
         spotifyTrackPojos = tracks.items.map { it.toSpotifyTrackPojo(albumId = id) },
     )
 
@@ -84,7 +83,6 @@ data class SpotifyResponseAlbum(
         uri = uri,
         fullImage = images.maxByOrNull { it.size },
         thumbnail = images.sortedBy { it.size }.firstOrNull { it.width != null && it.width >= IMAGE_MIN_PX_THUMBNAIL },
-        artists = artists.map { it.name },
     )
 }
 
@@ -95,8 +93,5 @@ data class SpotifyResponseAlbumItem(
     fun toSpotifyAlbumPojo() = album.toSpotifyAlbumPojo()
 }
 
-suspend fun Request.getSpotifyAlbums(): SpotifyResponse<SpotifyResponseAlbumItem>? {
-    val responseType = object : TypeToken<SpotifyResponse<SpotifyResponseAlbumItem>>() {}
-    val gson: Gson = GsonBuilder().create()
-    return gson.fromJson(getString(), responseType)
-}
+suspend fun Request.getSpotifyAlbums(): SpotifyResponse<SpotifyResponseAlbumItem>? =
+    connect().getObject(object : TypeToken<SpotifyResponse<SpotifyResponseAlbumItem>>() {})

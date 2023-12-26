@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses.pojos
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumArtist
@@ -44,8 +43,8 @@ data class SpotifyAlbumPojo(
     )
     val spotifyTrackPojos: List<SpotifyTrackPojo>,
 ) {
-    val artist: String?
-        get() = artists.map { it.name }.takeIf { it.isNotEmpty() }?.joinToString("/")
+    val artist: String
+        get() = artists.joinToString("/") { it.name }
 
     val durationMs: Int
         get() = spotifyTrackPojos.sumOf { it.track.durationMs }
@@ -58,23 +57,17 @@ data class SpotifyAlbumPojo(
 
     val searchQuery: String
         get() = primaryArtist?.let { "$it - ${spotifyAlbum.name}" } ?: spotifyAlbum.name
+}
 
-    fun toAlbumPojo(isInLibrary: Boolean): AlbumWithTracksPojo {
-        val album = toAlbum(isInLibrary)
 
-        return AlbumWithTracksPojo(
-            album = album,
-            genres = genres,
-            tracks = spotifyTrackPojos.map { it.toTrack(isInLibrary = isInLibrary, albumId = album.albumId) },
-            spotifyAlbum = spotifyAlbum,
-        )
+fun List<SpotifyAlbumPojo>.filterBySearchTerm(term: String): List<SpotifyAlbumPojo> {
+    val words = term.lowercase().split(Regex(" +"))
+
+    return filter { pojo ->
+        words.all {
+            pojo.artist.lowercase().contains(it) ||
+                pojo.spotifyAlbum.name.lowercase().contains(it) ||
+                pojo.spotifyAlbum.year?.toString()?.contains(it) == true
+        }
     }
-
-    private fun toAlbum(isInLibrary: Boolean) = Album(
-        title = spotifyAlbum.name,
-        isLocal = false,
-        isInLibrary = isInLibrary,
-        artist = artist,
-        year = spotifyAlbum.year,
-    )
 }

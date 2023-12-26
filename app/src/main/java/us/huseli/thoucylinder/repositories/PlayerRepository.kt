@@ -16,20 +16,25 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Constants.PREF_CURRENT_TRACK_POSITION
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
+import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import us.huseli.thoucylinder.dataclasses.pojos.containsWithPosition
 import us.huseli.thoucylinder.dataclasses.pojos.reindexed
 import us.huseli.thoucylinder.dataclasses.pojos.toMediaItems
+import us.huseli.thoucylinder.filterValuesNotNull
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
+import kotlin.math.min
 
 @Singleton
 @MainThread
@@ -47,6 +52,7 @@ class PlayerRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var positionUpdateJob: Job? = null
     private var positionSaveJob: Job? = null
+    private var currentTrackPlayTimeJob: Job? = null
 
     private val _canGotoNext = MutableStateFlow(player.hasNextMediaItem())
     private val _canPlay = MutableStateFlow(player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
@@ -57,15 +63,18 @@ class PlayerRepository @Inject constructor(
     private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
     private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
     private var _lastAction = LastAction.STOP
+    private val _isCurrentTrackHalfPlayedReported = MutableStateFlow(false)
+    private val _currentTrackPlayTime = MutableStateFlow(0) // seconds
+    private val _currentTrackPlayStartTimestamp = MutableStateFlow<Long?>(null)
 
-    val canGotoNext = _canGotoNext.asStateFlow()
-    val canPlay = _canPlay.asStateFlow()
-    val currentPojo = _currentPojo.asStateFlow()
-    val currentPositionMs = _currentPositionMs.asStateFlow()
-    val isRepeatEnabled = _isRepeatEnabled.asStateFlow()
-    val isShuffleEnabled = _isShuffleEnabled.asStateFlow()
-    val playbackState = _playbackState.asStateFlow()
-    val queue = _queue.asStateFlow()
+    val canGotoNext: StateFlow<Boolean> = _canGotoNext.asStateFlow()
+    val canPlay: StateFlow<Boolean> = _canPlay.asStateFlow()
+    val currentPojo: StateFlow<QueueTrackPojo?> = _currentPojo.asStateFlow()
+    val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
+    val isRepeatEnabled: StateFlow<Boolean> = _isRepeatEnabled.asStateFlow()
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+    val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+    val queue: StateFlow<List<QueueTrackPojo>> = _queue.asStateFlow()
 
     val nextItemIndex: Int
         get() = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
@@ -96,6 +105,24 @@ class PlayerRepository @Inject constructor(
         }
 
         scope.launch {
+            /**
+             * However, continuously monitor _track_ data from the database, in case URIs change because a track has
+             * been downloaded or locally deleted.
+             */
+            queueDao.flowTracksInQueue().distinctUntilChanged().collect { tracks ->
+                mutex.withLock {
+                    val uriMap =
+                        _queue.value.associateWith { pojo -> tracks.find { it.trackId == pojo.track.trackId }?.playUri }
+
+                    // Handle updated URIs:
+                    uriMap.filterValuesNotNull().forEach { (pojo, uri) ->
+                        if (uri != pojo.uri) updateTrack(pojo.copy(uri = uri))
+                    }
+                }
+            }
+        }
+
+        scope.launch {
             _playbackState.collect { state ->
                 if (state == PlaybackState.PLAYING) {
                     positionUpdateJob = launch {
@@ -110,12 +137,51 @@ class PlayerRepository @Inject constructor(
                             delay(5000)
                         }
                     }
+                    currentTrackPlayTimeJob = launch {
+                        while (true) {
+                            if (!_isCurrentTrackHalfPlayedReported.value) {
+                                val pojo = _currentPojo.value
+                                val duration = pojo?.track?.duration
+
+                                if (pojo != null && duration != null) {
+                                    // Scrobble when the track has been played for at least half its duration, or for 4
+                                    // minutes (whichever occurs earlier).
+                                    // https://www.last.fm/api/scrobbling#when-is-a-scrobble-a-scrobble
+                                    val threshold = min(duration.inWholeSeconds / 2, 240L)
+
+                                    if (_currentTrackPlayTime.value >= threshold) {
+                                        _currentTrackPlayStartTimestamp.value?.also { startTimestamp ->
+                                            listeners.forEach { it.onHalfTrackPlayed(pojo, startTimestamp) }
+                                        }
+                                        _isCurrentTrackHalfPlayedReported.value = true
+                                    }
+                                }
+                            }
+                            delay(5000)
+                            _currentTrackPlayTime.value += 5
+                        }
+                    }
+                    if (_currentTrackPlayStartTimestamp.value == null) {
+                        _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                    }
                 } else {
                     positionUpdateJob?.cancel()
                     positionUpdateJob = null
                     positionSaveJob?.cancel()
                     positionSaveJob = null
+                    currentTrackPlayTimeJob?.cancel()
+                    currentTrackPlayTimeJob = null
                 }
+
+                listeners.forEach { it.onPlaybackChange(_currentPojo.value, state) }
+            }
+        }
+
+        scope.launch {
+            _currentPojo.collect { pojo ->
+                _currentTrackPlayTime.value = 0
+                _isCurrentTrackHalfPlayedReported.value = false
+                listeners.forEach { it.onPlaybackChange(pojo, _playbackState.value) }
             }
         }
     }
@@ -160,13 +226,15 @@ class PlayerRepository @Inject constructor(
         } else play()
     }
 
-    fun removeFromQueue(pojos: List<QueueTrackPojo>) {
-        val ids = pojos.map { it.queueTrackId }
-        val indices =
-            _queue.value.mapIndexedNotNull { index, pojo -> if (ids.contains(pojo.queueTrackId)) index else null }
+    fun removeFromQueue(pojos: List<QueueTrackPojo>) = scope.launch {
+        mutex.withLock {
+            val ids = pojos.map { it.queueTrackId }
+            val indices =
+                _queue.value.mapIndexedNotNull { index, pojo -> if (ids.contains(pojo.queueTrackId)) index else null }
 
-        indices.sortedDescending().forEach { index ->
-            player.removeMediaItem(index)
+            indices.sortedDescending().forEach { index ->
+                player.removeMediaItem(index)
+            }
         }
     }
 
@@ -242,8 +310,13 @@ class PlayerRepository @Inject constructor(
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         if (isPlaying) Log.i(javaClass.simpleName, "Playing: ${player.currentMediaItem?.localConfiguration?.uri}")
+        player.currentMediaItem?.requestMetadata?.mediaUri
         _playbackState.value =
-            if (isPlaying) PlaybackState.PLAYING
+            if (isPlaying) {
+                if (_currentTrackPlayStartTimestamp.value == null)
+                    _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                PlaybackState.PLAYING
+            }
             else if (player.playbackState == Player.STATE_READY && !player.playWhenReady) PlaybackState.PAUSED
             else PlaybackState.STOPPED
         saveCurrentPosition()
@@ -260,6 +333,9 @@ class PlayerRepository @Inject constructor(
                     Log.i("PlayerRepository", "current track URI: ${pojo?.uri}")
                     _currentPojo.value = pojo
                     _currentPositionMs.value = player.currentPosition
+                    if (_playbackState.value == PlaybackState.PLAYING)
+                        _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                    else _currentTrackPlayStartTimestamp.value = null
                 }
             }
         }

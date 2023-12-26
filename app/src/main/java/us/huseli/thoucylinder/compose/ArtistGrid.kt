@@ -9,54 +9,53 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
-import us.huseli.thoucylinder.dataclasses.getMediaStoreFileNullable
-import us.huseli.retaintheme.toBitmap
-import java.io.File
+import us.huseli.thoucylinder.viewmodels.ArtistListViewModel
 
 @Composable
 fun ArtistGrid(
-    artists: List<ArtistPojo>,
-    images: Map<String, File>,
+    isImporting: Boolean,
+    viewModel: ArtistListViewModel = hiltViewModel(),
     onArtistClick: (String) -> Unit,
-    onEmpty: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
 ) {
     val context = LocalContext.current
+    val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     ItemGrid(
-        things = artists,
-        onClick = { onArtistClick(it.name) },
+        things = artistPojos,
+        onClick = { _, artist -> onArtistClick(artist.name) },
         contentPadding = contentPadding,
-        key = { it.name },
-        onEmpty = onEmpty,
-    ) { artist ->
-        val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
-
-        LaunchedEffect(Unit) {
-            imageBitmap.value = images[artist.name.lowercase()]?.toBitmap()?.asImageBitmap()
-                ?: artist.firstAlbumArt?.let {
-                    context.getMediaStoreFileNullable(it)?.toBitmap()?.asImageBitmap()
-                }
-        }
+        key = { _, artist -> artist.name },
+        onEmpty = {
+            Text(
+                stringResource(
+                    if (isImporting) R.string.importing_local_artists
+                    else if (isLoading) R.string.loading_artists
+                    else R.string.no_artists_found
+                ),
+                modifier = Modifier.padding(10.dp),
+            )
+        },
+    ) { _, artist ->
+        val imageBitmap by viewModel.flowArtistImage(artist, context).collectAsStateWithLifecycle()
 
         Thumbnail(
-            image = imageBitmap.value,
+            image = imageBitmap,
             modifier = Modifier.fillMaxWidth(),
             borderWidth = null,
             placeholderIcon = Icons.Sharp.InterpreterMode,

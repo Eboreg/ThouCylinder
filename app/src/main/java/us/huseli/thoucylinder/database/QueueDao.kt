@@ -8,7 +8,9 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import java.util.UUID
 
@@ -26,12 +28,18 @@ interface QueueDao {
     @Delete
     suspend fun deleteQueueTracks(vararg queueTracks: QueueTrack)
 
+    @Query("SELECT Track.* FROM QueueTrack JOIN Track ON Track_trackId = QueueTrack_trackId")
+    fun flowTracksInQueue(): Flow<List<Track>>
+
     @Query(
         """
-        SELECT t.*, a.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
-        FROM QueueTrack qt 
-        JOIN Track t ON Track_trackId = QueueTrack_trackId
-        LEFT JOIN Album a ON Track_albumId = Album_albumId
+        SELECT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, SpotifyAlbum.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
+        FROM QueueTrack  
+            JOIN Track ON Track_trackId = QueueTrack_trackId
+            LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
+            LEFT JOIN SpotifyAlbum ON Track_albumId = SpotifyAlbum_albumId
         ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )

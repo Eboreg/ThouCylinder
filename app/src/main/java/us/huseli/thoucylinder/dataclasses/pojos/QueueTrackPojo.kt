@@ -6,13 +6,19 @@ import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
 data class QueueTrackPojo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,
+    @Embedded override val spotifyTrack: SpotifyTrack?,
+    @Embedded override val lastFmTrack: LastFmTrack?,
+    @Embedded val spotifyAlbum: SpotifyAlbum? = null,
     @ColumnInfo("QueueTrack_uri") val uri: Uri,
     @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: UUID = UUID.randomUUID(),
     @ColumnInfo("QueueTrack_position") val position: Int = 0,

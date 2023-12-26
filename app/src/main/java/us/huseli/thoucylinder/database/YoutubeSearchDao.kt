@@ -55,9 +55,8 @@ interface YoutubeSearchDao {
 
     @Query(
         """
-        SELECT t.* FROM Track t
-        JOIN YoutubeQueryTrack y ON Track_trackId = YoutubeQueryTrack_trackId
-        AND YoutubeQueryTrack_query = :query
+        SELECT Track.* FROM Track
+            JOIN YoutubeQueryTrack ON Track_trackId = YoutubeQueryTrack_trackId AND YoutubeQueryTrack_query = :query
         ORDER BY YoutubeQueryTrack_position
         """
     )

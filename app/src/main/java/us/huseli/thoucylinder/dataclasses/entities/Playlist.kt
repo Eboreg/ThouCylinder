@@ -12,8 +12,8 @@ import java.util.UUID
 data class Playlist(
     @ColumnInfo("Playlist_playlistId") @PrimaryKey override val playlistId: UUID = UUID.randomUUID(),
     @ColumnInfo("Playlist_name") override val name: String,
-    @ColumnInfo("Playlist_created") override val created: Instant? = null,
-    @ColumnInfo("Playlist_updated") override val updated: Instant? = null,
+    @ColumnInfo("Playlist_created") override val created: Instant? = Instant.now(),
+    @ColumnInfo("Playlist_updated") override val updated: Instant? = Instant.now(),
 ) : AbstractPlaylist() {
     override fun toString() = name
 }

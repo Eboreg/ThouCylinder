@@ -2,27 +2,29 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.toBitmap
-import us.huseli.thoucylinder.Request
+import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.capitalized
 import us.huseli.thoucylinder.dataclasses.DiscogsMasterData
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResultItem
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.getBitmapByUrl
 import javax.inject.Inject
 
 @HiltViewModel
-class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : ViewModel() {
+class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
     private val _imageBitmaps = MutableStateFlow<List<ImageBitmap>>(emptyList())
     private val _initialTracks = MutableStateFlow<List<Track>>(emptyList())
@@ -47,6 +49,27 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         _loadingSearchResults.value = false
     }
 
+    fun save(imageBitmap: ImageBitmap?, context: Context, onSave: (AlbumWithTracksPojo) -> Unit) {
+        _albumPojo.value?.also { pojo ->
+            getAlbumDownloadDirDocumentFile(pojo.album, context)?.also { dirDocumentFile ->
+                val albumArt = imageBitmap?.let {
+                    MediaStoreImage.fromBitmap(
+                        bitmap = it.asAndroidBitmap(),
+                        context = context,
+                        dirDocumentFile = dirDocumentFile,
+                    )
+                }
+
+                onSave(
+                    pojo.copy(
+                        album = pojo.album.copy(albumArt = albumArt),
+                        tracks = pojo.tracks.map { it.copy(image = albumArt) },
+                    ),
+                )
+            }
+        }
+    }
+
     fun selectMasterId(masterId: Int, context: Context) = viewModelScope.launch {
         val master =
             _masters.value[masterId]
@@ -61,8 +84,8 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
                         artist = master.artist,
                         year = master.year?.takeIf { it > 1000 } ?: pojo.album.year,
                     ),
-                    genres = master.genres.map { Genre(genreName = it) },
-                    styles = master.styles.map { Style(styleName = it) },
+                    genres = master.genres.map { Genre(it.capitalized()) },
+                    styles = master.styles.map { Style(it.capitalized()) },
                 )
             }
             updateTracksFromMaster(master)
@@ -71,7 +94,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
     }
 
     fun setAlbum(album: Album, context: Context) = viewModelScope.launch {
-        repos.room.getAlbumWithTracks(album.albumId)?.also { pojo -> setAlbum(pojo, context) }
+        repos.album.getAlbumWithTracks(album.albumId)?.also { pojo -> setAlbum(pojo, context) }
     }
 
     fun setAlbum(pojo: AlbumWithTracksPojo, context: Context) {
@@ -109,18 +132,14 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         }
     }
 
-    private fun getImages(master: DiscogsMasterData, context: Context) = viewModelScope.launch {
+    private fun getImages(master: DiscogsMasterData, context: Context) = viewModelScope.launch(Dispatchers.IO) {
         val bitmaps = mutableListOf<ImageBitmap>()
 
         _albumPojo.value?.also { pojo ->
             pojo.getFullImage(context)?.also { bitmaps.add(it) }
-
-            repos.mediaStore.collectAlbumImages(pojo).forEach { file ->
-                file.toBitmap()?.asImageBitmap()?.also { bitmaps.add(it) }
-            }
-
+            bitmaps.addAll(repos.localMedia.collectAlbumImages(pojo).map { it.asImageBitmap() })
             master.images.filter { it.type == "primary" }.forEach { masterImage ->
-                Request(masterImage.uri).getImageBitmap()?.also { bitmaps.add(it) }
+                masterImage.uri.getBitmapByUrl()?.asImageBitmap()?.also { bitmaps.add(it) }
             }
         }
 

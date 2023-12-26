@@ -8,8 +8,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumArtist
@@ -18,7 +16,6 @@ import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
 import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.SpotifyTrackPojo
 import java.util.UUID
 
 @Dao
@@ -31,39 +28,6 @@ interface SpotifyDao {
 
     @Query("DELETE FROM SpotifyTrack WHERE SpotifyTrack_spotifyAlbumId = :albumId AND SpotifyTrack_id NOT IN (:except)")
     suspend fun _deleteSpotifyTracks(albumId: String, except: List<String> = emptyList())
-
-    @Query("SELECT * FROM SpotifyAlbumArtist")
-    fun _flowSpotifyAlbumArtists(): Flow<List<SpotifyAlbumArtist>>
-
-    @Query("SELECT * FROM SpotifyAlbumGenre")
-    fun _flowSpotifyAlbumGenres(): Flow<List<SpotifyAlbumGenre>>
-
-    @Query("SELECT * FROM SpotifyAlbum")
-    fun _flowSpotifyAlbums(): Flow<List<SpotifyAlbum>>
-
-    @Query("SELECT * FROM SpotifyArtist")
-    fun _flowSpotifyArtists(): Flow<List<SpotifyArtist>>
-
-    @Query("SELECT * FROM SpotifyTrackArtist")
-    fun _flowSpotifyTrackArtists(): Flow<List<SpotifyTrackArtist>>
-
-    fun _flowSpotifyTrackPojos(): Flow<List<SpotifyTrackPojo>> = combine(
-        _flowSpotifyTracks(),
-        _flowSpotifyTrackArtists(),
-        _flowSpotifyArtists(),
-    ) { tracks, trackArtists, artists ->
-        tracks.map { track ->
-            SpotifyTrackPojo(
-                track = track,
-                artists = artists.filter { artist ->
-                    trackArtists.any { it.trackId == track.id && it.artistId == artist.id }
-                },
-            )
-        }
-    }
-
-    @Query("SELECT * FROM SpotifyTrack")
-    fun _flowSpotifyTracks(): Flow<List<SpotifyTrack>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun _insertGenres(vararg genres: Genre)
@@ -89,31 +53,10 @@ interface SpotifyDao {
     @Upsert
     suspend fun _upsertSpotifyAlbums(vararg albums: SpotifyAlbum)
 
-    // TODO: Maybe not use?
-    fun flowSpotifyAlbumPojos(): Flow<List<SpotifyAlbumPojo>> = combine(
-        _flowSpotifyAlbums(),
-        _flowSpotifyAlbumGenres(),
-        _flowSpotifyAlbumArtists(),
-        _flowSpotifyArtists(),
-        _flowSpotifyTrackPojos(),
-    ) { albums, genres, albumArtists, artists, trackPojos ->
-        albums.map { album ->
-            SpotifyAlbumPojo(
-                spotifyAlbum = album,
-                artists = artists.filter { artist ->
-                    albumArtists.any { it.albumId == album.id && it.artistId == artist.id }
-                },
-                genres = genres.filter { it.albumId == album.id }.map { Genre(it.genreName) },
-                spotifyTrackPojos = trackPojos.filter { it.track.albumId == album.id },
-            )
-        }
-    }
-
-    @Transaction
     @Query("SELECT * FROM SpotifyAlbum WHERE SpotifyAlbum_albumId = :albumId")
-    suspend fun getSpotifyAlbumPojo(albumId: UUID): SpotifyAlbumPojo?
+    suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum?
 
-    @Query("SELECT DISTINCT SpotifyAlbum_id FROM SpotifyAlbum s JOIN Album a ON a.Album_albumId = s.SpotifyAlbum_albumId WHERE a.Album_isInLibrary = 1")
+    @Query("SELECT DISTINCT SpotifyAlbum_id FROM SpotifyAlbum JOIN Album ON Album_albumId = SpotifyAlbum_albumId WHERE Album_isInLibrary = 1")
     suspend fun listImportedAlbumIds(): List<String>
 
     @Transaction

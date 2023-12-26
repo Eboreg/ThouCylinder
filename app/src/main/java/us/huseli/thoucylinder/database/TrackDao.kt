@@ -15,31 +15,20 @@ import androidx.room.Transaction
 import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
+import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
 import java.util.UUID
 
 @Dao
 interface TrackDao {
-    /** Pseudo-private methods ************************************************/
-    @Query(
-        """
-        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId 
-        WHERE Track_isInLibrary = 1 AND LOWER(Track_title) >= LOWER(:fromTitle) AND LOWER(Track_title) <= LOWER(:toTitle)  
-        ORDER BY LOWER(Track_title)
-        """
-    )
-    suspend fun _listTrackPojosBetween(fromTitle: String, toTitle: String): List<TrackPojo>
-
-    @RawQuery(observedEntities = [Track::class, Album::class])
+    @RawQuery(observedEntities = [Track::class, Album::class, SpotifyTrack::class, LastFmTrack::class])
     fun _pageTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
-
-    @RawQuery(observedEntities = [Track::class, Album::class])
-    fun _searchTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
 
     /** Public methods ********************************************************/
     @Delete
@@ -51,26 +40,27 @@ interface TrackDao {
     @Query("DELETE FROM Track WHERE Track_albumId = :albumId")
     suspend fun deleteTracksByAlbumId(albumId: UUID)
 
+    @Query(
+        """
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*
+        FROM Track
+            LEFT JOIN Album ON Track_albumId = Album_albumId 
+            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
+        WHERE Track_albumId = :albumId
+        ORDER BY Track_albumPosition
+        """
+    )
+    fun flowTrackPojosByAlbumId(albumId: UUID): Flow<List<TrackPojo>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTracks(vararg tracks: Track)
 
-    @Query(
-        """
-        SELECT Track_image_uri FROM Track WHERE Track_image_uri IS NOT NULL
-        UNION
-        SELECT Track_image_thumbnailUri FROM Track WHERE Track_image_thumbnailUri IS NOT NULL
-        """
-    )
-    suspend fun listImageUris(): List<Uri>
-
     @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
-    suspend fun listTracks(): List<Track>
+    suspend fun listLibraryTracks(): List<Track>
 
-    suspend fun listTrackPojosBetween(from: AbstractTrackPojo, to: AbstractTrackPojo): List<TrackPojo> {
-        if (from.track.title.lowercase() < to.track.title.lowercase())
-            return _listTrackPojosBetween(from.track.title, to.track.title)
-        return _listTrackPojosBetween(to.track.title, from.track.title)
-    }
+    @Query("SELECT Track_localUri FROM Track WHERE Track_localUri IS NOT NULL")
+    suspend fun listLocalUris(): List<Uri>
 
     fun pageTrackPojos(
         sortParameter: TrackSortParameter,
@@ -91,9 +81,12 @@ interface TrackDao {
         return _pageTrackPojos(
             SimpleSQLiteQuery(
                 """
-                SELECT DISTINCT Track.*, Album.* FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId
+                SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
+                FROM Track
+                    LEFT JOIN Album ON Track_albumId = Album_albumId
+                    LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
                 WHERE Track_isInLibrary = 1 ${searchQuery?.let { "AND $it" } ?: ""}
-                ORDER BY ${sortParameter.sqlColumn} ${if (sortOrder == SortOrder.ASCENDING) "ASC" else "DESC"}
+                ORDER BY ${sortParameter.sqlColumn} ${sortOrder.sql}
                 """.trimIndent()
             )
         )
@@ -101,7 +94,11 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT t.*, a.* FROM Track t LEFT JOIN Album a ON Track_albumId = Album_albumId
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*
+        FROM Track
+            LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE (
             LOWER(Track_artist) = LOWER(:artist) OR (Track_artist IS NULL AND LOWER(Album_artist) = LOWER(:artist))
         ) AND Track_isInLibrary = 1

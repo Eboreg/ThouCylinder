@@ -1,54 +1,49 @@
 package us.huseli.thoucylinder.viewmodels
 
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.repositories.Repositories
-import kotlin.math.max
-import kotlin.math.min
+import us.huseli.thoucylinder.listItemsBetween
 
 abstract class AbstractSelectViewModel(
     private val selectionKey: String,
     private val repos: Repositories,
 ) : AbstractBaseViewModel(repos) {
-    val selectedAlbums = repos.room.getSelectedAlbumFlow(selectionKey)
-    val selectedTrackPojos = repos.room.getSelectedTrackPojoFlow(selectionKey)
+    val selectedAlbums: StateFlow<List<Album>> = repos.album.flowSelectedAlbums(selectionKey)
+    val selectedTrackPojos: StateFlow<List<TrackPojo>> = repos.track.flowSelectedTrackPojos(selectionKey)
 
-    fun selectAlbums(albums: List<Album>) = repos.room.selectAlbums(selectionKey, albums)
+    val latestSelectedTrackPojo = selectedTrackPojos.map { it.lastOrNull() }
+    val latestSelectedAlbum = selectedAlbums.map { it.lastOrNull() }
 
-    fun selectAlbumsFromLastSelected(albums: List<Album>, to: Album) {
-        val lastSelected = selectedAlbums.value.lastOrNull()
+    fun selectAlbums(albums: Iterable<Album>) = repos.album.selectAlbums(selectionKey, albums)
 
-        if (lastSelected != null) {
-            val thisIdx = albums.indexOf(to)
-            val lastSelectedIdx = albums.indexOf(lastSelected)
+    fun selectAlbumsFromLastSelected(to: Album, allAlbums: List<Album>) {
+        val albums = selectedAlbums.value.lastOrNull()
+            ?.let { allAlbums.listItemsBetween(it, to).plus(to) }
+            ?: listOf(to)
 
-            repos.room.selectAlbums(
-                selectionKey = selectionKey,
-                albums = albums.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1),
-            )
-        } else {
-            repos.room.selectAlbums(selectionKey, listOf(to))
-        }
+        repos.album.selectAlbums(selectionKey, albums)
     }
 
-    fun selectTrackPojosFromLastSelected(to: TrackPojo) = viewModelScope.launch {
-        val lastSelected = selectedTrackPojos.value.lastOrNull()
+    fun selectTrackPojos(pojos: Iterable<TrackPojo>) = repos.track.selectTrackPojos(selectionKey, pojos)
 
-        if (lastSelected != null) {
-            val tracks = repos.room.listTrackPojosBetween(lastSelected, to)
-            repos.room.selectTrackPojos(selectionKey, tracks)
-        } else {
-            repos.room.selectTrackPojos(selectionKey, listOf(to))
-        }
+    fun selectTrackPojosFromLastSelected(to: TrackPojo, allPojos: List<TrackPojo>) {
+        val pojos = selectedTrackPojos.value.lastOrNull()
+            ?.let { allPojos.listItemsBetween(it, to).plus(to) }
+            ?: listOf(to)
+
+        repos.track.selectTrackPojos(selectionKey, pojos)
     }
 
-    fun toggleSelected(album: Album) = repos.room.toggleAlbumSelected(selectionKey, album)
+    fun toggleSelected(album: Album) = repos.album.toggleAlbumSelected(selectionKey, album)
 
-    fun toggleSelected(pojo: TrackPojo) = repos.room.toggleTrackPojoSelected(selectionKey, pojo)
+    fun toggleSelected(trackPojo: TrackPojo) {
+        repos.track.toggleTrackPojoSelected(selectionKey, trackPojo)
+    }
 
-    fun unselectAllAlbums() = repos.room.unselectAllAlbums(selectionKey)
+    fun unselectAllAlbums() = repos.album.unselectAllAlbums(selectionKey)
 
-    open fun unselectAllTrackPojos() = repos.room.unselectAllTrackPojos(selectionKey)
+    open fun unselectAllTrackPojos() = repos.track.unselectAllTrackPojos(selectionKey)
 }

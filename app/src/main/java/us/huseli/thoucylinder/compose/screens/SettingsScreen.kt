@@ -1,10 +1,8 @@
 package us.huseli.thoucylinder.compose.screens
 
 import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import android.os.Environment
-import android.provider.DocumentsContract
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -34,13 +32,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.thoucylinder.Constants.VALID_FILENAME_REGEX
+import us.huseli.thoucylinder.Constants.LASTFM_AUTH_URL
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
@@ -51,54 +51,51 @@ fun SettingsScreen(
     appCallbacks: AppCallbacks,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val autoImportLocalMusic by viewModel.autoImportLocalMusic.collectAsStateWithLifecycle()
-    val musicImportDirectory by viewModel.musicImportDirectory.collectAsStateWithLifecycle()
-    val musicImportVolume by viewModel.musicImportVolume.collectAsStateWithLifecycle()
-    val musicDownloadDirectory by viewModel.musicDownloadDirectory.collectAsStateWithLifecycle()
-    var showMusicImportDirectoryDialog by rememberSaveable { mutableStateOf(false) }
-    var showMusicDownloadDirectoryDialog by rememberSaveable { mutableStateOf(false) }
-    val selectImportDirlauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            val (volume, directory) = DocumentsContract.getTreeDocumentId(uri).split(':', limit = 2)
-            val externalVolume =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.VOLUME_EXTERNAL_PRIMARY
-                else "external"
+    val lastFmUsername by viewModel.lastFmUsername.collectAsStateWithLifecycle()
+    val musicDownloadUri by viewModel.musicDownloadUri.collectAsStateWithLifecycle()
+    val musicImportUri by viewModel.musicImportUri.collectAsStateWithLifecycle()
+    val lastFmScrobble by viewModel.lastFmScrobble.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
 
-            viewModel.setAutoImportLocalMusic(true)
-            viewModel.setMusicImportVolume(if (volume == "primary") externalVolume else volume)
-            viewModel.setMusicImportDirectory(directory)
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
-        }
-    }
+    var showLastFmUsernameDialog by rememberSaveable { mutableStateOf(false) }
+    var showMusicImportUriDialog by rememberSaveable { mutableStateOf(false) }
+    var showMusicDownloadUriDialog by rememberSaveable { mutableStateOf(false) }
 
-    if (showMusicDownloadDirectoryDialog) {
-        MusicDownloadDirectoryDialog(
-            currentValue = musicDownloadDirectory,
-            onCancelClick = { showMusicDownloadDirectoryDialog = false },
-            onSaveClick = {
-                viewModel.setMusicDownloadDirectory(it)
-                showMusicDownloadDirectoryDialog = false
+    if (showMusicDownloadUriDialog) {
+        LocalMusicDownloadUriDialog(
+            currentValue = musicDownloadUri,
+            onCancelClick = { showMusicDownloadUriDialog = false },
+            onSave = { uri ->
+                viewModel.setMusicDownloadUri(uri)
+                showMusicDownloadUriDialog = false
             },
         )
     }
 
-    if (showMusicImportDirectoryDialog) {
-        MusicImportDirectoryDialog(
-            currentValue = musicImportDirectory,
-            onCancelClick = { showMusicImportDirectoryDialog = false },
-            onSelectDirectoryClick = {
-                val uri = Environment.getExternalStorageDirectory()
-                    .toUri()
-                    .buildUpon()
-                    .appendPath(Environment.DIRECTORY_MUSIC)
-                    .build()
-                selectImportDirlauncher.launch(uri)
-                showMusicImportDirectoryDialog = false
+    if (showMusicImportUriDialog) {
+        LocalMusicImportUriDialog(
+            currentValue = musicImportUri,
+            onCancelClick = { showMusicImportUriDialog = false },
+            onSave = { uri ->
+                viewModel.setAutoImportLocalMusic(true)
+                viewModel.setMusicImportUri(uri)
+                showMusicImportUriDialog = false
             },
+        )
+    }
+
+    if (showLastFmUsernameDialog) {
+        SingleStringSettingDialog(
+            currentValue = lastFmUsername,
+            onCancelClick = { showLastFmUsernameDialog = false },
+            onSave = { value ->
+                viewModel.setLastFmUsername(value.takeIf { it.isNotEmpty() })
+                showLastFmUsernameDialog = false
+            },
+            placeholderText = stringResource(R.string.enter_username),
+            title = { Text(text = stringResource(R.string.last_fm_username)) },
+            subtitle = { Text(text = stringResource(R.string.used_for_importing_your_top_albums)) },
         )
     }
 
@@ -108,7 +105,11 @@ fun SettingsScreen(
             tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(bottom = 5.dp),
+            ) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
                     content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
@@ -121,38 +122,60 @@ fun SettingsScreen(
         }
 
         Column(modifier = Modifier.verticalScroll(state = rememberScrollState())) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                /*
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.auto_import_local_music),
                         style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
                     )
                 }
+                 */
+                Text(
+                    text = stringResource(R.string.auto_import_local_music),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
                 Switch(
                     checked = autoImportLocalMusic == true,
                     onCheckedChange = { viewModel.setAutoImportLocalMusic(it) },
                 )
             }
 
-            Row(modifier = Modifier.clickable { showMusicImportDirectoryDialog = true }.padding(10.dp)) {
+            Row(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .let { if (autoImportLocalMusic == true) it.clickable { showMusicImportUriDialog = true } else it },
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    val textColor =
+                        if (autoImportLocalMusic != true) MaterialTheme.colorScheme.onSurfaceVariant
+                        else Color.Unspecified
+
                     Text(
                         text = stringResource(R.string.music_import_directory),
                         style = MaterialTheme.typography.titleMedium,
+                        color = textColor,
                     )
                     Text(
                         text = stringResource(R.string.directory_from_which_to_auto_import_local_music),
                         style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
                     )
                     Text(
-                        text = musicImportVolume?.let { "$it:$musicImportDirectory" } ?: musicImportDirectory,
+                        text = musicImportUri?.lastPathSegment ?: stringResource(R.string.none),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
 
-            Row(modifier = Modifier.clickable { showMusicDownloadDirectoryDialog = true }.padding(10.dp)) {
+            Row(modifier = Modifier.clickable { showMusicDownloadUriDialog = true }.padding(10.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.music_download_directory),
@@ -163,7 +186,49 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        text = musicDownloadDirectory,
+                        text = musicDownloadUri?.lastPathSegment ?: stringResource(R.string.none),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.clickable { uriHandler.openUri(LASTFM_AUTH_URL) }.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.scrobble_to_last_fm),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.after_enabling_this_authorize_app_with_last_fm),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Switch(
+                    checked = lastFmScrobble,
+                    onCheckedChange = {
+                        viewModel.setLastFmScobble(it)
+                        if (it) uriHandler.openUri(LASTFM_AUTH_URL)
+                    },
+                )
+            }
+
+            Row(modifier = Modifier.clickable { showLastFmUsernameDialog = true }.padding(10.dp)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.last_fm_username),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.used_for_importing_your_top_albums),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text =  lastFmUsername ?: stringResource(R.string.none),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -175,74 +240,137 @@ fun SettingsScreen(
 
 
 @Composable
-fun MusicImportDirectoryDialog(
-    currentValue: String,
+fun LocalMusicUriDialog(
+    currentValue: Uri?,
+    modeFlags: Int,
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    cancelButtonText: String = stringResource(R.string.cancel),
     onCancelClick: () -> Unit,
-    onSelectDirectoryClick: () -> Unit,
+    onDismissRequest: () -> Unit = onCancelClick,
+    onSave: (Uri) -> Unit,
 ) {
+    val context = LocalContext.current
+    val selectDirlauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(uri, modeFlags)
+            onSave(uri)
+        }
+    }
+
     AlertDialog(
         shape = MaterialTheme.shapes.small,
-        onDismissRequest = onCancelClick,
-        dismissButton = { TextButton(onClick = onCancelClick, content = { Text(stringResource(R.string.cancel)) }) },
+        onDismissRequest = onDismissRequest,
+        dismissButton = { TextButton(onClick = onCancelClick, content = { Text(cancelButtonText) }) },
         confirmButton = {
             TextButton(
-                onClick = { onSelectDirectoryClick() },
+                onClick = {
+                    val input = currentValue ?: Environment.getExternalStorageDirectory()
+                        .toUri()
+                        .buildUpon()
+                        .appendPath(Environment.DIRECTORY_MUSIC)
+                        .build()
+                    selectDirlauncher.launch(input)
+                },
                 content = { Text(stringResource(R.string.select_directory)) },
             )
         },
-        title = { Text(stringResource(R.string.music_import_directory)) },
-        text = { Text(stringResource(R.string.current_value, currentValue)) },
+        title = title,
+        text = text,
     )
 }
 
 
 @Composable
-fun MusicDownloadDirectoryDialog(
-    currentValue: String,
+fun SingleStringSettingDialog(
+    currentValue: String?,
+    placeholderText: String = "",
+    title: @Composable () -> Unit = {},
+    subtitle: @Composable () -> Unit = {},
     onCancelClick: () -> Unit,
-    onSaveClick: (String) -> Unit,
+    onDismissRequest: () -> Unit = onCancelClick,
+    onSave: (String) -> Unit,
 ) {
-    var value by rememberSaveable(currentValue) {
-        mutableStateOf(currentValue.substringAfter(Environment.DIRECTORY_MUSIC).trim('/'))
-    }
-    val isValid by rememberSaveable(value) { mutableStateOf(VALID_FILENAME_REGEX.matches(value)) }
+    var value by rememberSaveable(currentValue) { mutableStateOf(currentValue ?: "") }
 
     AlertDialog(
         shape = MaterialTheme.shapes.small,
-        onDismissRequest = onCancelClick,
-        dismissButton = {
-            TextButton(onClick = onCancelClick, content = { Text(text = stringResource(R.string.cancel)) })
-        },
+        onDismissRequest = onDismissRequest,
+        dismissButton = { TextButton(onClick = onCancelClick, content = { Text(stringResource(R.string.cancel)) }) },
         confirmButton = {
             TextButton(
-                onClick = {
-                    onSaveClick(
-                        if (value.trim('/').isBlank()) Environment.DIRECTORY_MUSIC
-                        else "${Environment.DIRECTORY_MUSIC}/${value.trim('/')}"
-                    )
-                },
-                content = { Text(text = stringResource(R.string.save)) },
-                enabled = isValid,
+                onClick = { onSave(value) },
+                content = { Text(stringResource(R.string.save)) },
             )
         },
-        title = { Text(text = stringResource(R.string.music_download_directory)) },
+        title = title,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = stringResource(R.string.download_directory_help_1, Environment.DIRECTORY_MUSIC))
-                Text(text = stringResource(R.string.download_directory_help_2))
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(text = "${Environment.DIRECTORY_MUSIC}/", modifier = Modifier.padding(top = 18.dp))
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = { value = it },
-                        isError = !isValid,
-                        supportingText = {
-                            if (!isValid) Text(text = stringResource(R.string.contains_invalid_characters))
-                        },
-                        singleLine = true,
-                    )
-                }
+                subtitle()
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    placeholder = { Text(text = placeholderText) },
+                )
             }
-        }
+        },
+    )
+}
+
+
+@Composable
+fun LocalMusicImportUriDialog(
+    currentValue: Uri?,
+    cancelButtonText: String = stringResource(R.string.cancel),
+    onCancelClick: () -> Unit,
+    onDismissRequest: () -> Unit = onCancelClick,
+    onSave: (Uri) -> Unit,
+) {
+    LocalMusicUriDialog(
+        currentValue = currentValue,
+        modeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        title = { Text(stringResource(R.string.music_import_directory)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(text = stringResource(R.string.select_root_directory_to_import_from))
+                Text(
+                    stringResource(
+                        R.string.current_value,
+                        currentValue?.lastPathSegment ?: stringResource(R.string.none),
+                    )
+                )
+            }
+        },
+        onCancelClick = onCancelClick,
+        onSave = onSave,
+        cancelButtonText = cancelButtonText,
+        onDismissRequest = onDismissRequest,
+    )
+}
+
+
+@Composable
+fun LocalMusicDownloadUriDialog(
+    currentValue: Uri? = null,
+    onCancelClick: () -> Unit = {},
+    onSave: (Uri) -> Unit,
+) {
+    LocalMusicUriDialog(
+        currentValue = currentValue,
+        modeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        title = { Text(stringResource(R.string.music_download_directory)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(text = stringResource(R.string.download_directory_help))
+                Text(
+                    stringResource(
+                        R.string.current_value,
+                        currentValue?.lastPathSegment ?: stringResource(R.string.none),
+                    )
+                )
+            }
+        },
+        onCancelClick = onCancelClick,
+        onSave = onSave,
     )
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -11,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -18,13 +20,19 @@ import androidx.compose.ui.unit.dp
 fun AlbumBadges(
     genres: List<String>,
     styles: List<String>,
+    year: String?,
     modifier: Modifier = Modifier,
 ) {
-    if (genres.isNotEmpty() || styles.isNotEmpty()) {
-        FlowRow(
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = modifier.padding(vertical = 10.dp),
-        ) {
+    if (genres.isNotEmpty() || styles.isNotEmpty() || year != null) {
+        FlowRow(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = modifier) {
+            if (year != null) {
+                Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        content = { Text(text = year) },
+                    )
+                }
+            }
             genres.forEach { genre ->
                 Box(modifier = Modifier.padding(horizontal = 2.5.dp)) {
                     Badge(

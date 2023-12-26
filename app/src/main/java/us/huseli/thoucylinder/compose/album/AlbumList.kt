@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -36,11 +35,12 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.nullIfBlank
 
 @Composable
-fun AlbumList(
-    pojos: List<AbstractAlbumPojo>,
-    albumCallbacks: (AbstractAlbumPojo) -> AlbumCallbacks,
+fun <T : AbstractAlbumPojo> AlbumList(
+    pojos: List<T>,
+    albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
     albumDownloadTasks: List<AlbumDownloadTask>,
@@ -49,7 +49,7 @@ fun AlbumList(
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val isSelected = { pojo: AbstractAlbumPojo -> selectedAlbums.contains(pojo.album) }
+    val isSelected = { pojo: T -> selectedAlbums.contains(pojo.album) }
 
     Column {
         SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
@@ -57,19 +57,22 @@ fun AlbumList(
         ItemList(
             things = pojos,
             isSelected = isSelected,
-            onClick = { pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
-            onLongClick = { pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
+            onClick = { _, pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
+            onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
             onEmpty = onEmpty,
-            key = { it.album.albumId },
+            key = { _, item -> item.album.albumId },
             listState = listState,
-        ) { pojo ->
-            val (downloadProgress, downloadIsActive) = getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
+            cardHeight = 70.dp,
+        ) { _, pojo ->
+            val (downloadProgress, downloadIsActive) =
+                getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
             val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
                 pluralStringResource(R.plurals.x_tracks, pojo.trackCount, pojo.trackCount),
                 pojo.yearString,
                 pojo.duration?.sensibleFormat(),
-            ).joinToString(" • ").takeIf { it.isNotBlank() }
+            ).joinToString(" • ").nullIfBlank()
+            val callbacks = albumCallbacks(pojo)
 
             LaunchedEffect(pojo.album.albumId) {
                 imageBitmap.value = pojo.getThumbnail(context)
@@ -83,12 +86,11 @@ fun AlbumList(
                     borderWidth = if (isSelected(pojo)) null else 1.dp,
                 )
 
-                Column(modifier = Modifier.fillMaxHeight()) {
+                Column {
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(top = 5.dp, bottom = if (downloadIsActive) 3.dp else 5.dp)
-                            .weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -114,15 +116,22 @@ fun AlbumList(
                                 Text(
                                     text = thirdRow,
                                     style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                                    maxLines = 1,
                                 )
                             }
                         }
+
+                        Column(
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxHeight(),
+                            content = { AlbumSmallIcons(pojo = pojo) },
+                        )
 
                         AlbumContextMenuWithButton(
                             isLocal = pojo.album.isLocal,
                             isInLibrary = pojo.album.isInLibrary,
                             isPartiallyDownloaded = pojo.isPartiallyDownloaded,
-                            callbacks = albumCallbacks(pojo),
+                            callbacks = callbacks,
                         )
                     }
 

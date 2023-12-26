@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.sensibleFormat
 import us.huseli.thoucylinder.R
@@ -42,11 +43,11 @@ fun PlaylistList(
 
     ItemList(
         things = playlists,
-        onClick = onPlaylistClick,
+        onClick = { _, pojo -> onPlaylistClick(pojo) },
         cardHeight = 60.dp,
-        key = { it.playlistId },
+        key = { _, pojo -> pojo.playlistId },
         onEmpty = onEmpty,
-    ) { playlist ->
+    ) { _, playlist ->
         val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(Unit) {
@@ -72,7 +73,12 @@ fun PlaylistList(
                     playlist.totalDuration.sensibleFormat(),
                 )
 
-                Text(text = playlist.name, maxLines = 1, style = ThouCylinderTheme.typographyExtended.listNormalHeader)
+                Text(
+                    text = playlist.name,
+                    maxLines = 2,
+                    style = ThouCylinderTheme.typographyExtended.listNormalHeader,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     text = secondLine.joinToString(" • "),
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,

@@ -54,6 +54,8 @@ fun TrackListRow(
 ) {
     val (downloadProgress, downloadIsActive) = getDownloadProgress(downloadTask)
 
+    callbacks.onEach?.invoke()
+
     Card(
         colors = CardDefaults.outlinedCardColors(
             containerColor = containerColor
@@ -77,6 +79,7 @@ fun TrackListRow(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(top = 5.dp, bottom = if (downloadIsActive) 3.dp else 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(

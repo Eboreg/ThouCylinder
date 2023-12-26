@@ -1,8 +1,10 @@
 import java.util.Properties
 import java.io.FileInputStream
 
+val keystoreProperties = Properties()
 val secretsProperties = Properties()
 
+keystoreProperties.load(FileInputStream(rootProject.file("keystore.properties")))
 secretsProperties.load(FileInputStream(rootProject.file("secrets.properties")))
 
 plugins {
@@ -22,12 +24,24 @@ android {
     namespace = "us.huseli.thoucylinder"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
+    }
+
     defaultConfig {
+        manifestPlaceholders += mapOf()
         val youtubeApiKey = secretsProperties["youtubeApiKey"] as String
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
         val spotifyClientId = secretsProperties["spotifyClientId"] as String
         val spotifyClientSecret = secretsProperties["spotifyClientSecret"] as String
+        val lastFmApiKey = secretsProperties["lastFmApiKey"] as String
+        val lastFmApiSecret = secretsProperties["lastFmApiSecret"] as String
 
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
@@ -48,6 +62,9 @@ android {
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
         buildConfigField("String", "spotifyClientId", "\"$spotifyClientId\"")
         buildConfigField("String", "spotifyClientSecret", "\"$spotifyClientSecret\"")
+        buildConfigField("String", "lastFmApiKey", "\"$lastFmApiKey\"")
+        buildConfigField("String", "lastFmApiSecret", "\"$lastFmApiSecret\"")
+        signingConfig = signingConfigs.getByName("release")
     }
 
     buildTypes {
@@ -91,7 +108,7 @@ android {
 
 val lifecycleVersion = "2.6.2"
 val roomVersion = "2.6.1"
-val daggerVersion = "2.49"
+val daggerVersion = "2.50"
 val media3Version = "1.2.0"
 val pagingVersion = "3.3.0-alpha02"
 
@@ -107,8 +124,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Compose related:
-    implementation("androidx.activity:activity-compose:1.8.1")
-    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
@@ -155,8 +172,14 @@ dependencies {
     implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
 
     // Spotify:
-    implementation("com.spotify.android:auth:2.1.0")
+    implementation("com.spotify.android:auth:2.1.1")
 
     // Levenshtein string distance:
     implementation("org.apache.commons:commons-text:1.11.0")
+
+    // SimpleStorage for easier file handling:
+    implementation("com.anggrayudi:storage:1.5.5")
+
+    // XStream to parse XML:
+    implementation("com.thoughtworks.xstream:xstream:1.4.20")
 }

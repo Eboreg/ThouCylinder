@@ -8,8 +8,8 @@ data class ArtistPojo(
     val name: String,
     val albumCount: Int,
     val trackCount: Int,
-    val firstAlbumArt: Uri?,
-    val firstAlbumArtThumbnail: Uri?,
+    val firstAlbumArtUri: Uri?,
+    val firstAlbumArtUrl: String?,
     val totalDurationMs: Long,
 ) {
     val totalDuration: Duration

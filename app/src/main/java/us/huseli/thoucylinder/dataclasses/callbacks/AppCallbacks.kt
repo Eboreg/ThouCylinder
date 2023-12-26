@@ -1,6 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.callbacks
 
-import us.huseli.thoucylinder.Selection
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track

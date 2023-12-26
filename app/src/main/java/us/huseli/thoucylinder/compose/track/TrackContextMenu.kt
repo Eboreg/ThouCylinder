@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -82,6 +83,28 @@ fun TrackContextMenu(
                     onArtistClick()
                     onDismissRequest()
                 },
+            )
+        }
+
+        callbacks.onPlayOnYoutubeClick?.also { onPlayOnYoutubeClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play_on_youtube)) },
+                leadingIcon = { Icon(painterResource(R.drawable.youtube), null) },
+                onClick = {
+                    onPlayOnYoutubeClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
+        callbacks.onPlayOnSpotifyClick?.also { onPlayOnSpotifyClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play_on_spotify)) },
+                leadingIcon = { Icon(painterResource(R.drawable.spotify), null) },
+                onClick = {
+                    onPlayOnSpotifyClick()
+                    onDismissRequest()
+                }
             )
         }
 

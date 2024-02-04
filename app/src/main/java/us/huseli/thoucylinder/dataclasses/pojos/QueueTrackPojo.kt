@@ -1,7 +1,11 @@
 package us.huseli.thoucylinder.dataclasses.pojos
 
+import android.content.Context
 import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
@@ -26,19 +30,39 @@ data class QueueTrackPojo(
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
 
+    fun toMediaItem(): MediaItem = MediaItem.Builder()
+        .setMediaId(queueTrackId.toString())
+        .setUri(uri)
+        .setMediaMetadata(getMediaMetadata())
+        .setTag(this)
+        .build()
+
+    private fun getMediaMetadata(): MediaMetadata {
+        return MediaMetadata.Builder()
+            .setArtist(track.artist)
+            .setTitle(track.title)
+            .setAlbumArtist(album?.artist)
+            .setAlbumTitle(album?.title)
+            .setDiscNumber(track.discNumber)
+            .setReleaseYear(track.year ?: album?.year)
+            .setArtworkUri(
+                album?.albumArt?.uri
+                    ?: album?.lastFmFullImageUrl?.toUri()
+                    ?: album?.youtubePlaylist?.fullImage?.url?.toUri()
+            )
+            .build()
+    }
+
     override fun equals(other: Any?) = other is QueueTrackPojo &&
         other.track.trackId == track.trackId &&
         other.queueTrackId == queueTrackId &&
         other.uri == uri
 
-    fun toMediaItem(): MediaItem = MediaItem.Builder()
-        .setMediaId(queueTrackId.toString())
-        .setUri(uri)
-        .setTag(this)
-        .build()
+    override suspend fun getFullImageBitmap(context: Context): ImageBitmap? {
+        return super.getFullImageBitmap(context) ?: spotifyAlbum?.getFullImageBitmap(context)
+    }
 
-    override fun hashCode(): Int =
-        31 * (31 * (31 * track.trackId.hashCode()) + uri.hashCode()) + queueTrackId.hashCode()
+    override fun hashCode(): Int = 31 * (31 * track.trackId.hashCode() + uri.hashCode()) + queueTrackId.hashCode()
 }
 
 fun List<QueueTrackPojo>.reindexed(): List<QueueTrackPojo> = mapIndexed { index, pojo -> pojo.copy(position = index) }

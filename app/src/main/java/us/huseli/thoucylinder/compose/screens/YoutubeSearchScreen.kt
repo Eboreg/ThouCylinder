@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -22,7 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.TrackDownloadTask
@@ -56,7 +54,6 @@ fun YoutubeSearchScreen(
     appCallbacks: AppCallbacks,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
     val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle(emptyList())
@@ -72,24 +69,6 @@ fun YoutubeSearchScreen(
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var latestSelectedTrackIndex by rememberSaveable(selectedTrackPojos) { mutableStateOf<Int?>(null) }
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
-
-    fun ensureTrackMetadata(pojos: List<TrackPojo>, callback: (List<TrackPojo>) -> Unit) =
-        scope.launch { callback(viewModel.ensureTrackMetadata(pojos)) }
-
-    fun ensureTrackMetadata(pojo: TrackPojo, callback: (TrackPojo) -> Unit) =
-        ensureTrackMetadata(listOf(pojo)) { callback(it.first()) }
-
-    fun ensureTrackMetadata(pojos: List<AlbumWithTracksPojo>, callback: (List<AlbumWithTracksPojo>) -> Unit) =
-        scope.launch {
-            callback(
-                pojos.map { pojo ->
-                    pojo.copy(tracks = viewModel.ensureTrackMetadata(pojo.trackPojos).map { it.track })
-                }
-            )
-        }
-
-    fun ensureTrackMetadata(pojo: AlbumWithTracksPojo, callback: (AlbumWithTracksPojo) -> Unit) =
-        ensureTrackMetadata(listOf(pojo)) { callback(it.first()) }
 
     val isSearching = when (listType) {
         ListType.ALBUMS -> isSearchingAlbums
@@ -126,9 +105,7 @@ fun YoutubeSearchScreen(
             }
         }
 
-        if (isSearching) {
-            ObnoxiousProgressIndicator(modifier = Modifier.padding(10.dp), tonalElevation = 5.dp)
-        }
+        if (isSearching) ObnoxiousProgressIndicator()
 
         when (listType) {
             ListType.ALBUMS -> AlbumSearchResults(
@@ -138,16 +115,16 @@ fun YoutubeSearchScreen(
                 isSearching = isSearchingAlbums,
                 albumDownloadTasks = albumDownloadTasks,
                 albumCallbacks = { pojo: AlbumWithTracksPojo ->
-                    AlbumCallbacks.fromAppCallbacks(
+                    AlbumCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         context = context,
-                        onPlayClick = { ensureTrackMetadata(pojo) { viewModel.playTrackPojos(it.trackPojos) } },
+                        onPlayClick = { viewModel.ensureAlbumTracksMetadataAsync(pojo) { viewModel.playTrackPojos(it.trackPojos) } },
                         onEnqueueClick = {
-                            ensureTrackMetadata(pojo) { viewModel.enqueueTrackPojos(it.trackPojos, context) }
+                            viewModel.ensureAlbumTracksMetadataAsync(pojo) { viewModel.enqueueTrackPojos(it.trackPojos, context) }
                         },
                         onAddToPlaylistClick = {
-                            ensureTrackMetadata(pojo) {
+                            viewModel.ensureAlbumTracksMetadataAsync(pojo) {
                                 appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = it))
                             }
                         },
@@ -162,18 +139,18 @@ fun YoutubeSearchScreen(
                 },
                 albumSelectionCallbacks = AlbumSelectionCallbacks(
                     onPlayClick = {
-                        ensureTrackMetadata(selectedAlbumPojos.flatMap { it.trackPojos }) {
+                        viewModel.ensureTrackPojoMetadataAsync(selectedAlbumPojos.flatMap { it.trackPojos }) {
                             viewModel.playTrackPojos(it)
                         }
                     },
                     onEnqueueClick = {
-                        ensureTrackMetadata(selectedAlbumPojos.flatMap { it.trackPojos }) {
+                        viewModel.ensureTrackPojoMetadataAsync(selectedAlbumPojos.flatMap { it.trackPojos }) {
                             viewModel.enqueueTrackPojos(it, context)
                         }
                     },
                     onUnselectAllClick = { viewModel.unselectAllAlbums() },
                     onAddToPlaylistClick = {
-                        ensureTrackMetadata(selectedAlbumPojos) {
+                        viewModel.ensureAlbumTracksMetadataAsync(selectedAlbumPojos) {
                             appCallbacks.onAddToPlaylistClick(Selection(albumsWithTracks = it))
                         }
                     },
@@ -187,13 +164,17 @@ fun YoutubeSearchScreen(
                 displayType = displayType,
                 isSearching = isSearchingTracks,
                 trackCallbacks = { index: Int, pojo: TrackPojo ->
-                    TrackCallbacks.fromAppCallbacks(
+                    TrackCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         context = context,
-                        onEnqueueClick = { ensureTrackMetadata(pojo) { viewModel.enqueueTrackPojo(it, context) } },
+                        onEnqueueClick = {
+                            viewModel.ensureTrackPojoMetadataAsync(pojo) { viewModel.enqueueTrackPojo(it, context) }
+                        },
                         onAddToPlaylistClick = {
-                            ensureTrackMetadata(pojo) { appCallbacks.onAddToPlaylistClick(Selection(track = it.track)) }
+                            viewModel.ensureTrackPojoMetadataAsync(pojo) {
+                                appCallbacks.onAddToPlaylistClick(Selection(track = it.track))
+                            }
                         },
                         onLongClick = {
                             viewModel.selectTrackPojos(
@@ -203,7 +184,7 @@ fun YoutubeSearchScreen(
                             )
                         },
                         onTrackClick = {
-                            ensureTrackMetadata(pojo) {
+                            viewModel.ensureTrackPojoMetadataAsync(pojo) {
                                 if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(it)
                                 else viewModel.playTrackPojo(it)
                             }
@@ -217,13 +198,13 @@ fun YoutubeSearchScreen(
                 trackDownloadTasks = trackDownloadTasks,
                 trackSelectionCallbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = {
-                        ensureTrackMetadata(selectedTrackPojos) { pojos ->
+                        viewModel.ensureTrackPojoMetadataAsync(selectedTrackPojos) { pojos ->
                             appCallbacks.onAddToPlaylistClick(Selection(tracks = pojos.tracks()))
                         }
                     },
-                    onPlayClick = { ensureTrackMetadata(selectedTrackPojos) { viewModel.playTrackPojos(it) } },
+                    onPlayClick = { viewModel.ensureTrackPojoMetadataAsync(selectedTrackPojos) { viewModel.playTrackPojos(it) } },
                     onEnqueueClick = {
-                        ensureTrackMetadata(selectedTrackPojos) {
+                        viewModel.ensureTrackPojoMetadataAsync(selectedTrackPojos) {
                             viewModel.enqueueTrackPojos(it, context)
                         }
                     },
@@ -281,7 +262,7 @@ fun TrackSearchResults(
     displayType: DisplayType,
     isSearching: Boolean,
     selectedTrackPojos: List<TrackPojo>,
-    trackCallbacks: (Int, TrackPojo) -> TrackCallbacks,
+    trackCallbacks: (Int, TrackPojo) -> TrackCallbacks<TrackPojo>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     tracks: LazyPagingItems<TrackPojo>,
     trackDownloadTasks: List<TrackDownloadTask>,

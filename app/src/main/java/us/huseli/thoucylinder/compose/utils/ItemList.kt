@@ -29,7 +29,7 @@ fun <T> ItemList(
     things: List<T>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
-    cardHeight: Dp? = 70.dp,
+    cardHeight: Dp = 70.dp,
     gap: Dp = 8.dp,
     key: ((index: Int, item: T) -> Any)? = null,
     border: BorderStroke? = null,
@@ -39,7 +39,7 @@ fun <T> ItemList(
     cardModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     padding: PaddingValues = PaddingValues(horizontal = 10.dp),
-    showNumericBarAtItemCount: Int = 20,
+    showNumericBarAtItemCount: Int = 50,
     onEmpty: (@Composable () -> Unit)? = null,
     leadingItem: (@Composable LazyItemScope.() -> Unit)? = null,
     trailingItem: (@Composable LazyItemScope.() -> Unit)? = null,
@@ -53,6 +53,7 @@ fun <T> ItemList(
         listSize = things.size,
         minItems = showNumericBarAtItemCount,
         modifier = modifier.padding(padding),
+        itemHeight = cardHeight + gap,
     ) {
         LazyColumn(
             state = listState,
@@ -71,8 +72,7 @@ fun <T> ItemList(
                     border = border,
                     colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
                     shape = MaterialTheme.shapes.extraSmall,
-                    modifier = cardModifier.fillMaxWidth()
-                        .let { if (cardHeight != null) it.height(cardHeight) else it }
+                    modifier = cardModifier.fillMaxWidth().height(cardHeight)
                         .let {
                             if (onClick != null || onLongClick != null) it.combinedClickable(
                                 onClick = { onClick?.invoke(index, thing) },

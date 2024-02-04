@@ -18,14 +18,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
+import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
 import us.huseli.thoucylinder.nullIfBlank
 
 @Composable
 fun EditAlbumTrackSection(
     track: Track,
-    initialTrack: Track,
+    albumPojo: AlbumWithTracksPojo,
     enabled: Boolean,
     modifier: Modifier = Modifier,
     onChange: (Track) -> Unit,
@@ -35,59 +37,73 @@ fun EditAlbumTrackSection(
     var year by rememberSaveable { mutableStateOf(track.year) }
     var editMode by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = modifier) {
-        Text(text = initialTrack.toString(), style = MaterialTheme.typography.labelMedium)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                if (!editMode) {
-                    Text(text = (artist?.let { "$it - " } ?: "") + title + (year?.let { " ($it)" } ?: ""))
-                } else {
-                    Row {
-                        OutlinedTextField(
-                            value = title,
-                            onValueChange = { title = it },
-                            label = { OutlinedTextFieldLabel(text = stringResource(R.string.title)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f).height(60.dp),
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.title)) },
-                            enabled = enabled,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        OutlinedTextField(
-                            value = artist ?: "",
-                            onValueChange = { value -> artist = value.nullIfBlank() },
-                            label = { OutlinedTextFieldLabel(text = stringResource(R.string.artist)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.7f).height(60.dp),
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.artist)) },
-                            enabled = enabled,
-                        )
-                        OutlinedTextField(
-                            value = year?.toString() ?: "",
-                            onValueChange = { year = it.toIntOrNull() },
-                            label = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.3f).height(60.dp),
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
-                            enabled = enabled,
-                        )
-                    }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            if (!editMode) {
+                Text(track.toString(showYear = true, albumPojo = albumPojo))
+            } else {
+                Row {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { OutlinedTextFieldLabel(text = stringResource(R.string.title)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).height(60.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.title)) },
+                        enabled = enabled,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    OutlinedTextField(
+                        value = artist ?: "",
+                        onValueChange = { value -> artist = value.nullIfBlank() },
+                        label = { OutlinedTextFieldLabel(text = stringResource(R.string.artist)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(0.7f).height(60.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.artist)) },
+                        enabled = enabled,
+                    )
+                    OutlinedTextField(
+                        value = year?.toString() ?: "",
+                        onValueChange = { year = it.toIntOrNull() },
+                        label = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(0.3f).height(60.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        placeholder = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
+                        enabled = enabled,
+                    )
                 }
             }
-            Column {
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (editMode) {
+                SmallButton(
+                    onClick = {
+                        onChange(track.copy(title = title, artist = artist, year = year))
+                        editMode = false
+                    },
+                    text = stringResource(R.string.save),
+                )
                 SmallOutlinedButton(
                     onClick = {
-                        if (editMode) onChange(track.copy(title = title, artist = artist, year = year))
-                        editMode = !editMode
+                        editMode = false
+                        title = track.title
+                        artist = track.artist
+                        year = track.year
                     },
-                    text = stringResource(if (!editMode) R.string.edit else R.string.save),
+                    text = stringResource(R.string.cancel),
+                )
+            } else {
+                SmallOutlinedButton(
+                    onClick = { editMode = true },
+                    text = stringResource(R.string.edit),
                 )
             }
         }

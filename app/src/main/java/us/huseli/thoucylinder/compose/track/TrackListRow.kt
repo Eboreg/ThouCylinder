@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.DragHandle
 import androidx.compose.material.icons.sharp.MusicNote
@@ -28,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.burnoutcrew.reorderable.ReorderableLazyListState
 import org.burnoutcrew.reorderable.detectReorder
-import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
@@ -45,7 +44,8 @@ fun TrackListRow(
     thumbnail: ImageBitmap?,
     isSelected: Boolean,
     isDownloadable: Boolean,
-    callbacks: TrackCallbacks,
+    isInLibrary: Boolean,
+    callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
@@ -75,25 +75,25 @@ fun TrackListRow(
                 borderWidth = if (isSelected) null else 1.dp,
             )
 
-            Column(modifier = Modifier.fillMaxHeight()) {
+            Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 5.dp, bottom = if (downloadIsActive) 3.dp else 5.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(
                             text = title,
                             maxLines = if (artist == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                            style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
                         if (artist != null) {
                             Text(
                                 text = artist,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                                style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
                             )
                         }
                     }
@@ -102,15 +102,15 @@ fun TrackListRow(
                         Text(
                             text = duration.sensibleFormat(),
                             modifier = Modifier.padding(start = 5.dp),
-                            style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                            style = ThouCylinderTheme.typographyExtended.listNormalTitle,
                         )
                     }
 
-                    TrackContextMenuWithButton(
+                    TrackContextButtonWithMenu(
                         isDownloadable = isDownloadable,
                         callbacks = callbacks,
                         extraItems = extraContextMenuItems,
-                        modifier = Modifier.size(35.dp),
+                        isInLibrary = isInLibrary,
                     )
 
                     if (reorderableState != null) {
@@ -122,11 +122,13 @@ fun TrackListRow(
                     }
                 }
 
-                if (downloadIsActive) {
-                    LinearProgressIndicator(
-                        progress = downloadProgress?.toFloat() ?: 0f,
-                        modifier = Modifier.fillMaxWidth().height(2.dp),
-                    )
+                Row(modifier = Modifier.height(2.dp).fillMaxWidth()) {
+                    if (downloadIsActive) {
+                        LinearProgressIndicator(
+                            progress = downloadProgress?.toFloat() ?: 0f,
+                            modifier = Modifier.fillMaxWidth().height(2.dp),
+                        )
+                    }
                 }
             }
         }

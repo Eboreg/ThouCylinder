@@ -22,8 +22,10 @@ abstract class AbstractTrackPojo {
     val isOnSpotify: Boolean
         get() = spotifyTrack != null
 
-    suspend fun getFullImage(context: Context): ImageBitmap? =
-        track.getFullImage(context) ?: album?.getFullImage(context)
+    suspend fun getFullBitmap(context: Context) = track.getFullBitmap(context) ?: album?.getFullBitmap(context)
+
+    open suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
+        track.getFullImageBitmap(context) ?: album?.getFullImageBitmap(context)
 
     override fun equals(other: Any?) = other is AbstractTrackPojo && other.track == track && other.album == album
 

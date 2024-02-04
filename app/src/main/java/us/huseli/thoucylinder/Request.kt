@@ -81,8 +81,12 @@ class Request(
     }
 }
 
-suspend fun URLConnection.getString(): String =
+suspend fun URLConnection.getString(): String = try {
     withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
+} catch (e: Exception) {
+    Log.e(javaClass.simpleName, "getString [url=$url]: $e", e)
+    throw e
+}
 
 suspend fun <T> URLConnection.getObject(responseType: TypeToken<T>): T? =
     getString().let { Request.gson.fromJson(it, responseType) }
@@ -93,3 +97,5 @@ suspend fun URLConnection.getJson(): Map<String, *> = getString().let {
 
 suspend fun URLConnection.getBitmap(): Bitmap? =
     withContext(Dispatchers.IO) { getInputStream().use { BitmapFactory.decodeStream(it) } }
+
+suspend fun URLConnection.getSquareBitmap(): Bitmap? = getBitmap()?.square()

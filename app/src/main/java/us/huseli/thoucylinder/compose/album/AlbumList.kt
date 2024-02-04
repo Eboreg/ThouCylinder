@@ -24,7 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
@@ -60,13 +60,12 @@ fun <T : AbstractAlbumPojo> AlbumList(
             onClick = { _, pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
             onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
             onEmpty = onEmpty,
-            key = { _, item -> item.album.albumId },
             listState = listState,
             cardHeight = 70.dp,
         ) { _, pojo ->
             val (downloadProgress, downloadIsActive) =
                 getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
-            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+            val imageBitmap = remember(pojo.album) { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
                 pluralStringResource(R.plurals.x_tracks, pojo.trackCount, pojo.trackCount),
                 pojo.yearString,
@@ -74,7 +73,7 @@ fun <T : AbstractAlbumPojo> AlbumList(
             ).joinToString(" • ").nullIfBlank()
             val callbacks = albumCallbacks(pojo)
 
-            LaunchedEffect(pojo.album.albumId) {
+            LaunchedEffect(pojo.album) {
                 imageBitmap.value = pojo.getThumbnail(context)
             }
 

@@ -1,13 +1,14 @@
 package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.PlaylistAdd
-import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Download
+import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
+import androidx.compose.material.icons.sharp.PlaylistAdd
+import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,12 +27,12 @@ import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 
-
 @Composable
 fun TrackContextMenu(
     isShown: Boolean,
     isDownloadable: Boolean,
-    callbacks: TrackCallbacks,
+    isInLibrary: Boolean,
+    callbacks: TrackCallbacks<*>,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
@@ -130,15 +131,27 @@ fun TrackContextMenu(
             },
         )
 
+        if (isInLibrary) {
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.edit_track)) },
+                leadingIcon = { Icon(Icons.Sharp.Edit, null) },
+                onClick = {
+                    callbacks.onEditTrackClick()
+                    onDismissRequest()
+                },
+            )
+        }
+
         extraItems?.invoke()
     }
 }
 
 
 @Composable
-fun TrackContextMenuWithButton(
+fun TrackContextButtonWithMenu(
     isDownloadable: Boolean,
-    callbacks: TrackCallbacks,
+    isInLibrary: Boolean,
+    callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
@@ -159,6 +172,7 @@ fun TrackContextMenuWithButton(
                 isDownloadable = isDownloadable,
                 hideAlbum = hideAlbum,
                 extraItems = extraItems,
+                isInLibrary = isInLibrary,
             )
         }
     )

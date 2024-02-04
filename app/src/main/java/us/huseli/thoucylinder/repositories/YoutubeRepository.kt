@@ -15,9 +15,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import us.huseli.retaintheme.dpToPx
-import us.huseli.retaintheme.toDuration
+import us.huseli.retaintheme.extensions.dpToPx
+import us.huseli.retaintheme.extensions.toDuration
 import us.huseli.thoucylinder.AlbumDownloadTask
+import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
 import us.huseli.thoucylinder.Constants.DOWNLOAD_CHUNK_SIZE
 import us.huseli.thoucylinder.Constants.HEADER_ANDROID_SDK_VERSION
 import us.huseli.thoucylinder.Constants.HEADER_X_YOUTUBE_CLIENT_NAME
@@ -26,12 +27,13 @@ import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_EXCLUDE
 import us.huseli.thoucylinder.Constants.VIDEO_MIMETYPE_FILTER
 import us.huseli.thoucylinder.Constants.YOUTUBE_BROWSE_URL
-import us.huseli.thoucylinder.Constants.YOUTUBE_HEADER_USER_AGENT
+import us.huseli.thoucylinder.Constants.YOUTUBE_USER_AGENT
 import us.huseli.thoucylinder.Constants.YOUTUBE_PLAYER_URL
 import us.huseli.thoucylinder.Constants.YOUTUBE_SEARCH_URL
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
@@ -127,7 +129,7 @@ class YoutubeRepository @Inject constructor(
         val body = Request.get(
             url = "https://www.youtube.com/results?search_query=$encodedQuery",
             headers = mapOf(
-                "User-Agent" to "kuken/1.2.3",
+                "User-Agent" to CUSTOM_USER_AGENT,
                 "Accept" to "*/*",
             )
         ).connect().getString()
@@ -220,7 +222,7 @@ class YoutubeRepository @Inject constructor(
         val requestData: MutableMap<String, Any> = mutableMapOf(
             "context" to mapOf(
                 "client" to mapOf(
-                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
+                    "userAgent" to YOUTUBE_USER_AGENT,
                     "hl" to "en",
                     "clientName" to "WEB",
                     "clientVersion" to "2.20231003.02.02",
@@ -248,11 +250,12 @@ class YoutubeRepository @Inject constructor(
             val thumbnailRenderer = response.yquery<Collection<Map<*, *>>>("sidebar.playlistSidebarRenderer.items")
                 ?.firstOrNull()
                 ?.yquery<Map<*, *>>("playlistSidebarPrimaryInfoRenderer.thumbnailRenderer")
-            val imageData =
-                thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistCustomThumbnailRenderer.thumbnail.thumbnails")
-                    ?.let { getImageData(it) }
-                    ?: thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistVideoThumbnailRenderer.thumbnail.thumbnails")
-                        ?.let { getImageData(it) }
+            val imageData = getImageData(
+                listOf(
+                    thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistCustomThumbnailRenderer.thumbnail.thumbnails"),
+                    thumbnailRenderer?.yquery<Collection<Map<*, *>>>("playlistVideoThumbnailRenderer.thumbnail.thumbnails"),
+                )
+            )
             val tracks = mutableListOf<Track>()
             val album = Album(
                 title = title,
@@ -267,6 +270,7 @@ class YoutubeRepository @Inject constructor(
                     thumbnail = imageData?.thumbnail,
                     fullImage = imageData?.fullImage,
                 ),
+                albumArt = imageData?.fullImage?.let { MediaStoreImage.fromUrls(it.url, imageData.thumbnail?.url) },
             )
 
             response.yquery<Collection<Map<*, *>>>("contents.twoColumnBrowseResultsRenderer.tabs")
@@ -317,7 +321,7 @@ class YoutubeRepository @Inject constructor(
         val requestData: MutableMap<String, Any> = mutableMapOf(
             "context" to mapOf(
                 "client" to mapOf(
-                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
+                    "userAgent" to YOUTUBE_USER_AGENT,
                     "hl" to "en",
                     "clientName" to "WEB",
                     "clientVersion" to "2.20231003.02.02",
@@ -332,7 +336,7 @@ class YoutubeRepository @Inject constructor(
         val response = Request.postJson(
             url = YOUTUBE_SEARCH_URL,
             headers = mapOf(
-                "User-Agent" to YOUTUBE_HEADER_USER_AGENT,
+                "User-Agent" to YOUTUBE_USER_AGENT,
                 "X-YouTube-Client-Name" to "WEB",
                 "X-YouTube-Client-Version" to "2.20231003.02.02",
                 "Origin" to "https://www.youtube.com",
@@ -354,8 +358,9 @@ class YoutubeRepository @Inject constructor(
                 val videoId = itemContent.yquery<String>("videoRenderer.videoId")
                 val title = itemContent.yquery<Collection<Map<*, *>>>("videoRenderer.title.runs")
                     ?.firstOrNull()?.get("text") as? String
-                val imageData = itemContent.yquery<Collection<Map<*, *>>>("videoRenderer.thumbnail.thumbnails")
-                    ?.let { getImageData(it) }
+                val imageData = getImageData(
+                    listOf(itemContent.yquery<Collection<Map<*, *>>>("videoRenderer.thumbnail.thumbnails"))
+                )
                 val lengthText = itemContent.yquery<String>("videoRenderer.lengthText.simpleText")
 
                 if (videoId != null && title != null) {
@@ -413,7 +418,7 @@ class YoutubeRepository @Inject constructor(
                     "clientName" to "ANDROID",
                     "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION,
                     "androidSdkVersion" to HEADER_ANDROID_SDK_VERSION,
-                    "userAgent" to YOUTUBE_HEADER_USER_AGENT,
+                    "userAgent" to YOUTUBE_USER_AGENT,
                     "hl" to "en",
                     "timeZone" to "UTC",
                     "utcOffsetMinutes" to 0,
@@ -432,7 +437,7 @@ class YoutubeRepository @Inject constructor(
         val response = Request.postJson(
             url = YOUTUBE_PLAYER_URL,
             headers = mapOf(
-                "User-Agent" to YOUTUBE_HEADER_USER_AGENT,
+                "User-Agent" to YOUTUBE_USER_AGENT,
                 "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME,
                 "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION,
                 "Origin" to "https://www.youtube.com",
@@ -475,16 +480,18 @@ class YoutubeRepository @Inject constructor(
      * Does not fetch the actual images.
      * Used by getTrackSearchResult() & listPlaylistDetails().
      */
-    private fun getImageData(thumbnailSections: Collection<Map<*, *>>): ImageData? {
+    private fun getImageData(thumbnailSections: List<Collection<Map<*, *>>?>): ImageData? {
         val thumbnailSizePx = context.dpToPx(IMAGE_MAX_DP_THUMBNAIL * IMAGE_MAX_DP_THUMBNAIL)
         val images = mutableListOf<YoutubeImage>()
 
         thumbnailSections.forEach { section ->
-            val tnUrl = section["url"] as? String
-            val tnWidth = section["width"] as? Double
-            val tnHeight = section["height"] as? Double
-            if (tnUrl != null && tnWidth != null && tnHeight != null) {
-                images.add(YoutubeImage(url = tnUrl, width = tnWidth.toInt(), height = tnHeight.toInt()))
+            section?.forEach { collection ->
+                val tnUrl = collection["url"] as? String
+                val tnWidth = collection["width"] as? Double
+                val tnHeight = collection["height"] as? Double
+                if (tnUrl != null && tnWidth != null && tnHeight != null) {
+                    images.add(YoutubeImage(url = tnUrl, width = tnWidth.toInt(), height = tnHeight.toInt()))
+                }
             }
         }
 

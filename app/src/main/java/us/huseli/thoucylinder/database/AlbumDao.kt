@@ -70,14 +70,8 @@ interface AlbumDao {
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
 
-    @Query("DELETE FROM Album WHERE Album_isDeleted = 1")
-    suspend fun deleteMarkedAlbums()
-
     @Query("DELETE FROM Album WHERE Album_isInLibrary = 0")
     suspend fun deleteTempAlbums()
-
-    @Query("DELETE FROM Track WHERE Track_albumId IN (SELECT Album_albumId FROM Album WHERE Album_isDeleted = 1)")
-    suspend fun deleteTracksFromMarkedAlbums()
 
     fun flowAlbumPojosByArtist(artist: String) = flowAlbumPojos(
         sortParameter = AlbumSortParameter.TITLE,
@@ -123,6 +117,9 @@ interface AlbumDao {
     @Transaction
     fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
 
+    @Query("SELECT * FROM Genre ORDER BY Genre_genreName")
+    fun flowGenres(): Flow<List<Genre>>
+
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     suspend fun getAlbum(albumId: UUID): Album?
 
@@ -131,19 +128,15 @@ interface AlbumDao {
     suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo?
 
     @Transaction
-    suspend fun insertAlbumGenres(pojo: AbstractAlbumPojo) {
-        _insertGenres(*pojo.genres.toTypedArray())
-        _insertAlbumGenres(*pojo.genres.map {
-            AlbumGenre(albumId = pojo.album.albumId, genreName = it.genreName)
-        }.toTypedArray())
+    suspend fun insertAlbumGenres(albumId: UUID, genres: Collection<Genre>) {
+        _insertGenres(*genres.toTypedArray())
+        _insertAlbumGenres(*genres.map { AlbumGenre(albumId = albumId, genreName = it.genreName) }.toTypedArray())
     }
 
     @Transaction
-    suspend fun insertAlbumStyles(pojo: AbstractAlbumPojo) {
-        _insertStyles(*pojo.styles.toTypedArray())
-        _insertAlbumStyles(*pojo.styles.map {
-            AlbumStyle(albumId = pojo.album.albumId, styleName = it.styleName)
-        }.toTypedArray())
+    suspend fun insertAlbumStyles(albumId: UUID, styles: Collection<Style>) {
+        _insertStyles(*styles.toTypedArray())
+        _insertAlbumStyles(*styles.map { AlbumStyle(albumId = albumId, styleName = it.styleName) }.toTypedArray())
     }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -154,6 +147,9 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
     suspend fun listAlbums(): List<Album>
+
+    @Query("SELECT * FROM Album WHERE Album_isDeleted = 1")
+    suspend fun listDeletionMarkedAlbums(): List<Album>
 
     @Query("SELECT * FROM Genre")
     suspend fun listGenres(): List<Genre>
@@ -173,6 +169,18 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
     suspend fun listTracks(albumId: UUID): List<Track>
+
+    @Query("UPDATE Album SET Album_isDeleted = :isDeleted WHERE Album_albumId = :albumId")
+    suspend fun setAlbumIsDeleted(albumId: UUID, isDeleted: Boolean)
+
+    @Query("UPDATE Album SET Album_isHidden = :value WHERE Album_albumId = :albumId")
+    suspend fun setAlbumIsHidden(albumId: UUID, value: Boolean)
+
+    @Query("UPDATE Album SET Album_isInLibrary = :isInLibrary WHERE Album_albumId = :albumId")
+    suspend fun setAlbumIsInLibrary(albumId: UUID, isInLibrary: Boolean)
+
+    @Query("UPDATE Album SET Album_isLocal = :isLocal WHERE Album_albumId = :albumId")
+    suspend fun setAlbumIsLocal(albumId: UUID, isLocal: Boolean)
 
     @Update
     suspend fun updateAlbums(vararg albums: Album)

@@ -21,8 +21,7 @@ data class ID3Data(
 
 
 fun MediaInformation.extractID3Data(): ID3Data {
-    val format = getProperty("format")
-    val tags = if (format?.has("tags") == true) format.getJSONObject("tags") else null
+    val tags = streams.firstNotNullOfOrNull { it.tags }
 
     return ID3Data(
         title = tags?.getStringOrNull("title"),
@@ -32,7 +31,7 @@ fun MediaInformation.extractID3Data(): ID3Data {
         trackNumber = tags?.getIntOrNull("track"),
         year = tags?.getIntOrNull("date")?.takeIf { it in 1000..3000 },
         discNumber = tags?.getIntOrNull("disc"),
-        duration = format?.getDoubleOrNull("duration")?.seconds,
-        bitrate = format?.getIntOrNull("bit_rate"),
+        duration = formatProperties?.getDoubleOrNull("duration")?.seconds,
+        bitrate = formatProperties?.getIntOrNull("bit_rate"),
     )
 }

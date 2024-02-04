@@ -2,18 +2,21 @@ package us.huseli.thoucylinder.dataclasses.abstr
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import us.huseli.thoucylinder.asThumbnailImageBitmap
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getSquareBitmapByUrl
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -34,9 +37,6 @@ abstract class AbstractAlbumPojo {
 
     val isOnSpotify: Boolean
         get() = spotifyAlbum != null
-
-    val lastFmWebUrl: String?
-        get() = lastFmAlbum?.url
 
     val spotifyWebUrl: String?
         get() = spotifyAlbum?.let { "https://open.spotify.com/album/${it.id}" }
@@ -61,19 +61,34 @@ abstract class AbstractAlbumPojo {
     suspend fun getFullImage(context: Context): ImageBitmap? =
         getFullImageBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
 
+    @WorkerThread
+    suspend fun getOrCreateAlbumArt(context: Context): MediaStoreImage? {
+        val imageUrl = spotifyAlbum?.fullImage?.url ?: album.youtubePlaylist?.fullImage?.url
+
+        return album.albumArt ?: imageUrl?.let { album.saveInternalAlbumArtFiles(it, context) }
+    }
+
     suspend fun getThumbnail(context: Context): ImageBitmap? =
-        getThumbnailBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
+        getThumbnailBitmap(context)?.asThumbnailImageBitmap(context)
 
+    private suspend fun getFullImageBitmap(context: Context): Bitmap? = album.albumArt?.getFullBitmap(context)
+
+    /*
     private suspend fun getFullImageBitmap(context: Context): Bitmap? =
-        album.albumArt?.getFullImageBitmap(context)
-            ?: spotifyAlbum?.fullImage?.url?.getBitmapByUrl()
-            ?: lastFmAlbum?.fullImageUrl?.getBitmapByUrl()
-            ?: album.youtubePlaylist?.fullImage?.url?.getBitmapByUrl()
+        album.albumArt?.getFullBitmap(context)
+            ?: spotifyAlbum?.fullImage?.url?.getSquareBitmapByUrl()
+            ?: lastFmAlbum?.fullImageUrl?.getSquareBitmapByUrl()
+            ?: album.youtubePlaylist?.fullImage?.url?.getSquareBitmapByUrl()
+     */
 
+    private suspend fun getThumbnailBitmap(context: Context): Bitmap? = album.albumArt?.getThumbnailBitmap(context)
+
+    /*
     private suspend fun getThumbnailBitmap(context: Context): Bitmap? =
         album.albumArt?.getThumbnailBitmap(context)
-            ?: spotifyAlbum?.thumbnail?.url?.getBitmapByUrl()
-            ?: spotifyAlbum?.fullImage?.url?.getBitmapByUrl()
-            ?: lastFmAlbum?.thumbnailUrl?.getBitmapByUrl()
-            ?: album.youtubePlaylist?.thumbnail?.url?.getBitmapByUrl()
+            ?: spotifyAlbum?.thumbnail?.url?.getSquareBitmapByUrl()
+            ?: spotifyAlbum?.fullImage?.url?.getSquareBitmapByUrl()
+            ?: lastFmAlbum?.thumbnailUrl?.getSquareBitmapByUrl()
+            ?: album.youtubePlaylist?.thumbnail?.url?.getSquareBitmapByUrl()
+     */
 }

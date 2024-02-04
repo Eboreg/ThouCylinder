@@ -9,31 +9,55 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import com.anggrayudi.storage.extension.openInputStream
+import com.anggrayudi.storage.file.fullName
 import com.anggrayudi.storage.file.isWritable
 import com.anggrayudi.storage.file.mimeType
+import com.anggrayudi.storage.file.openInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import us.huseli.retaintheme.extensions.scaleToMaxSize
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
+import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.security.MessageDigest
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
-
-enum class DateTimePrecision { DAY, HOUR, MINUTE, SECOND }
-
-
-fun getApiUserAgent() = "ThouCylinder/${BuildConfig.VERSION_NAME} ( https://github.com/Eboreg/ThouCylinder )"
+import kotlin.math.sqrt
 
 
-fun <K, V> List<Map<K, V>>.join(): Map<K, V> =
-    mutableMapOf<K, V>().also { map { map -> it.putAll(map) } }.toMap()
+fun <T> List<T>.slice(start: Int, maxCount: Int) =
+    if (start >= size) emptyList()
+    else subList(start, min(start + maxCount, size))
+
+
+fun Color.distance(other: Color): Float {
+    val drp2 = (red - other.red).pow(2)
+    val dgp2 = (green - other.green).pow(2)
+    val dbp2 = (blue - other.blue).pow(2)
+    val t = (red + other.red) / 2
+
+    return sqrt(2 * drp2 + 4 * dgp2 + 3 * dbp2 + t * (drp2 - dbp2) / 256)
+}
+
+
+fun Int.pow(n: Int): Int = toDouble().pow(n).toInt()
+
+
+fun Bitmap.square(): Bitmap {
+    val length = min(width, height)
+
+    return if (width == height) this
+    else Bitmap.createBitmap(this, (width - length) / 2, (height - length) / 2, length, length)
+}
 
 
 @Suppress("UNCHECKED_CAST")
@@ -41,17 +65,6 @@ fun <K, V : Any> Map<K, V?>.filterValuesNotNull(): Map<K, V> = filterValues { it
 
 
 fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
-
-
-fun Long.toInstant(): Instant = Instant.ofEpochSecond(this)
-
-
-fun <T> List<T>.clone(): MutableList<T> = mutableListOf<T>().also { it.addAll(this) }
-
-
-fun <T> List<T>.padStart(length: Int, value: T? = null): List<T?> =
-    if (size < length) List(length - size) { value }.plus(this)
-    else this
 
 
 fun <T> List<T>.listItemsBetween(item1: T, item2: T): List<T> {
@@ -66,18 +79,6 @@ fun <T> List<T>.listItemsBetween(item1: T, item2: T): List<T> {
         toIndex - fromIndex < 2 -> emptyList()
         else -> subList(fromIndex + 1, toIndex)
     }
-}
-
-
-fun Instant.isoDateTime(precision: DateTimePrecision = DateTimePrecision.SECOND): String {
-    val pattern = when (precision) {
-        DateTimePrecision.DAY -> "yyyy-MM-dd"
-        DateTimePrecision.HOUR -> "yyyy-MM-dd HH"
-        DateTimePrecision.MINUTE -> "yyyy-MM-dd HH:mm"
-        DateTimePrecision.SECOND -> "yyyy-MM-dd HH:mm:ss"
-    }
-    val formatter = DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault())
-    return formatter.format(this)
 }
 
 
@@ -112,18 +113,15 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
 
 
 /** STRING ********************************************************************/
-
 fun String.escapeQuotes() = replace("\"", "\\\"")
 
 fun String.nullIfBlank(): String? = takeIf { it.isNotBlank() }
 
 fun String.nullIfEmpty(): String? = takeIf { it.isNotEmpty() }
 
-fun String.capitalized() = replace(Regex("((^\\p{L})|(?<=\\P{L})(\\p{L}))")) { it.value.uppercase() }
-
-suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
+suspend fun String.getSquareBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     try {
-        Request.get(this@getBitmapByUrl).connect().getBitmap()
+        Request.get(this@getSquareBitmapByUrl).connect().getSquareBitmap()
     } catch (e: FileNotFoundException) {
         Log.e("String", "getBitmapByUrl: $e", e)
         null
@@ -133,11 +131,8 @@ suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     }
 }
 
-fun String.md5(): ByteArray = MessageDigest.getInstance("MD5").digest(toByteArray(Charsets.UTF_8))
-
 
 /** MEDIAFORMAT ***************************************************************/
-
 fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
     getInteger(name)
 } catch (e: NullPointerException) {
@@ -162,7 +157,6 @@ fun MediaFormat.getIntegerOrDefault(name: String, default: Int?): Int? = getInte
 
 
 /** JSONOBJECT ****************************************************************/
-
 fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString(name) else null
 
 fun JSONObject.getIntOrNull(name: String): Int? =
@@ -172,7 +166,6 @@ fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble
 
 
 /** IMAGEBITMAP ***************************************************************/
-
 fun ImageBitmap.getAverageColor(): Color {
     val pixelMap = toPixelMap()
     var redSum = 0f
@@ -200,16 +193,36 @@ fun ImageBitmap.getAverageColor(): Color {
     )
 }
 
+fun Bitmap.asFullImageBitmap(context: Context): ImageBitmap =
+    scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context).asImageBitmap()
+
+fun Bitmap.asThumbnailImageBitmap(context: Context): ImageBitmap =
+    scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context).asImageBitmap()
+
 
 /** URI ***********************************************************************/
-
 fun Uri.getRelativePath() = lastPathSegment?.substringAfterLast(':')?.nullIfEmpty()
 
 fun Uri.getRelativePathWithoutFilename() = getRelativePath()?.substringBeforeLast('/')?.nullIfEmpty()
 
+suspend fun Uri.getSquareBitmap(context: Context): Bitmap? = withContext(Dispatchers.IO) {
+    try {
+        if (this@getSquareBitmap.scheme?.startsWith("http") == true) {
+            Request(this@getSquareBitmap.toString()).connect().getSquareBitmap()
+        } else {
+            this@getSquareBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it).square() }
+        }
+    } catch (e: FileNotFoundException) {
+        Log.e("Uri", "getSquareBitmap: $e", e)
+        null
+    } catch (e: IOException) {
+        Log.e("Uri", "getSquareBitmap: $e", e)
+        null
+    }
+}
+
 
 /** DOCUMENTFILE **************************************************************/
-
 @WorkerThread
 fun DocumentFile.toBitmap(context: Context): Bitmap? = try {
     context.contentResolver.openFileDescriptor(uri, "r")
@@ -219,6 +232,17 @@ fun DocumentFile.toBitmap(context: Context): Bitmap? = try {
     null
 } catch (e: IllegalArgumentException) {
     Log.e("DocumentFile", "toBitmap: $e", e)
+    null
+}
+
+@WorkerThread
+fun DocumentFile.toByteArray(context: Context): ByteArray? = try {
+    openInputStream(context)?.use { it.readBytes() }
+} catch (e: FileNotFoundException) {
+    Log.e("DocumentFile", "toByteArray: $e", e)
+    null
+} catch (e: IllegalArgumentException) {
+    Log.e("DocumentFile", "toByteArray: $e", e)
     null
 }
 
@@ -240,6 +264,7 @@ fun DocumentFile.matchFiles(filename: Regex, mimeType: Regex? = null): List<Docu
     } else emptyList()
 }
 
+@Suppress("unused")
 @WorkerThread
 fun DocumentFile.matchFilesRecursive(filename: Regex, mimeType: Regex? = null): List<DocumentFile> {
     val matches = mutableListOf<DocumentFile>()
@@ -295,3 +320,14 @@ fun DocumentFile.deleteWithEmptyParentDirs(context: Context) {
         }
     }
 }
+
+
+@WorkerThread
+fun DocumentFile.copyTo(context: Context, directory: File, filename: String = fullName): File =
+    File(directory, filename).also { outfile ->
+        outfile.outputStream().use { outputStream ->
+            openInputStream(context)?.use { inputStream ->
+                outputStream.write(inputStream.readBytes())
+            }
+        }
+    }

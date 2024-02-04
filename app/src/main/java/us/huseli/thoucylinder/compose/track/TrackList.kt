@@ -33,7 +33,7 @@ fun <T : AbstractTrackPojo> TrackList(
     listState: LazyListState = rememberLazyListState(),
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    trackCallbacks: (Int, T) -> TrackCallbacks,
+    trackCallbacks: (Int, T) -> TrackCallbacks<T>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
     onEmpty: (@Composable () -> Unit)? = null,
@@ -53,6 +53,8 @@ fun <T : AbstractTrackPojo> TrackList(
             listState = listState,
             listSize = trackPojos.itemCount,
             modifier = Modifier.padding(horizontal = 10.dp),
+            itemHeight = 55.dp,
+            minItems = 50,
         ) {
             LazyColumn(
                 state = listState,
@@ -61,15 +63,15 @@ fun <T : AbstractTrackPojo> TrackList(
             ) {
                 items(count = trackPojos.itemCount) { index ->
                     trackPojos[index]?.let { pojo ->
-                        val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+                        val thumbnail = remember(pojo.track) { mutableStateOf<ImageBitmap?>(null) }
 
-                        LaunchedEffect(pojo.track.trackId) {
+                        LaunchedEffect(pojo.track) {
                             thumbnail.value = viewModel.getTrackThumbnail(
                                 track = pojo.track,
                                 album = pojo.album,
                                 context = context,
                             )
-                            viewModel.ensureTrackMetadata(pojo.track, commit = true)
+                            viewModel.ensureTrackMetadata(pojo.track)
                         }
 
                         TrackListRow(
@@ -82,6 +84,7 @@ fun <T : AbstractTrackPojo> TrackList(
                             artist = if (showArtist) pojo.artist else null,
                             callbacks = trackCallbacks(index, pojo),
                             isSelected = selectedTrackPojos.contains(pojo),
+                            isInLibrary = pojo.track.isInLibrary,
                         )
                     }
                 }

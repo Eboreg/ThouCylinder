@@ -91,7 +91,7 @@ fun LibraryScreen(
                 val sortParameter by viewModel.albumSortParameter.collectAsStateWithLifecycle()
 
                 val albumCallbacks = { pojo: AlbumPojo ->
-                    AlbumCallbacks.fromAppCallbacks(
+                    AlbumCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         context = context,
@@ -170,7 +170,7 @@ fun LibraryScreen(
                 var latestSelectedIndex by rememberSaveable(selectedTrackPojos) { mutableStateOf<Int?>(null) }
 
                 val trackCallbacks = { index: Int, pojo: TrackPojo ->
-                    TrackCallbacks.fromAppCallbacks(
+                    TrackCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         context = context,

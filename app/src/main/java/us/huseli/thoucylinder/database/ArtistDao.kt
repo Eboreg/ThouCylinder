@@ -10,23 +10,19 @@ interface ArtistDao {
     @Query(
         """
         SELECT
-            a1.Album_artist AS name,
+            Album_artist AS name,
             COUNT(DISTINCT Track_trackId) AS trackCount,
-            COUNT(DISTINCT a1.Album_albumId) AS albumCount,
-            a2.Album_albumArt_uri AS firstAlbumArtUri,
-            COALESCE(SpotifyAlbum_fullImage_url, a3.Album_youtubePlaylist_thumbnail_url) AS firstAlbumArtUrl,
+            COUNT(DISTINCT Album_albumId) AS albumCount,
+            group_concat(DISTINCT quote(Album_albumArt_uri)) AS albumArtUris,
+            group_concat(DISTINCT quote(Album_youtubePlaylist_thumbnail_url)) AS youtubeFullImageUrls,
+            group_concat(DISTINCT quote(SpotifyAlbum_fullImage_url)) AS spotifyFullImageUrls,
+            group_concat(DISTINCT quote(LastFmAlbum_fullImageUrl)) AS lastFmFullImageUrls,
             COALESCE(SUM(Track_metadata_durationMs), SUM(Track_youtubeVideo_durationMs), 0) AS totalDurationMs
-        FROM Album a1
-            LEFT JOIN Track ON Track_albumId = a1.Album_albumId AND Track_isInLibrary = 1
-            LEFT JOIN Album a2 ON a2.Album_artist = a1.Album_artist 
-                AND a2.Album_albumArt_uri IS NOT NULL 
-                AND a2.Album_isInLibrary = 1
-            LEFT JOIN Album a3 ON a3.Album_artist = a1.Album_artist
-                AND a3.Album_youtubePlaylist_thumbnail_url IS NOT NULL
-                AND a3.Album_isInLibrary = 1
-            LEFT JOIN SpotifyAlbum ON SpotifyAlbum_albumId = a1.Album_albumId
-                AND SpotifyAlbum_fullImage_url IS NOT NULL
-        WHERE name IS NOT NULL AND a1.Album_isInLibrary = 1
+        FROM Album
+            LEFT JOIN Track ON Track_albumId = Album_albumId AND Track_isInLibrary = 1
+            LEFT JOIN SpotifyAlbum ON SpotifyAlbum_albumId = Album_albumId
+            LEFT JOIN LastFmAlbum ON LastFmAlbum_albumId = Album_albumId
+        WHERE name IS NOT NULL AND Album_isInLibrary = 1
         GROUP BY name
         ORDER BY LOWER(name)
         """
@@ -39,18 +35,15 @@ interface ArtistDao {
             Track_artist AS name,
             COUNT(DISTINCT Track_trackId) AS trackCount,
             0 AS albumCount,
-            a1.Album_albumArt_uri AS firstAlbumArtUri,
-            COALESCE(SpotifyAlbum_fullImage_url, a2.Album_youtubePlaylist_thumbnail_url) AS firstAlbumArtUrl,
+            group_concat(DISTINCT quote(Album_albumArt_uri)) AS albumArtUris,
+            group_concat(DISTINCT quote(Album_youtubePlaylist_thumbnail_url)) AS youtubeFullImageUrls,
+            group_concat(DISTINCT quote(SpotifyAlbum_fullImage_url)) AS spotifyFullImageUrls,
+            group_concat(DISTINCT quote(LastFmAlbum_fullImageUrl)) AS lastFmFullImageUrls,
             COALESCE(SUM(Track_metadata_durationMs), 0) AS totalDurationMs
         FROM Track
-            LEFT JOIN Album a1 ON a1.Album_albumId = Track_albumId 
-                AND a1.Album_albumArt_uri IS NOT NULL 
-                AND a1.Album_isInLibrary = 1
-            LEFT JOIN Album a2 ON a2.Album_artist = a1.Album_artist
-                AND a2.Album_youtubePlaylist_thumbnail_url IS NOT NULL
-                AND a2.Album_isInLibrary = 1
-            LEFT JOIN SpotifyAlbum ON SpotifyAlbum_albumId = a1.Album_albumId
-                AND SpotifyAlbum_fullImage_url IS NOT NULL
+            LEFT JOIN Album ON Album_albumId = Track_albumId AND Album_isInLibrary = 1
+            LEFT JOIN SpotifyAlbum ON SpotifyAlbum_albumId = Album_albumId
+            LEFT JOIN LastFmAlbum ON LastFmAlbum_albumId = Album_albumId
         WHERE name IS NOT NULL 
             AND Track_isInLibrary = 1
             AND NOT EXISTS(

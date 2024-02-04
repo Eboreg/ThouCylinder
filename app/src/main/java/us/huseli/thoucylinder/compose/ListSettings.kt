@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.thoucylinder.R
 
 enum class DisplayType { LIST, GRID }
@@ -42,7 +43,10 @@ fun ListSettingsRow(
         tonalElevation = tonalElevation,
     ) {
         Row(
-            modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(bottom = 10.dp),
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp)
+                .padding(bottom = 10.dp, top = if (isInLandscapeMode()) 10.dp else 0.dp),
             horizontalArrangement = Arrangement.SpaceAround,
         ) {
             Row(

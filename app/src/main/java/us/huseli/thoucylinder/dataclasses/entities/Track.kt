@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.ImageBitmap
@@ -16,14 +17,17 @@ import androidx.room.PrimaryKey
 import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.sanitizeFilename
-import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.retaintheme.extensions.sanitizeFilename
+import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.getSquareBitmapByUrl
+import us.huseli.thoucylinder.getParentDirectory
+import us.huseli.thoucylinder.matchFiles
 import us.huseli.thoucylinder.nullIfEmpty
 import java.util.UUID
 import kotlin.time.Duration
@@ -78,11 +82,10 @@ data class Track(
     val youtubeWebUrl: String?
         get() = youtubeVideo?.let { "https://youtu.be/${it.id}" }
 
-    fun generateBasename(albumArtist: String? = null): String {
-        /** Filename will only include this.artist if it differs from albumArtist. */
+    fun generateBasename(includeArtist: Boolean = false): String {
         var name = ""
         if (albumPosition != null) name += "${String.format("%02d", albumPosition)} - "
-        if (artist != null && artist != albumArtist) name += "$artist - "
+        if (artist != null && includeArtist) name += "$artist - "
         name += title
 
         return name.sanitizeFilename()
@@ -93,9 +96,17 @@ data class Track(
         localUri?.let { DocumentFileCompat.fromUri(context, it) }
 
     @WorkerThread
-    suspend fun getFullImage(context: Context): ImageBitmap? =
-        (image?.getFullImageBitmap(context) ?: youtubeVideo?.fullImage?.url?.getBitmapByUrl())
-            ?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
+    suspend fun getFullBitmap(context: Context): Bitmap? = image?.getFullBitmap(context)
+
+    /*
+    @WorkerThread
+    suspend fun getFullBitmap(context: Context): Bitmap? =
+        image?.getFullBitmap(context) ?: youtubeVideo?.fullImage?.url?.getSquareBitmapByUrl()
+     */
+
+    @WorkerThread
+    suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
+        getFullBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
 
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
@@ -129,15 +140,37 @@ data class Track(
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()
 
+    fun getPositionString(albumDiscCount: Int): String =
+        if (albumDiscCount > 1 && discNumber != null && albumPosition != null) "$discNumber.$albumPosition"
+        else albumPosition?.toString() ?: ""
+
     suspend fun getThumbnail(context: Context): ImageBitmap? =
-        (image?.getThumbnailBitmap(context) ?: youtubeVideo?.thumbnail?.url?.getBitmapByUrl())
+        (image?.getThumbnailBitmap(context) ?: youtubeVideo?.thumbnail?.url?.getSquareBitmapByUrl())
             ?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
 
-    fun toString(showAlbumPosition: Boolean, showArtist: Boolean): String {
+    fun toString(
+        showAlbumPosition: Boolean = true,
+        showArtist: Boolean = true,
+        showYear: Boolean = false,
+        showArtistIfSameAsAlbumArtist: Boolean = false,
+        albumPojo: AlbumWithTracksPojo? = null,
+    ): String {
         var string = ""
-        if (albumPosition != null && showAlbumPosition) string += "$albumPosition. "
-        if (artist != null && showArtist) string += "$artist - "
+        if (showAlbumPosition) {
+            if (albumPojo != null) string += getPositionString(albumPojo.discCount) + ". "
+            else if (albumPosition != null) string += "$albumPosition. "
+        }
+        if (showArtist) {
+            val trackArtist = artist
+            val albumArtist = albumPojo?.album?.artist
+
+            if (trackArtist != null && (showArtistIfSameAsAlbumArtist || trackArtist != albumArtist))
+                string += "$trackArtist - "
+            else if (albumArtist != null && showArtistIfSameAsAlbumArtist)
+                string += "$albumArtist - "
+        }
         string += title
+        if (year != null && showYear) string += " ($year)"
 
         return string
     }
@@ -150,5 +183,21 @@ data class Track(
         return title.compareTo(other.title)
     }
 
-    override fun toString(): String = toString(showAlbumPosition = true, showArtist = true)
+    override fun toString(): String = toString(showAlbumPosition = true, showArtist = true, showYear = false)
+}
+
+@WorkerThread
+fun Iterable<Track>.listParentDirectories(context: Context): List<DocumentFile> =
+    mapNotNull { it.getDocumentFile(context)?.getParentDirectory(context) }.distinctBy { it.uri.path }
+
+@WorkerThread
+fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean = false): List<DocumentFile> {
+    val filenameRegex =
+        if (includeThumbnails) Regex("^cover(-thumbnail)?\\..*", RegexOption.IGNORE_CASE)
+        else Regex("^cover\\..*", RegexOption.IGNORE_CASE)
+
+    return listParentDirectories(context)
+        .map { it.matchFiles(filenameRegex, Regex("^image/.*")) }
+        .flatten()
+        .distinctBy { it.uri.path }
 }

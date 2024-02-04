@@ -12,7 +12,6 @@ import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +30,10 @@ import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
@@ -50,7 +49,7 @@ fun QueueScreen(
     val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle(emptyList())
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val playerCurrentPojo by viewModel.playerCurrentPojo.collectAsStateWithLifecycle(null)
+    val playerCurrentPojo by viewModel.currentPojo.collectAsStateWithLifecycle(null)
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -78,7 +77,12 @@ fun QueueScreen(
             Text(text = stringResource(R.string.the_queue_is_empty), modifier = Modifier.padding(10.dp))
         }
 
-        ListWithNumericBar(listState = reorderableState.listState, listSize = queue.size) {
+        ListWithNumericBar(
+            listState = reorderableState.listState,
+            listSize = queue.size,
+            itemHeight = 55.dp,
+            minItems = 50,
+        ) {
             LazyColumn(
                 modifier = Modifier.reorderable(reorderableState),
                 state = reorderableState.listState,
@@ -94,47 +98,46 @@ fun QueueScreen(
                             album = pojo.album,
                             context = context,
                         )
-                        viewModel.ensureTrackMetadata(pojo.track, commit = true)
+                        viewModel.ensureTrackMetadata(pojo.track)
                     }
 
-                    ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                        ReorderableItem(reorderableState = reorderableState, key = pojo.queueTrackId) { isDragging ->
-                            val isSelected = selectedTracks.contains(pojo)
-                            val containerColor =
-                                if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
-                                else if (!isSelected && playerCurrentPojo == pojo)
-                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                                else null
+                    ReorderableItem(reorderableState = reorderableState, key = pojo.queueTrackId) { isDragging ->
+                        val isSelected = selectedTracks.contains(pojo)
+                        val containerColor =
+                            if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
+                            else if (!isSelected && playerCurrentPojo == pojo)
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                            else null
 
-                            TrackListRow(
-                                title = pojo.track.title,
-                                isDownloadable = pojo.track.isDownloadable,
-                                downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
-                                thumbnail = thumbnail.value,
-                                containerColor = containerColor,
-                                reorderableState = reorderableState,
-                                artist = pojo.artist,
-                                duration = pojo.track.metadata?.duration,
-                                callbacks = TrackCallbacks.fromAppCallbacks(
-                                    pojo = pojo,
-                                    appCallbacks = appCallbacks,
-                                    context = context,
-                                    onTrackClick = {
-                                        if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
-                                        else viewModel.skipTo(pojoIdx)
-                                    },
-                                    onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = pojo) },
-                                ),
-                                isSelected = selectedTracks.contains(pojo),
-                                extraContextMenuItems = {
-                                    DropdownMenuItem(
-                                        text = { Text(text = stringResource(R.string.remove_from_queue)) },
-                                        leadingIcon = { Icon(Icons.Sharp.Delete, null) },
-                                        onClick = { viewModel.removeFromQueue(pojo) },
-                                    )
+                        TrackListRow(
+                            title = pojo.track.title,
+                            isDownloadable = pojo.track.isDownloadable,
+                            isInLibrary = pojo.track.isInLibrary,
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
+                            thumbnail = thumbnail.value,
+                            containerColor = containerColor,
+                            reorderableState = reorderableState,
+                            artist = pojo.artist,
+                            duration = pojo.track.metadata?.duration,
+                            callbacks = TrackCallbacks(
+                                pojo = pojo,
+                                appCallbacks = appCallbacks,
+                                context = context,
+                                onTrackClick = {
+                                    if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
+                                    else viewModel.skipTo(pojoIdx)
                                 },
-                            )
-                        }
+                                onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = pojo) },
+                            ),
+                            isSelected = selectedTracks.contains(pojo),
+                            extraContextMenuItems = {
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.remove_from_queue)) },
+                                    leadingIcon = { Icon(Icons.Sharp.Delete, null) },
+                                    onClick = { viewModel.removeFromQueue(pojo) },
+                                )
+                            },
+                        )
                     }
                 }
             }

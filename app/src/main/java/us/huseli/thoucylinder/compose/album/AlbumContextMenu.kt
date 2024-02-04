@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Bookmark
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
@@ -39,41 +38,38 @@ fun AlbumContextMenu(
     modifier: Modifier = Modifier,
     onDismissRequest: () -> Unit,
     callbacks: AlbumCallbacks,
-    light: Boolean = false,
 ) {
     DropdownMenu(
         modifier = modifier,
         onDismissRequest = onDismissRequest,
         expanded = expanded,
     ) {
-        if (!light) {
-            if (!isInLibrary) DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.add_to_library)) },
-                leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
-                onClick = {
-                    callbacks.onAddToLibraryClick()
-                    onDismissRequest()
-                },
-            )
+        if (!isInLibrary) DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.add_to_library)) },
+            leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
+            onClick = {
+                callbacks.onAddToLibraryClick()
+                onDismissRequest()
+            },
+        )
 
-            if (!isLocal || isPartiallyDownloaded) DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.download)) },
-                leadingIcon = { Icon(Icons.Sharp.Download, null) },
-                onClick = {
-                    callbacks.onDownloadClick()
-                    onDismissRequest()
-                },
-            )
+        if (!isLocal || isPartiallyDownloaded) DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.download)) },
+            leadingIcon = { Icon(Icons.Sharp.Download, null) },
+            onClick = {
+                callbacks.onDownloadClick()
+                onDismissRequest()
+            },
+        )
 
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.play)) },
-                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
-                onClick = {
-                    callbacks.onPlayClick()
-                    onDismissRequest()
-                }
-            )
-        }
+        DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.play)) },
+            leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
+            onClick = {
+                callbacks.onPlayClick()
+                onDismissRequest()
+            }
+        )
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.enqueue)) },
@@ -135,16 +131,7 @@ fun AlbumContextMenu(
             )
         }
 
-        if (!light && !isLocal && isInLibrary) DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.remove_from_library)) },
-            leadingIcon = { Icon(Icons.Sharp.Bookmark, null) },
-            onClick = {
-                callbacks.onRemoveFromLibraryClick()
-                onDismissRequest()
-            },
-        )
-
-        if (isLocal || isPartiallyDownloaded) DropdownMenuItem(
+        if (isInLibrary) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.delete_album)) },
             leadingIcon = { Icon(Icons.Sharp.Delete, null) },
             onClick = {
@@ -162,8 +149,7 @@ fun AlbumContextMenuWithButton(
     isPartiallyDownloaded: Boolean,
     modifier: Modifier = Modifier,
     callbacks: AlbumCallbacks,
-    light: Boolean = false,
-    buttonIconSize: Dp = 24.dp,
+    buttonIconSize: Dp = 30.dp,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -177,7 +163,6 @@ fun AlbumContextMenuWithButton(
                 expanded = isMenuShown,
                 onDismissRequest = { isMenuShown = false },
                 callbacks = callbacks,
-                light = light,
                 isPartiallyDownloaded = isPartiallyDownloaded,
             )
             Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(buttonIconSize))

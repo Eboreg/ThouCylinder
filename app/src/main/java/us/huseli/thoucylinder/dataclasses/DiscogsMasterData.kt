@@ -10,9 +10,6 @@ data class DiscogsMasterTrack(
 ) {
     val artist: String?
         get() = artists?.join()
-
-    val discNumberNonNull: Int
-        get() = position.split("-").takeIf { it.size > 1 }?.first()?.toIntOrNull() ?: 1
 }
 
 
@@ -30,29 +27,12 @@ data class DiscogsMasterData(
     val id: Int,
     val artists: List<DiscogsArtist>,
     val tracklist: List<DiscogsMasterTrack>,
-    val styles: List<String> = emptyList(),
-    val genres: List<String> = emptyList(),
+    val styles: List<String>? = emptyList(),
+    val genres: List<String>? = emptyList(),
     val images: List<DiscogsMasterImage> = emptyList(),
 ) {
     val artist: String
         get() = artists.join()
-
-    fun getPositionPairs(): List<PositionPair> {
-        val pairs = mutableListOf<PositionPair>()
-        var discNumber = 1
-        var albumPosition = 1
-
-        tracklist.forEach { track ->
-            if (track.discNumberNonNull != discNumber) {
-                discNumber = track.discNumberNonNull
-                albumPosition = 1
-            }
-            pairs.add(PositionPair(discNumber, albumPosition))
-            albumPosition++
-        }
-
-        return pairs
-    }
 }
 
 

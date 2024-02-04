@@ -3,9 +3,9 @@
 package us.huseli.thoucylinder.dataclasses
 
 import com.google.gson.reflect.TypeToken
+import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.Constants.IMAGE_MIN_PX_THUMBNAIL
 import us.huseli.thoucylinder.Request
-import us.huseli.thoucylinder.capitalized
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist

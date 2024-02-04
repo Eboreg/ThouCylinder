@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -11,173 +10,91 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.capitalized
-import us.huseli.thoucylinder.dataclasses.DiscogsMasterData
-import us.huseli.thoucylinder.dataclasses.DiscogsSearchResultItem
+import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getSquareBitmapByUrl
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
-    private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
-    private val _imageBitmaps = MutableStateFlow<List<ImageBitmap>>(emptyList())
-    private val _initialTracks = MutableStateFlow<List<Track>>(emptyList())
-    private val _loading = MutableStateFlow(false)
-    private val _loadingSearchResults = MutableStateFlow(true)
-    private val _masters = MutableStateFlow<Map<Int, DiscogsMasterData>>(emptyMap())
-    private val _searchResults = MutableStateFlow<List<DiscogsSearchResultItem>>(emptyList())
-    private val _selectedMasterId = MutableStateFlow<Int?>(null)
+    private val _isLoadingAlbumArt = MutableStateFlow(false)
 
-    val albumPojo = _albumPojo.asStateFlow()
-    val imageBitmaps = _imageBitmaps.asStateFlow()
-    val initialTracks = _initialTracks.asStateFlow()
-    val loading = _loading.asStateFlow()
-    val loadingSearchResults = _loadingSearchResults.asStateFlow()
-    val searchResults = _searchResults.asStateFlow()
-    val selectedMasterId = _selectedMasterId.asStateFlow()
+    val allGenres = repos.album.flowGenres()
+    val isLoadingAlbumArt = _isLoadingAlbumArt.asStateFlow()
 
-    fun loadSearchResults(album: Album) = viewModelScope.launch {
-        _loadingSearchResults.value = true
-        _searchResults.value =
-            repos.discogs.searchMasters(query = album.title, artist = album.artist)?.data?.results ?: emptyList()
-        _loadingSearchResults.value = false
-    }
-
-    fun save(imageBitmap: ImageBitmap?, context: Context, onSave: (AlbumWithTracksPojo) -> Unit) {
-        _albumPojo.value?.also { pojo ->
-            getAlbumDownloadDirDocumentFile(pojo.album, context)?.also { dirDocumentFile ->
-                val albumArt = imageBitmap?.let {
-                    MediaStoreImage.fromBitmap(
-                        bitmap = it.asAndroidBitmap(),
-                        context = context,
-                        dirDocumentFile = dirDocumentFile,
-                    )
+    fun flowAlbumArt(albumId: UUID, context: Context) =
+        MutableStateFlow<List<ImageBitmap>>(emptyList()).also { flow ->
+            _isLoadingAlbumArt.value = true
+            viewModelScope.launch(Dispatchers.IO) {
+                repos.album.getAlbumWithTracks(albumId)?.also { pojo ->
+                    pojo.album.albumArt
+                        ?.getFullBitmap(context)
+                        ?.asFullImageBitmap(context)
+                        ?.also { flow.value += it }
+                    pojo.spotifyAlbum?.fullImage?.url
+                        ?.getSquareBitmapByUrl()
+                        ?.asFullImageBitmap(context)
+                        ?.also { flow.value += it }
+                    pojo.album.youtubePlaylist?.fullImage?.url
+                        ?.getSquareBitmapByUrl()
+                        ?.asFullImageBitmap(context)
+                        ?.also { flow.value += it }
+                    pojo.lastFmAlbum?.fullImageUrl
+                        ?.getSquareBitmapByUrl()
+                        ?.asFullImageBitmap(context)
+                        ?.also { flow.value += it }
+                    flow.value += repos.localMedia.collectAlbumArt(pojo).map { it.asFullImageBitmap(context) }
+                    repos.discogs.searchMasters(
+                        query = pojo.album.title,
+                        artist = pojo.album.artist,
+                    )?.data?.results?.forEach { item ->
+                        repos.discogs.getMaster(item.id)?.data?.images
+                            ?.filter { image -> image.type == "primary" }
+                            ?.forEach { image ->
+                                image.uri.getSquareBitmapByUrl()?.asFullImageBitmap(context)?.also { bitmap ->
+                                    flow.value += bitmap
+                                }
+                            }
+                    }
+                    _isLoadingAlbumArt.value = false
                 }
-
-                onSave(
-                    pojo.copy(
-                        album = pojo.album.copy(albumArt = albumArt),
-                        tracks = pojo.tracks.map { it.copy(image = albumArt) },
-                    ),
-                )
             }
-        }
+        }.asStateFlow()
+
+    fun flowAlbumWithTracks(albumId: UUID) = repos.album.flowAlbumWithTracks(albumId)
+
+    fun saveAlbumPojo(pojo: AbstractAlbumPojo) = viewModelScope.launch(Dispatchers.IO) {
+        repos.album.saveAlbum(pojo.album)
+        repos.album.saveAlbumGenres(pojo.album.albumId, pojo.genres)
     }
 
-    fun selectMasterId(masterId: Int, context: Context) = viewModelScope.launch {
-        val master =
-            _masters.value[masterId]
-                ?: repos.discogs.getMaster(masterId)?.data?.also { _masters.value += masterId to it }
+    fun saveAlbumArt(albumId: UUID, imageBitmap: ImageBitmap?, context: Context) =
+        viewModelScope.launch(Dispatchers.IO) {
+            repos.album.getAlbum(albumId)?.also { album ->
+                repos.localMedia.deleteAlbumDirectoryAlbumArt(album)
+                album.albumArt?.deleteInternalFiles()
 
-        if (master != null) {
-            _selectedMasterId.value = masterId
-            _albumPojo.value?.also { pojo ->
-                _albumPojo.value = pojo.copy(
-                    album = pojo.album.copy(
-                        title = master.title,
-                        artist = master.artist,
-                        year = master.year?.takeIf { it > 1000 } ?: pojo.album.year,
-                    ),
-                    genres = master.genres.map { Genre(it.capitalized()) },
-                    styles = master.styles.map { Style(it.capitalized()) },
-                )
-            }
-            updateTracksFromMaster(master)
-            getImages(master, context)
-        }
-    }
-
-    fun setAlbum(album: Album, context: Context) = viewModelScope.launch {
-        repos.album.getAlbumWithTracks(album.albumId)?.also { pojo -> setAlbum(pojo, context) }
-    }
-
-    fun setAlbum(pojo: AlbumWithTracksPojo, context: Context) {
-        _albumPojo.value = pojo
-        _initialTracks.value = pojo.tracks.map { track ->
-            track.copy(artist = track.artist ?: pojo.album.artist)
-        }
-        viewModelScope.launch {
-            val bitmap = pojo.getFullImage(context)
-            if (bitmap != null) _imageBitmaps.value = listOf(bitmap)
-        }
-    }
-
-    fun setArtist(value: String) {
-        _albumPojo.value = _albumPojo.value?.let { pojo ->
-            pojo.copy(album = pojo.album.copy(artist = value))
-        }
-    }
-
-    fun setTitle(value: String) {
-        _albumPojo.value = _albumPojo.value?.let { pojo ->
-            pojo.copy(album = pojo.album.copy(title = value))
-        }
-    }
-
-    fun unsetAlbum() {
-        _albumPojo.value = null
-        _initialTracks.value = emptyList()
-    }
-
-    fun updateTrack(index: Int, track: Track) {
-        _albumPojo.value = _albumPojo.value?.let { pojo ->
-            val tracks = pojo.tracks.toMutableList().apply { this[index] = track }
-            pojo.copy(tracks = tracks)
-        }
-    }
-
-    private fun getImages(master: DiscogsMasterData, context: Context) = viewModelScope.launch(Dispatchers.IO) {
-        val bitmaps = mutableListOf<ImageBitmap>()
-
-        _albumPojo.value?.also { pojo ->
-            pojo.getFullImage(context)?.also { bitmaps.add(it) }
-            bitmaps.addAll(repos.localMedia.collectAlbumImages(pojo).map { it.asImageBitmap() })
-            master.images.filter { it.type == "primary" }.forEach { masterImage ->
-                masterImage.uri.getBitmapByUrl()?.asImageBitmap()?.also { bitmaps.add(it) }
-            }
-        }
-
-        _imageBitmaps.value = bitmaps
-    }
-
-    private fun updateTracksFromMaster(master: DiscogsMasterData) {
-        _albumPojo.value = _albumPojo.value?.let { pojo ->
-            val tracks = pojo.tracks.toMutableList().apply {
-                val masterPositionPairs = master.getPositionPairs()
-                val pojoPositionPairs = pojo.getPositionPairs()
-
-                masterPositionPairs.zip(master.tracklist).forEach { (positions, masterTrack) ->
-                    val trackIdx = pojoPositionPairs.indexOfFirst { it == positions }
-
-                    if (trackIdx > -1) {
-                        set(
-                            trackIdx,
-                            this[trackIdx].copy(
-                                title = masterTrack.title,
-                                artist = masterTrack.artist ?: master.artist,
-                                year = masterTrack.year?.takeIf { it > 1000 }
-                                    ?: this[trackIdx].year
-                                    ?: master.year?.takeIf { it > 1000 }
-                                    ?: _albumPojo.value?.album?.year,
-                            )
-                        )
+                val albumArt = imageBitmap?.let { MediaStoreImage.fromBitmap(it.asAndroidBitmap(), context, album) }
+                if (album.isLocal) {
+                    repos.localMedia.createAlbumDocumentFile(album)?.also {
+                        albumArt?.saveToAlbumDirectory(context, it)
                     }
                 }
-
-                // If our tracklist contains tracks not in master tracklist, reset the "extra" tracks to initial state:
-                pojoPositionPairs.forEachIndexed { index, positionPair ->
-                    if (!masterPositionPairs.contains(positionPair)) {
-                        this[index] = _initialTracks.value[index]
-                    }
-                }
+                repos.album.saveAlbum(album.copy(albumArt = albumArt))
             }
-            pojo.copy(tracks = tracks)
         }
+
+    fun saveTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) { repos.track.updateTrack(track) }
+
+    fun tagAlbumTrack(pojo: AlbumWithTracksPojo, track: Track) = viewModelScope.launch(Dispatchers.IO) {
+        repos.localMedia.tagTrack(ensureTrackMetadata(track), pojo)
+    }
+
+    fun tagAlbumTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch(Dispatchers.IO) {
+        repos.localMedia.tagAlbumTracks(ensureAlbumTracksMetadata(pojo))
     }
 }

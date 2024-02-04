@@ -2,57 +2,26 @@ package us.huseli.thoucylinder.dataclasses.callbacks
 
 import android.content.Context
 import androidx.compose.ui.platform.AndroidUriHandler
+import androidx.compose.ui.platform.UriHandler
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 
 data class AlbumCallbacks(
-    val onAddToLibraryClick: () -> Unit,
-    val onAddToPlaylistClick: () -> Unit,
+    private val pojo: AbstractAlbumPojo,
+    private val appCallbacks: AppCallbacks,
+    private val context: Context,
+    private val uriHandler: UriHandler = AndroidUriHandler(context),
+    val onAddToLibraryClick: () -> Unit = { appCallbacks.onAddAlbumToLibraryClick(pojo) },
+    val onAddToPlaylistClick: () -> Unit = { appCallbacks.onAddToPlaylistClick(Selection(album = pojo.album)) },
     val onAlbumClick: (() -> Unit)? = null,
     val onAlbumLongClick: (() -> Unit)? = null,
-    val onArtistClick: (() -> Unit)? = null,
-    val onCancelDownloadClick: () -> Unit,
-    val onDownloadClick: () -> Unit,
-    val onEditClick: () -> Unit,
-    val onPlayClick: () -> Unit,
+    val onArtistClick: (() -> Unit)? = pojo.album.artist?.let { { appCallbacks.onArtistClick(it) } },
+    val onCancelDownloadClick: () -> Unit = { appCallbacks.onCancelAlbumDownloadClick(pojo.album.albumId) },
+    val onDeleteClick: () -> Unit = { appCallbacks.onDeleteAlbumPojoClick(pojo) },
+    val onDownloadClick: () -> Unit = { appCallbacks.onDownloadAlbumClick(pojo.album) },
+    val onEditClick: () -> Unit = { appCallbacks.onEditAlbumClick(pojo) },
     val onEnqueueClick: () -> Unit,
-    val onRemoveFromLibraryClick: () -> Unit,
-    val onDeleteClick: () -> Unit,
-    val onPlayOnYoutubeClick: (() -> Unit)? = null,
-    val onPlayOnSpotifyClick: (() -> Unit)? = null,
-) {
-    companion object {
-        fun fromAppCallbacks(
-            pojo: AbstractAlbumPojo,
-            appCallbacks: AppCallbacks,
-            context: Context,
-            onAddToPlaylistClick: (() -> Unit)? = null,
-            onAlbumClick: (() -> Unit)? = null,
-            onAlbumLongClick: (() -> Unit)? = null,
-            onPlayClick: () -> Unit,
-            onEnqueueClick: () -> Unit,
-            onRemoveFromLibraryClick: (() -> Unit)? = null,
-        ): AlbumCallbacks {
-            val uriHandler = AndroidUriHandler(context)
-
-            return AlbumCallbacks(
-                onAddToLibraryClick = { appCallbacks.onAddAlbumToLibraryClick(pojo.album) },
-                onAddToPlaylistClick = onAddToPlaylistClick
-                    ?: { appCallbacks.onAddToPlaylistClick(Selection(album = pojo.album)) },
-                onAlbumClick = onAlbumClick,
-                onAlbumLongClick = onAlbumLongClick,
-                onArtistClick = pojo.album.artist?.let { { appCallbacks.onArtistClick(it) } },
-                onCancelDownloadClick = { appCallbacks.onCancelAlbumDownloadClick(pojo.album.albumId) },
-                onDownloadClick = { appCallbacks.onDownloadAlbumClick(pojo.album) },
-                onEditClick = { appCallbacks.onEditAlbumClick(pojo.album) },
-                onPlayClick = onPlayClick,
-                onEnqueueClick = onEnqueueClick,
-                onRemoveFromLibraryClick = onRemoveFromLibraryClick
-                    ?: { appCallbacks.onRemoveAlbumFromLibraryClick(pojo.album) },
-                onDeleteClick = { appCallbacks.onDeleteAlbumClick(pojo.album) },
-                onPlayOnYoutubeClick = pojo.album.youtubeWebUrl?.let { { uriHandler.openUri(it) } },
-                onPlayOnSpotifyClick = pojo.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
-            )
-        }
-    }
-}
+    val onPlayClick: () -> Unit,
+    val onPlayOnSpotifyClick: (() -> Unit)? = pojo.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
+    val onPlayOnYoutubeClick: (() -> Unit)? = pojo.album.youtubeWebUrl?.let { { uriHandler.openUri(it) } },
+)

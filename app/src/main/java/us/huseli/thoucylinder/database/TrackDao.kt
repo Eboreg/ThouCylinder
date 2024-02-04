@@ -37,8 +37,8 @@ interface TrackDao {
     @Query("DELETE FROM Track WHERE Track_isInLibrary = 0")
     suspend fun deleteTempTracks()
 
-    @Query("DELETE FROM Track WHERE Track_albumId = :albumId")
-    suspend fun deleteTracksByAlbumId(albumId: UUID)
+    @Query("DELETE FROM Track WHERE Track_albumId IN (:albumIds)")
+    suspend fun deleteTracksByAlbumId(vararg albumIds: UUID)
 
     @Query(
         """
@@ -85,7 +85,8 @@ interface TrackDao {
                 FROM Track
                     LEFT JOIN Album ON Track_albumId = Album_albumId
                     LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-                WHERE Track_isInLibrary = 1 ${searchQuery?.let { "AND $it" } ?: ""}
+                WHERE Track_isInLibrary = 1 AND Album_isHidden != 1 
+                    ${searchQuery?.let { "AND $it" } ?: ""}
                 ORDER BY ${sortParameter.sqlColumn} ${sortOrder.sql}
                 """.trimIndent()
             )
@@ -107,6 +108,9 @@ interface TrackDao {
     )
     @Transaction
     fun pageTrackPojosByArtist(artist: String): PagingSource<Int, TrackPojo>
+
+    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId = :albumId")
+    suspend fun setIsInLibraryByAlbumId(albumId: UUID, isInLibrary: Boolean)
 
     @Update
     suspend fun updateTracks(vararg tracks: Track)

@@ -8,8 +8,8 @@ import android.webkit.MimeTypeMap
 import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.MediaInformation
 import kotlinx.parcelize.Parcelize
-import us.huseli.retaintheme.bytesToString
-import us.huseli.retaintheme.formattedString
+import us.huseli.retaintheme.extensions.bytesToString
+import us.huseli.retaintheme.extensions.formattedString
 import us.huseli.thoucylinder.getIntegerOrDefault
 import us.huseli.thoucylinder.getLongOrNull
 import java.io.File
@@ -49,7 +49,7 @@ fun MediaExtractor.extractTrackMetadata(ff: MediaInformation?): TrackMetadata {
 
         if (mimeType?.startsWith("audio/") == true) {
             val metadata = TrackMetadata(
-                bitrate = format.getIntegerOrDefault(MediaFormat.KEY_BIT_RATE, ff?.bitrate?.toInt()),
+                bitrate = ff?.bitrate?.toInt(),
                 channels = format.getIntegerOrDefault(
                     MediaFormat.KEY_CHANNEL_COUNT,
                     ffStream?.getNumberProperty("channels")?.toInt()

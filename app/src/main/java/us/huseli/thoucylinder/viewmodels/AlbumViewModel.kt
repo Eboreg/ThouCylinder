@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,7 +45,7 @@ class AlbumViewModel @Inject constructor(
     init {
         unselectAllTrackPojos()
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repos.album.flowAlbumWithTracks(_albumId).distinctUntilChanged().collect { pojo ->
                 if (pojo != null) {
                     _albumNotFound.value = false
@@ -61,8 +62,8 @@ class AlbumViewModel @Inject constructor(
          * On-demand fetch (and save, if necessary) of track metadata, because
          * we only want to load it when it is actually going to be used.
          */
-        if (track.metadata == null) viewModelScope.launch {
-            ensureTrackMetadata(track, commit = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            ensureTrackMetadata(track)
         }
     }
 }

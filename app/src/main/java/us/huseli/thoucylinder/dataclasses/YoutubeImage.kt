@@ -2,6 +2,8 @@ package us.huseli.thoucylinder.dataclasses
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import us.huseli.thoucylinder.pow
+import kotlin.math.min
 
 @Parcelize
 data class YoutubeImage(
@@ -10,5 +12,5 @@ data class YoutubeImage(
     val height: Int,
 ) : Parcelable {
     val size: Int
-        get() = width * height
+        get() = min(width, height).pow(2)
 }

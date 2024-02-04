@@ -115,7 +115,7 @@ fun PlaylistScreen(
                 trackDownloadTasks = trackDownloadTasks,
                 onEmpty = { Text(stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp)) },
                 trackCallbacks = { index: Int, pojo: PlaylistTrackPojo ->
-                    TrackCallbacks.fromAppCallbacks(
+                    TrackCallbacks(
                         pojo = pojo,
                         appCallbacks = appCallbacks,
                         context = context,

@@ -2,11 +2,11 @@ package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,34 +20,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
-import us.huseli.thoucylinder.compose.track.TrackContextMenuWithButton
+import us.huseli.thoucylinder.compose.track.TrackContextButtonWithMenu
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import kotlin.time.Duration
 
 data class AlbumTrackRowData(
     val title: String,
     val isDownloadable: Boolean,
+    val isInLibrary: Boolean,
     val artist: String? = null,
     val duration: Duration? = null,
-    val albumPosition: Int? = null,
-    val discNumber: Int? = null,
     val downloadTask: TrackDownloadTask? = null,
     val showArtist: Boolean = true,
-    val showDiscNumber: Boolean = false,
     val isSelected: Boolean = false,
+    val position: String,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumTrackRow(
     data: AlbumTrackRowData,
-    callbacks: TrackCallbacks,
+    callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
+    positionColumnWidth: Dp = 40.dp,
 ) {
     val surfaceColor =
         if (data.isSelected) MaterialTheme.colorScheme.primaryContainer
@@ -61,16 +62,15 @@ fun AlbumTrackRow(
     ) {
         Surface(shape = MaterialTheme.shapes.extraSmall, color = surfaceColor) {
             Column(modifier = modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val position =
-                        if (data.showDiscNumber && data.discNumber != null && data.albumPosition != null)
-                            "${data.discNumber}.${data.albumPosition}"
-                        else data.albumPosition?.toString() ?: ""
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Text(
-                        text = position,
-                        modifier = Modifier.width(40.dp),
+                        text = data.position,
+                        modifier = Modifier.width(positionColumnWidth),
                         style = ThouCylinderTheme.typographyExtended.listNormalTitle,
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.End,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -91,16 +91,15 @@ fun AlbumTrackRow(
                     data.duration?.also {
                         Text(
                             text = it.sensibleFormat(),
-                            modifier = Modifier.padding(start = 10.dp),
                             style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
                         )
                     }
 
-                    TrackContextMenuWithButton(
+                    TrackContextButtonWithMenu(
                         isDownloadable = data.isDownloadable,
                         callbacks = callbacks,
-                        modifier = Modifier.padding(start = 10.dp).size(30.dp),
                         hideAlbum = true,
+                        isInLibrary = data.isInLibrary,
                     )
                 }
 
@@ -113,13 +112,13 @@ fun AlbumTrackRow(
                         val statusText = stringResource(status.stringId)
 
                         Row(
-                            modifier = Modifier.padding(start = 40.dp),
+                            modifier = Modifier.padding(start = positionColumnWidth + 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = "$statusText ...",
                                 style = ThouCylinderTheme.typographyExtended.listSmallTitle,
-                                modifier = Modifier.width(100.dp),
+                                modifier = Modifier.width(110.dp),
                             )
                             LinearProgressIndicator(
                                 progress = progress.toFloat(),

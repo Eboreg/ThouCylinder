@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
 import com.spotify.sdk.android.auth.AuthorizationResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,55 +39,56 @@ data class SpotifyAlbumMatch(
 @HiltViewModel
 class SpotifyImportViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     private val _localOffset = MutableStateFlow(0)
-    private val _selectedUserAlbums = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
+    private val _selectedAlbumPojos = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
     private val _thumbnailCache = mutableMapOf<String, ImageBitmap>()
     private val _progress = MutableStateFlow<ImportProgressData?>(null)
     private val _importedAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _searchTerm = MutableStateFlow("")
-    private val _userAlbums = repos.spotify.userAlbums.map { pojos ->
+    private val _albumPojos = repos.spotify.userAlbumPojos.map { pojos ->
         pojos.filter { !_pastImportedAlbumIds.contains(it.spotifyAlbum.id) }
     }
-    private val _filteredUserAlbums: Flow<List<SpotifyAlbumPojo>> =
-        combine(_userAlbums, _searchTerm) { pojos, term -> pojos.filterBySearchTerm(term) }
+    private val _filteredAlbumPojos: Flow<List<SpotifyAlbumPojo>> =
+        combine(_albumPojos, _searchTerm) { pojos, term -> pojos.filterBySearchTerm(term) }
     private val _pastImportedAlbumIds = mutableSetOf<String>()
     private val _isSearching = MutableStateFlow(false)
 
-    val offsetUserAlbums: Flow<List<SpotifyAlbumPojo>> = combine(_filteredUserAlbums, _localOffset) { pojos, offset ->
+    val offsetAlbumPojos: Flow<List<SpotifyAlbumPojo>> = combine(_filteredAlbumPojos, _localOffset) { pojos, offset ->
         pojos.subList(min(offset, max(pojos.lastIndex, 0)), min(offset + 50, pojos.size))
     }
 
     val localOffset: StateFlow<Int> = _localOffset.asStateFlow()
-    val selectedUserAlbums: StateFlow<List<SpotifyAlbumPojo>> = _selectedUserAlbums.asStateFlow()
-    val isAllSelected: Flow<Boolean> = combine(offsetUserAlbums, _selectedUserAlbums) { userAlbums, selected ->
+    val selectedAlbumPojos: StateFlow<List<SpotifyAlbumPojo>> = _selectedAlbumPojos.asStateFlow()
+    val isAllSelected: Flow<Boolean> = combine(offsetAlbumPojos, _selectedAlbumPojos) { userAlbums, selected ->
         userAlbums.isNotEmpty() && selected.map { it.spotifyAlbum.id }
             .containsAll(userAlbums.map { it.spotifyAlbum.id })
     }
-    val isAuthorized: Flow<Boolean> = repos.spotify.isAuthorized
+    val isAuthorized: Flow<Boolean?> = repos.spotify.isAuthorized
     val progress: StateFlow<ImportProgressData?> = _progress.asStateFlow()
     val importedAlbumIds: StateFlow<List<String>> = _importedAlbumIds.asStateFlow()
-    val nextUserAlbumIdx = repos.spotify.nextUserAlbumIdx
+    val nextAlbumIdx = repos.spotify.nextUserAlbumIdx
     val notFoundAlbumIds: StateFlow<List<String>> = _notFoundAlbumIds.asStateFlow()
+    val requestCode = repos.spotify.requestCode
     val searchTerm: StateFlow<String> = _searchTerm.asStateFlow()
-    val filteredUserAlbumCount: Flow<Int?> = combine(
+    val filteredAlbumCount: Flow<Int?> = combine(
         _searchTerm,
-        _filteredUserAlbums,
+        _filteredAlbumPojos,
         repos.spotify.totalUserAlbumCount,
     ) { term, filteredAlbums, totalCount ->
         if (term == "") totalCount?.minus(_pastImportedAlbumIds.size)
         else filteredAlbums.size
     }
-    val isUserAlbumCountExact: Flow<Boolean> =
+    val isAlbumCountExact: Flow<Boolean> =
         combine(_searchTerm, repos.spotify.allUserAlbumsFetched) { term, allFetched ->
             term == "" || allFetched
         }
     val hasNext: Flow<Boolean> =
-        combine(filteredUserAlbumCount, _localOffset) { total, offset -> total == null || total > offset + 50 }
+        combine(filteredAlbumCount, _localOffset) { total, offset -> total == null || total > offset + 50 }
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
-    val totalUserAlbumCount: StateFlow<Int?> = repos.spotify.totalUserAlbumCount
+    val totalAlbumCount: StateFlow<Int?> = repos.spotify.totalUserAlbumCount
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _pastImportedAlbumIds.addAll(repos.spotify.listImportedAlbumIds())
         }
     }
@@ -95,91 +97,97 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
 
     suspend fun getThumbnail(spotifyAlbum: SpotifyAlbum, context: Context): ImageBitmap? {
         _thumbnailCache[spotifyAlbum.id]?.also { return it }
-        return spotifyAlbum.getThumbnail(context)?.also { _thumbnailCache[spotifyAlbum.id] = it }
+        return spotifyAlbum.getThumbnailImageBitmap(context)?.also { _thumbnailCache[spotifyAlbum.id] = it }
     }
 
-    fun importSelectedAlbums(onFinish: (importCount: Int, notFoundCount: Int) -> Unit) = viewModelScope.launch {
-        val selectedPojos = _selectedUserAlbums.value
-        var notFoundCount = 0
+    fun importSelectedAlbums(onFinish: (importCount: Int, notFoundCount: Int) -> Unit) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val selectedPojos = _selectedAlbumPojos.value
+            var notFoundCount = 0
 
-        selectedPojos.forEachIndexed { index, spotifyPojo ->
-            val progressBaseline = index.toDouble() / selectedPojos.size
-            val progressMultiplier = 1.0 / selectedPojos.size
-            val importProgressData = ImportProgressData(
-                item = spotifyPojo.spotifyAlbum.name,
-                progress = progressBaseline,
-                status = ImportProgressStatus.MATCHING,
-            )
-
-            _progress.value = importProgressData
-
-            val match = findAlbumOnYoutube(spotifyPojo) { progress ->
-                _progress.value = importProgressData.copy(
-                    progress = progressBaseline + (progress * progressMultiplier * 0.9)
-                )
-            }
-
-            if (match != null) {
-                _progress.value = importProgressData.copy(
-                    progress = progressBaseline + (progressMultiplier * 0.9),
-                    status = ImportProgressStatus.IMPORTING,
+            selectedPojos.forEachIndexed { index, spotifyPojo ->
+                val progressBaseline = index.toDouble() / selectedPojos.size
+                val progressMultiplier = 1.0 / selectedPojos.size
+                val importProgressData = ImportProgressData(
+                    item = spotifyPojo.spotifyAlbum.name,
+                    progress = progressBaseline,
+                    status = ImportProgressStatus.MATCHING,
                 )
 
-                // Main "source of truth" for each track must be Youtube, since
-                // that's where we get the audio from. But if the titles are
-                // similar enough, we copy Spotify's track info as it's
-                // generally better.
-                val tracks = match.youtubeAlbumPojo.tracks.mapIndexed { trackIdx, trackYoutube ->
-                    val trackSpotify = match.albumWithTracksPojo.tracks.getOrNull(trackIdx)
-                    val (title, artist) =
-                        if (
-                            trackSpotify != null &&
-                            trackSpotify.getLevenshteinDistance(
-                                trackYoutube,
-                                match.albumWithTracksPojo.album.artist
-                            ) <= 10
-                        ) Pair(trackSpotify.title, trackSpotify.artist)
-                        else Pair(trackYoutube.title, trackYoutube.artist)
-                    trackYoutube.copy(title = title, artist = artist, isInLibrary = true)
+                _progress.value = importProgressData
+
+                val match = findAlbumOnYoutube(spotifyPojo) { progress ->
+                    _progress.value = importProgressData.copy(
+                        progress = progressBaseline + (progress * progressMultiplier * 0.9)
+                    )
                 }
-                val spotifyTrackPojos =
-                    match.spotifyAlbumPojo.spotifyTrackPojos.mapIndexed { trackIdx, spotifyTrackPojo ->
-                        tracks.getOrNull(trackIdx)
-                            ?.let { spotifyTrackPojo.copy(track = spotifyTrackPojo.track.copy(trackId = it.trackId)) }
-                            ?: spotifyTrackPojo
-                    }
-                val albumPojo = match.youtubeAlbumPojo.copy(
-                    album = match.albumWithTracksPojo.album.copy(
-                        youtubePlaylist = match.youtubeAlbumPojo.album.youtubePlaylist,
-                    ),
-                    tracks = tracks.map { it.copy(albumId = match.albumWithTracksPojo.album.albumId) },
-                    spotifyAlbum = match.spotifyAlbumPojo.spotifyAlbum,
-                )
-                val spotifyAlbumPojo = match.spotifyAlbumPojo.copy(
-                    spotifyTrackPojos = spotifyTrackPojos,
-                )
 
-                repos.album.saveAlbumPojo(albumPojo)
-                repos.track.insertTracks(albumPojo.tracks)
-                repos.spotify.saveSpotifyAlbumPojo(spotifyAlbumPojo)
-                _progress.value = importProgressData.copy(
-                    progress = progressBaseline + progressMultiplier,
-                    status = ImportProgressStatus.IMPORTING,
-                )
-                _importedAlbumIds.value += spotifyPojo.spotifyAlbum.id
-            } else {
-                notFoundCount++
-                _notFoundAlbumIds.value += spotifyPojo.spotifyAlbum.id
+                if (match != null) {
+                    _progress.value = importProgressData.copy(
+                        progress = progressBaseline + (progressMultiplier * 0.9),
+                        status = ImportProgressStatus.IMPORTING,
+                    )
+
+                    // Main "source of truth" for each track must be Youtube, since
+                    // that's where we get the audio from. But if the durations are
+                    // close enough, we copy Spotify's track info as it's
+                    // generally better.
+                    val tracks = match.youtubeAlbumPojo.tracks.mapIndexed { trackIdx, trackYoutube ->
+                        val spotifyTrackPojo = match.spotifyAlbumPojo.spotifyTrackPojos.getOrNull(trackIdx)
+                        val (title, artist) =
+                            if (spotifyTrackPojo?.hasSimilarDuration(trackYoutube) == true)
+                                Pair(spotifyTrackPojo.track.name, spotifyTrackPojo.artist)
+                            else Pair(trackYoutube.title, trackYoutube.artist)
+                        trackYoutube.copy(title = title, artist = artist, isInLibrary = true)
+                    }
+                    val spotifyTrackPojos =
+                        match.spotifyAlbumPojo.spotifyTrackPojos.mapIndexed { trackIdx, spotifyTrackPojo ->
+                            tracks.getOrNull(trackIdx)
+                                ?.let { spotifyTrackPojo.copy(track = spotifyTrackPojo.track.copy(trackId = it.trackId)) }
+                                ?: spotifyTrackPojo
+                        }
+                    val imageUrl = match.spotifyAlbumPojo.spotifyAlbum.fullImage?.url
+                        ?: match.youtubeAlbumPojo.album.youtubePlaylist?.fullImage?.url
+                    val albumArt =
+                        imageUrl?.let {
+                            repos.localMedia.saveInternalAlbumArtFiles(
+                                match.albumWithTracksPojo.album,
+                                it
+                            )
+                        }
+                    val albumPojo = match.youtubeAlbumPojo.copy(
+                        album = match.albumWithTracksPojo.album.copy(
+                            youtubePlaylist = match.youtubeAlbumPojo.album.youtubePlaylist,
+                            albumArt = albumArt,
+                        ),
+                        tracks = tracks.map { it.copy(albumId = match.albumWithTracksPojo.album.albumId) },
+                        spotifyAlbum = match.spotifyAlbumPojo.spotifyAlbum,
+                    )
+                    val spotifyAlbumPojo = match.spotifyAlbumPojo.copy(
+                        spotifyTrackPojos = spotifyTrackPojos,
+                    )
+
+                    repos.album.saveAlbumPojo(albumPojo)
+                    repos.track.insertTracks(albumPojo.tracks)
+                    repos.spotify.saveSpotifyAlbumPojo(spotifyAlbumPojo)
+                    _progress.value = importProgressData.copy(
+                        progress = progressBaseline + progressMultiplier,
+                        status = ImportProgressStatus.IMPORTING,
+                    )
+                    _importedAlbumIds.value += spotifyPojo.spotifyAlbum.id
+                } else {
+                    notFoundCount++
+                    _notFoundAlbumIds.value += spotifyPojo.spotifyAlbum.id
+                }
+
+                _selectedAlbumPojos.value -= spotifyPojo
             }
 
-            _selectedUserAlbums.value -= spotifyPojo
+            _progress.value = null
+            if (selectedPojos.isNotEmpty()) {
+                onFinish(selectedPojos.size - notFoundCount, notFoundCount)
+            }
         }
-
-        _progress.value = null
-        if (selectedPojos.isNotEmpty()) {
-            onFinish(selectedPojos.size - notFoundCount, notFoundCount)
-        }
-    }
 
     fun setAuthorizationResponse(value: AuthorizationResponse) {
         Log.i(javaClass.simpleName, "setAuthorizationResponse: type=${value.type}, error=${value.error}")
@@ -188,7 +196,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
 
     fun setOffset(offset: Int) {
         _localOffset.value = offset
-        _selectedUserAlbums.value = emptyList()
+        _selectedAlbumPojos.value = emptyList()
         fetchUserAlbumsIfNeeded()
     }
 
@@ -200,25 +208,25 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
     }
 
     fun setSelectAll(value: Boolean) = viewModelScope.launch {
-        if (value) _selectedUserAlbums.value = offsetUserAlbums.first().filter {
+        if (value) _selectedAlbumPojos.value = offsetAlbumPojos.first().filter {
             !_importedAlbumIds.value.contains(it.spotifyAlbum.id) && !_notFoundAlbumIds.value.contains(it.spotifyAlbum.id)
         }
-        else _selectedUserAlbums.value = emptyList()
+        else _selectedAlbumPojos.value = emptyList()
     }
 
     fun toggleSelected(spotifyPojo: SpotifyAlbumPojo) {
-        if (_selectedUserAlbums.value.contains(spotifyPojo)) _selectedUserAlbums.value -= spotifyPojo
+        if (_selectedAlbumPojos.value.contains(spotifyPojo)) _selectedAlbumPojos.value -= spotifyPojo
         else if (
             !_importedAlbumIds.value.contains(spotifyPojo.spotifyAlbum.id) &&
             !_notFoundAlbumIds.value.contains(spotifyPojo.spotifyAlbum.id)
-        ) _selectedUserAlbums.value += spotifyPojo
+        ) _selectedAlbumPojos.value += spotifyPojo
     }
 
 
     /** PRIVATE FUNCTIONS *****************************************************/
-    private fun fetchUserAlbumsIfNeeded() = viewModelScope.launch {
+    private fun fetchUserAlbumsIfNeeded() = viewModelScope.launch(Dispatchers.IO) {
         while (
-            _filteredUserAlbums.first().size < _localOffset.value + 100 &&
+            _filteredAlbumPojos.first().size < _localOffset.value + 100 &&
             !repos.spotify.allUserAlbumsFetched.value
         ) {
             _isSearching.value = true
@@ -265,7 +273,9 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
             }
             .map {
                 SpotifyAlbumMatch(
-                    spotifyAlbumPojo = spotifyPojo,
+                    spotifyAlbumPojo = spotifyPojo.copy(
+                        spotifyAlbum = spotifyPojo.spotifyAlbum.copy(albumId = album.albumId),
+                    ),
                     youtubeAlbumPojo = it,
                     levenshtein = pojo.getLevenshteinDistance(it),
                     albumWithTracksPojo = pojo,

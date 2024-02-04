@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:height="50dp"
+        android:width="50dp"
+        android:gravity="center"
+        android:drawable="@mipmap/ic_launcher_monochrome_foreground_cropped" />
+</layer-list>

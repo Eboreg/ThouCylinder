@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 fun <T> ItemGrid(
     things: List<T>,
     modifier: Modifier = Modifier,
-    key: (index: Int, item: T) -> Any,
+    key: ((index: Int, item: T) -> Any)? = null,
     onClick: (Int, T) -> Unit,
     onLongClick: ((Int, T) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),

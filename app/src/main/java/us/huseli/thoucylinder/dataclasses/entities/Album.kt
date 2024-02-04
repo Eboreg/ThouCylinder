@@ -15,15 +15,15 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.sanitizeFilename
-import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.retaintheme.extensions.sanitizeFilename
+import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.createDirectoryIfNotExists
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getSquareBitmapByUrl
 import java.util.UUID
 
 @Entity(
@@ -51,14 +51,32 @@ data class Album(
         get() = youtubePlaylist?.let { "https://youtube.com/playlist?list=${it.id}" }
 
     @WorkerThread
-    fun getDownloadDirDocumentFile(downloadRoot: DocumentFile, context: Context): DocumentFile? {
+    fun createDownloadDirDocumentFile(downloadRoot: DocumentFile, context: Context): DocumentFile? {
         var ret: DocumentFile? = downloadRoot
         getSubDirs(context).forEach { ret = ret?.createDirectoryIfNotExists(it) }
         return ret
     }
 
-    suspend fun getFullImage(context: Context): ImageBitmap? =
-        getFullImageBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
+    @WorkerThread
+    fun getDownloadDirDocumentFile(downloadRoot: DocumentFile, context: Context): DocumentFile? {
+        var ret: DocumentFile? = downloadRoot
+        getSubDirs(context).forEach { dirname ->
+            ret = ret?.findFile(dirname)?.takeIf { it.isDirectory }
+        }
+        return ret
+    }
+
+    suspend fun getFullBitmap(context: Context): Bitmap? = albumArt?.getFullBitmap(context)
+
+    /*
+    suspend fun getFullBitmap(context: Context): Bitmap? =
+        albumArt?.getFullBitmap(context)
+            ?: lastFmFullImageUrl?.getSquareBitmapByUrl()
+            ?: youtubePlaylist?.fullImage?.url?.getSquareBitmapByUrl()
+     */
+
+    suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
+        getFullBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
 
     fun getLevenshteinDistance(other: Album): Int {
         val levenshtein = LevenshteinDistance()
@@ -83,18 +101,23 @@ data class Album(
     suspend fun getThumbnail(context: Context): ImageBitmap? =
         getThumbnailBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
 
-    private suspend fun getFullImageBitmap(context: Context): Bitmap? =
-        albumArt?.getFullImageBitmap(context)
-            ?: lastFmFullImageUrl?.getBitmapByUrl()
-            ?: youtubePlaylist?.fullImage?.url?.getBitmapByUrl()
+    @WorkerThread
+    suspend fun saveInternalAlbumArtFiles(imageUrl: String, context: Context): MediaStoreImage? = imageUrl
+        .getSquareBitmapByUrl()
+        ?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)
+        ?.let { MediaStoreImage.fromBitmap(it, context, this) }
 
     private fun getSubDirs(context: Context): List<String> =
         listOf(artist?.sanitizeFilename() ?: context.getString(R.string.unknown_artist), title.sanitizeFilename())
 
+    private suspend fun getThumbnailBitmap(context: Context): Bitmap? = albumArt?.getThumbnailBitmap(context)
+
+    /*
     private suspend fun getThumbnailBitmap(context: Context): Bitmap? =
         albumArt?.getThumbnailBitmap(context)
-            ?: lastFmThumbnailUrl?.getBitmapByUrl()
-            ?: youtubePlaylist?.thumbnail?.url?.getBitmapByUrl()
+            ?: lastFmThumbnailUrl?.getSquareBitmapByUrl()
+            ?: youtubePlaylist?.thumbnail?.url?.getSquareBitmapByUrl()
+     */
 
     override fun toString(): String = artist?.let { "$it - $title" } ?: title
 }

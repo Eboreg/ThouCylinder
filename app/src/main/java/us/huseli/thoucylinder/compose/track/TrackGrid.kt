@@ -59,7 +59,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    trackCallbacks: (Int, T) -> TrackCallbacks,
+    trackCallbacks: (Int, T) -> TrackCallbacks<T>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
@@ -95,11 +95,11 @@ fun <T : AbstractTrackPojo> TrackGrid(
                         .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
                 ) {
                     Box(modifier = Modifier.aspectRatio(1f)) {
-                        val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+                        val imageBitmap = remember(track) { mutableStateOf<ImageBitmap?>(null) }
 
-                        LaunchedEffect(track.trackId) {
-                            imageBitmap.value = pojo.getFullImage(context)
-                            viewModel.ensureTrackMetadata(track, commit = true)
+                        LaunchedEffect(track) {
+                            imageBitmap.value = pojo.getFullImageBitmap(context)
+                            viewModel.ensureTrackMetadata(track)
                         }
 
                         Thumbnail(
@@ -156,8 +156,9 @@ fun <T : AbstractTrackPojo> TrackGrid(
                             }
                         }
 
-                        TrackContextMenuWithButton(
+                        TrackContextButtonWithMenu(
                             isDownloadable = track.isDownloadable,
+                            isInLibrary = track.isInLibrary,
                             callbacks = callbacks,
                         )
                     }

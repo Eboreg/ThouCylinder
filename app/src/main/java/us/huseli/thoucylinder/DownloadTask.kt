@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anggrayudi.storage.file.extension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -113,7 +114,8 @@ class TrackDownloadTask(
     private suspend fun run(context: Context): Track {
         val youtubeMetadata = repos.youtube.getBestMetadata(track)
             ?: throw Error("Could not get Youtube metadata for $track")
-        val filename = "${track.generateBasename(albumPojo?.album?.artist)}.${youtubeMetadata.fileExtension}"
+        val basename = track.generateBasename(includeArtist = albumPojo == null)
+        val filename = "$basename.${youtubeMetadata.fileExtension}"
         val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
 
         setProgress(0.0)
@@ -130,8 +132,10 @@ class TrackDownloadTask(
 
         setStatus(DownloadStatus.MOVING)
         dirDocumentFile.findFile(filename)?.delete()
-        val documentFile = dirDocumentFile.createFile(youtubeMetadata.mimeType, filename)
+        val documentFile = dirDocumentFile.createFile(youtubeMetadata.mimeType, basename)
             ?: throw Error("DocumentFile.fromTreeUri() returned null")
+
+        if (documentFile.extension.isEmpty()) documentFile.renameTo(filename)
 
         context.contentResolver.openFileDescriptor(documentFile.uri, "w")?.use {
             FileOutputStream(it.fileDescriptor).use { outputStream ->
@@ -143,7 +147,7 @@ class TrackDownloadTask(
         setStatus(DownloadStatus.SAVING)
         val downloadedTrack = track.copy(
             isInLibrary = true,
-            albumId = albumPojo?.album?.albumId,
+            albumId = albumPojo?.album?.albumId ?: track.albumId,
             metadata = tempFile.extractTrackMetadata(),
             localUri = documentFile.uri,
         )

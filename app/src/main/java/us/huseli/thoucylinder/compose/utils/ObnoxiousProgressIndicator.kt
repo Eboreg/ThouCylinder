@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.compose.utils
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import us.huseli.retaintheme.circular
+import us.huseli.retaintheme.extensions.circular
 import us.huseli.retaintheme.ui.theme.RetainBasicColorsDark
 import us.huseli.retaintheme.ui.theme.RetainBasicColorsLight
 import us.huseli.thoucylinder.R
@@ -37,7 +38,8 @@ fun ObnoxiousProgressIndicator(
     text: String = stringResource(R.string.loading_scream),
     textStyle: TextStyle = LocalTextStyle.current,
     wigglePx: Int = 20,
-    tonalElevation: Dp = 0.dp,
+    tonalElevation: Dp = 5.dp,
+    padding: PaddingValues = PaddingValues(10.dp),
 ) {
     var rowWidth by remember { mutableIntStateOf(0) }
     val colors = listOf(RetainBasicColorsDark, RetainBasicColorsLight).map {
@@ -59,6 +61,7 @@ fun ObnoxiousProgressIndicator(
     Row(
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
+            .padding(padding)
             .fillMaxWidth()
             .onSizeChanged { size ->
                 if (rowWidth != size.width) rowWidth = size.width

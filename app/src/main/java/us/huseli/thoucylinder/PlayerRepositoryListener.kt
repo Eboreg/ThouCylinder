@@ -9,7 +9,8 @@ interface PlayerRepositoryListener {
         error: PlaybackException,
         currentPojo: QueueTrackPojo?,
         lastAction: PlayerRepository.LastAction,
-    ) {}
+    ) {
+    }
 
     suspend fun onPlaybackChange(pojo: QueueTrackPojo?, state: PlayerRepository.PlaybackState) {}
 

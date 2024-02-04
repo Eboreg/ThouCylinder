@@ -23,7 +23,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
@@ -48,9 +48,9 @@ fun PlaylistList(
         key = { _, pojo -> pojo.playlistId },
         onEmpty = onEmpty,
     ) { _, playlist ->
-        val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+        val imageBitmap = remember(playlist) { mutableStateOf<ImageBitmap?>(null) }
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(playlist) {
             viewModel.getPlaylistImage(playlist.playlistId, context)?.also { imageBitmap.value = it }
         }
 

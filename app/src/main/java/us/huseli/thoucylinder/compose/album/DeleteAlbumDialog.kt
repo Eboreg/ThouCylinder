@@ -14,6 +14,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 fun DeleteAlbumDialog(
     album: Album,
     onCancel: () -> Unit,
+    onDeleteAlbumClick: () -> Unit,
     onDeleteAlbumAndFilesClick: () -> Unit,
     onDeleteFilesClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -26,6 +27,7 @@ fun DeleteAlbumDialog(
         title = { Text(text = "Delete $album") },
         confirmButton = {
             TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album_and_delete_files)) }
+            TextButton(onClick = onDeleteAlbumClick) { Text(stringResource(R.string.only_remove_album)) }
             if (album.isOnYoutube)
                 TextButton(onClick = onDeleteFilesClick) { Text(stringResource(R.string.only_delete_files)) }
         },

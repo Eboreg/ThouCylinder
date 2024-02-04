@@ -56,7 +56,7 @@ fun SmallOutlinedButton(
     height: Dp = 32.dp,
     leadingIcon: ImageVector? = null,
     shape: Shape = MaterialTheme.shapes.small,
-    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    textStyle: TextStyle = MaterialTheme.typography.labelLarge,
 ) {
     SmallOutlinedButton(
         onClick = onClick,

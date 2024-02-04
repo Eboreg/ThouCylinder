@@ -25,6 +25,12 @@ interface LastFmDao {
         _insertLastFmTracks(*pojo.tracks.toTypedArray())
     }
 
-    @Query("SELECT LastFmAlbum_musicBrainzId FROM LastFmAlbum")
+    @Query(
+        """
+        SELECT LastFmAlbum_musicBrainzId FROM LastFmAlbum
+            JOIN Album ON Album_albumId = LastFmAlbum_albumId
+        WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0
+        """
+    )
     suspend fun listImportedAlbumIds(): List<String>
 }

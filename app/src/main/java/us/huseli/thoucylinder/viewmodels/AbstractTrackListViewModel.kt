@@ -53,9 +53,11 @@ abstract class AbstractTrackListViewModel(
     }
 
     private suspend fun getQueueTrackPojo(trackPojo: AbstractTrackPojo, index: Int): QueueTrackPojo? {
-        return trackPojo.track.playUri?.let { uri ->
+        val track = ensureTrackMetadata(trackPojo.track)
+
+        return track.playUri?.let { uri ->
             QueueTrackPojo(
-                track = ensureTrackMetadata(trackPojo.track, commit = true),
+                track = track,
                 uri = uri,
                 position = index,
                 album = trackPojo.album,

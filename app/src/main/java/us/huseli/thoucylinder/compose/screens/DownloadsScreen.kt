@@ -32,13 +32,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import us.huseli.retaintheme.extensions.isoDateTime
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.DownloadTaskState
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.isoDateTime
 import us.huseli.thoucylinder.viewmodels.DownloadsViewModel
 
 @Composable
@@ -51,8 +51,8 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         cardHeight = 60.dp,
         gap = 5.dp,
         onEmpty = { Text(stringResource(R.string.no_downloads_found), modifier = Modifier.padding(10.dp)) },
-    ) {_, task ->
-        val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+    ) { _, task ->
+        val thumbnail = remember(task.track) { mutableStateOf<ImageBitmap?>(null) }
         val progress by task.downloadProgress.collectAsStateWithLifecycle()
         val state by task.state.collectAsStateWithLifecycle()
 

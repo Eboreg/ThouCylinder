@@ -25,6 +25,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
 
     private val _selectedTrackPojos = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
 
+    suspend fun addToLibraryByAlbumId(albumId: UUID) = trackDao.setIsInLibraryByAlbumId(albumId, true)
+
     suspend fun deleteTempTracks() = trackDao.deleteTempTracks()
 
     @WorkerThread
@@ -37,6 +39,9 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     }
 
     suspend fun deleteTracksByAlbumId(albumId: UUID) = trackDao.deleteTracksByAlbumId(albumId)
+
+    suspend fun deleteTracksByAlbumId(albumIds: Collection<UUID>) =
+        trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
 
     fun flowSelectedTrackPojos(viewModelClass: String): StateFlow<List<TrackPojo>> =
         mutableFlowSelectedTrackPojos(viewModelClass).asStateFlow()
@@ -69,8 +74,7 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
             if (it.value.contains(track)) {
                 it.value -= track
                 false
-            }
-            else {
+            } else {
                 it.value += track
                 true
             }

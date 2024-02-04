@@ -1,12 +1,9 @@
 package us.huseli.thoucylinder.dataclasses.pojos
 
-import android.content.Context
-import androidx.annotation.WorkerThread
-import androidx.documentfile.provider.DocumentFile
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
-import us.huseli.retaintheme.sumOfOrNull
+import us.huseli.retaintheme.extensions.sumOfOrNull
 import us.huseli.thoucylinder.dataclasses.PositionPair
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -17,8 +14,6 @@ import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.getParentDirectory
-import us.huseli.thoucylinder.matchFilesRecursive
 
 data class AlbumWithTracksPojo(
     @Embedded override val album: Album,
@@ -99,22 +94,6 @@ data class AlbumWithTracksPojo(
     }
 
     fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
-
-    @WorkerThread
-    fun listCoverImages(context: Context, includeThumbnails: Boolean = false): List<DocumentFile> {
-        val filenameRegex =
-            if (includeThumbnails) Regex("^cover(-thumbnail)?\\..*", RegexOption.IGNORE_CASE)
-            else Regex("^cover\\..*", RegexOption.IGNORE_CASE)
-
-        return listTrackParentDirectories(context)
-            .map { it.matchFilesRecursive(filenameRegex, Regex("^image/.*")) }
-            .flatten()
-            .distinctBy { it.uri.path }
-    }
-
-    @WorkerThread
-    fun listTrackParentDirectories(context: Context): List<DocumentFile> =
-        tracks.mapNotNull { it.getDocumentFile(context)?.getParentDirectory(context) }.distinctBy { it.uri.path }
 
     fun sorted(): AlbumWithTracksPojo = copy(
         tracks = tracks.sorted(),

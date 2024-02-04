@@ -21,7 +21,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import us.huseli.retaintheme.extensions.join
+import us.huseli.retaintheme.extensions.md5
 import us.huseli.thoucylinder.BuildConfig
+import us.huseli.thoucylinder.Constants.LASTFM_API_ROOT
+import us.huseli.thoucylinder.Constants.LASTFM_PAGE_LIMIT
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
@@ -38,12 +42,9 @@ import us.huseli.thoucylinder.dataclasses.lastFm.getLastFmTopAlbums
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.LastFmAlbumPojo
 import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.getString
-import us.huseli.thoucylinder.join
-import us.huseli.thoucylinder.md5
 import us.huseli.thoucylinder.toHex
-import java.net.URLConnection
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -95,7 +96,7 @@ class LastFmRepository @Inject constructor(
                                 val scrobbles = scrobbleMutex.withLock { _scrobbles.value }
 
                                 scrobbles.chunked(50).forEach { chunk ->
-                                    post(
+                                    postAndGetString(
                                         method = "track.scrobble",
                                         params = chunk
                                             .mapIndexed { index, scrobble -> scrobble.toMap(index) }
@@ -103,7 +104,6 @@ class LastFmRepository @Inject constructor(
                                             .plus("sk" to sessionKey),
                                     )?.also {
                                         scrobbleMutex.withLock { _scrobbles.value -= chunk }
-                                        Log.i(javaClass.simpleName, it.getString())
                                     }
                                 }
                                 delay(10_000)
@@ -130,7 +130,7 @@ class LastFmRepository @Inject constructor(
                 Request.get(url).getLastFmTopAlbums()?.also {
                     _nextTopAlbumPage.value += 1
                     _topAlbums.value += it
-                    if (it.isEmpty() || _nextTopAlbumPage.value >= PAGE_LIMIT) _allTopAlbumsFetched.value = true
+                    if (it.isEmpty() || _nextTopAlbumPage.value >= LASTFM_PAGE_LIMIT) _allTopAlbumsFetched.value = true
                     return true
                 }
             }
@@ -141,18 +141,14 @@ class LastFmRepository @Inject constructor(
     suspend fun getFullImage(album: LastFmTopAlbumsResponse.TopAlbums.Album): ImageBitmap? {
         return album.image.getFullImage()?.let { image ->
             if (_albumArtCache.contains(image.url)) _albumArtCache[image.url]
-            else image.url.getBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
+            else image.url.getSquareBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
         }
     }
 
     @Suppress("UNCHECKED_CAST")
     suspend fun getSession(authToken: String): Session? {
         val xstream = XStream()
-        val body = post(
-            method = "auth.getSession",
-            params = mapOf("token" to authToken),
-            failSilently = false,
-        )?.getString()
+        val body = postAndGetString(method = "auth.getSession", params = mapOf("token" to authToken))
 
         return body?.let {
             xstream.alias("session", Session::class.java)
@@ -166,7 +162,7 @@ class LastFmRepository @Inject constructor(
     suspend fun getThumbnail(album: LastFmTopAlbumsResponse.TopAlbums.Album): ImageBitmap? {
         return album.image.getThumbnail()?.let { image ->
             if (_albumArtCache.contains(image.url)) _albumArtCache[image.url]
-            else image.url.getBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
+            else image.url.getSquareBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
         }
     }
 
@@ -185,7 +181,7 @@ class LastFmRepository @Inject constructor(
         val allParams = params.plus("api_key" to BuildConfig.lastFmApiKey)
         val paramsString = allParams.toList().joinToString("&") { (key, value) -> "$key=$value" }
 
-        return "$API_ROOT?$paramsString"
+        return "$LASTFM_API_ROOT?$paramsString"
     }
 
     private fun getSignature(params: Map<String, String>): String {
@@ -198,16 +194,20 @@ class LastFmRepository @Inject constructor(
             .toHex()
     }
 
-    private suspend fun post(method: String, params: Map<String, String>, failSilently: Boolean = true): URLConnection? {
+    private suspend fun postAndGetString(
+        method: String,
+        params: Map<String, String>,
+        failSilently: Boolean = true,
+    ): String? {
         return try {
             Request.postFormData(
-                url = API_ROOT,
+                url = LASTFM_API_ROOT,
                 formData = withSignature(
                     params.plus("method" to method).plus("api_key" to BuildConfig.lastFmApiKey)
                 ),
-            ).connect()
+            ).connect().getString()
         } catch (e: Exception) {
-            Log.e(javaClass.simpleName, "post $method: $e", e)
+            Log.e(javaClass.simpleName, "postAndGetString $method: $e", e)
             if (!failSilently) throw e
             null
         }
@@ -245,10 +245,10 @@ class LastFmRepository @Inject constructor(
                 }
 
                 if (nowPlaying != null && nowPlaying != _latestNowPlaying.value) {
-                    post(
+                    postAndGetString(
                         method = "track.updateNowPlaying",
                         params = nowPlaying.toMap().plus("sk" to sessionKey)
-                    )?.also { Log.i(javaClass.simpleName, it.getString()) }
+                    )
                 }
                 _latestNowPlaying.value = nowPlaying
             }
@@ -281,12 +281,5 @@ class LastFmRepository @Inject constructor(
             PREF_LASTFM_USERNAME -> preferences.getString(key, null)?.also { setUsername(it) }
             PREF_LASTFM_SCROBBLE -> _scrobble.value = preferences.getBoolean(key, false)
         }
-    }
-
-    companion object {
-        // Don't know if Last.fm has any hard quota limit, but better not
-        // overdo it.
-        const val PAGE_LIMIT = 20
-        const val API_ROOT = "https://ws.audioscrobbler.com/2.0/"
     }
 }

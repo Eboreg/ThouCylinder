@@ -48,9 +48,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.2.0"
-        manifestPlaceholders["redirectSchemeName"] = "klaatu"
-        manifestPlaceholders["redirectHostName"] = "thoucylinder"
 
+        manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -72,12 +71,18 @@ android {
             isDebuggable = true
             // isRenderscriptDebuggable = true
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["hostName"] = "thoucylinder.debug"
+            manifestPlaceholders["redirectHostName"] = "thoucylinder.debug"
+            buildConfigField("String", "hostName", "\"thoucylinder.debug\"")
         }
         release {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            manifestPlaceholders["hostName"] = "thoucylinder"
+            manifestPlaceholders["redirectHostName"] = "thoucylinder"
+            buildConfigField("String", "hostName", "\"thoucylinder\"")
         }
     }
 
@@ -96,7 +101,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
 
     packaging {
@@ -120,8 +125,11 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2023.10.01"))
 
     // Material:
+    implementation("androidx.compose.material:material:1.5.4") // for swipeable
     implementation("androidx.compose.material3:material3")
+    // implementation("androidx.compose.material3:material3:1.2.0-beta02")
     implementation("androidx.compose.material:material-icons-extended")
+    // implementation("androidx.compose.material3:material3-android:1.2.0-beta02")
 
     // Compose related:
     implementation("androidx.activity:activity-compose:1.8.2")
@@ -138,9 +146,10 @@ dependencies {
     implementation("com.google.dagger:hilt-android:$daggerVersion")
     kapt("com.google.dagger:hilt-compiler:$daggerVersion")
 
-    // Media:
+    // Media3:
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-session:$media3Version")
 
     // Room:
     implementation("androidx.room:room-runtime:$roomVersion")
@@ -151,7 +160,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:3.1.0")
+    implementation("com.github.Eboreg:RetainTheme:4.0.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
@@ -159,9 +168,6 @@ dependencies {
 
     // Splashscreen:
     implementation("androidx.core:core-splashscreen:1.0.1")
-
-    // For reading document tree:
-    // implementation("androidx.documentfile:documentfile:1.0.1")
 
     // Paging:
     // https://developer.android.com/topic/libraries/architecture/paging/v3-overview
@@ -182,4 +188,8 @@ dependencies {
 
     // XStream to parse XML:
     implementation("com.thoughtworks.xstream:xstream:1.4.20")
+
+    // Glance for widget:
+    implementation("androidx.glance:glance-appwidget:1.0.0")
+    implementation("androidx.glance:glance-material3:1.0.0")
 }

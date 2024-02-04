@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.documentfile.provider.DocumentFile
+import androidx.core.net.toFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,17 +11,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import us.huseli.retaintheme.dpToPx
-import us.huseli.retaintheme.scaleToMaxSize
+import us.huseli.retaintheme.extensions.dpToPx
+import us.huseli.retaintheme.extensions.scaleToMaxSize
+import us.huseli.retaintheme.extensions.toBitmap
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.matchDirectoriesRecursive
 import us.huseli.thoucylinder.matchFiles
 import us.huseli.thoucylinder.toBitmap
@@ -48,22 +47,24 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
     }.asStateFlow()
 
     private suspend fun fetchArtistImage(artistPojo: ArtistPojo, context: Context): ImageBitmap? {
-        return withContext(Dispatchers.IO) {
-            repos.settings.getMusicImportDocumentFile()
-                ?.matchDirectoriesRecursive(Regex("^${artistPojo.name}"))
-                ?.map { it.matchFiles(Regex("^artist\\..*", RegexOption.IGNORE_CASE), Regex("^image/.*")) }
-                ?.flatten()
-                ?.distinctBy { it.uri.path }
-                ?.firstNotNullOfOrNull { it.toBitmap(context) }
-                ?.also { return@withContext it.asImageBitmap() }
+        repos.settings.getLocalMusicDocumentFile()
+            ?.matchDirectoriesRecursive(Regex("^${artistPojo.name}"))
+            ?.map { it.matchFiles(Regex("^artist\\..*", RegexOption.IGNORE_CASE), Regex("^image/.*")) }
+            ?.flatten()
+            ?.distinctBy { it.uri.path }
+            ?.firstNotNullOfOrNull { it.toBitmap(context) }
+            ?.also { return it.asImageBitmap() }
 
-            artistPojo.firstAlbumArtUri
-                ?.let { DocumentFile.fromTreeUri(context, it)?.toBitmap(context)?.asImageBitmap() }
-                ?.also { return@withContext it }
+        artistPojo.listAlbumArtUris()
+            .forEach { uri -> uri.toFile().toBitmap()?.asImageBitmap()?.also { return it } }
 
-            artistPojo.firstAlbumArtUrl
-                ?.let { it.getBitmapByUrl()?.scaleToMaxSize(context.dpToPx(IMAGE_MAX_DP_FULL))?.asImageBitmap() }
-                ?.also { return@withContext it }
+        artistPojo.listFullImageUrls().forEach { url ->
+            url.getSquareBitmapByUrl()
+                ?.scaleToMaxSize(context.dpToPx(IMAGE_MAX_DP_FULL))
+                ?.asImageBitmap()
+                ?.also { return it }
         }
+
+        return null
     }
 }

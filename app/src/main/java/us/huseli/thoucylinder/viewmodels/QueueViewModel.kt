@@ -5,35 +5,38 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
-import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.Repositories
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.time.DurationUnit
 
 @HiltViewModel
 class QueueViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
     private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
 
-    val playerCurrentPojo: Flow<QueueTrackPojo?> = repos.player.currentPojo.filterNotNull().distinctUntilChanged()
-    val playerPlaybackState: StateFlow<PlayerRepository.PlaybackState> = repos.player.playbackState
-    val playerCurrentPositionMs: StateFlow<Long> = repos.player.currentPositionMs
-    val playerCanGotoNext: StateFlow<Boolean> = repos.player.canGotoNext
-    val playerCanPlay: StateFlow<Boolean> = repos.player.canPlay
-    val playerIsRepeatEnabled = repos.player.isRepeatEnabled
-    val playerIsShuffleEnabled = repos.player.isShuffleEnabled
+    val canGotoNext = repos.player.canGotoNext
+    val canPlay = repos.player.canPlay
+    val currentPojo = repos.player.currentPojo.filterNotNull().distinctUntilChanged()
+    val currentPositionSeconds = repos.player.currentPositionMs.map { it / 1000 }.distinctUntilChanged()
+    val currentProgress: Flow<Float> = combine(repos.player.currentPositionMs, currentPojo) { position, pojo ->
+        val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+        endPosition?.let { position / it.toFloat() } ?: 0f
+    }.distinctUntilChanged()
+    val isLoading = repos.player.isLoading
+    val isPlaying = repos.player.isPlaying
+    val isRepeatEnabled = repos.player.isRepeatEnabled
+    val isShuffleEnabled = repos.player.isShuffleEnabled
     val queue = _queue.asStateFlow()
     val selectedQueueTracks: Flow<List<QueueTrackPojo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
         selected.filter { queue.contains(it) }
@@ -53,7 +56,9 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
         )
     }
 
-    suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum? = repos.spotify.getSpotifyAlbum(albumId)
+    fun getNextPojo(): QueueTrackPojo? = repos.player.getNextTrack()
+
+    fun getPreviousPojo(): QueueTrackPojo? = repos.player.getPreviousTrack()
 
     fun onMoveTrack(from: Int, to: Int) {
         /**
@@ -76,9 +81,9 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
         _selectedQueueTracks.value -= pojos
     }
 
-    fun seekTo(positionMs: Long) = repos.player.seekTo(positionMs)
+    fun seekToProgress(progress: Float) = repos.player.seekToProgress(progress)
 
-    fun selectQueueTracksFromLastSelected(to: QueueTrackPojo) = viewModelScope.launch {
+    fun selectQueueTracksFromLastSelected(to: QueueTrackPojo) {
         val lastSelectedIdx = queue.value.indexOf(_selectedQueueTracks.value.lastOrNull())
         val thisIdx = queue.value.indexOf(to)
 
@@ -93,6 +98,8 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     fun skipTo(index: Int) = repos.player.skipTo(index)
 
     fun skipToNext() = repos.player.skipToNext()
+
+    fun skipToPrevious() = repos.player.skipToPrevious()
 
     fun skipToStartOrPrevious() = repos.player.skipToStartOrPrevious()
 

@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application android:name=".Application"
         android:allowBackup="true"
@@ -17,11 +19,27 @@
         android:theme="@style/Theme.ThouCylinder.Starting"
         tools:targetApi="31">
 
+        <service android:name=".PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
+        <receiver android:name=".widget.Receiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/app_widget_info" />
+        </receiver>
+
         <activity android:name=".MainActivity"
             android:launchMode="standard"
             android:exported="true"
             android:theme="@style/Theme.ThouCylinder.Starting"
-            android:windowSoftInputMode="adjustPan">
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -30,7 +48,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:host="thoucylinder" android:scheme="klaatu" />
+                <data android:host="${hostName}" android:scheme="klaatu" />
             </intent-filter>
         </activity>
     </application>

@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.retaintheme.sensibleFormat
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
@@ -40,7 +40,6 @@ fun ArtistList(
     ItemList(
         things = artistPojos,
         onClick = onArtistClick?.let { { _, artist -> onArtistClick(artist.name) } },
-        key = { _, artist -> artist.name },
         onEmpty = {
             Text(
                 stringResource(

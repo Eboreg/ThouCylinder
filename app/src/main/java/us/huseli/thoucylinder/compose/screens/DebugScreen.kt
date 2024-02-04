@@ -17,12 +17,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.utils.CompactSearchTextField
 
 @Composable
 fun DebugScreen() {
+    val density = LocalDensity.current
+
     Column(modifier = Modifier.padding(10.dp).verticalScroll(state = rememberScrollState())) {
+        CompactSearchTextField(value = "blurg")
+        Text("1 dp = ${with(density) { 1.dp.toPx() }} px")
+        Text("1 px = ${with(density) { 1.toDp() }} dp")
         Row {
             ColorSample(Modifier.weight(0.5f), "background", MaterialTheme.colorScheme.background)
             ColorSample(Modifier.weight(0.5f), "error", MaterialTheme.colorScheme.error)

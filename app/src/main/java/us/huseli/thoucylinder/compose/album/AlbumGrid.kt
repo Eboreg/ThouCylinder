@@ -60,7 +60,6 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
         onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
-        key = { _, pojo -> pojo.album.albumId },
         isSelected = isSelected,
     ) { _, pojo ->
         val (downloadProgress, downloadIsActive) =
@@ -68,9 +67,9 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
         val callbacks = albumCallbacks(pojo)
 
         Box(modifier = Modifier.aspectRatio(1f)) {
-            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+            val imageBitmap = remember(pojo.album) { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(pojo.album.albumId) {
+            LaunchedEffect(pojo.album) {
                 imageBitmap.value = pojo.getFullImage(context)
             }
 
@@ -105,11 +104,12 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
                     top = if (downloadIsActive) 3.dp else 5.dp,
                     bottom = 5.dp,
                     start = 5.dp,
-                ),
+                )
+                .height(62.dp),
         ) {
             Column(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceEvenly,
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = pojo.album.title,

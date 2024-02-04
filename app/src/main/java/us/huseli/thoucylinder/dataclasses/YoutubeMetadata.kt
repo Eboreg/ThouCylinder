@@ -27,7 +27,7 @@ data class YoutubeMetadata(
         loudnessDb: Double? = null,
         durationMs: Long? = null,
     ) : this(
-        mimeType = mimeType.split(";").first(),
+        mimeType = extractMimeType(mimeType),
         codecs = extractCodecs(mimeType),
         bitrate = bitrate,
         sampleRate = sampleRate,
@@ -65,6 +65,14 @@ data class YoutubeMetadata(
             ?.getOrNull(1)
             ?.split(",")
             ?: emptyList()
+
+        private fun extractMimeType(value: String): String {
+            val mimeType = value.split(";").first()
+            val codecs = extractCodecs(value)
+
+            return if (mimeType == "audio/webm" && codecs.isNotEmpty()) "audio/${codecs.first()}"
+            else mimeType
+        }
     }
 }
 

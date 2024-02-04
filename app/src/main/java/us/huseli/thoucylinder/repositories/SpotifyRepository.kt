@@ -13,16 +13,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import us.huseli.retaintheme.extensions.toInstant
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_ACCESS_TOKEN
 import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES
+import us.huseli.thoucylinder.Constants.SPOTIFY_REDIRECT_URL
 import us.huseli.thoucylinder.Constants.SPOTIFY_USER_ALBUMS_URL
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.getSpotifyAlbums
 import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
-import us.huseli.thoucylinder.toInstant
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -35,8 +37,6 @@ class SpotifyRepository @Inject constructor(
     @ApplicationContext context: Context,
 ) : SharedPreferences.OnSharedPreferenceChangeListener {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val requestCode = Random.nextInt(1, 10000)
-    private val redirectUri = "klaatu://thoucylinder/spotify/import-albums"
     private val spotifyDao = database.spotifyDao()
 
     private val _accessToken = MutableStateFlow(preferences.getString(PREF_SPOTIFY_ACCESS_TOKEN, null))
@@ -47,13 +47,14 @@ class SpotifyRepository @Inject constructor(
     private val _nextUserAlbumIdx = MutableStateFlow(0)
     private val _requestInstants = MutableStateFlow<List<Instant>>(emptyList())
     private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
-    private val _userAlbums = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
+    private val _userAlbumPojos = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
 
     val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
-    val isAuthorized: Flow<Boolean> = _accessTokenExpires.map { it?.let { it > Instant.now() } == true }
+    val isAuthorized: Flow<Boolean?> = _accessTokenExpires.map { it?.let { it > Instant.now() } }
     val nextUserAlbumIdx: StateFlow<Int> = _nextUserAlbumIdx.asStateFlow()
+    val requestCode = Random.nextInt(1, 10000)
     val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
-    val userAlbums: StateFlow<List<SpotifyAlbumPojo>> = _userAlbums.asStateFlow()
+    val userAlbumPojos: StateFlow<List<SpotifyAlbumPojo>> = _userAlbumPojos.asStateFlow()
 
     init {
         preferences.registerOnSharedPreferenceChangeListener(this)
@@ -70,7 +71,7 @@ class SpotifyRepository @Inject constructor(
             val request = AuthorizationRequest.Builder(
                 BuildConfig.spotifyClientId,
                 AuthorizationResponse.Type.TOKEN,
-                redirectUri,
+                SPOTIFY_REDIRECT_URL,
             ).setScopes(arrayOf("user-library-read")).build()
             AuthorizationClient.openLoginActivity(activity, requestCode, request)
         }
@@ -83,7 +84,7 @@ class SpotifyRepository @Inject constructor(
             val url = "$SPOTIFY_USER_ALBUMS_URL?limit=50&offset=${_nextUserAlbumIdx.value}"
 
             apiRequest(url)?.getSpotifyAlbums()?.also { response ->
-                _userAlbums.value += response.items.map { it.toSpotifyAlbumPojo() }
+                _userAlbumPojos.value += response.items.map { it.toSpotifyAlbumPojo() }
                 _nextUserAlbumIdx.value += response.items.size
                 _allUserAlbumsFetched.value = response.next == null
                 _totalUserAlbumCount.value = response.total
@@ -104,6 +105,7 @@ class SpotifyRepository @Inject constructor(
         } else {
             _accessToken.value = null
             _accessTokenExpires.value = null
+            if (value.error != null) SnackbarEngine.addError(value.error)
         }
         preferences.edit()
             .putString(PREF_SPOTIFY_ACCESS_TOKEN, _accessToken.value)

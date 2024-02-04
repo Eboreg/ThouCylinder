@@ -95,7 +95,7 @@ fun ArtistScreen(
                     val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle(emptyList())
 
                     val albumCallbacks = { pojo: AlbumPojo ->
-                        AlbumCallbacks.fromAppCallbacks(
+                        AlbumCallbacks(
                             pojo = pojo,
                             appCallbacks = appCallbacks,
                             context = context,
@@ -152,7 +152,7 @@ fun ArtistScreen(
                     var latestSelectedTrackIndex by rememberSaveable(selectedTrackPojos) { mutableStateOf<Int?>(null) }
 
                     val trackCallbacks = { index: Int, pojo: TrackPojo ->
-                        TrackCallbacks.fromAppCallbacks(
+                        TrackCallbacks(
                             pojo = pojo,
                             appCallbacks = appCallbacks,
                             context = context,

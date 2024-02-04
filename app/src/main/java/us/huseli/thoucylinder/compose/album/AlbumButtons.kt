@@ -3,12 +3,14 @@ package us.huseli.thoucylinder.compose.album
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Bookmark
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Cancel
+import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
+import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,10 +31,20 @@ fun AlbumButtons(
     isPartiallyDownloaded: Boolean,
     callbacks: AlbumCallbacks,
     modifier: Modifier = Modifier,
-    iconSize: Dp = 30.dp,
+    iconSize: Dp = 40.dp,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
+            IconButton(
+                onClick = callbacks.onEditClick,
+                content = {
+                    Icon(
+                        imageVector = Icons.Sharp.Edit,
+                        contentDescription = stringResource(R.string.edit_album),
+                        modifier = Modifier.size(iconSize),
+                    )
+                }
+            )
             if (isDownloading) {
                 IconButton(
                     onClick = callbacks.onCancelDownloadClick,
@@ -44,33 +56,31 @@ fun AlbumButtons(
                             modifier = Modifier.size(iconSize),
                         )
                     },
-                    modifier = modifier,
+                    modifier = modifier.padding(horizontal = 5.dp),
                 )
             } else {
-                if (!isLocal) {
-                    if (isInLibrary) IconButton(
-                        onClick = callbacks.onRemoveFromLibraryClick,
-                        content = {
-                            Icon(
-                                imageVector = Icons.Sharp.Bookmark,
-                                contentDescription = stringResource(R.string.remove_from_library),
-                                modifier = Modifier.size(iconSize),
-                            )
-                        },
-                        modifier = modifier,
-                    )
-                    else IconButton(
-                        onClick = callbacks.onAddToLibraryClick,
-                        content = {
-                            Icon(
-                                imageVector = Icons.Sharp.BookmarkBorder,
-                                contentDescription = stringResource(R.string.add_to_library),
-                                modifier = Modifier.size(iconSize),
-                            )
-                        },
-                        modifier = modifier,
-                    )
-                }
+                if (isInLibrary) IconButton(
+                    onClick = callbacks.onDeleteClick,
+                    content = {
+                        Icon(
+                            imageVector = Icons.Sharp.Delete,
+                            contentDescription = stringResource(R.string.delete_album),
+                            modifier = Modifier.size(iconSize),
+                        )
+                    },
+                    modifier = modifier.padding(horizontal = 5.dp),
+                )
+                else IconButton(
+                    onClick = callbacks.onAddToLibraryClick,
+                    content = {
+                        Icon(
+                            imageVector = Icons.Sharp.BookmarkBorder,
+                            contentDescription = stringResource(R.string.add_to_library),
+                            modifier = Modifier.size(iconSize),
+                        )
+                    },
+                    modifier = modifier.padding(horizontal = 5.dp),
+                )
 
                 if (!isLocal || isPartiallyDownloaded) IconButton(
                     onClick = callbacks.onDownloadClick,
@@ -81,7 +91,7 @@ fun AlbumButtons(
                             modifier = Modifier.size(iconSize),
                         )
                     },
-                    modifier = modifier,
+                    modifier = modifier.padding(horizontal = 5.dp),
                 )
             }
 
@@ -94,7 +104,7 @@ fun AlbumButtons(
                         modifier = Modifier.size(iconSize),
                     )
                 },
-                modifier = modifier,
+                modifier = modifier.padding(horizontal = 5.dp),
             )
         }
 
@@ -103,9 +113,7 @@ fun AlbumButtons(
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,
                 callbacks = callbacks,
-                light = true,
                 isPartiallyDownloaded = isPartiallyDownloaded,
-                buttonIconSize = 30.dp,
             )
         }
     }

@@ -56,7 +56,13 @@ interface SpotifyDao {
     @Query("SELECT * FROM SpotifyAlbum WHERE SpotifyAlbum_albumId = :albumId")
     suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum?
 
-    @Query("SELECT DISTINCT SpotifyAlbum_id FROM SpotifyAlbum JOIN Album ON Album_albumId = SpotifyAlbum_albumId WHERE Album_isInLibrary = 1")
+    @Query(
+        """
+        SELECT DISTINCT SpotifyAlbum_id FROM SpotifyAlbum
+            JOIN Album ON Album_albumId = SpotifyAlbum_albumId
+        WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0
+        """
+    )
     suspend fun listImportedAlbumIds(): List<String>
 
     @Transaction

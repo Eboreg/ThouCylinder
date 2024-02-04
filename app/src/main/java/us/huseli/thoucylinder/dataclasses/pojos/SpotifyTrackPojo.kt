@@ -6,6 +6,8 @@ import androidx.room.Relation
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import kotlin.math.absoluteValue
 
 data class SpotifyTrackPojo(
     @Embedded val track: SpotifyTrack,
@@ -23,4 +25,8 @@ data class SpotifyTrackPojo(
 ) {
     val artist: String?
         get() = artists.map { it.name }.takeIf { it.isNotEmpty() }?.joinToString("/")
+
+    fun hasSimilarDuration(track: Track, limit: Int = 3000): Boolean =
+        (track.metadata?.durationMs ?: track.youtubeVideo?.durationMs)
+            ?.let { (it - this.track.durationMs).absoluteValue <= limit } ?: false
 }

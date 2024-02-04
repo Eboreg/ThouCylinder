@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.dataclasses.entities.Album
 
 abstract class AbstractAlbumListViewModel(
     selectionKey: String,

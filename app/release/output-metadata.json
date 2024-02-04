@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "us.huseli.thoucylinder",
+  "variantName": "release",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "versionCode": 1,
+      "versionName": "0.2.0",
+      "outputFile": "thoucylinder_0.2.0-release.apk"
+    }
+  ],
+  "elementType": "File"
+}

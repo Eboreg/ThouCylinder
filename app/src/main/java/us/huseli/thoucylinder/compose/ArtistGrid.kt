@@ -40,7 +40,6 @@ fun ArtistGrid(
         things = artistPojos,
         onClick = { _, artist -> onArtistClick(artist.name) },
         contentPadding = contentPadding,
-        key = { _, artist -> artist.name },
         onEmpty = {
             Text(
                 stringResource(

@@ -2,24 +2,17 @@ package us.huseli.thoucylinder.compose
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Album
-import androidx.compose.material.icons.sharp.Cancel
-import androidx.compose.material.icons.sharp.CheckCircle
-import androidx.compose.material3.Badge
 import androidx.compose.material3.BottomAppBarDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,25 +28,24 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.screens.PaginationSection
+import us.huseli.thoucylinder.compose.screens.ProgressSection
+import us.huseli.thoucylinder.compose.screens.SelectAllCheckbox
 import us.huseli.thoucylinder.compose.utils.CompactSearchTextField
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.SmallButton
-import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
-import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
 import us.huseli.thoucylinder.viewmodels.LastFmViewModel
 import kotlin.math.max
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportLastFm(
     modifier: Modifier = Modifier,
@@ -61,6 +53,7 @@ fun ImportLastFm(
     listState: LazyListState = rememberLazyListState(),
     onGotoSettingsClick: () -> Unit,
     onGotoLibraryClick: () -> Unit,
+    backendSelection: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -125,6 +118,7 @@ fun ImportLastFm(
             },
             importButtonEnabled = progress == null && selectedTopAlbums.isNotEmpty(),
             progress = progress,
+            backendSelection = backendSelection,
         )
 
         ItemList(
@@ -137,10 +131,7 @@ fun ImportLastFm(
             onClick = { _, topAlbum -> viewModel.toggleSelected(topAlbum) },
             trailingItem = {
                 if (isSearching) {
-                    ObnoxiousProgressIndicator(
-                        modifier = Modifier.padding(10.dp),
-                        tonalElevation = 5.dp,
-                    )
+                    ObnoxiousProgressIndicator()
                 }
                 if (username == null) {
                     Column(
@@ -171,71 +162,28 @@ fun ImportLastFm(
                     else null
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Thumbnail(
-                    image = imageBitmap.value,
-                    shape = MaterialTheme.shapes.extraSmall,
-                    placeholderIcon = when {
-                        isImported -> Icons.Sharp.CheckCircle
-                        isNotFound -> Icons.Sharp.Cancel
-                        else -> Icons.Sharp.Album
-                    },
-                    placeholderIconTint = when {
-                        isImported -> LocalBasicColors.current.Green
-                        isNotFound -> LocalBasicColors.current.Red
-                        else -> null
-                    },
-                )
-
-                Column(modifier = Modifier.fillMaxHeight()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            verticalArrangement = Arrangement.SpaceEvenly,
-                        ) {
-                            Text(
-                                text = album.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listNormalHeader,
-                            )
-                            Text(
-                                text = album.artist.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-                            )
-                            if (isImported) {
-                                Badge(
-                                    containerColor = LocalBasicColors.current.Green,
-                                    content = { Text(text = stringResource(R.string.imported)) },
-                                )
-                            } else if (isNotFound) {
-                                Badge(
-                                    containerColor = LocalBasicColors.current.Red,
-                                    content = { Text(text = stringResource(R.string.no_match_found)) },
-                                )
-                            } else {
-                                album.playcount?.also { playCount ->
-                                    Text(
-                                        text = stringResource(R.string.play_count, playCount),
-                                        style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
+            ImportableAlbumRow(
+                imageBitmap = imageBitmap.value,
+                isImported = isImported,
+                isNotFound = isNotFound,
+                albumTitle = album.name,
+                artist = album.artist.name,
+                thirdRow = {
+                    album.playcount?.also { playCount ->
+                        Text(
+                            text = stringResource(R.string.play_count, playCount),
+                            style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                            maxLines = 1,
+                        )
                     }
-                }
-            }
+                },
+            )
         }
     }
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ImportLastFmHeader(
     modifier: Modifier = Modifier,
@@ -254,92 +202,83 @@ fun ImportLastFmHeader(
     onSearch: (String) -> Unit,
     onSelectAllClick: (Boolean) -> Unit,
     onImportClick: () -> Unit,
+    backendSelection: @Composable () -> Unit,
 ) {
     var isSearchFocused by rememberSaveable { mutableStateOf(false) }
+    val isLandscape = isInLandscapeMode()
 
     Surface(tonalElevation = 2.dp, color = BottomAppBarDefaults.containerColor) {
         Column(
-            modifier = modifier.padding(horizontal =  10.dp).padding(bottom = 10.dp).fillMaxWidth(),
+            modifier = modifier
+                .padding(horizontal = 10.dp)
+                .padding(bottom = 10.dp, top = if (isLandscape) 10.dp else 0.dp)
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            ProvideTextStyle(value = ThouCylinderTheme.typographyExtended.listNormalTitle) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    maxItemsInEachRow = if (isLandscape) 3 else 2,
                 ) {
-                    SmallOutlinedButton(
-                        onClick = onPreviousClick,
-                        text = stringResource(R.string.previous),
-                        enabled = hasPrevious,
-                    )
-                    if (currentAlbumCount > 0) {
-                        Text(
-                            text = "${offset + 1} - ${currentAlbumCount + offset} (≥$totalAlbumCount)",
-                            style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                    backendSelection()
+
+                    if (!isLandscape) {
+                        SmallButton(
+                            onClick = onImportClick,
+                            text = stringResource(R.string.import_str),
+                            enabled = importButtonEnabled,
                         )
                     }
-                    SmallOutlinedButton(
-                        onClick = onNextClick,
-                        text = stringResource(R.string.next),
-                        enabled = hasNext,
+
+                    PaginationSection(
+                        currentAlbumCount = currentAlbumCount,
+                        offset = offset,
+                        totalAlbumCount = totalAlbumCount,
+                        isTotalAlbumCountExact = false,
+                        hasPrevious = hasPrevious,
+                        hasNext = hasNext,
+                        onPreviousClick = onPreviousClick,
+                        onNextClick = onNextClick,
                     )
+
+                    if (isLandscape) {
+                        SmallButton(
+                            onClick = onImportClick,
+                            text = stringResource(R.string.import_str),
+                            enabled = importButtonEnabled,
+                        )
+                    }
+
+                    if (!isLandscape) {
+                        SelectAllCheckbox(
+                            checked = isAllSelected,
+                            enabled = selectAllEnabled,
+                            onCheckedChange = onSelectAllClick,
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                        )
+                    }
+
+                    CompactSearchTextField(
+                        value = searchTerm,
+                        onSearch = onSearch,
+                        onFocusChanged = { isSearchFocused = it.isFocused },
+                        placeholderText = stringResource(R.string.search),
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    if (isLandscape) {
+                        SelectAllCheckbox(
+                            checked = isAllSelected,
+                            enabled = selectAllEnabled,
+                            onCheckedChange = onSelectAllClick,
+                            modifier = Modifier.align(Alignment.CenterVertically).padding(start = 10.dp),
+                        )
+                    }
                 }
 
-                SmallButton(
-                    onClick = onImportClick,
-                    text = stringResource(R.string.import_selected),
-                    enabled = importButtonEnabled,
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CompactSearchTextField(
-                    value = searchTerm,
-                    onSearch = onSearch,
-                    onFocusChanged = { isSearchFocused = it.isFocused },
-                    placeholderText = stringResource(R.string.search),
-                    modifier = Modifier.weight(1f),
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.select_all_visible),
-                        style = ThouCylinderTheme.typographyExtended.listSmallTitle,
-                    )
-                    Checkbox(
-                        checked = isAllSelected,
-                        onCheckedChange = onSelectAllClick,
-                        enabled = selectAllEnabled,
-                    )
-                }
-            }
-
-            if (progress != null) {
-                val statusText = stringResource(progress.status.stringId)
-
-                Column(
-                    modifier = Modifier.padding(top = 5.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Text(
-                        text = "$statusText ${progress.item} …",
-                        style = ThouCylinderTheme.typographyExtended.listSmallTitle,
-                    )
-                    LinearProgressIndicator(
-                        progress = progress.progress.toFloat(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                ProgressSection(progress = progress)
             }
         }
     }

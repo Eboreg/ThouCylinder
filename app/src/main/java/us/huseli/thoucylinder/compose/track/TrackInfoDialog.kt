@@ -1,9 +1,11 @@
 package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -20,12 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.sensibleFormat
+import androidx.compose.ui.window.DialogProperties
+import us.huseli.retaintheme.extensions.sensibleFormat
+import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TrackInfoDialog(
     isDownloaded: Boolean,
@@ -40,44 +45,84 @@ fun TrackInfoDialog(
     onClose: () -> Unit,
 ) {
     AlertDialog(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = 20.dp),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onClose,
         dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
         confirmButton = {},
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            FlowRow(
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+                maxItemsInEachRow = if (isInLandscapeMode()) 2 else 1,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val rowModifier = Modifier.weight(1f)
+
                 if (albumTitle != null)
-                    TrackInfoTextRow(label = stringResource(R.string.album), value = albumTitle)
+                    TrackInfoTextRow(
+                        label = stringResource(R.string.album),
+                        value = albumTitle,
+                        modifier = rowModifier,
+                    )
                 if (albumArtist != null)
-                    TrackInfoTextRow(label = stringResource(R.string.album_artist), value = albumArtist)
-                TrackInfoTextRow(label = stringResource(R.string.year), value = year?.toString() ?: "-")
+                    TrackInfoTextRow(
+                        label = stringResource(R.string.album_artist),
+                        value = albumArtist,
+                        modifier = rowModifier,
+                    )
+                TrackInfoTextRow(
+                    label = stringResource(R.string.year),
+                    value = year?.toString() ?: "-",
+                    modifier = rowModifier,
+                )
                 metadata?.also { metadata ->
                     TrackInfoTextRow(
                         label = stringResource(R.string.duration),
                         value = metadata.duration.sensibleFormat(),
+                        modifier = rowModifier,
                     )
-                    TrackInfoTextRow(label = stringResource(R.string.mime_type), value = metadata.mimeType)
+                    TrackInfoTextRow(
+                        label = stringResource(R.string.mime_type),
+                        value = metadata.mimeType,
+                        modifier = rowModifier,
+                    )
                     TrackInfoTextRow(
                         label = stringResource(R.string.file_size),
-                        value = metadata.sizeString ?: "-"
+                        value = metadata.sizeString ?: "-",
+                        modifier = rowModifier,
                     )
                     TrackInfoTextRow(
                         label = stringResource(R.string.bit_rate),
-                        value = metadata.bitrateString ?: "-"
+                        value = metadata.bitrateString ?: "-",
+                        modifier = rowModifier,
                     )
                     TrackInfoTextRow(
                         label = stringResource(R.string.channels),
                         value = metadata.channels?.toString() ?: "-",
+                        modifier = rowModifier,
                     )
                     TrackInfoTextRow(
                         label = stringResource(R.string.sample_rate),
                         value = metadata.sampleRateString ?: "",
+                        modifier = rowModifier,
                     )
                 }
-                TrackInfoBooleanRow(label = stringResource(R.string.is_downloaded), value = isDownloaded)
-                TrackInfoBooleanRow(label = stringResource(R.string.is_on_youtube), value = isOnYoutube)
-                TrackInfoBooleanRow(label = stringResource(R.string.is_on_spotify), value = isOnSpotify)
+                TrackInfoBooleanRow(
+                    label = stringResource(R.string.is_downloaded),
+                    value = isDownloaded,
+                    modifier = rowModifier,
+                )
+                TrackInfoBooleanRow(
+                    label = stringResource(R.string.is_on_youtube),
+                    value = isOnYoutube,
+                    modifier = rowModifier,
+                )
+                TrackInfoBooleanRow(
+                    label = stringResource(R.string.is_on_spotify),
+                    value = isOnSpotify,
+                    modifier = rowModifier,
+                )
                 localPath?.also {
                     Text(text = stringResource(R.string.local_file))
                     Text(text = it, style = ThouCylinderTheme.typographyExtended.listSmallTitle)
@@ -88,11 +133,11 @@ fun TrackInfoDialog(
 }
 
 @Composable
-fun TrackInfoBooleanRow(label: String, value: Boolean?) {
+fun TrackInfoBooleanRow(label: String, value: Boolean?, modifier: Modifier = Modifier) {
     val colors = LocalBasicColors.current
     val iconModifier = Modifier.size(20.dp)
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
         Text(text = label, modifier = Modifier.weight(0.4f))
         when (value) {
             true -> Icon(Icons.Rounded.CheckCircle, null, tint = colors.Green, modifier = iconModifier)
@@ -103,8 +148,8 @@ fun TrackInfoBooleanRow(label: String, value: Boolean?) {
 }
 
 @Composable
-fun TrackInfoTextRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+fun TrackInfoTextRow(label: String, value: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(text = label, modifier = Modifier.weight(0.4f))
         Text(text = value, modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
     }

@@ -5,6 +5,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,9 +36,6 @@ class YoutubeSearchViewModel @Inject constructor(
             pojos.filter { pojo -> selected.map { it.albumId }.contains(pojo.album.albumId) }
         }
 
-    suspend fun ensureTrackMetadata(pojos: List<TrackPojo>): List<TrackPojo> =
-        pojos.map { pojo -> pojo.copy(track = ensureTrackMetadata(pojo.track, commit = true)) }
-
     fun search(query: String) {
         if (query != _query.value) {
             _query.value = query
@@ -45,7 +43,7 @@ class YoutubeSearchViewModel @Inject constructor(
             if (query.length >= 3) {
                 _isSearchingAlbums.value = true
 
-                viewModelScope.launch {
+                viewModelScope.launch(Dispatchers.IO) {
                     val pojos = repos.youtube.getAlbumSearchResult(query)
 
                     repos.album.insertAlbums(pojos.map { it.album })
@@ -53,7 +51,7 @@ class YoutubeSearchViewModel @Inject constructor(
                     _albumPojos.value = pojos
                     _isSearchingAlbums.value = false
                 }
-                viewModelScope.launch {
+                viewModelScope.launch(Dispatchers.IO) {
                     repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope).collectLatest { pagingData ->
                         _trackPojos.value = pagingData.map { TrackPojo(track = it) }
                     }

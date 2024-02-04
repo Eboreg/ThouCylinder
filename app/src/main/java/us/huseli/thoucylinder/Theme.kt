@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -45,63 +46,72 @@ fun ThouCylinderTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val darkColors = DarkColors.copy(background = DarkColors.surface)
-    val lightColors = LightColors.copy(background = LightColors.surface)
+    val darkColors = DarkColors.copy(
+        background = DarkColors.surface,
+        tertiary = Color(255, 86, 86),
+        tertiaryContainer = Color(113, 0, 0),
+    )
+    val lightColors = LightColors.copy(
+        background = LightColors.surface,
+        tertiary = Color(133, 19, 19),
+        tertiaryContainer = Color(255, 163, 163),
+    )
     val colorScheme = getColorScheme(
         lightColors = lightColors,
         darkColors = darkColors,
-        dynamicColor = dynamicColor
+        dynamicColor = dynamicColor,
+        useDarkTheme = useDarkTheme,
     )
     val typography = Typography()
 
     val typographyExtended = TypographyExtended(
         listNormalHeader = TextStyle.Default.copy(
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.1.sp,
         ),
         listNormalTitle = TextStyle.Default.copy(
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.2.sp,
         ),
         listNormalTitleSecondary = TextStyle.Default.copy(
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.2.sp,
             color = colorScheme.onSurfaceVariant,
         ),
         listNormalSubtitle = TextStyle.Default.copy(
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
         ),
         listNormalSubtitleSecondary = TextStyle.Default.copy(
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
             color = colorScheme.onSurfaceVariant,
         ),
         listSmallHeader = TextStyle.Default.copy(
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.5.sp,
         ),
         listSmallTitle = TextStyle.Default.copy(
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
         ),
         listSmallTitleSecondary = TextStyle.Default.copy(
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
             color = colorScheme.onSurfaceVariant,

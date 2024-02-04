@@ -9,18 +9,15 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     val autoImportLocalMusic: StateFlow<Boolean?> = repos.settings.autoImportLocalMusic
-    val musicDownloadUri: StateFlow<Uri?> = repos.settings.musicDownloadUri
-    val musicImportUri: StateFlow<Uri?> = repos.settings.musicImportUri
+    val localMusicUri: StateFlow<Uri?> = repos.settings.localMusicUri
     val lastFmUsername: StateFlow<String?> = repos.settings.lastFmUsername
     val lastFmScrobble: StateFlow<Boolean> = repos.settings.lastFmScrobble
 
-    fun setAutoImportLocalMusic(value: Boolean) = repos.settings.setAutoImportLocalMusic(value)
+    fun disableLastFmScrobble() = repos.settings.setLastFmScrobble(false)
 
-    fun setLastFmScobble(value: Boolean) = repos.settings.setLastFmScrobble(value)
+    fun setAutoImportLocalMusic(value: Boolean) = repos.settings.setAutoImportLocalMusic(value)
 
     fun setLastFmUsername(value: String?) = repos.settings.setLastFmUsername(value)
 
-    fun setMusicDownloadUri(value: Uri?) = repos.settings.setMusicDownloadUri(value)
-
-    fun setMusicImportUri(value: Uri) = repos.settings.setMusicImportUri(value)
+    fun setLocalMusicUri(value: Uri?) = repos.settings.setLocalMusicUri(value)
 }

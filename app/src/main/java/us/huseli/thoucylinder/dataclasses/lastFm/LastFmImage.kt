@@ -3,18 +3,23 @@ package us.huseli.thoucylinder.dataclasses.lastFm
 import com.google.gson.annotations.SerializedName
 
 data class LastFmImage(
-    val size: String,
+    val size: Size,
     @SerializedName("#text")
     val url: String,
 ) {
+    @Suppress("unused")
+    enum class Size {
+        @SerializedName("small") SMALL,
+        @SerializedName("medium") MEDIUM,
+        @SerializedName("large") LARGE,
+        @SerializedName("extralarge") EXTRALARGE,
+        @SerializedName("mega") MEGA,
+    }
+
     companion object {
-        val fullImageSizePriority = listOf("mega", "extralarge", "large", "medium")
-        val thumbnailSizePriority = listOf("large", "extralarge", "medium")
+        val thumbnailSizePriority = listOf(Size.LARGE, Size.EXTRALARGE, Size.MEDIUM)
     }
 }
 
 fun List<LastFmImage>.getThumbnail(): LastFmImage? =
     LastFmImage.thumbnailSizePriority.firstNotNullOfOrNull { size -> find { it.size == size && it.url.isNotEmpty() } }
-
-fun List<LastFmImage>.getFullImage(): LastFmImage? =
-    LastFmImage.fullImageSizePriority.firstNotNullOfOrNull { size -> find { it.size == size && it.url.isNotEmpty() } }

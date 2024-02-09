@@ -1,21 +1,20 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
 import us.huseli.retaintheme.extensions.sumOfOrNull
-import us.huseli.thoucylinder.dataclasses.PositionPair
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.entities.getLevenshteinDistance
 
-data class AlbumWithTracksPojo(
+data class AlbumWithTracksCombo(
     @Embedded override val album: Album,
     @Relation(
         entity = Genre::class,
@@ -43,14 +42,12 @@ data class AlbumWithTracksPojo(
     override val spotifyAlbum: SpotifyAlbum? = null,
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
     val tracks: List<Track> = emptyList(),
-    @Relation(parentColumn = "Album_albumId", entityColumn = "LastFmAlbum_albumId")
-    override val lastFmAlbum: LastFmAlbum? = null,
-) : AbstractAlbumPojo() {
+) : AbstractAlbumCombo() {
     val discCount: Int
         get() = tracks.mapNotNull { it.discNumber }.maxOrNull() ?: 1
 
-    val trackPojos: List<TrackPojo>
-        get() = tracks.map { TrackPojo(track = it, album = album) }
+    val trackCombos: List<TrackCombo>
+        get() = tracks.map { TrackCombo(track = it, album = album) }
 
     override val trackCount: Int
         get() = tracks.size
@@ -69,33 +66,15 @@ data class AlbumWithTracksPojo(
     override val isPartiallyDownloaded: Boolean
         get() = tracks.any { it.isDownloaded } && tracks.any { !it.isDownloaded }
 
-    fun getLevenshteinDistance(other: AlbumWithTracksPojo): Double {
+    fun getLevenshteinDistance(other: AlbumWithTracksCombo): Double {
         /** N.B. May be misleading if `other` has a different amount of tracks. */
         return album.getLevenshteinDistance(other.album).toDouble().div(tracks.size) +
-            tracks.zip(other.tracks).map { (t1, t2) -> t1.getLevenshteinDistance(t2, album.artist) }.average()
-    }
-
-    fun getPositionPairs(): List<PositionPair> {
-        val pairs = mutableListOf<PositionPair>()
-        var discNumber = 1
-        var albumPosition = 1
-
-        tracks.forEach { track ->
-            if (track.discNumberNonNull != discNumber) {
-                discNumber = track.discNumberNonNull
-                albumPosition = 1
-            }
-            if (track.albumPosition != null) albumPosition = track.albumPosition
-            pairs.add(PositionPair(discNumber, albumPosition))
-            albumPosition++
-        }
-
-        return pairs
+            tracks.getLevenshteinDistance(other.tracks, album.artist)
     }
 
     fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
 
-    fun sorted(): AlbumWithTracksPojo = copy(
+    fun sorted(): AlbumWithTracksCombo = copy(
         tracks = tracks.sorted(),
         genres = genres.sortedBy { it.genreName.length },
         styles = styles.sortedBy { it.styleName.length },

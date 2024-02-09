@@ -22,10 +22,10 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.getString
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import java.time.Instant
@@ -37,7 +37,7 @@ class AppViewModel @Inject constructor(
     private val repos: Repositories,
 ) : DownloadsViewModel(repos), PlayerRepositoryListener {
     private var deletedPlaylist: AbstractPlaylist? = null
-    private var deletedPlaylistTracks: List<PlaylistTrackPojo> = emptyList()
+    private var deletedPlaylistTracks: List<PlaylistTrackCombo> = emptyList()
 
     val playlists = repos.playlist.playlists
     val isWelcomeDialogShown = repos.settings.isWelcomeDialogShown
@@ -71,8 +71,8 @@ class AppViewModel @Inject constructor(
 
     fun deleteLocalAlbumFiles(albumId: UUID, onFinish: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
         repos.album.setAlbumIsLocal(albumId, false)
-        repos.album.getAlbumWithTracks(albumId)?.also { pojo ->
-            deleteLocalAlbumFiles(pojo)
+        repos.album.getAlbumWithTracks(albumId)?.also { combo ->
+            deleteLocalAlbumFiles(combo)
             onFinish()
         }
     }
@@ -94,14 +94,10 @@ class AppViewModel @Inject constructor(
     fun markAlbumForDeletion(albumId: UUID, onFinish: () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
         repos.album.setAlbumIsDeleted(albumId, true)
         repos.album.setAlbumIsLocal(albumId, false)
-        repos.album.getAlbumWithTracks(albumId)?.also { pojo ->
-            deleteLocalAlbumFiles(pojo)
+        repos.album.getAlbumWithTracks(albumId)?.also { combo ->
+            deleteLocalAlbumFiles(combo)
             onFinish()
         }
-    }
-
-    fun saveTrack(track: Track) = viewModelScope.launch {
-        repos.track.updateTrack(track)
     }
 
     fun setAlbumIsHidden(albumId: UUID, value: Boolean, onFinish: () -> Unit = {}) =
@@ -133,12 +129,12 @@ class AppViewModel @Inject constructor(
     }
 
     /** PRIVATE METHODS ******************************************************/
-    private suspend fun deleteLocalAlbumFiles(pojo: AlbumWithTracksPojo) {
+    private suspend fun deleteLocalAlbumFiles(combo: AlbumWithTracksCombo) {
         withContext(Dispatchers.IO) {
-            repos.localMedia.deleteAlbumDirectoryAlbumArt(pojo)
-            repos.track.deleteTrackFiles(pojo.tracks)
+            repos.localMedia.deleteAlbumDirectoryAlbumArt(combo)
+            repos.track.deleteTrackFiles(combo.tracks)
         }
-        repos.track.updateTracks(pojo.tracks.map { it.copy(localUri = null) })
+        repos.track.clearLocalUris(combo.tracks.map { it.trackId })
     }
 
     private suspend fun deleteMarkedAlbums() {
@@ -160,26 +156,26 @@ class AppViewModel @Inject constructor(
         // Separate those that have Youtube connection from those that don't:
         val (realOrphanTracks, youtubeOnlyTracks) = orphanTracks.partition { it.youtubeVideo == null }
         // And albums that _only_ have orphan tracks in them:
-        val realOrphanAlbumPojos = albumMultimap
+        val realOrphanAlbumCombos = albumMultimap
             .filter { (_, tracks) -> realOrphanTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
-            .map { (album, tracks) -> AlbumWithTracksPojo(album = album, tracks = tracks) }
+            .map { (album, tracks) -> AlbumWithTracksCombo(album = album, tracks = tracks) }
         val youtubeOnlyAlbums = albumMultimap
             .filter { (_, tracks) -> youtubeOnlyTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
             .keys
 
         // Delete the totally orphaned tracks and albums:
-        realOrphanAlbumPojos.forEach {
+        realOrphanAlbumCombos.forEach {
             it.album.albumArt?.deleteInternalFiles()
             repos.localMedia.deleteAlbumDirectoryAlbumArt(it)
         }
         repos.track.deleteTracks(realOrphanTracks)
-        repos.album.deleteAlbumPojos(realOrphanAlbumPojos)
+        repos.album.deleteAlbums(realOrphanAlbumCombos.map { it.album })
         // Update the Youtube-only tracks and albums if needed:
         youtubeOnlyAlbums.filter { it.isLocal }.takeIf { it.isNotEmpty() }?.also { albums ->
-            repos.album.updateAlbums(albums.map { it.copy(isLocal = false) })
+            repos.album.setAlbumsIsLocal(albums.map { it.albumId }, false)
         }
         youtubeOnlyTracks.filter { it.localUri != null }.takeIf { it.isNotEmpty() }?.also { tracks ->
-            repos.track.updateTracks(tracks.map { it.copy(localUri = null) })
+            repos.track.clearLocalUris(tracks.map { it.trackId })
         }
     }
 
@@ -205,24 +201,24 @@ class AppViewModel @Inject constructor(
     /** OVERRIDDEN METHODS ***************************************************/
     override fun onPlayerError(
         error: PlaybackException,
-        currentPojo: QueueTrackPojo?,
+        currentCombo: QueueTrackCombo?,
         lastAction: PlayerRepository.LastAction,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            val metadataIsOld = currentPojo?.track?.youtubeVideo?.expiresAt?.isBefore(Instant.now())
+            val metadataIsOld = currentCombo?.track?.youtubeVideo?.expiresAt?.isBefore(Instant.now())
 
             if (
                 error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
-                currentPojo != null &&
-                (currentPojo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
+                currentCombo != null &&
+                (currentCombo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
             ) {
-                val track = ensureTrackMetadata(currentPojo.track)
+                val track = ensureTrackMetadata(currentCombo.track)
                 val playUri = track.playUri
 
-                if (playUri != null && playUri != currentPojo.uri) {
+                if (playUri != null && playUri != currentCombo.uri) {
                     withContext(Dispatchers.Main) {
-                        repos.player.updateTrack(currentPojo.copy(track = track, uri = playUri))
-                        if (lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentPojo.position)
+                        repos.player.updateTrack(currentCombo.copy(track = track, uri = playUri))
+                        if (lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentCombo.position)
                     }
                 }
             } else if (lastAction == PlayerRepository.LastAction.PLAY) SnackbarEngine.addError(error.toString())

@@ -30,6 +30,7 @@ import us.huseli.thoucylinder.Constants.YOUTUBE_BROWSE_URL
 import us.huseli.thoucylinder.Constants.YOUTUBE_USER_AGENT
 import us.huseli.thoucylinder.Constants.YOUTUBE_PLAYER_URL
 import us.huseli.thoucylinder.Constants.YOUTUBE_SEARCH_URL
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeTrackSearchMediator
 import us.huseli.thoucylinder.database.Database
@@ -42,7 +43,7 @@ import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.parseContentRange
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.getJson
 import us.huseli.thoucylinder.getString
 import us.huseli.thoucylinder.yquery
@@ -74,7 +75,71 @@ class YoutubeRepository @Inject constructor(
     private val _isSearchingTracks = MutableStateFlow(false)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val metadataCache = mutableMapOf<String, YoutubeMetadataList>()
+
+    @Suppress("UNCHECKED_CAST")
+    private val metadataCache = MutexCache<String, YoutubeMetadataList> { videoId ->
+        val data: Map<String, *> = mapOf(
+            "context" to mapOf(
+                "client" to mapOf(
+                    "clientName" to "ANDROID",
+                    "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION,
+                    "androidSdkVersion" to HEADER_ANDROID_SDK_VERSION,
+                    "userAgent" to YOUTUBE_USER_AGENT,
+                    "hl" to "en",
+                    "timeZone" to "UTC",
+                    "utcOffsetMinutes" to 0,
+                ),
+            ),
+            "playbackContext" to mapOf(
+                "contentPlaybackContext" to mapOf(
+                    "html5Preference" to "HTML5_PREF_WANTS",
+                ),
+            ),
+            "params" to "CgIQBg==",
+            "videoId" to videoId,
+            "contentCheckOk" to true,
+            "racyCheckOk" to true,
+        )
+        val response = Request.postJson(
+            url = YOUTUBE_PLAYER_URL,
+            headers = mapOf(
+                "User-Agent" to YOUTUBE_USER_AGENT,
+                "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME,
+                "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION,
+                "Origin" to "https://www.youtube.com",
+            ),
+            json = data,
+        ).connect().getJson()
+        val formats =
+            (response["streamingData"] as? Map<*, *>)?.get("formats") as? Collection<Map<*, *>> ?: emptyList()
+        val adaptiveFormats =
+            (response["streamingData"] as? Map<*, *>)?.get("adaptiveFormats") as? Collection<Map<*, *>> ?: emptyList()
+        val metadataList = YoutubeMetadataList()
+
+        formats.plus(adaptiveFormats).forEach { fmt ->
+            val mimeType = fmt["mimeType"] as? String
+            val bitrate = fmt["bitrate"] as? Double
+            val sampleRate = fmt["audioSampleRate"] as? String
+            val url = fmt["url"] as? String
+
+            if (mimeType != null && bitrate != null && sampleRate != null && url != null) {
+                metadataList.metadata.add(
+                    YoutubeMetadata(
+                        mimeType = mimeType,
+                        bitrate = bitrate.toInt(),
+                        sampleRate = sampleRate.toInt(),
+                        url = url,
+                        size = (fmt["contentLength"] as? String)?.toInt(),
+                        channels = (fmt["audioChannels"] as? Double)?.toInt(),
+                        loudnessDb = fmt["loudnessDb"] as? Double,
+                        durationMs = (fmt["approxDurationMs"] as? String)?.toLong(),
+                    )
+                )
+            }
+        }
+
+        metadataList
+    }
 
     val gson: Gson = GsonBuilder().create()
     val albumDownloadTasks = _albumDownloadTasks.asStateFlow()
@@ -123,7 +188,7 @@ class YoutubeRepository @Inject constructor(
     suspend inline fun getAlbumSearchResult(
         query: String,
         progressCallback: (Double) -> Unit = {},
-    ): List<AlbumWithTracksPojo> {
+    ): List<AlbumWithTracksCombo> {
         val scrapedAlbums = mutableListOf<Album>()
         val encodedQuery = withContext(Dispatchers.IO) { URLEncoder.encode(query, "UTF-8") }
         val body = Request.get(
@@ -218,7 +283,7 @@ class YoutubeRepository @Inject constructor(
         return emptyList()
     }
 
-    suspend fun getAlbumWithTracksFromPlaylist(playlistId: String, artist: String?): AlbumWithTracksPojo? {
+    suspend fun getAlbumWithTracksFromPlaylist(playlistId: String, artist: String?): AlbumWithTracksCombo? {
         val requestData: MutableMap<String, Any> = mutableMapOf(
             "context" to mapOf(
                 "client" to mapOf(
@@ -303,7 +368,7 @@ class YoutubeRepository @Inject constructor(
                     }
                 }
 
-            return AlbumWithTracksPojo(album = album, tracks = tracks)
+            return AlbumWithTracksCombo(album = album, tracks = tracks)
         }
 
         return null
@@ -408,72 +473,8 @@ class YoutubeRepository @Inject constructor(
 
     /** PRIVATE METHODS ******************************************************/
 
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun getMetadataList(videoId: String, forceReload: Boolean = false): YoutubeMetadataList {
-        metadataCache[videoId]?.let { if (!forceReload) return it }
-
-        val data: Map<String, *> = mapOf(
-            "context" to mapOf(
-                "client" to mapOf(
-                    "clientName" to "ANDROID",
-                    "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION,
-                    "androidSdkVersion" to HEADER_ANDROID_SDK_VERSION,
-                    "userAgent" to YOUTUBE_USER_AGENT,
-                    "hl" to "en",
-                    "timeZone" to "UTC",
-                    "utcOffsetMinutes" to 0,
-                ),
-            ),
-            "playbackContext" to mapOf(
-                "contentPlaybackContext" to mapOf(
-                    "html5Preference" to "HTML5_PREF_WANTS",
-                ),
-            ),
-            "params" to "CgIQBg==",
-            "videoId" to videoId,
-            "contentCheckOk" to true,
-            "racyCheckOk" to true,
-        )
-        val response = Request.postJson(
-            url = YOUTUBE_PLAYER_URL,
-            headers = mapOf(
-                "User-Agent" to YOUTUBE_USER_AGENT,
-                "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME,
-                "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION,
-                "Origin" to "https://www.youtube.com",
-            ),
-            json = data,
-        ).connect().getJson()
-        val formats =
-            (response["streamingData"] as? Map<*, *>)?.get("formats") as? Collection<Map<*, *>> ?: emptyList()
-        val adaptiveFormats =
-            (response["streamingData"] as? Map<*, *>)?.get("adaptiveFormats") as? Collection<Map<*, *>> ?: emptyList()
-        val metadataList = YoutubeMetadataList()
-
-        formats.plus(adaptiveFormats).forEach { fmt ->
-            val mimeType = fmt["mimeType"] as? String
-            val bitrate = fmt["bitrate"] as? Double
-            val sampleRate = fmt["audioSampleRate"] as? String
-            val url = fmt["url"] as? String
-
-            if (mimeType != null && bitrate != null && sampleRate != null && url != null) {
-                metadataList.metadata.add(
-                    YoutubeMetadata(
-                        mimeType = mimeType,
-                        bitrate = bitrate.toInt(),
-                        sampleRate = sampleRate.toInt(),
-                        url = url,
-                        size = (fmt["contentLength"] as? String)?.toInt(),
-                        channels = (fmt["audioChannels"] as? Double)?.toInt(),
-                        loudnessDb = fmt["loudnessDb"] as? Double,
-                        durationMs = (fmt["approxDurationMs"] as? String)?.toLong(),
-                    )
-                )
-            }
-        }
-        metadataCache[videoId] = metadataList
-        return metadataList
-    }
+    private suspend fun getMetadataList(videoId: String, forceReload: Boolean = false): YoutubeMetadataList =
+        metadataCache.get(videoId, forceReload) ?: YoutubeMetadataList()
 
     /**
      * Extracts image URLs from API response, works for both playlists and videos.

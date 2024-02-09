@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,18 +23,35 @@ class YoutubeSearchViewModel @Inject constructor(
 ) : AbstractAlbumListViewModel("YoutubeSearchViewModel", repos) {
     private val _isSearchingAlbums = MutableStateFlow(false)
     private val _query = MutableStateFlow("")
-    private val _albumPojos = MutableStateFlow<List<AlbumWithTracksPojo>>(emptyList())
-    private val _trackPojos = MutableStateFlow<PagingData<TrackPojo>>(PagingData.empty())
+    private val _albumCombos = MutableStateFlow<List<AlbumWithTracksCombo>>(emptyList())
+    private val _trackCombos = MutableStateFlow<PagingData<TrackCombo>>(PagingData.empty())
 
-    val albumPojos = _albumPojos.asStateFlow()
-    val trackPojos = _trackPojos.asStateFlow()
+    val albumCombos = _albumCombos.asStateFlow()
+    val trackCombos = _trackCombos.asStateFlow()
     val isSearchingTracks = repos.youtube.isSearchingTracks
     val isSearchingAlbums = _isSearchingAlbums.asStateFlow()
     val query = _query.asStateFlow()
-    val selectedAlbumsWithTracks: Flow<List<AlbumWithTracksPojo>> =
-        combine(selectedAlbums, _albumPojos) { selected, pojos ->
-            pojos.filter { pojo -> selected.map { it.albumId }.contains(pojo.album.albumId) }
+    val selectedAlbumsWithTracks: Flow<List<AlbumWithTracksCombo>> =
+        combine(selectedAlbums, _albumCombos) { selected, combos ->
+            combos.filter { combo -> selected.map { it.albumId }.contains(combo.album.albumId) }
         }
+
+    fun matchMusicBrainz(combo: AlbumWithTracksCombo) = viewModelScope.launch(Dispatchers.IO) {
+        if (combo.album.musicBrainzReleaseId == null) {
+            val match = repos.musicBrainz.matchAlbumWithTracks(combo)
+
+            if (match != null) {
+                repos.album.updateAlbum(match.album)
+                repos.track.updateTracks(match.tracks)
+                repos.album.saveAlbumGenres(match.album.albumId, match.genres)
+                if (match.album.musicBrainzReleaseId != null) {
+                    repos.musicBrainz.getReleaseCoverArt(match.album.musicBrainzReleaseId)?.also {
+                        repos.album.updateAlbumArt(match.album.albumId, it)
+                    }
+                }
+            }
+        }
+    }
 
     fun search(query: String) {
         if (query != _query.value) {
@@ -44,16 +61,16 @@ class YoutubeSearchViewModel @Inject constructor(
                 _isSearchingAlbums.value = true
 
                 viewModelScope.launch(Dispatchers.IO) {
-                    val pojos = repos.youtube.getAlbumSearchResult(query)
+                    val combos = repos.youtube.getAlbumSearchResult(query)
 
-                    repos.album.insertAlbums(pojos.map { it.album })
-                    repos.track.insertTracks(pojos.flatMap { it.tracks })
-                    _albumPojos.value = pojos
+                    repos.album.insertAlbums(combos.map { it.album })
+                    repos.track.insertTracks(combos.flatMap { it.tracks })
+                    _albumCombos.value = combos
                     _isSearchingAlbums.value = false
                 }
                 viewModelScope.launch(Dispatchers.IO) {
                     repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope).collectLatest { pagingData ->
-                        _trackPojos.value = pagingData.map { TrackPojo(track = it) }
+                        _trackCombos.value = pagingData.map { TrackCombo(track = it) }
                     }
                 }
             }

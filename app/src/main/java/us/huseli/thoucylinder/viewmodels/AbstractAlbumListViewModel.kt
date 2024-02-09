@@ -17,11 +17,11 @@ abstract class AbstractAlbumListViewModel(
     fun enqueueAlbum(album: Album, context: Context) = enqueueAlbums(listOf(album), context)
 
     fun enqueueAlbums(albums: List<Album>, context: Context) = viewModelScope.launch {
-        val pojos =
-            getQueueTrackPojos(repos.album.listAlbumTrackPojos(albums.map { it.albumId }), repos.player.nextItemIndex)
+        val combos =
+            getQueueTrackCombos(repos.album.listAlbumTrackCombos(albums.map { it.albumId }), repos.player.nextItemIndex)
 
-        if (pojos.isNotEmpty()) {
-            repos.player.insertNext(pojos)
+        if (combos.isNotEmpty()) {
+            repos.player.insertNext(combos)
             SnackbarEngine.addInfo(
                 context.resources.getQuantityString(R.plurals.x_albums_enqueued_next, albums.size, albums.size)
             )
@@ -32,7 +32,7 @@ abstract class AbstractAlbumListViewModel(
 
     fun playAlbums(albums: List<Album>) = viewModelScope.launch {
         repos.player.replaceAndPlay(
-            getQueueTrackPojos(repos.album.listAlbumTrackPojos(albums.map { it.albumId }))
+            getQueueTrackCombos(repos.album.listAlbumTrackCombos(albums.map { it.albumId }))
         )
     }
 }

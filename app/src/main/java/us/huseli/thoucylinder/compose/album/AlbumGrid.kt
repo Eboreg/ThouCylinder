@@ -32,15 +32,15 @@ import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
 
 @Composable
-fun <T : AbstractAlbumPojo> AlbumGrid(
-    pojos: List<T>,
+fun <T : AbstractAlbumCombo> AlbumGrid(
+    combos: List<T>,
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
@@ -55,22 +55,22 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
     SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
-        things = pojos,
-        onClick = { _, pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
-        onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
+        things = combos,
+        onClick = { _, combo -> albumCallbacks(combo).onAlbumClick?.invoke() },
+        onLongClick = { _, combo -> albumCallbacks(combo).onAlbumLongClick?.invoke() },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         isSelected = isSelected,
-    ) { _, pojo ->
+    ) { _, combo ->
         val (downloadProgress, downloadIsActive) =
-            getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
-        val callbacks = albumCallbacks(pojo)
+            getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
+        val callbacks = albumCallbacks(combo)
 
         Box(modifier = Modifier.aspectRatio(1f)) {
-            val imageBitmap = remember(pojo.album) { mutableStateOf<ImageBitmap?>(null) }
+            val imageBitmap = remember(combo.album) { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(pojo.album) {
-                imageBitmap.value = pojo.getFullImage(context)
+            LaunchedEffect(combo.album) {
+                imageBitmap.value = combo.album.albumArt?.getFullImageBitmap(context)
             }
 
             Thumbnail(
@@ -79,7 +79,7 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
                 placeholderIcon = Icons.Sharp.Album,
             )
 
-            if (isSelected(pojo)) {
+            if (isSelected(combo)) {
                 Icon(
                     imageVector = Icons.Sharp.CheckCircle,
                     contentDescription = null,
@@ -112,13 +112,13 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = pojo.album.title,
-                    maxLines = if (pojo.album.artist != null && showArtist) 1 else 2,
+                    text = combo.album.title,
+                    maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 )
                 if (showArtist) {
-                    pojo.album.artist?.also { artist ->
+                    combo.album.artist?.also { artist ->
                         Text(
                             text = artist,
                             maxLines = 1,
@@ -128,14 +128,14 @@ fun <T : AbstractAlbumPojo> AlbumGrid(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AlbumSmallIcons(pojo = pojo)
+                    AlbumSmallIcons(combo = combo)
                 }
             }
 
             AlbumContextMenuWithButton(
-                isLocal = pojo.album.isLocal,
-                isInLibrary = pojo.album.isInLibrary,
-                isPartiallyDownloaded = pojo.isPartiallyDownloaded,
+                isLocal = combo.album.isLocal,
+                isInLibrary = combo.album.isInLibrary,
+                isPartiallyDownloaded = combo.isPartiallyDownloaded,
                 callbacks = callbacks,
             )
         }

@@ -10,8 +10,6 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
-import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
@@ -46,11 +44,9 @@ import java.util.concurrent.Executors
         SpotifyArtist::class,
         SpotifyTrack::class,
         SpotifyTrackArtist::class,
-        LastFmAlbum::class,
-        LastFmTrack::class,
     ],
     exportSchema = false,
-    version = 73,
+    version = 75,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -61,7 +57,6 @@ abstract class Database : RoomDatabase() {
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
     abstract fun spotifyDao(): SpotifyDao
-    abstract fun lastFmDao(): LastFmDao
 
     companion object {
         fun build(context: Context): Database {

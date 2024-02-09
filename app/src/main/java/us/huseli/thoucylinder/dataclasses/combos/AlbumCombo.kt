@@ -1,19 +1,18 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
 
 
-data class AlbumPojo(
+data class AlbumCombo(
     @Embedded override val album: Album,
     override val durationMs: Long? = null,
     override val minYear: Int? = null,
@@ -44,10 +43,8 @@ data class AlbumPojo(
     override val styles: List<Style> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "SpotifyAlbum_albumId")
     override val spotifyAlbum: SpotifyAlbum? = null,
-    @Relation(parentColumn = "Album_albumId", entityColumn = "LastFmAlbum_albumId")
-    override val lastFmAlbum: LastFmAlbum? = null,
-) : AbstractAlbumPojo() {
-    fun sorted(): AlbumPojo = copy(
+) : AbstractAlbumCombo() {
+    fun sorted(): AlbumCombo = copy(
         genres = genres.sortedBy { it.genreName.length },
         styles = styles.sortedBy { it.styleName.length },
     )
@@ -59,6 +56,6 @@ data class AlbumPojo(
     override fun toString() = album.toString()
 }
 
-fun Collection<AlbumPojo>.sortGenres() = map { it.sortGenres() }
+fun Collection<AlbumCombo>.sortGenres() = map { it.sortGenres() }
 
-fun Collection<AlbumPojo>.sortStyles() = map { it.sortStyles() }
+fun Collection<AlbumCombo>.sortStyles() = map { it.sortStyles() }

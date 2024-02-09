@@ -2,7 +2,7 @@ package us.huseli.thoucylinder.dataclasses
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
-import us.huseli.thoucylinder.pow
+import us.huseli.retaintheme.extensions.pow
 import kotlin.math.min
 
 @Parcelize

@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses.entities
 import android.content.Context
 import android.os.Parcelable
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -11,10 +10,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
-import us.huseli.retaintheme.extensions.dpToPx
-import us.huseli.retaintheme.extensions.scaleToMaxSize
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.dataclasses.SpotifyAlbumArt
 import us.huseli.thoucylinder.getSquareBitmapByUrl
 import java.util.UUID
@@ -49,11 +45,10 @@ data class SpotifyAlbum(
         get() = releaseDate.substringBefore('-').toIntOrNull()
 
     suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
-        fullImage?.url?.getSquareBitmapByUrl()?.scaleToMaxSize(context.dpToPx(IMAGE_MAX_DP_FULL))?.asImageBitmap()
+        fullImage?.url?.getSquareBitmapByUrl()?.asFullImageBitmap(context)
 
     suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
         (thumbnail?.url ?: fullImage?.url)
             ?.getSquareBitmapByUrl()
-            ?.scaleToMaxSize(context.dpToPx(IMAGE_MAX_DP_THUMBNAIL))
-            ?.asImageBitmap()
+            ?.asFullImageBitmap(context)
 }

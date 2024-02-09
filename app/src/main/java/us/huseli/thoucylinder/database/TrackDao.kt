@@ -19,18 +19,20 @@ import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import java.util.UUID
 
 @Dao
 interface TrackDao {
-    @RawQuery(observedEntities = [Track::class, Album::class, SpotifyTrack::class, LastFmTrack::class])
-    fun _pageTrackPojos(query: SupportSQLiteQuery): PagingSource<Int, TrackPojo>
+    @RawQuery(observedEntities = [Track::class, Album::class, SpotifyTrack::class])
+    fun _pageTrackCombos(query: SupportSQLiteQuery): PagingSource<Int, TrackCombo>
 
     /** Public methods ********************************************************/
+    @Query("UPDATE Track SET Track_localUri = NULL WHERE Track_trackId IN (:trackIds)")
+    suspend fun clearLocalUris(trackIds: Collection<UUID>)
+
     @Delete
     suspend fun deleteTracks(vararg tracks: Track)
 
@@ -42,16 +44,15 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
         FROM Track
             LEFT JOIN Album ON Track_albumId = Album_albumId 
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE Track_albumId = :albumId
         ORDER BY Track_albumPosition
         """
     )
-    fun flowTrackPojosByAlbumId(albumId: UUID): Flow<List<TrackPojo>>
+    fun flowTrackCombosByAlbumId(albumId: UUID): Flow<List<TrackCombo>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTracks(vararg tracks: Track)
@@ -62,11 +63,11 @@ interface TrackDao {
     @Query("SELECT Track_localUri FROM Track WHERE Track_localUri IS NOT NULL")
     suspend fun listLocalUris(): List<Uri>
 
-    fun pageTrackPojos(
+    fun pageTrackCombos(
         sortParameter: TrackSortParameter,
         sortOrder: SortOrder,
         searchTerm: String,
-    ): PagingSource<Int, TrackPojo> {
+    ): PagingSource<Int, TrackCombo> {
         val searchQuery = searchTerm
             .lowercase()
             .split(Regex(" +"))
@@ -78,7 +79,7 @@ interface TrackDao {
                     "Album_year LIKE $term OR Track_year LIKE $term)"
             }
 
-        return _pageTrackPojos(
+        return _pageTrackCombos(
             SimpleSQLiteQuery(
                 """
                 SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
@@ -95,11 +96,10 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
         FROM Track
             LEFT JOIN Album ON Track_albumId = Album_albumId
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE (
             LOWER(Track_artist) = LOWER(:artist) OR (Track_artist IS NULL AND LOWER(Album_artist) = LOWER(:artist))
         ) AND Track_isInLibrary = 1
@@ -107,10 +107,13 @@ interface TrackDao {
         """
     )
     @Transaction
-    fun pageTrackPojosByArtist(artist: String): PagingSource<Int, TrackPojo>
+    fun pageTrackCombosByArtist(artist: String): PagingSource<Int, TrackCombo>
 
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId = :albumId")
     suspend fun setIsInLibraryByAlbumId(albumId: UUID, isInLibrary: Boolean)
+
+    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
+    suspend fun setIsInLibrary(trackIds: Collection<UUID>, isInLibrary: Boolean)
 
     @Update
     suspend fun updateTracks(vararg tracks: Track)

@@ -38,15 +38,15 @@ fun EditAlbumTracksDialog(
         dismissButton = { TextButton(onClick = onClose, content = { Text(stringResource(R.string.close)) }) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                albumWithTracks?.also { pojo ->
-                    items(pojo.tracks) { track ->
+                albumWithTracks?.also { combo ->
+                    items(combo.tracks) { track ->
                         EditAlbumTrackSection(
                             track = track,
-                            albumPojo = pojo,
+                            albumCombo = combo,
                             enabled = true,
                             onChange = {
                                 viewModel.saveTrack(it)
-                                viewModel.tagAlbumTrack(pojo, it)
+                                viewModel.tagAlbumTrack(combo, it)
                             },
                         )
                     }

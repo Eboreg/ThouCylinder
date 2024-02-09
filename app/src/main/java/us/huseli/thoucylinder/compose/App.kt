@@ -34,6 +34,7 @@ import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SettingsDestination
+import us.huseli.thoucylinder.compose.modalcover.ModalCover
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
 import us.huseli.thoucylinder.compose.screens.DebugScreen
@@ -45,8 +46,8 @@ import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -69,19 +70,19 @@ fun App(
     val lifecycleOwner = LocalLifecycleOwner.current
     val onBackPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
-    val currentTrackPojo by queueViewModel.currentPojo.collectAsStateWithLifecycle(null)
+    val currentTrackCombo by queueViewModel.currentCombo.collectAsStateWithLifecycle(null)
     val isWelcomeDialogShown by viewModel.isWelcomeDialogShown.collectAsStateWithLifecycle()
 
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     var editTrack by rememberSaveable { mutableStateOf<Track?>(null) }
-    var infoTrackPojo by rememberSaveable { mutableStateOf<AbstractTrackPojo?>(null) }
+    var infoTrackCombo by rememberSaveable { mutableStateOf<AbstractTrackCombo?>(null) }
     var addToPlaylist by rememberSaveable { mutableStateOf(false) }
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
     var createPlaylist by rememberSaveable { mutableStateOf(false) }
     var addDownloadedAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
     var editAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
-    var deleteAlbumPojo by rememberSaveable { mutableStateOf<AbstractAlbumPojo?>(null) }
+    var deleteAlbumCombo by rememberSaveable { mutableStateOf<AbstractAlbumCombo?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.doStartupTasks(context)
@@ -120,7 +121,7 @@ fun App(
     }
 
     val appCallbacks = AppCallbacks(
-        onAddAlbumToLibraryClick = { pojo -> viewModel.addAlbumToLibrary(pojo.album.albumId) },
+        onAddAlbumToLibraryClick = { combo -> viewModel.addAlbumToLibrary(combo.album.albumId) },
         onAddToPlaylistClick = { selection ->
             addToPlaylistSelection = selection
             addToPlaylist = true
@@ -152,10 +153,10 @@ fun App(
         },
         onDownloadAlbumClick = { album -> addDownloadedAlbum = album },
         onDownloadTrackClick = { track -> viewModel.downloadTrack(track) },
-        onEditAlbumClick = { pojo -> editAlbum = pojo.album },
+        onEditAlbumClick = { combo -> editAlbum = combo.album },
         onPlaylistClick = onPlaylistClick,
-        onShowTrackInfoClick = { pojo -> infoTrackPojo = pojo },
-        onDeleteAlbumPojoClick = { pojo -> deleteAlbumPojo = pojo },
+        onShowTrackInfoClick = { combo -> infoTrackCombo = combo },
+        onDeleteAlbumComboClick = { combo -> deleteAlbumCombo = combo },
         onEditTrackClick = { editTrack = it },
     )
 
@@ -164,11 +165,11 @@ fun App(
         onCancel = {
             editAlbum = null
             editTrack = null
-            deleteAlbumPojo = null
+            deleteAlbumCombo = null
             addDownloadedAlbum = null
             createPlaylist = false
             addToPlaylist = false
-            infoTrackPojo = null
+            infoTrackCombo = null
             addToPlaylistSelection = null
         },
         onPlaylistClick = onPlaylistClick,
@@ -179,12 +180,12 @@ fun App(
         },
         editAlbum = editAlbum,
         editTrack = editTrack,
-        deleteAlbumPojo = deleteAlbumPojo,
+        deleteAlbumCombo = deleteAlbumCombo,
         addDownloadedAlbum = addDownloadedAlbum,
         createPlaylist = createPlaylist,
         addToPlaylist = addToPlaylist,
         addToPlaylistSelection = addToPlaylistSelection,
-        infoTrackPojo = infoTrackPojo,
+        infoTrackCombo = infoTrackCombo,
     )
 
     AskMusicImportPermissions()
@@ -208,7 +209,7 @@ fun App(
             startDestination = startDestination,
             modifier = Modifier
                 .matchParentSize()
-                .padding(bottom = if (currentTrackPojo != null) 80.dp else 0.dp)
+                .padding(bottom = if (currentTrackCombo != null) 80.dp else 0.dp)
         ) {
             composable(route = AddDestination.route) {
                 activeMenuItemId = AddDestination.menuItemId
@@ -266,16 +267,16 @@ fun App(
             }
         }
 
-        currentTrackPojo?.also { pojo ->
+        currentTrackCombo?.also { combo ->
             ModalCover(
-                pojo = pojo,
+                trackCombo = combo,
                 viewModel = queueViewModel,
                 isExpanded = isCoverExpanded,
                 onExpand = { isCoverExpanded = true },
                 onCollapse = { isCoverExpanded = false },
                 trackCallbacks = TrackCallbacks(
                     appCallbacks = appCallbacks,
-                    pojo = pojo,
+                    combo = combo,
                     context = context,
                 ),
             )

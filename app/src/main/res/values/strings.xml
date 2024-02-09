@@ -177,6 +177,9 @@
     <string name="edit_album_tracks">Edit album tracks</string>
     <string name="genres">Genres</string>
     <string name="loading">Loading ...</string>
+    <string name="clear">Clear</string>
+    <string name="could_not_open_the_selected_image">Could not open the selected image.</string>
+    <string name="updated_album_cover">Updated album cover.</string>
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>

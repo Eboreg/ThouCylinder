@@ -14,8 +14,8 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,21 +25,21 @@ class ArtistViewModel @Inject constructor(
 ) : AbstractAlbumListViewModel("ArtistViewModel", repos) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)
     private val _listType = MutableStateFlow(ListType.ALBUMS)
-    private val _albumPojos = MutableStateFlow<List<AlbumPojo>>(emptyList())
+    private val _albumCombos = MutableStateFlow<List<AlbumCombo>>(emptyList())
 
     val artist: String = savedStateHandle.get<String>(NAV_ARG_ARTIST)!!
 
-    val albumPojos = _albumPojos.asStateFlow()
+    val albumCombos = _albumCombos.asStateFlow()
     val displayType = _displayType.asStateFlow()
     val listType = _listType.asStateFlow()
-    val trackPojos: Flow<PagingData<TrackPojo>> =
-        repos.track.pageTrackPojosByArtist(artist).flow.cachedIn(viewModelScope)
+    val trackCombos: Flow<PagingData<TrackCombo>> =
+        repos.track.pageTrackCombosByArtist(artist).flow.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch {
-            repos.album.flowAlbumPojosByArtist(artist)
+            repos.album.flowAlbumCombosByArtist(artist)
                 .distinctUntilChanged()
-                .collect { pojos -> _albumPojos.value = pojos }
+                .collect { combos -> _albumCombos.value = combos }
         }
     }
 

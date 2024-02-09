@@ -13,7 +13,7 @@ import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import java.util.UUID
 import javax.inject.Inject
@@ -23,9 +23,11 @@ import javax.inject.Singleton
 class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
     private val trackDao = database.trackDao()
 
-    private val _selectedTrackPojos = mutableMapOf<String, MutableStateFlow<List<TrackPojo>>>()
+    private val _selectedTrackCombos = mutableMapOf<String, MutableStateFlow<List<TrackCombo>>>()
 
     suspend fun addToLibraryByAlbumId(albumId: UUID) = trackDao.setIsInLibraryByAlbumId(albumId, true)
+
+    suspend fun clearLocalUris(trackIds: Collection<UUID>) = trackDao.clearLocalUris(trackIds)
 
     suspend fun deleteTempTracks() = trackDao.deleteTempTracks()
 
@@ -43,13 +45,13 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     suspend fun deleteTracksByAlbumId(albumIds: Collection<UUID>) =
         trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
 
-    fun flowSelectedTrackPojos(viewModelClass: String): StateFlow<List<TrackPojo>> =
-        mutableFlowSelectedTrackPojos(viewModelClass).asStateFlow()
+    fun flowSelectedTrackCombos(viewModelClass: String): StateFlow<List<TrackCombo>> =
+        mutableFlowSelectedTrackCombos(viewModelClass).asStateFlow()
 
-    fun flowTrackPojoPager(sortParameter: TrackSortParameter, sortOrder: SortOrder, searchTerm: String) =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojos(sortParameter, sortOrder, searchTerm) }
+    fun flowTrackComboPager(sortParameter: TrackSortParameter, sortOrder: SortOrder, searchTerm: String) =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm) }
 
-    fun flowTrackPojosByAlbumId(albumId: UUID) = trackDao.flowTrackPojosByAlbumId(albumId)
+    fun flowTrackCombosByAlbumId(albumId: UUID) = trackDao.flowTrackCombosByAlbumId(albumId)
 
     suspend fun insertTracks(tracks: Collection<Track>) {
         if (tracks.isNotEmpty()) trackDao.insertTracks(*tracks.toTypedArray())
@@ -59,18 +61,18 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
 
     suspend fun listTrackLocalUris(): List<Uri> = trackDao.listLocalUris()
 
-    fun pageTrackPojosByArtist(artist: String): Pager<Int, TrackPojo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackPojosByArtist(artist) }
+    fun pageTrackCombosByArtist(artist: String): Pager<Int, TrackCombo> =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombosByArtist(artist) }
 
-    fun selectTrackPojos(selectionKey: String, pojos: Iterable<TrackPojo>) {
-        mutableFlowSelectedTrackPojos(selectionKey).also {
-            val currentIds = it.value.map { pojo -> pojo.track.trackId }
-            it.value += pojos.filter { pojo -> !currentIds.contains(pojo.track.trackId) }
+    fun selectTrackCombos(selectionKey: String, combos: Iterable<TrackCombo>) {
+        mutableFlowSelectedTrackCombos(selectionKey).also {
+            val currentIds = it.value.map { combo -> combo.track.trackId }
+            it.value += combos.filter { combo -> !currentIds.contains(combo.track.trackId) }
         }
     }
 
-    fun toggleTrackPojoSelected(selectionKey: String, track: TrackPojo): Boolean {
-        return mutableFlowSelectedTrackPojos(selectionKey).let {
+    fun toggleTrackComboSelected(selectionKey: String, track: TrackCombo): Boolean {
+        return mutableFlowSelectedTrackCombos(selectionKey).let {
             if (it.value.contains(track)) {
                 it.value -= track
                 false
@@ -81,8 +83,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
         }
     }
 
-    fun unselectAllTrackPojos(selectionKey: String) {
-        mutableFlowSelectedTrackPojos(selectionKey).value = emptyList()
+    fun unselectAllTrackCombos(selectionKey: String) {
+        mutableFlowSelectedTrackCombos(selectionKey).value = emptyList()
     }
 
     suspend fun updateTrack(track: Track) = updateTracks(listOf(track))
@@ -93,8 +95,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
 
 
     /** PRIVATE METHODS *******************************************************/
-    private fun mutableFlowSelectedTrackPojos(viewModelClass: String): MutableStateFlow<List<TrackPojo>> =
-        _selectedTrackPojos[viewModelClass] ?: MutableStateFlow<List<TrackPojo>>(emptyList()).also {
-            _selectedTrackPojos[viewModelClass] = it
+    private fun mutableFlowSelectedTrackCombos(viewModelClass: String): MutableStateFlow<List<TrackCombo>> =
+        _selectedTrackCombos[viewModelClass] ?: MutableStateFlow<List<TrackCombo>>(emptyList()).also {
+            _selectedTrackCombos[viewModelClass] = it
         }
 }

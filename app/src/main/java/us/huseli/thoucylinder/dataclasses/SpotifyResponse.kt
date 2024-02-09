@@ -10,8 +10,8 @@ import us.huseli.thoucylinder.dataclasses.entities.Genre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
-import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.SpotifyTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.SpotifyAlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.SpotifyTrackCombo
 import us.huseli.thoucylinder.getObject
 
 data class SpotifyResponse<T>(
@@ -34,7 +34,7 @@ data class SpotifyResponseTrack(
     val uri: String,
     val artists: List<SpotifyArtist>,
 ) {
-    fun toSpotifyTrackPojo(albumId: String? = null) = SpotifyTrackPojo(
+    fun toSpotifyTrackCombo(albumId: String? = null) = SpotifyTrackCombo(
         track = toSpotifyTrack(albumId),
         artists = artists,
     )
@@ -65,11 +65,11 @@ data class SpotifyResponseAlbum(
     val genres: List<String>,
     val tracks: SpotifyResponse<SpotifyResponseTrack>,
 ) {
-    fun toSpotifyAlbumPojo() = SpotifyAlbumPojo(
+    fun toSpotifyAlbumCombo() = SpotifyAlbumCombo(
         spotifyAlbum = toSpotifyAlbum(),
         artists = artists,
         genres = genres.map { Genre(it.capitalized()) },
-        spotifyTrackPojos = tracks.items.map { it.toSpotifyTrackPojo(albumId = id) },
+        spotifyTrackCombos = tracks.items.map { it.toSpotifyTrackCombo(albumId = id) },
     )
 
     private fun toSpotifyAlbum() = SpotifyAlbum(
@@ -90,7 +90,7 @@ data class SpotifyResponseAlbumItem(
     val added_at: String,
     val album: SpotifyResponseAlbum,
 ) {
-    fun toSpotifyAlbumPojo() = album.toSpotifyAlbumPojo()
+    fun toSpotifyAlbumCombo() = album.toSpotifyAlbumCombo()
 }
 
 suspend fun Request.getSpotifyAlbums(): SpotifyResponse<SpotifyResponseAlbumItem>? =

@@ -43,7 +43,7 @@ import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
@@ -51,9 +51,9 @@ import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun <T : AbstractTrackPojo> TrackGrid(
-    trackPojos: LazyPagingItems<T>,
-    selectedTrackPojos: List<T>,
+fun <T : AbstractTrackCombo> TrackGrid(
+    trackCombos: LazyPagingItems<T>,
+    selectedTrackCombos: List<T>,
     trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: AbstractBaseViewModel,
     gridState: LazyGridState = rememberLazyGridState(),
@@ -65,7 +65,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
 ) {
     val context = LocalContext.current
 
-    SelectedTracksButtons(trackCount = selectedTrackPojos.size, callbacks = trackSelectionCallbacks)
+    SelectedTracksButtons(trackCount = selectedTrackCombos.size, callbacks = trackSelectionCallbacks)
 
     LazyVerticalGrid(
         state = gridState,
@@ -75,13 +75,13 @@ fun <T : AbstractTrackPojo> TrackGrid(
         contentPadding = contentPadding,
         modifier = Modifier.padding(horizontal = 10.dp),
     ) {
-        items(count = trackPojos.itemCount) { index ->
-            trackPojos[index]?.also { pojo ->
-                val track = pojo.track
-                val isSelected = selectedTrackPojos.contains(pojo)
+        items(count = trackCombos.itemCount) { index ->
+            trackCombos[index]?.also { combo ->
+                val track = combo.track
+                val isSelected = selectedTrackCombos.contains(combo)
                 val (downloadProgress, downloadIsActive) =
                     getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
-                val callbacks = trackCallbacks(index, pojo)
+                val callbacks = trackCallbacks(index, combo)
 
                 callbacks.onEach?.invoke()
 
@@ -98,7 +98,7 @@ fun <T : AbstractTrackPojo> TrackGrid(
                         val imageBitmap = remember(track) { mutableStateOf<ImageBitmap?>(null) }
 
                         LaunchedEffect(track) {
-                            imageBitmap.value = pojo.getFullImageBitmap(context)
+                            imageBitmap.value = combo.getFullImageBitmap(context)
                             viewModel.ensureTrackMetadata(track)
                         }
 
@@ -181,5 +181,5 @@ fun <T : AbstractTrackPojo> TrackGrid(
         }
     }
 
-    if (trackPojos.itemCount == 0 && onEmpty != null) onEmpty()
+    if (trackCombos.itemCount == 0 && onEmpty != null) onEmpty()
 }

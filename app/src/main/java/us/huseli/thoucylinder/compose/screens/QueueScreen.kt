@@ -49,7 +49,7 @@ fun QueueScreen(
     val selectedTracks by viewModel.selectedQueueTracks.collectAsStateWithLifecycle(emptyList())
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val playerCurrentPojo by viewModel.currentPojo.collectAsStateWithLifecycle(null)
+    val playerCurrentCombo by viewModel.currentCombo.collectAsStateWithLifecycle(null)
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -89,52 +89,52 @@ fun QueueScreen(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 contentPadding = PaddingValues(10.dp),
             ) {
-                itemsIndexed(queue, key = { _, pojo -> pojo.queueTrackId }) { pojoIdx, pojo ->
+                itemsIndexed(queue, key = { _, combo -> combo.queueTrackId }) { comboIdx, combo ->
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
-                    LaunchedEffect(pojo.track.trackId) {
+                    LaunchedEffect(combo.track.trackId) {
                         thumbnail.value = viewModel.getTrackThumbnail(
-                            track = pojo.track,
-                            album = pojo.album,
+                            track = combo.track,
+                            album = combo.album,
                             context = context,
                         )
-                        viewModel.ensureTrackMetadata(pojo.track)
+                        viewModel.ensureTrackMetadata(combo.track)
                     }
 
-                    ReorderableItem(reorderableState = reorderableState, key = pojo.queueTrackId) { isDragging ->
-                        val isSelected = selectedTracks.contains(pojo)
+                    ReorderableItem(reorderableState = reorderableState, key = combo.queueTrackId) { isDragging ->
+                        val isSelected = selectedTracks.contains(combo)
                         val containerColor =
                             if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
-                            else if (!isSelected && playerCurrentPojo == pojo)
+                            else if (!isSelected && playerCurrentCombo == combo)
                                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                             else null
 
                         TrackListRow(
-                            title = pojo.track.title,
-                            isDownloadable = pojo.track.isDownloadable,
-                            isInLibrary = pojo.track.isInLibrary,
-                            downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
+                            title = combo.track.title,
+                            isDownloadable = combo.track.isDownloadable,
+                            isInLibrary = combo.track.isInLibrary,
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
                             thumbnail = thumbnail.value,
                             containerColor = containerColor,
                             reorderableState = reorderableState,
-                            artist = pojo.artist,
-                            duration = pojo.track.metadata?.duration,
+                            artist = combo.artist,
+                            duration = combo.track.metadata?.duration,
                             callbacks = TrackCallbacks(
-                                pojo = pojo,
+                                combo = combo,
                                 appCallbacks = appCallbacks,
                                 context = context,
                                 onTrackClick = {
-                                    if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(pojo)
-                                    else viewModel.skipTo(pojoIdx)
+                                    if (selectedTracks.isNotEmpty()) viewModel.toggleSelected(combo)
+                                    else viewModel.skipTo(comboIdx)
                                 },
-                                onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = pojo) },
+                                onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = combo) },
                             ),
-                            isSelected = selectedTracks.contains(pojo),
+                            isSelected = selectedTracks.contains(combo),
                             extraContextMenuItems = {
                                 DropdownMenuItem(
                                     text = { Text(text = stringResource(R.string.remove_from_queue)) },
                                     leadingIcon = { Icon(Icons.Sharp.Delete, null) },
-                                    onClick = { viewModel.removeFromQueue(pojo) },
+                                    onClick = { viewModel.removeFromQueue(combo) },
                                 )
                             },
                         )

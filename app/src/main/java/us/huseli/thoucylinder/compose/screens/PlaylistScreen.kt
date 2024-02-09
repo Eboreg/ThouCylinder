@@ -41,7 +41,7 @@ import us.huseli.thoucylinder.dataclasses.abstr.tracks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
 import kotlin.math.max
 import kotlin.math.min
@@ -56,13 +56,13 @@ fun PlaylistScreen(
     val colors = LocalBasicColors.current
     val context = LocalContext.current
 
-    val latestSelectedTrackPojo by viewModel.latestSelectedTrackPojo.collectAsStateWithLifecycle(null)
+    val latestSelectedTrackCombo by viewModel.latestSelectedTrackCombo.collectAsStateWithLifecycle(null)
     val playlistOrNull by viewModel.playlist.collectAsStateWithLifecycle(null)
-    val selectedTrackPojos by viewModel.selectedPlaylistTrackPojos.collectAsStateWithLifecycle()
+    val selectedTrackCombos by viewModel.selectedPlaylistTrackCombos.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val trackPojos: LazyPagingItems<PlaylistTrackPojo> = viewModel.trackPojos.collectAsLazyPagingItems()
+    val trackCombos: LazyPagingItems<PlaylistTrackCombo> = viewModel.trackCombos.collectAsLazyPagingItems()
 
-    var latestSelectedTrackIndex by rememberSaveable(selectedTrackPojos) { mutableStateOf<Int?>(null) }
+    var latestSelectedTrackIndex by rememberSaveable(selectedTrackCombos) { mutableStateOf<Int?>(null) }
 
     playlistOrNull?.also { playlist ->
         Column(modifier = modifier.fillMaxWidth()) {
@@ -108,46 +108,46 @@ fun PlaylistScreen(
             }
 
             TrackList(
-                trackPojos = trackPojos,
+                trackCombos = trackCombos,
                 viewModel = viewModel,
                 listState = listState,
-                selectedTrackPojos = selectedTrackPojos,
+                selectedTrackCombos = selectedTrackCombos,
                 trackDownloadTasks = trackDownloadTasks,
                 onEmpty = { Text(stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp)) },
-                trackCallbacks = { index: Int, pojo: PlaylistTrackPojo ->
+                trackCallbacks = { index: Int, combo: PlaylistTrackCombo ->
                     TrackCallbacks(
-                        pojo = pojo,
+                        combo = combo,
                         appCallbacks = appCallbacks,
                         context = context,
                         onTrackClick = {
-                            if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
-                            else viewModel.playPlaylist(startAt = pojo)
+                            if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(combo)
+                            else viewModel.playPlaylist(startAt = combo)
                         },
-                        onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
+                        onEnqueueClick = { viewModel.enqueueTrackCombo(combo, context) },
                         onLongClick = {
-                            viewModel.selectPlaylistTrackPojos(
+                            viewModel.selectPlaylistTrackCombos(
                                 latestSelectedTrackIndex?.let { index2 ->
-                                    (min(index, index2)..max(index, index2)).mapNotNull { idx -> trackPojos[idx] }
-                                } ?: listOf(pojo)
+                                    (min(index, index2)..max(index, index2)).mapNotNull { idx -> trackCombos[idx] }
+                                } ?: listOf(combo)
                             )
                         },
                         onEach = {
-                            if (pojo.track.trackId == latestSelectedTrackPojo?.track?.trackId)
+                            if (combo.track.trackId == latestSelectedTrackCombo?.track?.trackId)
                                 latestSelectedTrackIndex = index
                         },
                     )
                 },
                 trackSelectionCallbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = {
-                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackPojos.tracks()))
+                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
                     },
-                    onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
-                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
-                    onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
+                    onPlayClick = { viewModel.playTrackCombos(selectedTrackCombos) },
+                    onEnqueueClick = { viewModel.enqueueTrackCombos(selectedTrackCombos, context) },
+                    onUnselectAllClick = { viewModel.unselectAllTrackCombos() },
                 ),
                 extraTrackSelectionButtons = {
                     SmallOutlinedButton(
-                        onClick = { viewModel.removeTrackPojos(selectedTrackPojos) },
+                        onClick = { viewModel.removeTrackCombos(selectedTrackCombos) },
                         text = stringResource(R.string.remove),
                     )
                 }

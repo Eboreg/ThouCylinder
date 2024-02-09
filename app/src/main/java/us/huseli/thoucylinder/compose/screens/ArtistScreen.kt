@@ -42,8 +42,8 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
 import kotlin.math.max
 import kotlin.math.min
@@ -91,22 +91,22 @@ fun ArtistScreen(
             when (listType) {
                 ListType.ALBUMS -> {
                     val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
-                    val albumPojos by viewModel.albumPojos.collectAsStateWithLifecycle()
+                    val albumCombos by viewModel.albumCombos.collectAsStateWithLifecycle()
                     val selectedAlbums by viewModel.selectedAlbums.collectAsStateWithLifecycle(emptyList())
 
-                    val albumCallbacks = { pojo: AlbumPojo ->
+                    val albumCallbacks = { combo: AlbumCombo ->
                         AlbumCallbacks(
-                            pojo = pojo,
+                            combo = combo,
                             appCallbacks = appCallbacks,
                             context = context,
-                            onPlayClick = { viewModel.playAlbum(pojo.album) },
-                            onEnqueueClick = { viewModel.enqueueAlbum(pojo.album, context) },
+                            onPlayClick = { viewModel.playAlbum(combo.album) },
+                            onEnqueueClick = { viewModel.enqueueAlbum(combo.album, context) },
                             onAlbumLongClick = {
-                                viewModel.selectAlbumsFromLastSelected(pojo.album, albumPojos.map { it.album })
+                                viewModel.selectAlbumsFromLastSelected(combo.album, albumCombos.map { it.album })
                             },
                             onAlbumClick = {
-                                if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(pojo.album)
-                                else appCallbacks.onAlbumClick(pojo.album.albumId)
+                                if (selectedAlbums.isNotEmpty()) viewModel.toggleSelected(combo.album)
+                                else appCallbacks.onAlbumClick(combo.album.albumId)
                             },
                         )
                     }
@@ -116,12 +116,12 @@ fun ArtistScreen(
                         onPlayClick = { viewModel.playAlbums(selectedAlbums) },
                         onEnqueueClick = { viewModel.enqueueAlbums(selectedAlbums, context) },
                         onUnselectAllClick = { viewModel.unselectAllAlbums() },
-                        onSelectAllClick = { viewModel.selectAlbums(albumPojos.map { it.album }) },
+                        onSelectAllClick = { viewModel.selectAlbums(albumCombos.map { it.album }) },
                     )
 
                     when (displayType) {
                         DisplayType.LIST -> AlbumList(
-                            pojos = albumPojos,
+                            combos = albumCombos,
                             albumCallbacks = albumCallbacks,
                             albumSelectionCallbacks = albumSelectionCallbacks,
                             selectedAlbums = selectedAlbums,
@@ -132,7 +132,7 @@ fun ArtistScreen(
                             albumDownloadTasks = albumDownloadTasks,
                         )
                         DisplayType.GRID -> AlbumGrid(
-                            pojos = albumPojos,
+                            combos = albumCombos,
                             albumCallbacks = albumCallbacks,
                             albumSelectionCallbacks = albumSelectionCallbacks,
                             selectedAlbums = selectedAlbums,
@@ -145,51 +145,51 @@ fun ArtistScreen(
                     }
                 }
                 ListType.TRACKS -> {
-                    val latestSelectedTrackPojo by viewModel.latestSelectedTrackPojo.collectAsStateWithLifecycle(null)
-                    val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle(emptyList())
-                    val trackPojos: LazyPagingItems<TrackPojo> = viewModel.trackPojos.collectAsLazyPagingItems()
+                    val latestSelectedTrackCombo by viewModel.latestSelectedTrackCombo.collectAsStateWithLifecycle(null)
+                    val selectedTrackCombos by viewModel.selectedTrackCombos.collectAsStateWithLifecycle(emptyList())
+                    val trackCombos: LazyPagingItems<TrackCombo> = viewModel.trackCombos.collectAsLazyPagingItems()
 
-                    var latestSelectedTrackIndex by rememberSaveable(selectedTrackPojos) { mutableStateOf<Int?>(null) }
+                    var latestSelectedTrackIndex by rememberSaveable(selectedTrackCombos) { mutableStateOf<Int?>(null) }
 
-                    val trackCallbacks = { index: Int, pojo: TrackPojo ->
+                    val trackCallbacks = { index: Int, combo: TrackCombo ->
                         TrackCallbacks(
-                            pojo = pojo,
+                            combo = combo,
                             appCallbacks = appCallbacks,
                             context = context,
                             onTrackClick = {
-                                if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(pojo)
-                                else viewModel.playTrackPojo(pojo)
+                                if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(combo)
+                                else viewModel.playTrackCombo(combo)
                             },
-                            onEnqueueClick = { viewModel.enqueueTrackPojo(pojo, context) },
+                            onEnqueueClick = { viewModel.enqueueTrackCombo(combo, context) },
                             onLongClick = {
-                                viewModel.selectTrackPojos(
+                                viewModel.selectTrackCombos(
                                     latestSelectedTrackIndex?.let { index2 ->
-                                        (min(index, index2)..max(index, index2)).mapNotNull { trackPojos[it] }
-                                    } ?: listOf(pojo)
+                                        (min(index, index2)..max(index, index2)).mapNotNull { trackCombos[it] }
+                                    } ?: listOf(combo)
                                 )
                             },
                             onEach = {
-                                if (pojo.track.trackId == latestSelectedTrackPojo?.track?.trackId)
+                                if (combo.track.trackId == latestSelectedTrackCombo?.track?.trackId)
                                     latestSelectedTrackIndex = index
                             },
                         )
                     }
                     val trackSelectionCallbacks = TrackSelectionCallbacks(
                         onAddToPlaylistClick = {
-                            appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackPojos.tracks()))
+                            appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
                         },
-                        onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
-                        onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
-                        onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
+                        onPlayClick = { viewModel.playTrackCombos(selectedTrackCombos) },
+                        onEnqueueClick = { viewModel.enqueueTrackCombos(selectedTrackCombos, context) },
+                        onUnselectAllClick = { viewModel.unselectAllTrackCombos() },
                     )
                     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
 
                     when (displayType) {
                         DisplayType.LIST -> TrackList(
-                            trackPojos = trackPojos,
+                            trackCombos = trackCombos,
                             viewModel = viewModel,
                             showArtist = false,
-                            selectedTrackPojos = selectedTrackPojos,
+                            selectedTrackCombos = selectedTrackCombos,
                             trackCallbacks = trackCallbacks,
                             trackDownloadTasks = trackDownloadTasks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
@@ -198,12 +198,12 @@ fun ArtistScreen(
                             },
                         )
                         DisplayType.GRID -> TrackGrid(
-                            trackPojos = trackPojos,
+                            trackCombos = trackCombos,
                             viewModel = viewModel,
                             showArtist = false,
                             trackCallbacks = trackCallbacks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
-                            selectedTrackPojos = selectedTrackPojos,
+                            selectedTrackCombos = selectedTrackCombos,
                             trackDownloadTasks = trackDownloadTasks,
                             onEmpty = {
                                 Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))

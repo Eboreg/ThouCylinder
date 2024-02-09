@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -22,15 +22,15 @@ import kotlin.time.DurationUnit
 
 @HiltViewModel
 class QueueViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
-    private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
-    private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
+    private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
+    private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
 
     val canGotoNext = repos.player.canGotoNext
     val canPlay = repos.player.canPlay
-    val currentPojo = repos.player.currentPojo.filterNotNull().distinctUntilChanged()
+    val currentCombo = repos.player.currentCombo.filterNotNull().distinctUntilChanged()
     val currentPositionSeconds = repos.player.currentPositionMs.map { it / 1000 }.distinctUntilChanged()
-    val currentProgress: Flow<Float> = combine(repos.player.currentPositionMs, currentPojo) { position, pojo ->
-        val endPosition = pojo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+    val currentProgress: Flow<Float> = combine(repos.player.currentPositionMs, currentCombo) { position, combo ->
+        val endPosition = combo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
         endPosition?.let { position / it.toFloat() } ?: 0f
     }.distinctUntilChanged()
     val isLoading = repos.player.isLoading
@@ -38,7 +38,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     val isRepeatEnabled = repos.player.isRepeatEnabled
     val isShuffleEnabled = repos.player.isShuffleEnabled
     val queue = _queue.asStateFlow()
-    val selectedQueueTracks: Flow<List<QueueTrackPojo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
+    val selectedQueueTracks: Flow<List<QueueTrackCombo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
         selected.filter { queue.contains(it) }
     }
     val trackDownloadTasks = repos.download.tasks
@@ -49,16 +49,16 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
         }
     }
 
-    fun enqueueQueueTracks(pojos: List<QueueTrackPojo>, context: Context) {
-        repos.player.moveNext(pojos)
+    fun enqueueQueueTracks(combos: List<QueueTrackCombo>, context: Context) {
+        repos.player.moveNext(combos)
         SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, pojos.size, pojos.size)
+            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size)
         )
     }
 
-    fun getNextPojo(): QueueTrackPojo? = repos.player.getNextTrack()
+    fun getNextCombo(): QueueTrackCombo? = repos.player.getNextTrack()
 
-    fun getPreviousPojo(): QueueTrackPojo? = repos.player.getPreviousTrack()
+    fun getPreviousCombo(): QueueTrackCombo? = repos.player.getPreviousTrack()
 
     fun onMoveTrack(from: Int, to: Int) {
         /**
@@ -72,18 +72,18 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
-    fun playQueueTracks(pojos: List<QueueTrackPojo>) = repos.player.moveNextAndPlay(pojos)
+    fun playQueueTracks(combos: List<QueueTrackCombo>) = repos.player.moveNextAndPlay(combos)
 
-    fun removeFromQueue(pojo: QueueTrackPojo) = removeFromQueue(listOf(pojo))
+    fun removeFromQueue(combo: QueueTrackCombo) = removeFromQueue(listOf(combo))
 
-    fun removeFromQueue(pojos: List<QueueTrackPojo>) {
-        repos.player.removeFromQueue(pojos)
-        _selectedQueueTracks.value -= pojos
+    fun removeFromQueue(combos: List<QueueTrackCombo>) {
+        repos.player.removeFromQueue(combos)
+        _selectedQueueTracks.value -= combos
     }
 
     fun seekToProgress(progress: Float) = repos.player.seekToProgress(progress)
 
-    fun selectQueueTracksFromLastSelected(to: QueueTrackPojo) {
+    fun selectQueueTracksFromLastSelected(to: QueueTrackCombo) {
         val lastSelectedIdx = queue.value.indexOf(_selectedQueueTracks.value.lastOrNull())
         val thisIdx = queue.value.indexOf(to)
 
@@ -105,7 +105,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
 
     fun toggleRepeat() = repos.player.toggleRepeat()
 
-    fun toggleSelected(queueTrack: QueueTrackPojo) {
+    fun toggleSelected(queueTrack: QueueTrackCombo) {
         if (_selectedQueueTracks.value.contains(queueTrack))
             _selectedQueueTracks.value -= queueTrack
         else

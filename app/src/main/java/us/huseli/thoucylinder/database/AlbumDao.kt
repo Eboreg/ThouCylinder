@@ -3,6 +3,7 @@
 package us.huseli.thoucylinder.database
 
 import android.database.DatabaseUtils
+import android.net.Uri
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -16,18 +17,16 @@ import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.SortOrder
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.Style
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import java.util.UUID
 
 @Dao
@@ -40,10 +39,9 @@ interface AlbumDao {
             Genre::class,
             Style::class,
             SpotifyAlbum::class,
-            LastFmAlbum::class,
         ],
     )
-    fun _flowAlbumPojos(query: SupportSQLiteQuery): Flow<List<AlbumPojo>>
+    fun _flowAlbumCombos(query: SupportSQLiteQuery): Flow<List<AlbumCombo>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun _insertAlbumGenres(vararg albumGenres: AlbumGenre)
@@ -61,11 +59,14 @@ interface AlbumDao {
     @Query("SELECT EXISTS(SELECT Album_albumId FROM Album WHERE Album_albumId = :albumId)")
     suspend fun albumExists(albumId: UUID): Boolean
 
-    @Query("DELETE FROM AlbumGenre WHERE AlbumGenre_albumId = :albumId")
-    suspend fun clearAlbumGenres(albumId: UUID)
+    @Query("UPDATE Album SET Album_albumArt_uri = NULL, Album_albumArt_thumbnailUri = NULL WHERE Album_albumId = :albumId")
+    suspend fun clearAlbumArt(albumId: UUID)
 
-    @Query("DELETE FROM AlbumStyle WHERE AlbumStyle_albumId = :albumId")
-    suspend fun clearAlbumStyles(albumId: UUID)
+    @Query("DELETE FROM AlbumGenre WHERE AlbumGenre_albumId IN (:albumIds)")
+    suspend fun clearAlbumGenres(albumIds: Collection<UUID>)
+
+    @Query("DELETE FROM AlbumStyle WHERE AlbumStyle_albumId IN (:albumIds)")
+    suspend fun clearAlbumStyles(albumIds: Collection<UUID>)
 
     @Delete
     suspend fun deleteAlbums(vararg albums: Album)
@@ -73,18 +74,18 @@ interface AlbumDao {
     @Query("DELETE FROM Album WHERE Album_isInLibrary = 0")
     suspend fun deleteTempAlbums()
 
-    fun flowAlbumPojosByArtist(artist: String) = flowAlbumPojos(
+    fun flowAlbumCombosByArtist(artist: String) = flowAlbumCombos(
         sortParameter = AlbumSortParameter.TITLE,
         sortOrder = SortOrder.ASCENDING,
         artist = artist,
     )
 
-    fun flowAlbumPojos(
+    fun flowAlbumCombos(
         sortParameter: AlbumSortParameter,
         sortOrder: SortOrder,
         artist: String? = null,
         searchTerm: String? = null,
-    ): Flow<List<AlbumPojo>> {
+    ): Flow<List<AlbumCombo>> {
         val searchQuery = searchTerm
             ?.lowercase()
             ?.split(Regex(" +"))
@@ -94,7 +95,7 @@ interface AlbumDao {
                 "(LOWER(Album_artist) LIKE $term OR LOWER(Album_title) LIKE $term OR Album_year LIKE $term)"
             }
 
-        return _flowAlbumPojos(
+        return _flowAlbumCombos(
             SimpleSQLiteQuery(
                 """
                 SELECT Album.*, 
@@ -115,7 +116,7 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     @Transaction
-    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?>
+    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksCombo?>
 
     @Query("SELECT * FROM Genre ORDER BY Genre_genreName")
     fun flowGenres(): Flow<List<Genre>>
@@ -125,18 +126,18 @@ interface AlbumDao {
 
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     @Transaction
-    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo?
+    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksCombo?
 
     @Transaction
-    suspend fun insertAlbumGenres(albumId: UUID, genres: Collection<Genre>) {
-        _insertGenres(*genres.toTypedArray())
-        _insertAlbumGenres(*genres.map { AlbumGenre(albumId = albumId, genreName = it.genreName) }.toTypedArray())
+    suspend fun insertAlbumGenres(albumGenres: Collection<AlbumGenre>) {
+        _insertGenres(*albumGenres.map { Genre(it.genreName) }.toTypedArray())
+        _insertAlbumGenres(*albumGenres.toTypedArray())
     }
 
     @Transaction
-    suspend fun insertAlbumStyles(albumId: UUID, styles: Collection<Style>) {
-        _insertStyles(*styles.toTypedArray())
-        _insertAlbumStyles(*styles.map { AlbumStyle(albumId = albumId, styleName = it.styleName) }.toTypedArray())
+    suspend fun insertAlbumStyles(albumStyles: Collection<AlbumStyle>) {
+        _insertStyles(*albumStyles.map { Style(it.styleName) }.toTypedArray())
+        _insertAlbumStyles(*albumStyles.toTypedArray())
     }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -151,36 +152,44 @@ interface AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_isDeleted = 1")
     suspend fun listDeletionMarkedAlbums(): List<Album>
 
+    @Query("SELECT Album_albumId FROM Album WHERE Album_albumId IN (:albumIds)")
+    suspend fun listExistingAlbumIds(albumIds: Collection<UUID>): List<UUID>
+
     @Query("SELECT * FROM Genre")
     suspend fun listGenres(): List<Genre>
 
+    @Query("SELECT Album_musicBrainzReleaseId FROM Album WHERE Album_musicBrainzReleaseId IS NOT NULL")
+    suspend fun listMusicBrainzReleaseIds(): List<String>
+
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
         FROM Track
             LEFT JOIN Album ON Track_albumId = Album_albumId
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE Track_albumId IN (:albumIds)
         ORDER BY Track_albumId, Track_discNumber, Track_albumPosition
         """
     )
-    suspend fun listTrackPojos(albumIds: List<UUID>): List<TrackPojo>
+    suspend fun listTrackCombos(albumIds: List<UUID>): List<TrackCombo>
 
     @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
     suspend fun listTracks(albumId: UUID): List<Track>
 
     @Query("UPDATE Album SET Album_isDeleted = :isDeleted WHERE Album_albumId = :albumId")
-    suspend fun setAlbumIsDeleted(albumId: UUID, isDeleted: Boolean)
+    suspend fun setIsDeleted(albumId: UUID, isDeleted: Boolean)
 
     @Query("UPDATE Album SET Album_isHidden = :value WHERE Album_albumId = :albumId")
-    suspend fun setAlbumIsHidden(albumId: UUID, value: Boolean)
+    suspend fun setIsHidden(albumId: UUID, value: Boolean)
 
-    @Query("UPDATE Album SET Album_isInLibrary = :isInLibrary WHERE Album_albumId = :albumId")
-    suspend fun setAlbumIsInLibrary(albumId: UUID, isInLibrary: Boolean)
+    @Query("UPDATE Album SET Album_isInLibrary = :isInLibrary WHERE Album_albumId IN (:albumIds)")
+    suspend fun setIsInLibrary(albumIds: Collection<UUID>, isInLibrary: Boolean)
 
-    @Query("UPDATE Album SET Album_isLocal = :isLocal WHERE Album_albumId = :albumId")
-    suspend fun setAlbumIsLocal(albumId: UUID, isLocal: Boolean)
+    @Query("UPDATE Album SET Album_isLocal = :isLocal WHERE Album_albumId IN (:albumIds)")
+    suspend fun setIsLocal(albumIds: Collection<UUID>, isLocal: Boolean)
+
+    @Query("UPDATE Album SET Album_albumArt_uri = :uri, Album_albumArt_thumbnailUri = :thumbnailUri WHERE Album_albumId = :albumId")
+    suspend fun updateAlbumArt(albumId: UUID, uri: Uri, thumbnailUri: Uri)
 
     @Update
     suspend fun updateAlbums(vararg albums: Album)

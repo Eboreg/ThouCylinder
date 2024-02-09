@@ -20,8 +20,8 @@ import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import java.util.UUID
 import javax.inject.Inject
 
@@ -42,15 +42,15 @@ class LibraryViewModel @Inject constructor(
     private val _trackSearchTerm = MutableStateFlow("")
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val albumPojos: Flow<List<AlbumPojo>> =
+    val albumCombos: Flow<List<AlbumCombo>> =
         combine(_albumSortParameter, _albumSortOrder, _albumSearchTerm) { sortParameter, sortOrder, searchTerm ->
-            repos.album.flowAlbumPojos(sortParameter, sortOrder, searchTerm)
+            repos.album.flowAlbumCombos(sortParameter, sortOrder, searchTerm)
         }.flattenMerge().onStart { _isLoadingAlbums.value = true }.onEach { _isLoadingAlbums.value = false }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val pagingTrackPojos: Flow<PagingData<TrackPojo>> =
+    val pagingTrackCombos: Flow<PagingData<TrackCombo>> =
         combine(_trackSortParameter, _trackSortOrder, _trackSearchTerm) { sortParameter, sortOrder, searchTerm ->
-            repos.track.flowTrackPojoPager(sortParameter, sortOrder, searchTerm).flow.cachedIn(viewModelScope)
+            repos.track.flowTrackComboPager(sortParameter, sortOrder, searchTerm).flow.cachedIn(viewModelScope)
         }.flattenMerge().onStart { _isLoadingTracks.value = true }.onEach { _isLoadingTracks.value = false }
 
     val displayType = _displayType.asStateFlow()

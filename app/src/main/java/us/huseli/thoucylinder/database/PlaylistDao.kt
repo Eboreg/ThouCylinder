@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package us.huseli.thoucylinder.database
 
 import androidx.paging.PagingSource
@@ -13,8 +11,8 @@ import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import java.time.Instant
 import java.util.UUID
 
@@ -66,34 +64,32 @@ interface PlaylistDao {
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
         FROM Track
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId
             LEFT JOIN Album ON Track_albumId = Album_albumId
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE Playlist_playlistId = :playlistId
         ORDER BY PlaylistTrack_position
         """
     )
-    suspend fun listTracks(playlistId: UUID): List<PlaylistTrackPojo>
+    suspend fun listTracks(playlistId: UUID): List<PlaylistTrackCombo>
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
+        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*, Playlist.*, PlaylistTrack.PlaylistTrack_position
         FROM Track 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
             LEFT JOIN Album ON Track_albumId = Album_albumId
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
         WHERE Playlist_playlistId = :playlistId
         ORDER BY PlaylistTrack_position
         """
     )
     @Transaction
-    fun pageTracks(playlistId: UUID): PagingSource<Int, PlaylistTrackPojo>
+    fun pageTracks(playlistId: UUID): PagingSource<Int, PlaylistTrackCombo>
 
     @Query("UPDATE Playlist SET Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")
     suspend fun touchPlaylist(playlistId: UUID, updated: Instant = Instant.now())

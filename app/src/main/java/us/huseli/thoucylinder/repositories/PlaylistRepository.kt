@@ -9,8 +9,8 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
-import us.huseli.thoucylinder.dataclasses.pojos.toPlaylistTracks
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.combos.toPlaylistTracks
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,10 +39,12 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
         val unsavedTracks = tracks.filter { !it.isInLibrary }
         val unsavedAlbums = (selection.albums + selection.albumsWithTracks.map { it.album }).filter { !it.isInLibrary }
 
-        if (unsavedAlbums.isNotEmpty())
-            albumDao.insertAlbums(*unsavedAlbums.map { it.copy(isInLibrary = true) }.toTypedArray())
-        if (unsavedTracks.isNotEmpty())
-            trackDao.insertTracks(*unsavedTracks.map { it.copy(isInLibrary = true) }.toTypedArray())
+        if (unsavedAlbums.isNotEmpty()) {
+            albumDao.setIsInLibrary(unsavedAlbums.map { it.albumId }, true)
+        }
+        if (unsavedTracks.isNotEmpty()) {
+            trackDao.setIsInLibrary(unsavedTracks.map { it.trackId }, true)
+        }
         playlistDao.insertTracks(*playlistTracks.toTypedArray())
         playlistDao.touchPlaylist(playlist.playlistId)
     }
@@ -59,14 +61,14 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
 
     suspend fun listPlaylistAlbums(playlistId: UUID): List<Album> = playlistDao.listAlbums(playlistId)
 
-    suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrackPojo> = playlistDao.listTracks(playlistId)
+    suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrackCombo> = playlistDao.listTracks(playlistId)
 
-    fun pageTrackPojosByPlaylistId(playlistId: UUID): Pager<Int, PlaylistTrackPojo> =
+    fun pageTrackCombosByPlaylistId(playlistId: UUID): Pager<Int, PlaylistTrackCombo> =
         Pager(config = PagingConfig(pageSize = 100)) { playlistDao.pageTracks(playlistId) }
 
-    suspend fun removePlaylistTracks(pojos: List<PlaylistTrackPojo>) = database.withTransaction {
-        playlistDao.deletePlaylistTracks(*pojos.toPlaylistTracks().toTypedArray())
-        pojos.map { it.playlist.playlistId }.toSet().forEach { playlistId -> playlistDao.touchPlaylist(playlistId) }
+    suspend fun removePlaylistTracks(combos: List<PlaylistTrackCombo>) = database.withTransaction {
+        playlistDao.deletePlaylistTracks(*combos.toPlaylistTracks().toTypedArray())
+        combos.map { it.playlist.playlistId }.toSet().forEach { playlistId -> playlistDao.touchPlaylist(playlistId) }
     }
 
     private suspend fun getTracksFromSelection(selection: Selection): Set<Track> {

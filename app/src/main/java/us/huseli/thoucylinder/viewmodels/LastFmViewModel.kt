@@ -12,46 +12,31 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
 import us.huseli.thoucylinder.dataclasses.ImportProgressStatus
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
-import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.filterBySearchTerm
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.LastFmAlbumPojo
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.musicBrainz.artistString
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
-
-data class LastFmAlbumMatch(
-    val albumWithTracksPojo: AlbumWithTracksPojo,
-    val lastFmAlbum: LastFmAlbum,
-    val youtubeAlbumPojo: AlbumWithTracksPojo,
-    val levenshtein: Double,
-)
 
 @HiltViewModel
 class LastFmViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     private val _offset = MutableStateFlow(0)
     private val _searchTerm = MutableStateFlow("")
-    private val _filteredTopAlbums: Flow<List<LastFmTopAlbumsResponse.TopAlbums.Album>> =
+    private val _filteredTopAlbums: Flow<List<LastFmTopAlbumsResponse.Album>> =
         combine(repos.lastFm.topAlbums, _searchTerm) { albums, term ->
             albums.filterBySearchTerm(term).filter { !_pastImportedAlbumIds.contains(it.mbid) }
         }
     private val _isSearching = MutableStateFlow(false)
-    private val _selectedTopAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.TopAlbums.Album>>(emptyList())
+    private val _selectedTopAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
     private val _importedAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _pastImportedAlbumIds = mutableSetOf<String>()
     private val _progress = MutableStateFlow<ImportProgressData?>(null)
-    private var _genres: List<Genre>? = null
 
     val hasNext: Flow<Boolean> =
         combine(_filteredTopAlbums, repos.lastFm.allTopAlbumsFetched, _offset) { albums, allFetched, offset ->
@@ -59,7 +44,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
         }
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
     val offset: StateFlow<Int> = _offset.asStateFlow()
-    val offsetTopAlbums: Flow<List<LastFmTopAlbumsResponse.TopAlbums.Album>> =
+    val offsetTopAlbums: Flow<List<LastFmTopAlbumsResponse.Album>> =
         combine(_filteredTopAlbums, _offset) { albums, offset ->
             albums.subList(min(offset, max(albums.lastIndex, 0)), min(offset + 50, albums.size))
         }
@@ -88,7 +73,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
         _isSearching.value = false
     }
 
-    suspend fun getAlbumArt(album: LastFmTopAlbumsResponse.TopAlbums.Album) = repos.lastFm.getThumbnail(album)
+    suspend fun getAlbumArt(album: LastFmTopAlbumsResponse.Album) = repos.lastFm.getThumbnail(album)
 
     fun getSessionKey(authToken: String, onError: (Exception) -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
         try {
@@ -104,77 +89,46 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
         }
     }
 
-    private fun updateProgressData(
-        item: String? = null,
-        progress: Double? = null,
-        status: ImportProgressStatus? = null,
-    ) {
+    private fun updateProgressData(progress: Double? = null, status: ImportProgressStatus? = null) {
         _progress.value = _progress.value?.let {
-            it.copy(item = item ?: it.item, progress = progress ?: it.progress, status = status ?: it.status)
+            it.copy(progress = progress ?: it.progress, status = status ?: it.status)
         }
     }
 
     fun importSelectedTopAlbums(onFinish: (importCount: Int, notFoundCount: Int) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
             val selectedTopAlbums = _selectedTopAlbums.value
-            val lastFmAlbumPairs = selectedTopAlbums
-                .mapNotNull { topAlbum -> repos.lastFm.topAlbumToAlbum(topAlbum)?.let { Pair(topAlbum, it) } }
-            val allGenres = _genres ?: repos.album.listGenres().also { _genres = it }
             var notFoundCount = 0
 
-            lastFmAlbumPairs.forEachIndexed { index, (lastFmTopAlbum, lastFmAlbum) ->
-                val progressBaseline = index.toDouble() / lastFmAlbumPairs.size
-                val progressMultiplier = 1.0 / lastFmAlbumPairs.size
+            selectedTopAlbums.forEachIndexed { index, topAlbum ->
+                val progressBaseline = index.toDouble() / selectedTopAlbums.size
+                val progressMultiplier = 1.0 / selectedTopAlbums.size
 
                 _progress.value = ImportProgressData(
-                    item = lastFmAlbum.name,
+                    item = topAlbum.name,
                     progress = progressBaseline,
                     status = ImportProgressStatus.MATCHING,
                 )
 
-                val match = findAlbumOnYoutube(lastFmAlbum, allGenres) { progress ->
+                val combo = findAlbumOnYoutube(topAlbum.mbid) { progress ->
                     updateProgressData(progress = progressBaseline + (progress * progressMultiplier * 0.9))
                 }
 
-                if (match != null) {
+                if (combo != null) {
                     updateProgressData(
                         progress = progressBaseline + (progressMultiplier * 0.9),
                         status = ImportProgressStatus.IMPORTING,
                     )
-                    val albumArt = repos.localMedia.getOrCreateAlbumArt(match.albumWithTracksPojo)
-
-                    repos.album.saveAlbumPojo(
-                        match.albumWithTracksPojo.copy(
-                            album = match.albumWithTracksPojo.album.copy(albumArt = albumArt),
-                        )
-                    )
-                    repos.track.insertTracks(match.albumWithTracksPojo.tracks)
-                    repos.lastFm.insertLastFmAlbumPojo(
-                        LastFmAlbumPojo(
-                            album = match.lastFmAlbum,
-                            tracks = match.lastFmAlbum.tracks.mapIndexedNotNull { trackIdx, lfmTrack ->
-                                match.albumWithTracksPojo.tracks.getOrNull(trackIdx)?.let { track ->
-                                    LastFmTrack(
-                                        duration = lfmTrack.duration,
-                                        url = lfmTrack.url,
-                                        name = lfmTrack.name,
-                                        artist = lfmTrack.artist,
-                                        trackId = track.trackId,
-                                        albumId = match.lastFmAlbum.musicBrainzId,
-                                        musicBrainzId = lfmTrack.mbid,
-                                    )
-                                }
-                            }
-                        )
-                    )
+                    repos.album.saveAlbumCombo(combo)
+                    repos.track.insertTracks(combo.tracks)
                     updateProgressData(progress = progressBaseline + progressMultiplier)
-                    _importedAlbumIds.value += lastFmTopAlbum.mbid
+                    _importedAlbumIds.value += topAlbum.mbid
                 } else {
                     notFoundCount++
-                    _notFoundAlbumIds.value += lastFmTopAlbum.mbid
+                    _notFoundAlbumIds.value += topAlbum.mbid
                 }
 
-                _selectedTopAlbums.value -= lastFmTopAlbum
+                _selectedTopAlbums.value -= topAlbum
             }
 
             _progress.value = null
@@ -203,7 +157,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
         else _selectedTopAlbums.value = emptyList()
     }
 
-    fun toggleSelected(album: LastFmTopAlbumsResponse.TopAlbums.Album) {
+    fun toggleSelected(album: LastFmTopAlbumsResponse.Album) {
         if (_selectedTopAlbums.value.contains(album)) _selectedTopAlbums.value -= album
         else if (!_importedAlbumIds.value.contains(album.mbid) && !_notFoundAlbumIds.value.contains(album.mbid)) {
             _selectedTopAlbums.value += album
@@ -213,79 +167,20 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
 
     /** PRIVATE FUNCTIONS *****************************************************/
     private suspend fun findAlbumOnYoutube(
-        lastFmAlbum: LastFmAlbum,
-        allGenres: List<Genre>,
+        musicBrainzId: String,
         progressCallback: (Double) -> Unit = {},
-    ): LastFmAlbumMatch? {
-        val albumId = UUID.randomUUID()
-        val tags = lastFmAlbum.tags.map { it.capitalized() }
-        val genres = allGenres.filter { tags.contains(it.genreName) }
-        val pojo = AlbumWithTracksPojo(
-            album = Album(
-                title = lastFmAlbum.name,
-                isLocal = false,
-                isInLibrary = true,
-                year = lastFmAlbum.year,
-                artist = lastFmAlbum.artist.name,
-                albumId = albumId,
-                lastFmFullImageUrl = lastFmAlbum.fullImageUrl,
-                lastFmThumbnailUrl = lastFmAlbum.thumbnailUrl,
-            ),
-            genres = genres,
-            lastFmAlbum = lastFmAlbum.copy(albumId = albumId),
-            tracks = lastFmAlbum.tracks.mapIndexed { index, lastFmTrack ->
-                Track(
-                    albumId = albumId,
-                    artist = lastFmTrack.artist.name,
-                    isInLibrary = true,
-                    albumPosition = index + 1,
-                    title = lastFmTrack.name,
-                )
-            },
-        )
+    ): AlbumWithTracksCombo? = repos.musicBrainz.getRelease(musicBrainzId)?.let { musicBrainzRelease ->
+        val query = "${musicBrainzRelease.artistCredit.artistString()} - ${musicBrainzRelease.title}"
 
-        return repos.youtube.getAlbumSearchResult("${lastFmAlbum.artist.name} - ${lastFmAlbum.name}", progressCallback)
-            .asSequence()
-            .map {
-                if (it.tracks.size > lastFmAlbum.tracks.size)
-                    it.copy(tracks = it.tracks.subList(0, lastFmAlbum.tracks.size))
-                else it
-            }
-            .map {
-                LastFmAlbumMatch(
-                    albumWithTracksPojo = pojo.copy(album = pojo.album.copy(youtubePlaylist = it.album.youtubePlaylist)),
-                    lastFmAlbum = lastFmAlbum,
-                    youtubeAlbumPojo = it,
-                    levenshtein = pojo.getLevenshteinDistance(it),
-                )
-            }
-            .filter { it.levenshtein < 10.0 }
-            .sortedBy { it.levenshtein }
-            .minByOrNull { it.youtubeAlbumPojo.tracks.size <= it.lastFmAlbum.tracks.size }
-            ?.let { match ->
-                val tracks = match.youtubeAlbumPojo.tracks.mapIndexed { trackIdx, trackYoutube ->
-                    val trackLastFm = match.albumWithTracksPojo.tracks.getOrNull(trackIdx)
-                    val (title, artist) =
-                        if (
-                            trackLastFm != null &&
-                            trackLastFm.getLevenshteinDistance(
-                                trackYoutube,
-                                match.albumWithTracksPojo.album.artist
-                            ) <= 10
-                        ) Pair(trackLastFm.title, trackLastFm.artist)
-                        else Pair(trackYoutube.title, trackYoutube.artist)
-
-                    trackYoutube.copy(
-                        title = title,
-                        artist = artist,
-                        isInLibrary = true,
-                        albumId = match.albumWithTracksPojo.album.albumId,
-                    )
-                }
-
-                match.copy(
-                    albumWithTracksPojo = match.albumWithTracksPojo.copy(tracks = tracks),
-                    lastFmAlbum = match.lastFmAlbum.copy(albumId = match.albumWithTracksPojo.album.albumId),
+        repos.youtube.getAlbumSearchResult(query, progressCallback)
+            .map { repos.musicBrainz.matchAlbumWithTracks(it, musicBrainzRelease) }
+            .filter { it.distance <= 1.0 }
+            .minByOrNull { it.distance }
+            ?.albumCombo
+            ?.let { combo ->
+                combo.copy(
+                    album = combo.album.copy(isInLibrary = true),
+                    tracks = combo.tracks.map { it.copy(isInLibrary = true) },
                 )
             }
     }

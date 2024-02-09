@@ -11,7 +11,7 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import java.util.UUID
 
 @Dao
@@ -33,18 +33,17 @@ interface QueueDao {
 
     @Query(
         """
-        SELECT Track.*, Album.*, SpotifyTrack.*, LastFmTrack.*, SpotifyAlbum.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
+        SELECT Track.*, Album.*, SpotifyTrack.*, SpotifyAlbum.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
         FROM QueueTrack  
             JOIN Track ON Track_trackId = QueueTrack_trackId
             LEFT JOIN Album ON Track_albumId = Album_albumId
             LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN LastFmTrack ON Track_trackId = LastFmTrack_trackId
             LEFT JOIN SpotifyAlbum ON Track_albumId = SpotifyAlbum_albumId
         ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )
     @Transaction
-    suspend fun getQueue(): List<QueueTrackPojo>
+    suspend fun getQueue(): List<QueueTrackCombo>
 
     @Transaction
     suspend fun upsertQueueTracks(vararg queueTracks: QueueTrack) {

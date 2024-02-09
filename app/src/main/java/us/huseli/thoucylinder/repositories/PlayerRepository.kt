@@ -29,16 +29,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.thoucylinder.Constants.PREF_CURRENT_TRACK_POSITION
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.PlaybackService
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.database.QueueDao
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
-import us.huseli.thoucylinder.dataclasses.pojos.containsWithPosition
-import us.huseli.thoucylinder.dataclasses.pojos.reindexed
-import us.huseli.thoucylinder.dataclasses.pojos.toMediaItems
-import us.huseli.thoucylinder.filterValuesNotNull
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.combos.containsWithPosition
+import us.huseli.thoucylinder.dataclasses.combos.reindexed
+import us.huseli.thoucylinder.dataclasses.combos.toMediaItems
 import us.huseli.thoucylinder.widget.AppWidget
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -68,7 +68,7 @@ class PlayerRepository @Inject constructor(
 
     private val _canGotoNext = MutableStateFlow(player?.hasNextMediaItem() ?: false)
     private val _canPlay = MutableStateFlow(player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) ?: false)
-    private val _currentPojo = MutableStateFlow<QueueTrackPojo?>(null)
+    private val _currentCombo = MutableStateFlow<QueueTrackCombo?>(null)
     private val _currentPositionMs = MutableStateFlow(0L)
     private val _currentTrackPlayStartTimestamp = MutableStateFlow<Long?>(null)
     private val _currentTrackPlayTime = MutableStateFlow(0) // seconds
@@ -77,18 +77,18 @@ class PlayerRepository @Inject constructor(
     private val _isRepeatEnabled = MutableStateFlow(false)
     private val _isShuffleEnabled = MutableStateFlow(false)
     private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
-    private val _queue = MutableStateFlow<List<QueueTrackPojo>>(emptyList())
+    private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
     private var _lastAction = LastAction.STOP
 
     val canGotoNext: StateFlow<Boolean> = _canGotoNext.asStateFlow()
     val canPlay = combine(_canPlay, _isLoading) { canPlay, isLoading -> canPlay && !isLoading }.distinctUntilChanged()
-    val currentPojo: StateFlow<QueueTrackPojo?> = _currentPojo.asStateFlow()
+    val currentCombo: StateFlow<QueueTrackCombo?> = _currentCombo.asStateFlow()
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     val isPlaying: Flow<Boolean> = _playbackState.map { it == PlaybackState.PLAYING }.distinctUntilChanged()
     val isRepeatEnabled: StateFlow<Boolean> = _isRepeatEnabled.asStateFlow()
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
-    val queue: StateFlow<List<QueueTrackPojo>> = _queue.asStateFlow()
+    val queue: StateFlow<List<QueueTrackCombo>> = _queue.asStateFlow()
 
     val nextItemIndex: Int
         get() = player?.let { if (it.mediaItemCount == 0) 0 else it.currentMediaItemIndex + 1 } ?: 0
@@ -115,16 +115,16 @@ class PlayerRepository @Inject constructor(
              * single source of truth for queue contents and playback status etc, with some stateflows acting as cache.
              */
             queueMutex.withLock {
-                val pojos = queueDao.getQueue()
+                val combos = queueDao.getQueue()
                 val currentIndex =
-                    preferences.getInt(PREF_QUEUE_INDEX, 0).takeIf { it < pojos.size && it > -1 } ?: 0
+                    preferences.getInt(PREF_QUEUE_INDEX, 0).takeIf { it < combos.size && it > -1 } ?: 0
                 val currentTrackPosition = preferences.getLong(PREF_CURRENT_TRACK_POSITION, 0)
 
-                _queue.value = pojos
+                _queue.value = combos
 
-                if (pojos.isNotEmpty()) {
+                if (combos.isNotEmpty()) {
                     val func = { player: MediaController ->
-                        player.addMediaItems(pojos.map { it.toMediaItem() })
+                        player.addMediaItems(combos.map { it.toMediaItem() })
                         player.seekTo(currentIndex, currentTrackPosition)
                     }
 
@@ -141,11 +141,11 @@ class PlayerRepository @Inject constructor(
             queueDao.flowTracksInQueue().distinctUntilChanged().collect { tracks ->
                 queueMutex.withLock {
                     val uriMap =
-                        _queue.value.associateWith { pojo -> tracks.find { it.trackId == pojo.track.trackId }?.playUri }
+                        _queue.value.associateWith { combo -> tracks.find { it.trackId == combo.track.trackId }?.playUri }
 
                     // Handle updated URIs:
-                    uriMap.filterValuesNotNull().forEach { (pojo, uri) ->
-                        if (uri != pojo.uri) updateTrack(pojo.copy(uri = uri))
+                    uriMap.filterValuesNotNull().forEach { (combo, uri) ->
+                        if (uri != combo.uri) updateTrack(combo.copy(uri = uri))
                     }
                 }
             }
@@ -169,10 +169,10 @@ class PlayerRepository @Inject constructor(
                     currentTrackPlayTimeJob = launch {
                         while (true) {
                             if (!_isCurrentTrackHalfPlayedReported.value) {
-                                val pojo = _currentPojo.value
-                                val duration = pojo?.track?.duration
+                                val combo = _currentCombo.value
+                                val duration = combo?.track?.duration
 
-                                if (pojo != null && duration != null) {
+                                if (combo != null && duration != null) {
                                     // Scrobble when the track has been played for at least half its duration, or for 4
                                     // minutes (whichever occurs earlier).
                                     // https://www.last.fm/api/scrobbling#when-is-a-scrobble-a-scrobble
@@ -180,7 +180,7 @@ class PlayerRepository @Inject constructor(
 
                                     if (_currentTrackPlayTime.value >= threshold) {
                                         _currentTrackPlayStartTimestamp.value?.also { startTimestamp ->
-                                            listeners.forEach { it.onHalfTrackPlayed(pojo, startTimestamp) }
+                                            listeners.forEach { it.onHalfTrackPlayed(combo, startTimestamp) }
                                         }
                                         _isCurrentTrackHalfPlayedReported.value = true
                                     }
@@ -202,16 +202,16 @@ class PlayerRepository @Inject constructor(
                     currentTrackPlayTimeJob = null
                 }
 
-                listeners.forEach { it.onPlaybackChange(_currentPojo.value, state) }
+                listeners.forEach { it.onPlaybackChange(_currentCombo.value, state) }
                 updateWidget()
             }
         }
 
         scope.launch {
-            _currentPojo.collect { pojo ->
+            _currentCombo.collect { combo ->
                 _currentTrackPlayTime.value = 0
                 _isCurrentTrackHalfPlayedReported.value = false
-                listeners.forEach { it.onPlaybackChange(pojo, _playbackState.value) }
+                listeners.forEach { it.onPlaybackChange(combo, _playbackState.value) }
                 updateWidget()
             }
         }
@@ -219,23 +219,23 @@ class PlayerRepository @Inject constructor(
 
     fun addListener(listener: PlayerRepositoryListener) = listeners.add(listener)
 
-    fun insertNext(pojos: List<QueueTrackPojo>) {
-        if (pojos.isNotEmpty()) player?.addMediaItems(nextItemIndex, pojos.toMediaItems())
+    fun insertNext(combos: List<QueueTrackCombo>) {
+        if (combos.isNotEmpty()) player?.addMediaItems(nextItemIndex, combos.toMediaItems())
     }
 
-    fun insertNextAndPlay(pojo: QueueTrackPojo) {
-        player?.addMediaItem(nextItemIndex, pojo.toMediaItem())
+    fun insertNextAndPlay(combo: QueueTrackCombo) {
+        player?.addMediaItem(nextItemIndex, combo.toMediaItem())
         player?.seekTo(nextItemIndex, 0L)
         play()
     }
 
-    fun moveNext(pojos: List<QueueTrackPojo>) {
-        removeFromQueue(pojos)
-        player?.addMediaItems(nextItemIndex, pojos.map { it.toMediaItem() })
+    fun moveNext(combos: List<QueueTrackCombo>) {
+        removeFromQueue(combos)
+        player?.addMediaItems(nextItemIndex, combos.map { it.toMediaItem() })
     }
 
-    fun moveNextAndPlay(pojos: List<QueueTrackPojo>) {
-        moveNext(pojos)
+    fun moveNextAndPlay(combos: List<QueueTrackCombo>) {
+        moveNext(combos)
         player?.seekTo(nextItemIndex, 0L)
         play()
     }
@@ -262,11 +262,11 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun removeFromQueue(pojos: List<QueueTrackPojo>) = scope.launch {
+    fun removeFromQueue(combos: List<QueueTrackCombo>) = scope.launch {
         queueMutex.withLock {
-            val ids = pojos.map { it.queueTrackId }
+            val ids = combos.map { it.queueTrackId }
             val indices =
-                _queue.value.mapIndexedNotNull { index, pojo -> if (ids.contains(pojo.queueTrackId)) index else null }
+                _queue.value.mapIndexedNotNull { index, combo -> if (ids.contains(combo.queueTrackId)) index else null }
 
             indices.sortedDescending().forEach { index ->
                 player?.removeMediaItem(index)
@@ -274,18 +274,18 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun replaceAndPlay(pojos: List<QueueTrackPojo>, startIndex: Int? = 0) {
+    fun replaceAndPlay(combos: List<QueueTrackCombo>, startIndex: Int? = 0) {
         /** Clear queue, add tracks, play. */
         player?.clearMediaItems()
-        if (pojos.isNotEmpty()) {
-            player?.addMediaItems(pojos.map { it.toMediaItem() })
+        if (combos.isNotEmpty()) {
+            player?.addMediaItems(combos.map { it.toMediaItem() })
             player?.seekTo(max(startIndex ?: 0, 0), 0L)
             play()
         }
     }
 
     fun seekToProgress(progress: Float) = player?.also { player ->
-        val endPosition = _currentPojo.value?.track?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+        val endPosition = _currentCombo.value?.track?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
         if (endPosition != null) player.seekTo((endPosition * progress).toLong())
     }
 
@@ -335,21 +335,21 @@ class PlayerRepository @Inject constructor(
         player?.also { it.shuffleModeEnabled = !it.shuffleModeEnabled }
     }
 
-    fun updateTrack(pojo: QueueTrackPojo) {
+    fun updateTrack(combo: QueueTrackCombo) {
         player?.also {
-            it.removeMediaItem(pojo.position)
-            it.addMediaItem(pojo.position, pojo.toMediaItem())
-            if (pojo.position <= it.currentMediaItemIndex && _playbackState.value != PlaybackState.PLAYING)
+            it.removeMediaItem(combo.position)
+            it.addMediaItem(combo.position, combo.toMediaItem())
+            if (combo.position <= it.currentMediaItemIndex && _playbackState.value != PlaybackState.PLAYING)
                 it.seekTo(it.currentMediaItemIndex - 1, 0L)
         }
     }
 
 
     /** PRIVATE METHODS ******************************************************/
-    private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackPojo? =
+    private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackCombo? =
         mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
 
-    fun getNextTrack(): QueueTrackPojo? = player?.let {
+    fun getNextTrack(): QueueTrackCombo? = player?.let {
         val nextMediaItem =
             if (it.mediaItemCount > it.currentMediaItemIndex + 1)
                 it.getMediaItemAt(it.currentMediaItemIndex + 1)
@@ -358,7 +358,7 @@ class PlayerRepository @Inject constructor(
         findQueueItemByMediaItem(nextMediaItem)
     }
 
-    fun getPreviousTrack(): QueueTrackPojo? = player?.let {
+    fun getPreviousTrack(): QueueTrackCombo? = player?.let {
         val previousMediaItem =
             if (it.currentMediaItemIndex > 0) it.getMediaItemAt(it.currentMediaItemIndex - 1)
             else null
@@ -406,10 +406,10 @@ class PlayerRepository @Inject constructor(
             queueMutex.withLock {
                 saveCurrentPosition()
                 saveQueueIndex()
-                val pojo = findQueueItemByMediaItem(mediaItem)
-                if (pojo != _currentPojo.value) {
-                    Log.i("PlayerRepository", "current track URI: ${pojo?.uri}")
-                    _currentPojo.value = pojo
+                val combo = findQueueItemByMediaItem(mediaItem)
+                if (combo != _currentCombo.value) {
+                    Log.i("PlayerRepository", "current track URI: ${combo?.uri}")
+                    _currentCombo.value = combo
                     player?.currentPosition?.also { _currentPositionMs.value = it }
                     if (_playbackState.value == PlaybackState.PLAYING)
                         _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
@@ -420,7 +420,7 @@ class PlayerRepository @Inject constructor(
     }
 
     override fun onPlayerError(error: PlaybackException) {
-        listeners.forEach { it.onPlayerError(error, _currentPojo.value, _lastAction) }
+        listeners.forEach { it.onPlayerError(error, _currentCombo.value, _lastAction) }
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) {
@@ -439,7 +439,7 @@ class PlayerRepository @Inject constructor(
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
         if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) scope.launch {
             queueMutex.withLock {
-                val queue = mutableListOf<QueueTrackPojo>()
+                val queue = mutableListOf<QueueTrackCombo>()
                 val queueTrackIds = mutableListOf<String>()
 
                 if (timeline.windowCount > 0) {
@@ -448,7 +448,7 @@ class PlayerRepository @Inject constructor(
                         timeline.getWindow(idx, window)
                         queueTrackIds.add(window.mediaItem.mediaId)
                         window.mediaItem.localConfiguration?.tag?.also { tag ->
-                            if (tag is QueueTrackPojo) queue.add(tag)
+                            if (tag is QueueTrackCombo) queue.add(tag)
                         }
                     }
                 }

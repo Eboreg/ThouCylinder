@@ -1,12 +1,9 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
@@ -17,18 +14,18 @@ import androidx.room.PrimaryKey
 import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
 import org.apache.commons.text.similarity.LevenshteinDistance
+import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
-import us.huseli.retaintheme.extensions.scaleToMaxSize
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import us.huseli.retaintheme.extensions.stripCommonFixes
+import us.huseli.retaintheme.extensions.zipPadded
+import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.YoutubeVideo
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.getSquareBitmapByUrl
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.getParentDirectory
+import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.matchFiles
-import us.huseli.thoucylinder.nullIfEmpty
 import java.util.UUID
 import kotlin.time.Duration
 
@@ -47,13 +44,14 @@ import kotlin.time.Duration
 data class Track(
     @ColumnInfo("Track_trackId") @PrimaryKey val trackId: UUID = UUID.randomUUID(),
     @ColumnInfo("Track_title") val title: String,
-    @ColumnInfo("Track_isInLibrary") val isInLibrary: Boolean,
+    @ColumnInfo("Track_isInLibrary") val isInLibrary: Boolean = true,
     @ColumnInfo("Track_artist") val artist: String? = null,
     @ColumnInfo("Track_albumId") val albumId: UUID? = null,
     @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
     @ColumnInfo("Track_discNumber") val discNumber: Int? = null,
     @ColumnInfo("Track_year") val year: Int? = null,
     @ColumnInfo("Track_localUri") val localUri: Uri? = null,
+    @ColumnInfo("Track_musicBrainzId") val musicBrainzId: String? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
@@ -61,7 +59,7 @@ data class Track(
     private val albumPositionNonNull: Int
         get() = albumPosition ?: 0
 
-    val discNumberNonNull: Int
+    private val discNumberNonNull: Int
         get() = discNumber ?: 1
 
     val duration: Duration?
@@ -95,24 +93,12 @@ data class Track(
     fun getDocumentFile(context: Context): DocumentFile? =
         localUri?.let { DocumentFileCompat.fromUri(context, it) }
 
-    @WorkerThread
-    suspend fun getFullBitmap(context: Context): Bitmap? = image?.getFullBitmap(context)
-
-    /*
-    @WorkerThread
-    suspend fun getFullBitmap(context: Context): Bitmap? =
-        image?.getFullBitmap(context) ?: youtubeVideo?.fullImage?.url?.getSquareBitmapByUrl()
-     */
-
-    @WorkerThread
-    suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
-        getFullBitmap(context)?.scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)?.asImageBitmap()
-
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
         val distances = mutableListOf<Int>()
 
         distances.add(levenshtein.apply(title.lowercase(), other.title.lowercase()))
+
         if (albumArtist != null) {
             distances.add(levenshtein.apply("$albumArtist - $title".lowercase(), other.title.lowercase()))
             if (other.artist != null) distances.add(
@@ -144,25 +130,24 @@ data class Track(
         if (albumDiscCount > 1 && discNumber != null && albumPosition != null) "$discNumber.$albumPosition"
         else albumPosition?.toString() ?: ""
 
-    suspend fun getThumbnail(context: Context): ImageBitmap? =
-        (image?.getThumbnailBitmap(context) ?: youtubeVideo?.thumbnail?.url?.getSquareBitmapByUrl())
-            ?.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)?.asImageBitmap()
+    suspend fun getThumbnail(context: Context): ImageBitmap? = image?.getThumbnailImageBitmap(context)
+        ?: youtubeVideo?.thumbnail?.url?.getSquareBitmapByUrl()?.asThumbnailImageBitmap(context)
 
     fun toString(
         showAlbumPosition: Boolean = true,
         showArtist: Boolean = true,
         showYear: Boolean = false,
         showArtistIfSameAsAlbumArtist: Boolean = false,
-        albumPojo: AlbumWithTracksPojo? = null,
+        albumCombo: AlbumWithTracksCombo? = null,
     ): String {
         var string = ""
         if (showAlbumPosition) {
-            if (albumPojo != null) string += getPositionString(albumPojo.discCount) + ". "
+            if (albumCombo != null) string += getPositionString(albumCombo.discCount) + ". "
             else if (albumPosition != null) string += "$albumPosition. "
         }
         if (showArtist) {
             val trackArtist = artist
-            val albumArtist = albumPojo?.album?.artist
+            val albumArtist = albumCombo?.album?.artist
 
             if (trackArtist != null && (showArtistIfSameAsAlbumArtist || trackArtist != albumArtist))
                 string += "$trackArtist - "
@@ -200,4 +185,13 @@ fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean
         .map { it.matchFiles(filenameRegex, Regex("^image/.*")) }
         .flatten()
         .distinctBy { it.uri.path }
+}
+
+fun Iterable<Track>.stripTitleCommons(): List<Track> =
+    zip(map { it.title }.stripCommonFixes()).map { (track, title) -> track.copy(title = title) }
+
+fun Iterable<Track>.getLevenshteinDistance(other: Iterable<Track>, albumArtist: String? = null): Double {
+    return stripTitleCommons().zipPadded(other.stripTitleCommons(), Track(title = ""))
+        .map { (t1, t2) -> t1.getLevenshteinDistance(t2, albumArtist) }
+        .average()
 }

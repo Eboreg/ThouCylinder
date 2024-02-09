@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
@@ -61,9 +61,9 @@ fun getDownloadProgress(downloadTaskState: State<AbstractDownloadTask?>): Pair<D
 class TrackDownloadTask(
     private val scope: CoroutineScope,
     val track: Track,
-    private val dirDocumentFile: DocumentFile,
+    private val directory: DocumentFile,
     private val repos: Repositories,
-    val albumPojo: AbstractAlbumPojo? = null,
+    val albumCombo: AbstractAlbumCombo? = null,
     private val onError: (Throwable) -> Unit = {},
     private val onFinish: (Track) -> Unit = {},
 ) : AbstractDownloadTask() {
@@ -114,7 +114,7 @@ class TrackDownloadTask(
     private suspend fun run(context: Context): Track {
         val youtubeMetadata = repos.youtube.getBestMetadata(track)
             ?: throw Error("Could not get Youtube metadata for $track")
-        val basename = track.generateBasename(includeArtist = albumPojo == null)
+        val basename = track.generateBasename(includeArtist = albumCombo == null)
         val filename = "$basename.${youtubeMetadata.fileExtension}"
         val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
 
@@ -127,13 +127,16 @@ class TrackDownloadTask(
         )
 
         setStatus(DownloadStatus.TAGGING)
-        repos.localMedia.tagTrack(track = track, documentFile = DocumentFile.fromFile(tempFile), albumPojo = albumPojo)
+        repos.localMedia.tagTrack(track = track, documentFile = DocumentFile.fromFile(tempFile), albumCombo = albumCombo)
         setProgress(0.8)
 
         setStatus(DownloadStatus.MOVING)
-        dirDocumentFile.findFile(filename)?.delete()
-        val documentFile = dirDocumentFile.createFile(youtubeMetadata.mimeType, basename)
-            ?: throw Error("DocumentFile.fromTreeUri() returned null")
+        directory.findFile(filename)?.delete()
+        val documentFile = directory.createFile(youtubeMetadata.mimeType, basename)
+            ?: throw Error(
+                "DocumentFile.createFile() returned null. mimeType=${youtubeMetadata.mimeType}, " +
+                    "basename=$basename, directory=$directory"
+            )
 
         if (documentFile.extension.isEmpty()) documentFile.renameTo(filename)
 
@@ -147,7 +150,7 @@ class TrackDownloadTask(
         setStatus(DownloadStatus.SAVING)
         val downloadedTrack = track.copy(
             isInLibrary = true,
-            albumId = albumPojo?.album?.albumId ?: track.albumId,
+            albumId = albumCombo?.album?.albumId ?: track.albumId,
             metadata = tempFile.extractTrackMetadata(),
             localUri = documentFile.uri,
         )

@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import androidx.room.Embedded
 import androidx.room.Junction
@@ -12,7 +12,7 @@ import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-data class SpotifyAlbumPojo(
+data class SpotifyAlbumCombo(
     @Embedded val spotifyAlbum: SpotifyAlbum,
     @Relation(
         entity = SpotifyArtist::class,
@@ -41,13 +41,13 @@ data class SpotifyAlbumPojo(
         parentColumn = "SpotifyAlbum_id",
         entityColumn = "SpotifyTrack_spotifyAlbumId",
     )
-    val spotifyTrackPojos: List<SpotifyTrackPojo>,
+    val spotifyTrackCombos: List<SpotifyTrackCombo>,
 ) {
     val artist: String
         get() = artists.joinToString("/") { it.name }
 
     val durationMs: Int
-        get() = spotifyTrackPojos.sumOf { it.track.durationMs }
+        get() = spotifyTrackCombos.sumOf { it.track.durationMs }
 
     val duration: Duration
         get() = durationMs.milliseconds
@@ -60,14 +60,14 @@ data class SpotifyAlbumPojo(
 }
 
 
-fun List<SpotifyAlbumPojo>.filterBySearchTerm(term: String): List<SpotifyAlbumPojo> {
+fun List<SpotifyAlbumCombo>.filterBySearchTerm(term: String): List<SpotifyAlbumCombo> {
     val words = term.lowercase().split(Regex(" +"))
 
-    return filter { pojo ->
+    return filter { combo ->
         words.all {
-            pojo.artist.lowercase().contains(it) ||
-                pojo.spotifyAlbum.name.lowercase().contains(it) ||
-                pojo.spotifyAlbum.year?.toString()?.contains(it) == true
+            combo.artist.lowercase().contains(it) ||
+                combo.spotifyAlbum.name.lowercase().contains(it) ||
+                combo.spotifyAlbum.year?.toString()?.contains(it) == true
         }
     }
 }

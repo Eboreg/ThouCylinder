@@ -24,22 +24,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import us.huseli.retaintheme.extensions.nullIfBlank
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
-import us.huseli.thoucylinder.nullIfBlank
 
 @Composable
-fun <T : AbstractAlbumPojo> AlbumList(
-    pojos: List<T>,
+fun <T : AbstractAlbumCombo> AlbumList(
+    combos: List<T>,
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbums: List<Album>,
@@ -49,32 +49,32 @@ fun <T : AbstractAlbumPojo> AlbumList(
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val isSelected = { pojo: T -> selectedAlbums.contains(pojo.album) }
+    val isSelected = { combo: T -> selectedAlbums.contains(combo.album) }
 
     Column {
         SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
 
         ItemList(
-            things = pojos,
+            things = combos,
             isSelected = isSelected,
-            onClick = { _, pojo -> albumCallbacks(pojo).onAlbumClick?.invoke() },
-            onLongClick = { _, pojo -> albumCallbacks(pojo).onAlbumLongClick?.invoke() },
+            onClick = { _, combo -> albumCallbacks(combo).onAlbumClick?.invoke() },
+            onLongClick = { _, combo -> albumCallbacks(combo).onAlbumLongClick?.invoke() },
             onEmpty = onEmpty,
             listState = listState,
             cardHeight = 70.dp,
-        ) { _, pojo ->
+        ) { _, combo ->
             val (downloadProgress, downloadIsActive) =
-                getDownloadProgress(albumDownloadTasks.find { it.album.albumId == pojo.album.albumId })
-            val imageBitmap = remember(pojo.album) { mutableStateOf<ImageBitmap?>(null) }
+                getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
+            val imageBitmap = remember(combo.album) { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
-                pluralStringResource(R.plurals.x_tracks, pojo.trackCount, pojo.trackCount),
-                pojo.yearString,
-                pojo.duration?.sensibleFormat(),
+                pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
+                combo.yearString,
+                combo.duration?.sensibleFormat(),
             ).joinToString(" • ").nullIfBlank()
-            val callbacks = albumCallbacks(pojo)
+            val callbacks = albumCallbacks(combo)
 
-            LaunchedEffect(pojo.album) {
-                imageBitmap.value = pojo.getThumbnail(context)
+            LaunchedEffect(combo.album) {
+                imageBitmap.value = combo.album.albumArt?.getThumbnailImageBitmap(context)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -82,7 +82,7 @@ fun <T : AbstractAlbumPojo> AlbumList(
                     image = imageBitmap.value,
                     shape = MaterialTheme.shapes.extraSmall,
                     placeholderIcon = Icons.Sharp.Album,
-                    borderWidth = if (isSelected(pojo)) null else 1.dp,
+                    borderWidth = if (isSelected(combo)) null else 1.dp,
                 )
 
                 Column {
@@ -96,13 +96,13 @@ fun <T : AbstractAlbumPojo> AlbumList(
                             verticalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             Text(
-                                text = pojo.album.title,
-                                maxLines = if (pojo.album.artist != null && showArtist) 1 else 2,
+                                text = combo.album.title,
+                                maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                             )
                             if (showArtist) {
-                                pojo.album.artist?.also { artist ->
+                                combo.album.artist?.also { artist ->
                                     Text(
                                         text = artist,
                                         maxLines = 1,
@@ -123,13 +123,13 @@ fun <T : AbstractAlbumPojo> AlbumList(
                         Column(
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxHeight(),
-                            content = { AlbumSmallIcons(pojo = pojo) },
+                            content = { AlbumSmallIcons(combo = combo) },
                         )
 
                         AlbumContextMenuWithButton(
-                            isLocal = pojo.album.isLocal,
-                            isInLibrary = pojo.album.isInLibrary,
-                            isPartiallyDownloaded = pojo.isPartiallyDownloaded,
+                            isLocal = combo.album.isLocal,
+                            isInLibrary = combo.album.isInLibrary,
+                            isPartiallyDownloaded = combo.isPartiallyDownloaded,
                             callbacks = callbacks,
                         )
                     }

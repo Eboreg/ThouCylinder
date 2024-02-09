@@ -18,16 +18,16 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.thoucylinder.TrackDownloadTask
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.viewmodels.AbstractTrackListViewModel
 
 @Composable
-fun <T : AbstractTrackPojo> TrackList(
-    trackPojos: LazyPagingItems<out T>,
+fun <T : AbstractTrackCombo> TrackList(
+    trackCombos: LazyPagingItems<out T>,
     viewModel: AbstractTrackListViewModel,
-    selectedTrackPojos: List<T>,
+    selectedTrackCombos: List<T>,
     trackDownloadTasks: List<TrackDownloadTask>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
@@ -42,16 +42,16 @@ fun <T : AbstractTrackPojo> TrackList(
 
     Column {
         SelectedTracksButtons(
-            trackCount = selectedTrackPojos.size,
+            trackCount = selectedTrackCombos.size,
             callbacks = trackSelectionCallbacks,
             extraButtons = extraTrackSelectionButtons,
         )
 
-        if (trackPojos.itemCount == 0 && onEmpty != null) onEmpty()
+        if (trackCombos.itemCount == 0 && onEmpty != null) onEmpty()
 
         ListWithNumericBar(
             listState = listState,
-            listSize = trackPojos.itemCount,
+            listSize = trackCombos.itemCount,
             modifier = Modifier.padding(horizontal = 10.dp),
             itemHeight = 55.dp,
             minItems = 50,
@@ -61,30 +61,30 @@ fun <T : AbstractTrackPojo> TrackList(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 contentPadding = contentPadding,
             ) {
-                items(count = trackPojos.itemCount) { index ->
-                    trackPojos[index]?.let { pojo ->
-                        val thumbnail = remember(pojo.track) { mutableStateOf<ImageBitmap?>(null) }
+                items(count = trackCombos.itemCount) { index ->
+                    trackCombos[index]?.let { combo ->
+                        val thumbnail = remember(combo.track) { mutableStateOf<ImageBitmap?>(null) }
 
-                        LaunchedEffect(pojo.track) {
+                        LaunchedEffect(combo.track) {
                             thumbnail.value = viewModel.getTrackThumbnail(
-                                track = pojo.track,
-                                album = pojo.album,
+                                track = combo.track,
+                                album = combo.album,
                                 context = context,
                             )
-                            viewModel.ensureTrackMetadata(pojo.track)
+                            viewModel.ensureTrackMetadata(combo.track)
                         }
 
                         TrackListRow(
-                            title = pojo.track.title,
-                            isDownloadable = pojo.track.isDownloadable,
+                            title = combo.track.title,
+                            isDownloadable = combo.track.isDownloadable,
                             modifier = modifier,
-                            downloadTask = trackDownloadTasks.find { it.track.trackId == pojo.track.trackId },
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
                             thumbnail = thumbnail.value,
-                            duration = pojo.track.metadata?.duration,
-                            artist = if (showArtist) pojo.artist else null,
-                            callbacks = trackCallbacks(index, pojo),
-                            isSelected = selectedTrackPojos.contains(pojo),
-                            isInLibrary = pojo.track.isInLibrary,
+                            duration = combo.track.metadata?.duration,
+                            artist = if (showArtist) combo.artist else null,
+                            callbacks = trackCallbacks(index, combo),
+                            isSelected = selectedTrackCombos.contains(combo),
+                            isInLibrary = combo.track.isInLibrary,
                         )
                     }
                 }

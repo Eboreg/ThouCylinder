@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

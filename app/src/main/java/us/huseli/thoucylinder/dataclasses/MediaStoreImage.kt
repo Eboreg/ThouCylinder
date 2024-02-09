@@ -10,27 +10,28 @@ import androidx.core.net.toFile
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.extension.isRawFile
-import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.openOutputStream
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.extensions.dpToPx
 import us.huseli.retaintheme.extensions.scaleToMaxSize
-import us.huseli.retaintheme.extensions.toBitmap
+import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import us.huseli.thoucylinder.asFullImageBitmap
+import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import us.huseli.thoucylinder.getSquareBitmap
-import us.huseli.thoucylinder.square
-import us.huseli.thoucylinder.toBitmap
 import java.io.File
 
 @Parcelize
 @WorkerThread
 data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
-    fun deleteDirectoryFiles(context: Context, dirDocumentFile: DocumentFile) {
+    constructor(uri: Uri) : this(uri, uri)
+
+    fun deleteDirectoryFiles(context: Context, directory: DocumentFile) {
         listOf("cover.jpg", "cover-thumbnail.jpg").forEach { filename ->
-            dirDocumentFile.findFile(filename)?.deleteWithEmptyParentDirs(context)
+            directory.findFile(filename)?.deleteWithEmptyParentDirs(context)
         }
     }
 
@@ -39,32 +40,32 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
         if (thumbnailUri.isRawFile) thumbnailUri.toFile().delete()
     }
 
-    suspend fun getFullBitmap(context: Context): Bitmap? {
-        return uri.getSquareBitmap(context)
-        // return DocumentFileCompat.fromUri(context, uri)?.toBitmap(context)?.square()
+    suspend fun getFullBitmap(context: Context): Bitmap? = uri.getSquareBitmap(context)
+
+    suspend fun getFullImageBitmap(context: Context) = getFullBitmap(context)?.asFullImageBitmap(context)
+
+    suspend fun getThumbnailImageBitmap(context: Context) = getThumbnailBitmap(context)?.asThumbnailImageBitmap(context)
+
+    suspend fun saveInternal(album: Album, context: Context): MediaStoreImage? {
+        if (uri.isRawFile) return this
+        return getFullBitmap(context)?.let { fromBitmap(it, context, album) }
     }
 
-    suspend fun getThumbnailBitmap(context: Context): Bitmap? =
-        thumbnailUri.getSquareBitmap(context)
-        // DocumentFileCompat.fromUri(context, thumbnailUri)?.toBitmap(context)?.square() ?: getFullBitmap(context)
-
-    fun saveToAlbumDirectory(context: Context, dirDocumentFile: DocumentFile) {
-        deleteDirectoryFiles(context, dirDocumentFile)
-        if (uri.isRawFile) {
-            uri.toFile().toBitmap()?.square()?.also { fullBitmap ->
-                createDocumentFile(dirDocumentFile, "cover.jpg")
-                    ?.openOutputStream(context)
-                    ?.use { fullBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-            }
+    suspend fun saveToDirectory(context: Context, directory: DocumentFile) {
+        deleteDirectoryFiles(context, directory)
+        getFullBitmap(context)?.also { fullBitmap ->
+            createDocumentFile(directory, "cover.jpg")
+                ?.openOutputStream(context)
+                ?.use { fullBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
         }
-        if (thumbnailUri.isRawFile) {
-            thumbnailUri.toFile().toBitmap()?.square()?.also { thumbnailBitmap ->
-                createDocumentFile(dirDocumentFile, "cover-thumbnail.jpg")
-                    ?.openOutputStream(context)
-                    ?.use { thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-            }
+        getThumbnailBitmap(context)?.also { thumbnailBitmap ->
+            createDocumentFile(directory, "cover-thumbnail.jpg")
+                ?.openOutputStream(context)
+                ?.use { thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
         }
     }
+
+    private suspend fun getThumbnailBitmap(context: Context): Bitmap? = thumbnailUri.getSquareBitmap(context)
 
     companion object {
         fun fromBitmap(bitmap: Bitmap, context: Context, album: Album): MediaStoreImage {
@@ -90,8 +91,8 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
         fun fromUrls(fullImageUrl: String, thumbnailUrl: String? = fullImageUrl) =
             MediaStoreImage(uri = Uri.parse(fullImageUrl), thumbnailUri = Uri.parse(thumbnailUrl ?: fullImageUrl))
 
-        private fun createDocumentFile(dir: DocumentFile?, filename: String): DocumentFile? =
-            dir?.createFile("image/jpeg", filename)
+        private fun createDocumentFile(dir: DocumentFile, filename: String): DocumentFile? =
+            dir.createFile("image/jpeg", filename)
 
         private fun deleteInteralFiles(context: Context, album: Album) {
             getInternalFilenames(album).toList().forEach { filename ->

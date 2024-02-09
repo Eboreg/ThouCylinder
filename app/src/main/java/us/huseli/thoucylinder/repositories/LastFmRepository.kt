@@ -23,28 +23,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.retaintheme.extensions.join
 import us.huseli.retaintheme.extensions.md5
+import us.huseli.retaintheme.extensions.toHex
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.LASTFM_API_ROOT
 import us.huseli.thoucylinder.Constants.LASTFM_PAGE_LIMIT
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.entities.LastFmAlbum
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
-import us.huseli.thoucylinder.dataclasses.lastFm.getFullImage
-import us.huseli.thoucylinder.dataclasses.lastFm.getLastFmAlbum
 import us.huseli.thoucylinder.dataclasses.lastFm.getLastFmTopAlbums
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
-import us.huseli.thoucylinder.dataclasses.pojos.LastFmAlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.getString
-import us.huseli.thoucylinder.toHex
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -56,14 +53,14 @@ class LastFmRepository @Inject constructor(
     playerRepo: PlayerRepository,
 ) : SharedPreferences.OnSharedPreferenceChangeListener, PlayerRepositoryListener {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val lastFmDao = database.lastFmDao()
+    private val albumDao = database.albumDao()
     private val scrobbleMutex = Mutex()
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var scrobbleJob: Job? = null
 
     private val _allTopAlbumsFetched = MutableStateFlow(false)
-    private val _albumArtCache = mutableMapOf<String, ImageBitmap>()
-    private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.TopAlbums.Album>>(emptyList())
+    private val _albumArtCache = MutexCache<String, ImageBitmap> { it.getSquareBitmapByUrl()?.asImageBitmap() }
+    private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
     private val _nextTopAlbumPage = MutableStateFlow(1)
     private val _username = MutableStateFlow(preferences.getString(PREF_LASTFM_USERNAME, null))
     private val _sessionKey = MutableStateFlow(preferences.getString(PREF_LASTFM_SESSION_KEY, null))
@@ -72,7 +69,7 @@ class LastFmRepository @Inject constructor(
     private val _scrobble = MutableStateFlow(preferences.getBoolean(PREF_LASTFM_SCROBBLE, false))
 
     val allTopAlbumsFetched: StateFlow<Boolean> = _allTopAlbumsFetched.asStateFlow()
-    val topAlbums: StateFlow<List<LastFmTopAlbumsResponse.TopAlbums.Album>> = _topAlbums.asStateFlow()
+    val topAlbums: StateFlow<List<LastFmTopAlbumsResponse.Album>> = _topAlbums.asStateFlow()
 
     data class Session(
         val name: String,
@@ -138,13 +135,6 @@ class LastFmRepository @Inject constructor(
         return false
     }
 
-    suspend fun getFullImage(album: LastFmTopAlbumsResponse.TopAlbums.Album): ImageBitmap? {
-        return album.image.getFullImage()?.let { image ->
-            if (_albumArtCache.contains(image.url)) _albumArtCache[image.url]
-            else image.url.getSquareBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
-        }
-    }
-
     @Suppress("UNCHECKED_CAST")
     suspend fun getSession(authToken: String): Session? {
         val xstream = XStream()
@@ -159,21 +149,10 @@ class LastFmRepository @Inject constructor(
         }
     }
 
-    suspend fun getThumbnail(album: LastFmTopAlbumsResponse.TopAlbums.Album): ImageBitmap? {
-        return album.image.getThumbnail()?.let { image ->
-            if (_albumArtCache.contains(image.url)) _albumArtCache[image.url]
-            else image.url.getSquareBitmapByUrl()?.asImageBitmap()?.also { _albumArtCache[image.url] = it }
-        }
-    }
+    suspend fun getThumbnail(album: LastFmTopAlbumsResponse.Album): ImageBitmap? =
+        album.image.getThumbnail()?.let { image -> _albumArtCache.get(image.url) }
 
-    suspend fun insertLastFmAlbumPojo(pojo: LastFmAlbumPojo) = lastFmDao.insertLastFmAlbumPojo(pojo)
-
-    suspend fun listImportedAlbumIds(): List<String> = lastFmDao.listImportedAlbumIds()
-
-    suspend fun topAlbumToAlbum(topAlbum: LastFmTopAlbumsResponse.TopAlbums.Album): LastFmAlbum? {
-        val url = getApiUrl(mapOf("method" to "album.getinfo", "format" to "json", "mbid" to topAlbum.mbid))
-        return Request.get(url).getLastFmAlbum()?.toEntity(topAlbum.mbid, topAlbum.artist)
-    }
+    suspend fun listImportedAlbumIds(): List<String> = albumDao.listMusicBrainzReleaseIds()
 
 
     /** PRIVATE METHODS *******************************************************/
@@ -194,11 +173,7 @@ class LastFmRepository @Inject constructor(
             .toHex()
     }
 
-    private suspend fun postAndGetString(
-        method: String,
-        params: Map<String, String>,
-        failSilently: Boolean = true,
-    ): String? {
+    private suspend fun postAndGetString(method: String, params: Map<String, String>): String? {
         return try {
             Request.postFormData(
                 url = LASTFM_API_ROOT,
@@ -208,7 +183,6 @@ class LastFmRepository @Inject constructor(
             ).connect().getString()
         } catch (e: Exception) {
             Log.e(javaClass.simpleName, "postAndGetString $method: $e", e)
-            if (!failSilently) throw e
             null
         }
     }
@@ -227,10 +201,10 @@ class LastFmRepository @Inject constructor(
 
 
     /** OVERRIDDEN METHODS ****************************************************/
-    override suspend fun onPlaybackChange(pojo: QueueTrackPojo?, state: PlayerRepository.PlaybackState) {
+    override suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlayerRepository.PlaybackState) {
         _sessionKey.value?.also { sessionKey ->
             if (_scrobble.value) {
-                val nowPlaying = pojo?.let {
+                val nowPlaying = combo?.let {
                     it.artist?.let { artist ->
                         LastFmNowPlaying(
                             artist = artist,
@@ -239,7 +213,7 @@ class LastFmRepository @Inject constructor(
                             album = it.album?.title ?: it.spotifyAlbum?.name,
                             trackNumber = it.track.albumPosition,
                             albumArtist = it.album?.artist,
-                            mbid = it.lastFmTrack?.musicBrainzId,
+                            mbid = it.track.musicBrainzId,
                         )
                     }
                 }
@@ -255,20 +229,20 @@ class LastFmRepository @Inject constructor(
         }
     }
 
-    override suspend fun onHalfTrackPlayed(pojo: QueueTrackPojo, startTimestamp: Long) {
-        val artist = pojo.artist
-        val duration = pojo.track.duration
+    override suspend fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {
+        val artist = combo.artist
+        val duration = combo.track.duration
 
         if (artist != null && duration != null && duration > 30.seconds && _scrobble.value) {
             scrobbleMutex.withLock {
                 _scrobbles.value += LastFmScrobble(
-                    track = pojo.track.title,
+                    track = combo.track.title,
                     artist = artist,
-                    album = pojo.album?.title,
-                    albumArtist = pojo.album?.artist,
-                    mbid = pojo.lastFmTrack?.musicBrainzId,
-                    trackNumber = pojo.track.albumPosition,
-                    duration = pojo.track.duration?.inWholeSeconds?.toInt(),
+                    album = combo.album?.title,
+                    albumArtist = combo.album?.artist,
+                    mbid = combo.track.musicBrainzId,
+                    trackNumber = combo.track.albumPosition,
+                    duration = combo.track.duration?.inWholeSeconds?.toInt(),
                     timestamp = startTimestamp,
                 )
             }

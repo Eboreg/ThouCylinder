@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import androidx.room.ColumnInfo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist

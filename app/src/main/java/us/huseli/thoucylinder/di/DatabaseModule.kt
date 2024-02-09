@@ -7,9 +7,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import us.huseli.thoucylinder.database.AlbumDao
-import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.database.ArtistDao
-import us.huseli.thoucylinder.database.LastFmDao
+import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.database.PlaylistDao
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.database.SpotifyDao
@@ -44,7 +43,4 @@ class DatabaseModule {
 
     @Provides
     fun provideSpotifyDao(database: Database): SpotifyDao = database.spotifyDao()
-
-    @Provides
-    fun provideLastFmDao(database: Database): LastFmDao = database.lastFmDao()
 }

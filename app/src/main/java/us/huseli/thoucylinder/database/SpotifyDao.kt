@@ -15,7 +15,7 @@ import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumGenre
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
-import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
+import us.huseli.thoucylinder.dataclasses.combos.SpotifyAlbumCombo
 import java.util.UUID
 
 @Dao
@@ -66,33 +66,33 @@ interface SpotifyDao {
     suspend fun listImportedAlbumIds(): List<String>
 
     @Transaction
-    suspend fun upsertSpotifyAlbumPojo(pojo: SpotifyAlbumPojo) {
-        val albumArtists = pojo.artists.toSet()
-        val trackArtists = pojo.spotifyTrackPojos.flatMap { it.artists }.toSet()
+    suspend fun upsertSpotifyAlbumCombo(combo: SpotifyAlbumCombo) {
+        val albumArtists = combo.artists.toSet()
+        val trackArtists = combo.spotifyTrackCombos.flatMap { it.artists }.toSet()
         val artists = albumArtists.plus(trackArtists).toSet()
 
-        if (_spotifyAlbumExists(pojo.spotifyAlbum.id)) {
-            _deleteSpotifyAlbumArtists(pojo.spotifyAlbum.id, except = pojo.artists.map { it.id })
-            _deleteSpotifyAlbumGenres(pojo.spotifyAlbum.id, except = pojo.genres.map { it.genreName })
-            _deleteSpotifyTracks(pojo.spotifyAlbum.id, except = pojo.spotifyTrackPojos.map { it.track.id })
+        if (_spotifyAlbumExists(combo.spotifyAlbum.id)) {
+            _deleteSpotifyAlbumArtists(combo.spotifyAlbum.id, except = combo.artists.map { it.id })
+            _deleteSpotifyAlbumGenres(combo.spotifyAlbum.id, except = combo.genres.map { it.genreName })
+            _deleteSpotifyTracks(combo.spotifyAlbum.id, except = combo.spotifyTrackCombos.map { it.track.id })
         }
-        _upsertSpotifyAlbums(pojo.spotifyAlbum)
+        _upsertSpotifyAlbums(combo.spotifyAlbum)
         _insertSpotifyArtists(*artists.toTypedArray())
         _insertSpotifyAlbumArtists(
             *albumArtists
-                .map { SpotifyAlbumArtist(artistId = it.id, albumId = pojo.spotifyAlbum.id) }
+                .map { SpotifyAlbumArtist(artistId = it.id, albumId = combo.spotifyAlbum.id) }
                 .toTypedArray()
         )
-        _insertGenres(*pojo.genres.toTypedArray())
+        _insertGenres(*combo.genres.toTypedArray())
         _insertSpotifyAlbumGenres(
-            *pojo.genres
-                .map { SpotifyAlbumGenre(albumId = pojo.spotifyAlbum.id, genreName = it.genreName) }
+            *combo.genres
+                .map { SpotifyAlbumGenre(albumId = combo.spotifyAlbum.id, genreName = it.genreName) }
                 .toTypedArray()
         )
-        _insertSpotifyTracks(*pojo.spotifyTrackPojos.map { it.track }.toTypedArray())
+        _insertSpotifyTracks(*combo.spotifyTrackCombos.map { it.track }.toTypedArray())
         _insertSpotifyTrackArtists(
-            *pojo.spotifyTrackPojos.flatMap { trackPojo ->
-                trackPojo.artists.map { SpotifyTrackArtist(trackId = trackPojo.track.id, artistId = it.id) }
+            *combo.spotifyTrackCombos.flatMap { trackCombo ->
+                trackCombo.artists.map { SpotifyTrackArtist(trackId = trackCombo.track.id, artistId = it.id) }
             }.toTypedArray()
         )
     }

@@ -18,11 +18,11 @@ import us.huseli.thoucylinder.compose.screens.LocalMusicUriDialog
 import us.huseli.thoucylinder.compose.track.EditTrackDialog
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import java.util.UUID
 
@@ -33,14 +33,14 @@ fun AppCallbacksComposables(
     onPlaylistClick: (UUID) -> Unit,
     onAlbumClick: (UUID) -> Unit,
     onOpenCreatePlaylistDialog: () -> Unit,
-    deleteAlbumPojo: AbstractAlbumPojo? = null,
+    deleteAlbumCombo: AbstractAlbumCombo? = null,
     editTrack: Track? = null,
     editAlbum: Album? = null,
     addDownloadedAlbum: Album? = null,
     createPlaylist: Boolean = false,
     addToPlaylist: Boolean = false,
     addToPlaylistSelection: Selection? = null,
-    infoTrackPojo: AbstractTrackPojo? = null,
+    infoTrackCombo: AbstractTrackCombo? = null,
 ) {
     val context = LocalContext.current
     val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
@@ -114,29 +114,29 @@ fun AppCallbacksComposables(
         )
     }
 
-    deleteAlbumPojo?.also { pojo ->
-        if (!pojo.album.isLocal && !pojo.isPartiallyDownloaded) {
-            viewModel.markAlbumForDeletion(pojo.album.albumId) {
+    deleteAlbumCombo?.also { combo ->
+        if (!combo.album.isLocal && !combo.isPartiallyDownloaded) {
+            viewModel.markAlbumForDeletion(combo.album.albumId) {
                 SnackbarEngine.addInfo(
-                    message = context.getString(R.string.removed_album_from_library, pojo.album.title),
+                    message = context.getString(R.string.removed_album_from_library, combo.album.title),
                     actionLabel = context.getString(R.string.undo),
-                    onActionPerformed = { viewModel.unmarkAlbumForDeletion(pojo.album.albumId) },
+                    onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) },
                 )
             }
             onCancel()
         } else {
             DeleteAlbumDialog(
-                album = pojo.album,
+                album = combo.album,
                 onCancel = onCancel,
                 onDeleteAlbumAndFilesClick = {
-                    viewModel.markAlbumForDeletion(pojo.album.albumId) {
-                        val message = context.getString(R.string.removed_album_and_local_files, pojo.album.title)
+                    viewModel.markAlbumForDeletion(combo.album.albumId) {
+                        val message = context.getString(R.string.removed_album_and_local_files, combo.album.title)
 
-                        if (pojo.album.isOnYoutube) {
+                        if (combo.album.isOnYoutube) {
                             SnackbarEngine.addInfo(
                                 message = message,
                                 actionLabel = context.getString(R.string.undelete_album),
-                                onActionPerformed = { viewModel.unmarkAlbumForDeletion(pojo.album.albumId) }
+                                onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) }
                             )
                         } else {
                             SnackbarEngine.addInfo(message)
@@ -145,17 +145,17 @@ fun AppCallbacksComposables(
                     onCancel()
                 },
                 onDeleteFilesClick = {
-                    viewModel.deleteLocalAlbumFiles(pojo.album.albumId) {
-                        SnackbarEngine.addInfo(context.getString(R.string.deleted_album_local_files, pojo.album.title))
+                    viewModel.deleteLocalAlbumFiles(combo.album.albumId) {
+                        SnackbarEngine.addInfo(context.getString(R.string.deleted_album_local_files, combo.album.title))
                     }
                     onCancel()
                 },
                 onDeleteAlbumClick = {
-                    viewModel.setAlbumIsHidden(pojo.album.albumId, true) {
+                    viewModel.setAlbumIsHidden(combo.album.albumId, true) {
                         SnackbarEngine.addInfo(
-                            message = context.getString(R.string.removed_from_the_library, pojo.album.title),
+                            message = context.getString(R.string.removed_from_the_library, combo.album.title),
                             actionLabel = context.getString(R.string.undo),
-                            onActionPerformed = { viewModel.setAlbumIsHidden(pojo.album.albumId, false) },
+                            onActionPerformed = { viewModel.setAlbumIsHidden(combo.album.albumId, false) },
                         )
                     }
                     onCancel()
@@ -179,26 +179,26 @@ fun AppCallbacksComposables(
         )
     }
 
-    infoTrackPojo?.also { pojo ->
-        var album by rememberSaveable { mutableStateOf(pojo.album) }
+    infoTrackCombo?.also { combo ->
+        var album by rememberSaveable { mutableStateOf(combo.album) }
         var localPath by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
-            viewModel.ensureTrackMetadata(pojo.track)
-            album = pojo.album ?: viewModel.getTrackAlbum(pojo.track.albumId)
-            localPath = pojo.track.getLocalAbsolutePath(context)
+            viewModel.ensureTrackMetadata(combo.track)
+            album = combo.album ?: viewModel.getTrackAlbum(combo.track.albumId)
+            localPath = combo.track.getLocalAbsolutePath(context)
         }
 
         TrackInfoDialog(
-            isDownloaded = pojo.track.isDownloaded,
-            isOnYoutube = pojo.track.isOnYoutube,
-            metadata = pojo.track.metadata,
+            isDownloaded = combo.track.isDownloaded,
+            isOnYoutube = combo.track.isOnYoutube,
+            metadata = combo.track.metadata,
             albumTitle = album?.title,
             albumArtist = album?.artist,
-            year = pojo.track.year ?: album?.year,
+            year = combo.track.year ?: album?.year,
             localPath = localPath,
             onClose = onCancel,
-            isOnSpotify = pojo.isOnSpotify,
+            isOnSpotify = combo.isOnSpotify,
         )
     }
 }

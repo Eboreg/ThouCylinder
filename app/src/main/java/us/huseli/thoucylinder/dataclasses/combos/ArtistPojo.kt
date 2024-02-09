@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import android.net.Uri
 import androidx.core.net.toUri
@@ -13,7 +13,6 @@ data class ArtistPojo(
     val albumArtUris: String,
     val youtubeFullImageUrls: String,
     val spotifyFullImageUrls: String,
-    val lastFmFullImageUrls: String,
 ) {
     private val splitRegex: Regex
         get() = Regex("(?<!')','(?!')")
@@ -34,7 +33,6 @@ data class ArtistPojo(
 
         urls.addAll(youtubeFullImageUrls.trim('\'').split(splitRegex))
         urls.addAll(spotifyFullImageUrls.trim('\'').split(splitRegex))
-        urls.addAll(lastFmFullImageUrls.trim('\'').split(splitRegex))
         return urls.filter { it != "NULL" }
     }
 }

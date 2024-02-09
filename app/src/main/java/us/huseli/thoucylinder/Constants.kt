@@ -1,8 +1,9 @@
 package us.huseli.thoucylinder
 
 object Constants {
+    const val COVERARTARCHIVE_API_ROOT = "https://coverartarchive.org/release"
     const val CUSTOM_USER_AGENT = "ThouCylinder/${BuildConfig.VERSION_NAME} ( https://github.com/Eboreg/ThouCylinder )"
-    const val DISCOGS_API_BASE_URL = "https://api.discogs.com"
+    const val DISCOGS_API_ROOT = "https://api.discogs.com"
     const val DOWNLOAD_CHUNK_SIZE = 10 shl 16
     const val HEADER_ANDROID_SDK_VERSION = 30
     const val HEADER_X_YOUTUBE_CLIENT_NAME = "3"
@@ -16,7 +17,8 @@ object Constants {
 
     // Don't know if Last.fm has any hard quota limit, but better not overdo it:
     const val LASTFM_PAGE_LIMIT = 20
-    const val MUSICBRAINZ_GENRES_URL = "https://musicbrainz.org/ws/2/genre/all?fmt=txt"
+    const val MUSICBRAINZ_API_ROOT = "https://musicbrainz.org/ws/2"
+    const val MUSICBRAINZ_GENRES_URL = "$MUSICBRAINZ_API_ROOT/genre/all?fmt=txt"
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
     const val NAV_ARG_PLAYLIST = "playlist"

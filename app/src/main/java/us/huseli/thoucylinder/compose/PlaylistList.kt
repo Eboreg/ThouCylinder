@@ -28,7 +28,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable

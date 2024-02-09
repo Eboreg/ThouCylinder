@@ -5,6 +5,7 @@ import us.huseli.thoucylinder.repositories.ArtistRepository
 import us.huseli.thoucylinder.repositories.DiscogsRepository
 import us.huseli.thoucylinder.repositories.LastFmRepository
 import us.huseli.thoucylinder.repositories.LocalMediaRepository
+import us.huseli.thoucylinder.repositories.MusicBrainzRepository
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.PlaylistRepository
 import us.huseli.thoucylinder.repositories.TrackRepository
@@ -23,6 +24,7 @@ class Repositories @Inject constructor(
     val download: TrackDownloadRepository,
     val lastFm: LastFmRepository,
     val localMedia: LocalMediaRepository,
+    val musicBrainz: MusicBrainzRepository,
     val player: PlayerRepository,
     val playlist: PlaylistRepository,
     val settings: SettingsRepository,

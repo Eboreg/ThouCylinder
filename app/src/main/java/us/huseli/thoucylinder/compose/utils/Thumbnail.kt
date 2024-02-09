@@ -27,6 +27,7 @@ fun Thumbnail(
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
     borderWidth: Dp? = 1.dp,
+    borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
     placeholderPadding: PaddingValues = PaddingValues(10.dp),
     placeholderIcon: ImageVector? = null,
     placeholderIconTint: Color? = null,
@@ -36,7 +37,7 @@ fun Thumbnail(
         modifier = modifier.aspectRatio(1f).fillMaxSize(),
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        border = borderWidth?.let { BorderStroke(it, MaterialTheme.colorScheme.outlineVariant) },
+        border = borderWidth?.let { BorderStroke(it, borderColor) },
     ) {
         if (image != null) {
             Image(

@@ -1,11 +1,8 @@
 package us.huseli.thoucylinder
 
 import android.content.Context
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-
-@Suppress("unused")
-enum class LoadStatus { NOT_LOADED, LOADING, LOADED, ERROR }
 
 enum class SortOrder(val sql: String) { ASCENDING("ASC"), DESCENDING("DESC") }
 
@@ -16,37 +13,37 @@ interface SortParameter<T> {
     fun getStringValue(obj: T): String
 }
 
-enum class TrackSortParameter : SortParameter<AbstractTrackPojo> {
+enum class TrackSortParameter : SortParameter<AbstractTrackCombo> {
     TITLE {
         override val stringRes = R.string.title
         override val sqlColumn = "LOWER(Track_title)"
-        override fun getStringValue(obj: AbstractTrackPojo): String = obj.track.title
+        override fun getStringValue(obj: AbstractTrackCombo): String = obj.track.title
     },
     ALBUM_TITLE {
         override val stringRes = R.string.album_title
         override val sqlColumn = "LOWER(Album_title)"
-        override fun getStringValue(obj: AbstractTrackPojo): String = obj.album?.title ?: ""
+        override fun getStringValue(obj: AbstractTrackCombo): String = obj.album?.title ?: ""
     },
     ARTIST {
         override val stringRes = R.string.artist
         override val sqlColumn = "COALESCE(LOWER(Track_artist), LOWER(Album_artist))"
-        override fun getStringValue(obj: AbstractTrackPojo): String = obj.track.artist ?: obj.album?.artist ?: ""
+        override fun getStringValue(obj: AbstractTrackCombo): String = obj.track.artist ?: obj.album?.artist ?: ""
     },
     ALBUM_ARTIST {
         override val stringRes = R.string.album_artist
         override val sqlColumn = "LOWER(Album_artist)"
-        override fun getStringValue(obj: AbstractTrackPojo): String = obj.album?.artist ?: ""
+        override fun getStringValue(obj: AbstractTrackCombo): String = obj.album?.artist ?: ""
     },
     YEAR {
         override val stringRes = R.string.year
         override val sqlColumn = "COALESCE(Track_year, Album_year)"
-        override fun getStringValue(obj: AbstractTrackPojo): String =
+        override fun getStringValue(obj: AbstractTrackCombo): String =
             obj.track.year?.toString() ?: obj.album?.year?.toString() ?: ""
     },
     DURATION {
         override val stringRes = R.string.duration
         override val sqlColumn = "COALESCE(Track_metadata_durationMs, Track_youtubeVideo_durationMs)"
-        override fun getStringValue(obj: AbstractTrackPojo): String =
+        override fun getStringValue(obj: AbstractTrackCombo): String =
             obj.track.duration?.inWholeMilliseconds?.toString() ?: ""
     };
 

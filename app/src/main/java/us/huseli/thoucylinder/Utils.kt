@@ -21,65 +21,16 @@ import com.anggrayudi.storage.file.openInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.scaleToMaxSize
+import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
-
-
-fun <T> List<T>.slice(start: Int, maxCount: Int) =
-    if (start >= size) emptyList()
-    else subList(start, min(start + maxCount, size))
-
-
-fun Color.distance(other: Color): Float {
-    val drp2 = (red - other.red).pow(2)
-    val dgp2 = (green - other.green).pow(2)
-    val dbp2 = (blue - other.blue).pow(2)
-    val t = (red + other.red) / 2
-
-    return sqrt(2 * drp2 + 4 * dgp2 + 3 * dbp2 + t * (drp2 - dbp2) / 256)
-}
-
-
-fun Int.pow(n: Int): Int = toDouble().pow(n).toInt()
-
-
-fun Bitmap.square(): Bitmap {
-    val length = min(width, height)
-
-    return if (width == height) this
-    else Bitmap.createBitmap(this, (width - length) / 2, (height - length) / 2, length, length)
-}
-
-
-@Suppress("UNCHECKED_CAST")
-fun <K, V : Any> Map<K, V?>.filterValuesNotNull(): Map<K, V> = filterValues { it != null } as Map<K, V>
-
-
-fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
-
-
-fun <T> List<T>.listItemsBetween(item1: T, item2: T): List<T> {
-    /** from & to are both exclusive */
-    val item1Index = indexOf(item1)
-    val item2Index = indexOf(item2)
-    val fromIndex = min(item1Index, item2Index)
-    val toIndex = max(item1Index, item2Index)
-
-    return when {
-        fromIndex == -1 || toIndex == -1 -> emptyList()
-        toIndex - fromIndex < 2 -> emptyList()
-        else -> subList(fromIndex + 1, toIndex)
-    }
-}
 
 
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
@@ -114,10 +65,6 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
 
 /** STRING ********************************************************************/
 fun String.escapeQuotes() = replace("\"", "\\\"")
-
-fun String.nullIfBlank(): String? = takeIf { it.isNotBlank() }
-
-fun String.nullIfEmpty(): String? = takeIf { it.isNotEmpty() }
 
 suspend fun String.getSquareBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     try {
@@ -194,10 +141,10 @@ fun ImageBitmap.getAverageColor(): Color {
 }
 
 fun Bitmap.asFullImageBitmap(context: Context): ImageBitmap =
-    scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context).asImageBitmap()
+    square().scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context).asImageBitmap()
 
 fun Bitmap.asThumbnailImageBitmap(context: Context): ImageBitmap =
-    scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context).asImageBitmap()
+    square().scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context).asImageBitmap()
 
 
 /** URI ***********************************************************************/
@@ -245,10 +192,6 @@ fun DocumentFile.toByteArray(context: Context): ByteArray? = try {
     Log.e("DocumentFile", "toByteArray: $e", e)
     null
 }
-
-@WorkerThread
-fun DocumentFile.createDirectoryIfNotExists(displayName: String): DocumentFile? =
-    findFile(displayName) ?: createDirectory(displayName)
 
 @WorkerThread
 fun DocumentFile.matchFiles(filename: Regex, mimeType: Regex? = null): List<DocumentFile> {

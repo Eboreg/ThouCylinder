@@ -62,10 +62,10 @@ fun AlbumScreen(
     val (downloadProgress, downloadIsActive) = getDownloadProgress(
         viewModel.albumDownloadTask.collectAsStateWithLifecycle(null)
     )
-    val albumPojo by viewModel.albumPojo.collectAsStateWithLifecycle(null)
-    val selectedTrackPojos by viewModel.selectedTrackPojos.collectAsStateWithLifecycle()
+    val albumCombo by viewModel.albumCombo.collectAsStateWithLifecycle(null)
+    val selectedTrackCombos by viewModel.selectedTrackCombos.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val trackPojos by viewModel.trackPojos.collectAsStateWithLifecycle(emptyList())
+    val trackCombos by viewModel.trackCombos.collectAsStateWithLifecycle(emptyList())
     val albumNotFound by viewModel.albumNotFound.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -74,21 +74,21 @@ fun AlbumScreen(
         appCallbacks.onBackClick()
     }
 
-    albumPojo?.let { pojo ->
-        if (pojo.album.isDeleted) {
+    albumCombo?.let { combo ->
+        if (combo.album.isDeleted) {
             appCallbacks.onBackClick()
         }
 
         Column {
             SelectedTracksButtons(
-                trackCount = selectedTrackPojos.size,
+                trackCount = selectedTrackCombos.size,
                 callbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = {
-                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackPojos.tracks()))
+                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
                     },
-                    onPlayClick = { viewModel.playTrackPojos(selectedTrackPojos) },
-                    onEnqueueClick = { viewModel.enqueueTrackPojos(selectedTrackPojos, context) },
-                    onUnselectAllClick = { viewModel.unselectAllTrackPojos() },
+                    onPlayClick = { viewModel.playTrackCombos(selectedTrackCombos) },
+                    onEnqueueClick = { viewModel.enqueueTrackCombos(selectedTrackCombos, context) },
+                    onUnselectAllClick = { viewModel.unselectAllTrackCombos() },
                 )
             )
 
@@ -105,19 +105,19 @@ fun AlbumScreen(
                             content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                             modifier = Modifier.width(40.dp),
                         )
-                        pojo.album.youtubeWebUrl?.also { youtubeUrl ->
+                        combo.album.youtubeWebUrl?.also { youtubeUrl ->
                             LargeIconBadge(modifier = Modifier.clickable { uriHandler.openUri(youtubeUrl) }) {
                                 Icon(painterResource(R.drawable.youtube), null, modifier = Modifier.height(20.dp))
                                 Text(text = stringResource(R.string.youtube))
                             }
                         }
-                        pojo.spotifyWebUrl?.also { spotifyUrl ->
+                        combo.spotifyWebUrl?.also { spotifyUrl ->
                             LargeIconBadge(modifier = Modifier.clickable { uriHandler.openUri(spotifyUrl) }) {
                                 Icon(painterResource(R.drawable.spotify), null, modifier = Modifier.height(16.dp))
                                 Text(text = stringResource(R.string.spotify))
                             }
                         }
-                        if (pojo.album.isLocal) {
+                        if (combo.album.isLocal) {
                             LargeIconBadge {
                                 Icon(painterResource(R.drawable.hard_drive_filled), null, Modifier.height(20.dp))
                                 Text(text = stringResource(R.string.local))
@@ -146,12 +146,12 @@ fun AlbumScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = pojo.album.title,
-                                        style = if (pojo.album.title.length > 20) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                        text = combo.album.title,
+                                        style = if (combo.album.title.length > 20) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    pojo.album.artist?.also { artist ->
+                                    combo.album.artist?.also { artist ->
                                         Text(
                                             text = artist,
                                             style = if (artist.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
@@ -160,9 +160,9 @@ fun AlbumScreen(
                                         )
                                     }
                                     AlbumBadges(
-                                        genres = pojo.genres.map { it.genreName },
-                                        styles = pojo.styles.map { it.styleName },
-                                        year = pojo.yearString,
+                                        genres = combo.genres.map { it.genreName },
+                                        styles = combo.styles.map { it.styleName },
+                                        year = combo.yearString,
                                         modifier = Modifier
                                             .padding(vertical = 10.dp)
                                             .fillMaxWidth()
@@ -173,19 +173,19 @@ fun AlbumScreen(
 
                                 Row(modifier = Modifier.fillMaxWidth()) {
                                     AlbumButtons(
-                                        isLocal = pojo.album.isLocal,
-                                        isInLibrary = pojo.album.isInLibrary,
+                                        isLocal = combo.album.isLocal,
+                                        isInLibrary = combo.album.isInLibrary,
                                         modifier = Modifier.align(Alignment.Bottom),
                                         isDownloading = downloadIsActive,
-                                        isPartiallyDownloaded = pojo.isPartiallyDownloaded,
+                                        isPartiallyDownloaded = combo.isPartiallyDownloaded,
                                         callbacks = AlbumCallbacks(
-                                            pojo = pojo,
+                                            combo = combo,
                                             appCallbacks = appCallbacks,
                                             context = context,
-                                            onPlayClick = { viewModel.playTrackPojos(trackPojos) },
-                                            onEnqueueClick = { viewModel.enqueueTrackPojos(trackPojos, context) },
+                                            onPlayClick = { viewModel.playTrackCombos(trackCombos) },
+                                            onEnqueueClick = { viewModel.enqueueTrackCombos(trackCombos, context) },
                                             onAddToPlaylistClick = {
-                                                appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = pojo))
+                                                appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = combo))
                                             },
                                         )
                                     )
@@ -204,7 +204,7 @@ fun AlbumScreen(
                     }
                 }
 
-                if (pojo.isPartiallyDownloaded && !downloadIsActive) {
+                if (combo.isPartiallyDownloaded && !downloadIsActive) {
                     item {
                         Text(
                             text = stringResource(R.string.this_album_is_only_partially_downloaded),
@@ -214,38 +214,38 @@ fun AlbumScreen(
                     }
                 }
 
-                val rowDataObjects = trackPojos.map { trackPojo ->
+                val rowDataObjects = trackCombos.map { trackCombo ->
                     AlbumTrackRowData(
-                        title = trackPojo.track.title,
-                        isDownloadable = trackPojo.track.isDownloadable,
-                        artist = trackPojo.artist,
-                        duration = trackPojo.track.duration,
-                        showArtist = trackPojo.artist != pojo.album.artist,
-                        isSelected = selectedTrackPojos.contains(trackPojo),
-                        downloadTask = trackDownloadTasks.find { it.track.trackId == trackPojo.track.trackId },
-                        position = trackPojo.track.getPositionString(pojo.discCount),
-                        isInLibrary = trackPojo.track.isInLibrary,
+                        title = trackCombo.track.title,
+                        isDownloadable = trackCombo.track.isDownloadable,
+                        artist = trackCombo.artist,
+                        duration = trackCombo.track.duration,
+                        showArtist = trackCombo.artist != combo.album.artist,
+                        isSelected = selectedTrackCombos.contains(trackCombo),
+                        downloadTask = trackDownloadTasks.find { it.track.trackId == trackCombo.track.trackId },
+                        position = trackCombo.track.getPositionString(combo.discCount),
+                        isInLibrary = trackCombo.track.isInLibrary,
                     )
                 }
                 val positionColumnWidth = rowDataObjects.maxOfOrNull { it.position.length * 10 }?.dp
 
-                itemsIndexed(trackPojos) { index, trackPojo ->
-                    viewModel.loadTrackMetadata(trackPojo.track)
+                itemsIndexed(trackCombos) { index, trackCombo ->
+                    viewModel.loadTrackMetadata(trackCombo.track)
 
                     AlbumTrackRow(
                         data = rowDataObjects[index],
                         positionColumnWidth = positionColumnWidth ?: 40.dp,
                         callbacks = TrackCallbacks(
-                            pojo = trackPojo,
+                            combo = trackCombo,
                             appCallbacks = appCallbacks,
                             context = context,
                             onTrackClick = {
-                                if (selectedTrackPojos.isNotEmpty()) viewModel.toggleSelected(trackPojo)
-                                else viewModel.playTrackPojos(trackPojos, pojo.indexOfTrack(trackPojo.track))
+                                if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(trackCombo)
+                                else viewModel.playTrackCombos(trackCombos, combo.indexOfTrack(trackCombo.track))
                             },
-                            onEnqueueClick = { viewModel.enqueueTrackPojo(trackPojo, context) },
+                            onEnqueueClick = { viewModel.enqueueTrackCombo(trackCombo, context) },
                             onLongClick = {
-                                viewModel.selectTrackPojosFromLastSelected(to = trackPojo, allPojos = trackPojos)
+                                viewModel.selectTrackCombosFromLastSelected(to = trackCombo, allCombos = trackCombos)
                             },
                         ),
                     )

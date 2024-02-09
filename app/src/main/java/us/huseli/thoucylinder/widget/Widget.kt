@@ -45,7 +45,7 @@ fun Widget(playerRepo: PlayerRepository) {
     val context = LocalContext.current
     val canGotoNext by playerRepo.canGotoNext.collectAsState()
     val canPlay by playerRepo.canPlay.collectAsState(false)
-    val currentPojo by playerRepo.currentPojo.collectAsState()
+    val currentCombo by playerRepo.currentCombo.collectAsState()
     val isPlaying by playerRepo.isPlaying.collectAsState(false)
     val isShuffleEnabled by playerRepo.isShuffleEnabled.collectAsState()
     val isRepeatEnabled by playerRepo.isRepeatEnabled.collectAsState()
@@ -53,11 +53,11 @@ fun Widget(playerRepo: PlayerRepository) {
     val bitmap = remember { mutableStateOf<Bitmap?>(null) }
     val backgroundColor =
         if (bitmap.value != null) ColorProvider(R.color.widget_background) else GlanceTheme.colors.background
-    val currentTrackString = currentPojo?.let { listOfNotNull(it.artist, it.track.title) }?.joinToString(" • ")
+    val currentTrackString = currentCombo?.let { listOfNotNull(it.artist, it.track.title) }?.joinToString(" • ")
         ?: context.getString(R.string.no_track_playing)
 
-    LaunchedEffect(currentPojo) {
-        bitmap.value = currentPojo?.getFullBitmap(context)
+    LaunchedEffect(currentCombo) {
+        bitmap.value = currentCombo?.getFullBitmap(context)
     }
 
     Box(

@@ -59,7 +59,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         LaunchedEffect(task.track) {
             thumbnail.value = viewModel.getTrackThumbnail(
                 track = task.track,
-                albumPojo = task.albumPojo,
+                albumCombo = task.albumCombo,
                 context = context,
             )
         }
@@ -93,7 +93,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                         color = LocalBasicColors.current.Red,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else (task.track.artist ?: task.albumPojo?.album?.artist)?.also {
+                } else (task.track.artist ?: task.albumCombo?.album?.artist)?.also {
                     Text(
                         text = it,
                         maxLines = 1,

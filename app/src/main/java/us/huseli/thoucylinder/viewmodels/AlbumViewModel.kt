@@ -17,7 +17,7 @@ import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import java.util.UUID
 import javax.inject.Inject
 
@@ -28,28 +28,29 @@ class AlbumViewModel @Inject constructor(
     @ApplicationContext context: Context,
 ) : AbstractTrackListViewModel("AlbumViewModel", repos) {
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
-    private val _albumPojo = MutableStateFlow<AlbumWithTracksPojo?>(null)
+    private val _albumCombo = MutableStateFlow<AlbumWithTracksCombo?>(null)
     private val _albumNotFound = MutableStateFlow(false)
 
-    val albumArt: Flow<ImageBitmap?> = _albumPojo.map { it?.getFullImage(context) }.distinctUntilChanged()
+    val albumArt: Flow<ImageBitmap?> =
+        _albumCombo.map { it?.album?.albumArt?.getFullImageBitmap(context) }.distinctUntilChanged()
     val albumDownloadTask: Flow<AlbumDownloadTask?> = repos.youtube.albumDownloadTasks
         .map { tasks -> tasks.find { it.album.albumId == _albumId } }
         .distinctUntilChanged()
-    val albumPojo = _albumPojo.asStateFlow()
+    val albumCombo = _albumCombo.asStateFlow()
     override val trackDownloadTasks = repos.download.tasks
         .map { tasks -> tasks.filter { it.track.albumId == _albumId } }
         .distinctUntilChanged()
     val albumNotFound = _albumNotFound.asStateFlow()
-    val trackPojos = repos.track.flowTrackPojosByAlbumId(_albumId)
+    val trackCombos = repos.track.flowTrackCombosByAlbumId(_albumId)
 
     init {
-        unselectAllTrackPojos()
+        unselectAllTrackCombos()
 
         viewModelScope.launch(Dispatchers.IO) {
-            repos.album.flowAlbumWithTracks(_albumId).distinctUntilChanged().collect { pojo ->
-                if (pojo != null) {
+            repos.album.flowAlbumWithTracks(_albumId).distinctUntilChanged().collect { combo ->
+                if (combo != null) {
                     _albumNotFound.value = false
-                    _albumPojo.value = pojo
+                    _albumCombo.value = combo
                 } else {
                     _albumNotFound.value = true
                 }

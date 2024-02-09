@@ -24,7 +24,7 @@ import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.getSpotifyAlbums
-import us.huseli.thoucylinder.dataclasses.pojos.SpotifyAlbumPojo
+import us.huseli.thoucylinder.dataclasses.combos.SpotifyAlbumCombo
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -47,14 +47,14 @@ class SpotifyRepository @Inject constructor(
     private val _nextUserAlbumIdx = MutableStateFlow(0)
     private val _requestInstants = MutableStateFlow<List<Instant>>(emptyList())
     private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
-    private val _userAlbumPojos = MutableStateFlow<List<SpotifyAlbumPojo>>(emptyList())
+    private val _userAlbumCombos = MutableStateFlow<List<SpotifyAlbumCombo>>(emptyList())
 
     val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
     val isAuthorized: Flow<Boolean?> = _accessTokenExpires.map { it?.let { it > Instant.now() } }
     val nextUserAlbumIdx: StateFlow<Int> = _nextUserAlbumIdx.asStateFlow()
     val requestCode = Random.nextInt(1, 10000)
     val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
-    val userAlbumPojos: StateFlow<List<SpotifyAlbumPojo>> = _userAlbumPojos.asStateFlow()
+    val userAlbumCombos: StateFlow<List<SpotifyAlbumCombo>> = _userAlbumCombos.asStateFlow()
 
     init {
         preferences.registerOnSharedPreferenceChangeListener(this)
@@ -84,7 +84,7 @@ class SpotifyRepository @Inject constructor(
             val url = "$SPOTIFY_USER_ALBUMS_URL?limit=50&offset=${_nextUserAlbumIdx.value}"
 
             apiRequest(url)?.getSpotifyAlbums()?.also { response ->
-                _userAlbumPojos.value += response.items.map { it.toSpotifyAlbumPojo() }
+                _userAlbumCombos.value += response.items.map { it.toSpotifyAlbumCombo() }
                 _nextUserAlbumIdx.value += response.items.size
                 _allUserAlbumsFetched.value = response.next == null
                 _totalUserAlbumCount.value = response.total
@@ -96,7 +96,7 @@ class SpotifyRepository @Inject constructor(
 
     suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum? = spotifyDao.getSpotifyAlbum(albumId)
 
-    suspend fun saveSpotifyAlbumPojo(pojo: SpotifyAlbumPojo) = spotifyDao.upsertSpotifyAlbumPojo(pojo)
+    suspend fun saveSpotifyAlbumCombo(combo: SpotifyAlbumCombo) = spotifyDao.upsertSpotifyAlbumCombo(combo)
 
     fun setAuthorizationResponse(value: AuthorizationResponse) {
         if (value.type == AuthorizationResponse.Type.TOKEN) {

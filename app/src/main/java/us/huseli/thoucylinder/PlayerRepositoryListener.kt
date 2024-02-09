@@ -1,18 +1,18 @@
 package us.huseli.thoucylinder
 
 import androidx.media3.common.PlaybackException
-import us.huseli.thoucylinder.dataclasses.pojos.QueueTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.repositories.PlayerRepository
 
 interface PlayerRepositoryListener {
     fun onPlayerError(
         error: PlaybackException,
-        currentPojo: QueueTrackPojo?,
+        currentCombo: QueueTrackCombo?,
         lastAction: PlayerRepository.LastAction,
     ) {
     }
 
-    suspend fun onPlaybackChange(pojo: QueueTrackPojo?, state: PlayerRepository.PlaybackState) {}
+    suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlayerRepository.PlaybackState) {}
 
-    suspend fun onHalfTrackPlayed(pojo: QueueTrackPojo, startTimestamp: Long) {}
+    suspend fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {}
 }

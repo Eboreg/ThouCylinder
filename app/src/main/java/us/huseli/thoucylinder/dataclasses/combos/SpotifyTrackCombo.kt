@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import androidx.room.Embedded
 import androidx.room.Junction
@@ -9,7 +9,7 @@ import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import kotlin.math.absoluteValue
 
-data class SpotifyTrackPojo(
+data class SpotifyTrackCombo(
     @Embedded val track: SpotifyTrack,
     @Relation(
         entity = SpotifyArtist::class,

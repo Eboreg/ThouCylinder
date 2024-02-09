@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistTrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.Repositories
 import java.util.UUID
 import javax.inject.Inject
@@ -22,35 +22,35 @@ class PlaylistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repos: Repositories,
 ) : AbstractTrackListViewModel("PlaylistViewModel", repos) {
-    private val _selectedTrackPojos = MutableStateFlow<List<PlaylistTrackPojo>>(emptyList())
+    private val _selectedTrackCombos = MutableStateFlow<List<PlaylistTrackCombo>>(emptyList())
 
     val playlistId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_PLAYLIST)!!)
     val playlist: Flow<PlaylistPojo?> =
         repos.playlist.playlists.map { playlists -> playlists.find { it.playlistId == playlistId } }
-    val selectedPlaylistTrackPojos = _selectedTrackPojos.asStateFlow()
-    val trackPojos: Flow<PagingData<PlaylistTrackPojo>> =
-        repos.playlist.pageTrackPojosByPlaylistId(playlistId).flow.cachedIn(viewModelScope)
+    val selectedPlaylistTrackCombos = _selectedTrackCombos.asStateFlow()
+    val trackCombos: Flow<PagingData<PlaylistTrackCombo>> =
+        repos.playlist.pageTrackCombosByPlaylistId(playlistId).flow.cachedIn(viewModelScope)
 
-    fun playPlaylist(startAt: PlaylistTrackPojo? = null) = playPlaylist(playlistId, startAt?.track?.trackId)
+    fun playPlaylist(startAt: PlaylistTrackCombo? = null) = playPlaylist(playlistId, startAt?.track?.trackId)
 
-    fun removeTrackPojos(pojos: List<PlaylistTrackPojo>) = viewModelScope.launch {
-        repos.playlist.removePlaylistTracks(pojos)
-        _selectedTrackPojos.value -= pojos
+    fun removeTrackCombos(combos: List<PlaylistTrackCombo>) = viewModelScope.launch {
+        repos.playlist.removePlaylistTracks(combos)
+        _selectedTrackCombos.value -= combos
     }
 
-    fun selectPlaylistTrackPojos(pojos: List<PlaylistTrackPojo>) {
-        val currentIds = _selectedTrackPojos.value.map { pojo -> pojo.track.trackId }
-        _selectedTrackPojos.value += pojos.filter { pojo -> !currentIds.contains(pojo.track.trackId) }
+    fun selectPlaylistTrackCombos(combos: List<PlaylistTrackCombo>) {
+        val currentIds = _selectedTrackCombos.value.map { combo -> combo.track.trackId }
+        _selectedTrackCombos.value += combos.filter { combo -> !currentIds.contains(combo.track.trackId) }
     }
 
-    fun toggleSelected(pojo: PlaylistTrackPojo) {
-        if (_selectedTrackPojos.value.contains(pojo))
-            _selectedTrackPojos.value -= pojo
+    fun toggleSelected(combo: PlaylistTrackCombo) {
+        if (_selectedTrackCombos.value.contains(combo))
+            _selectedTrackCombos.value -= combo
         else
-            _selectedTrackPojos.value += pojo
+            _selectedTrackCombos.value += combo
     }
 
-    override fun unselectAllTrackPojos() {
-        _selectedTrackPojos.value = emptyList()
+    override fun unselectAllTrackCombos() {
+        _selectedTrackCombos.value = emptyList()
     }
 }

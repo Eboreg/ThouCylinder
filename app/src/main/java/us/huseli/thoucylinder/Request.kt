@@ -8,6 +8,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
 import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
 import java.io.InputStream

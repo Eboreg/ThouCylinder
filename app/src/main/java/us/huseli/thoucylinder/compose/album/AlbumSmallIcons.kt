@@ -9,11 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 
 @Composable
-fun AlbumSmallIcons(pojo: AbstractAlbumPojo, modifier: Modifier = Modifier) {
-    if (pojo.album.isLocal) {
+fun AlbumSmallIcons(combo: AbstractAlbumCombo, modifier: Modifier = Modifier) {
+    if (combo.album.isLocal) {
         Icon(
             painter = painterResource(R.drawable.hard_drive_filled),
             contentDescription = null,
@@ -21,7 +21,7 @@ fun AlbumSmallIcons(pojo: AbstractAlbumPojo, modifier: Modifier = Modifier) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    if (pojo.album.isOnYoutube) {
+    if (combo.album.isOnYoutube) {
         Icon(
             painter = painterResource(R.drawable.youtube),
             contentDescription = null,
@@ -29,7 +29,7 @@ fun AlbumSmallIcons(pojo: AbstractAlbumPojo, modifier: Modifier = Modifier) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    if (pojo.isOnSpotify) {
+    if (combo.isOnSpotify) {
         Icon(
             painter = painterResource(R.drawable.spotify),
             contentDescription = null,

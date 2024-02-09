@@ -11,17 +11,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.ContextMutexCache
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import java.util.UUID
 
 abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel() {
     private val _albumThumbnailCache = mutableMapOf<UUID, ImageBitmap>()
-    private val _trackThumbnailCache = mutableMapOf<UUID, ImageBitmap>()
+    private val _trackThumbnailCache = ContextMutexCache<Track, UUID, ImageBitmap>(
+        keyFromInstance = { track -> track.trackId },
+        fetchMethod = { track, context -> track.getThumbnail(context) },
+    )
 
     val totalAreaSize: Flow<DpSize> =
         combine(repos.settings.contentAreaSize, repos.settings.innerPadding) { size, padding -> // including menu
@@ -34,31 +38,31 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         }
 
     suspend fun ensureAlbumTracksMetadata(
-        pojo: AlbumWithTracksPojo,
+        combo: AlbumWithTracksCombo,
         commit: Boolean = true,
         forceReload: Boolean = false,
-    ): AlbumWithTracksPojo = pojo.copy(
-        tracks = pojo.tracks.map { track ->
+    ): AlbumWithTracksCombo = combo.copy(
+        tracks = combo.tracks.map { track ->
             ensureTrackMetadata(track, commit = commit, forceReload = forceReload)
         }
     )
 
     fun ensureAlbumTracksMetadataAsync(
-        pojo: AlbumWithTracksPojo,
+        combo: AlbumWithTracksCombo,
         commit: Boolean = true,
         forceReload: Boolean = false,
-        callback: (AlbumWithTracksPojo) -> Unit,
+        callback: (AlbumWithTracksCombo) -> Unit,
     ) = viewModelScope.launch(Dispatchers.IO) {
-        callback(ensureAlbumTracksMetadata(pojo, commit, forceReload))
+        callback(ensureAlbumTracksMetadata(combo, commit, forceReload))
     }
 
     fun ensureAlbumTracksMetadataAsync(
-        pojos: Collection<AlbumWithTracksPojo>,
+        combos: Collection<AlbumWithTracksCombo>,
         commit: Boolean = true,
         forceReload: Boolean = false,
-        callback: (List<AlbumWithTracksPojo>) -> Unit,
+        callback: (List<AlbumWithTracksCombo>) -> Unit,
     ) = viewModelScope.launch(Dispatchers.IO) {
-        callback(ensureAlbumTracksMetadata(pojos, commit, forceReload))
+        callback(ensureAlbumTracksMetadata(combos, commit, forceReload))
     }
 
     suspend fun ensureTrackMetadata(track: Track, commit: Boolean = true, forceReload: Boolean = false): Track {
@@ -79,35 +83,31 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         ).also { if (commit) repos.track.updateTrack(it) }
     }
 
-    fun ensureTrackPojoMetadataAsync(
-        pojo: TrackPojo,
+    fun ensureTrackComboMetadataAsync(
+        combo: TrackCombo,
         commit: Boolean = true,
         forceReload: Boolean = false,
-        callback: (TrackPojo) -> Unit,
+        callback: (TrackCombo) -> Unit,
     ) = viewModelScope.launch(Dispatchers.IO) {
-        callback(ensureTrackPojoMetadata(pojo, commit, forceReload))
+        callback(ensureTrackComboMetadata(combo, commit, forceReload))
     }
 
-    fun ensureTrackPojoMetadataAsync(
-        pojos: List<TrackPojo>,
+    fun ensureTrackComboMetadataAsync(
+        combos: List<TrackCombo>,
         commit: Boolean = true,
         forceReload: Boolean = false,
-        callback: (List<TrackPojo>) -> Unit,
+        callback: (List<TrackCombo>) -> Unit,
     ) = viewModelScope.launch(Dispatchers.IO) {
-        callback(ensureTrackPojoMetadata(pojos, commit, forceReload))
+        callback(ensureTrackComboMetadata(combos, commit, forceReload))
     }
 
     suspend fun getTrackThumbnail(
         track: Track,
-        albumPojo: AbstractAlbumPojo? = null,
-        album: Album? = albumPojo?.album,
+        albumCombo: AbstractAlbumCombo? = null,
+        album: Album? = albumCombo?.album,
         context: Context,
     ): ImageBitmap? {
-        _trackThumbnailCache[track.trackId]?.also { return it }
-        track.getThumbnail(context)?.also {
-            _trackThumbnailCache += track.trackId to it
-            return it
-        }
+        _trackThumbnailCache.get(track, context)?.also { return it }
 
         if (album != null) {
             _albumThumbnailCache[album.albumId]?.also { return it }
@@ -117,7 +117,7 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
             }
 
             val spotifyAlbum =
-                if (albumPojo != null) albumPojo.spotifyAlbum
+                if (albumCombo != null) albumCombo.spotifyAlbum
                 else repos.spotify.getSpotifyAlbum(album.albumId)
 
             spotifyAlbum?.getThumbnailImageBitmap(context)?.also {
@@ -139,41 +139,43 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
                 val existingTrackUris = existingTracks?.mapNotNull { it.localUri } ?: repos.track.listTrackLocalUris()
 
                 if (localMusicDirectory != null) {
-                    val newAlbumPojos =
+                    val newAlbumCombos =
                         repos.localMedia.listNewLocalAlbums(localMusicDirectory, existingTrackUris)
 
-                    newAlbumPojos.forEach { pojo -> repos.album.saveAlbumPojo(pojo) }
-                    newAlbumPojos.flatMap { it.tracks }.also { repos.track.insertTracks(it) }
+                    repos.album.saveAlbumCombos(newAlbumCombos)
+                    newAlbumCombos.flatMap { it.tracks }.also { repos.track.insertTracks(it) }
                 }
 
                 repos.localMedia.setIsImporting(false)
             }
         }
 
-    fun saveAlbumWithTracks(pojo: AlbumWithTracksPojo) = viewModelScope.launch(Dispatchers.IO) {
-        repos.album.saveAlbumPojo(pojo.copy(album = pojo.album.copy(isInLibrary = true)))
-        repos.track.deleteTracksByAlbumId(pojo.album.albumId)
-        repos.track.insertTracks(pojo.tracks.map { it.copy(albumId = pojo.album.albumId, isInLibrary = true) })
-        repos.localMedia.getOrCreateAlbumArt(pojo)
+    fun saveAlbumWithTracks(combo: AlbumWithTracksCombo) = viewModelScope.launch(Dispatchers.IO) {
+        repos.album.saveAlbumCombo(combo.copy(album = combo.album.copy(isInLibrary = true)))
+        repos.track.deleteTracksByAlbumId(combo.album.albumId)
+        repos.track.insertTracks(combo.tracks.map { it.copy(albumId = combo.album.albumId, isInLibrary = true) })
+        repos.localMedia.getOrCreateAlbumArt(combo)
     }
+
+    fun saveTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) { repos.track.updateTrack(track) }
 
 
     /** PRIVATE METHODS ***********************************************************************************************/
     private suspend fun ensureAlbumTracksMetadata(
-        pojos: Collection<AlbumWithTracksPojo>,
+        combos: Collection<AlbumWithTracksCombo>,
         commit: Boolean = true,
         forceReload: Boolean = false,
-    ): List<AlbumWithTracksPojo> = pojos.map { ensureAlbumTracksMetadata(it, commit, forceReload) }
+    ): List<AlbumWithTracksCombo> = combos.map { ensureAlbumTracksMetadata(it, commit, forceReload) }
 
-    private suspend fun ensureTrackPojoMetadata(
-        pojo: TrackPojo,
+    private suspend fun ensureTrackComboMetadata(
+        combo: TrackCombo,
         commit: Boolean = true,
         forceReload: Boolean = false,
-    ): TrackPojo = pojo.copy(track = ensureTrackMetadata(pojo.track, commit, forceReload))
+    ): TrackCombo = combo.copy(track = ensureTrackMetadata(combo.track, commit, forceReload))
 
-    private suspend fun ensureTrackPojoMetadata(
-        pojos: List<TrackPojo>,
+    private suspend fun ensureTrackComboMetadata(
+        combos: List<TrackCombo>,
         commit: Boolean = true,
         forceReload: Boolean = false,
-    ): List<TrackPojo> = pojos.map { pojo -> ensureTrackPojoMetadata(pojo, commit, forceReload) }
+    ): List<TrackCombo> = combos.map { combo -> ensureTrackComboMetadata(combo, commit, forceReload) }
 }

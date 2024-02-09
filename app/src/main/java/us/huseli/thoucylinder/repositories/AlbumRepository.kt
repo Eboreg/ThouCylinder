@@ -9,14 +9,17 @@ import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
+import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
 import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumPojo
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TrackPojo
-import us.huseli.thoucylinder.dataclasses.pojos.sortGenres
-import us.huseli.thoucylinder.dataclasses.pojos.sortStyles
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.combos.sortGenres
+import us.huseli.thoucylinder.dataclasses.combos.sortStyles
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,27 +29,23 @@ class AlbumRepository @Inject constructor(private val database: Database) {
     private val albumDao = database.albumDao()
     private val _selectedAlbums = mutableMapOf<String, MutableStateFlow<List<Album>>>()
 
-    suspend fun addToLibrary(albumId: UUID) = albumDao.setAlbumIsInLibrary(albumId, true)
+    suspend fun addToLibrary(albumId: UUID) = albumDao.setIsInLibrary(listOf(albumId), true)
 
-    suspend fun deleteAlbums(albums: Collection<Album>) =
-        albumDao.deleteAlbums(*albums.toTypedArray())
-
-    suspend fun deleteAlbumPojos(pojos: Iterable<AbstractAlbumPojo>) =
-        albumDao.deleteAlbums(*pojos.map { it.album }.toTypedArray())
+    suspend fun deleteAlbums(albums: Collection<Album>) = albumDao.deleteAlbums(*albums.toTypedArray())
 
     suspend fun deleteTempAlbums() = albumDao.deleteTempAlbums()
 
-    fun flowAlbumPojos(
+    fun flowAlbumCombos(
         sortParameter: AlbumSortParameter,
         sortOrder: SortOrder,
         searchTerm: String,
-    ): Flow<List<AlbumPojo>> =
-        albumDao.flowAlbumPojos(sortParameter = sortParameter, sortOrder = sortOrder, searchTerm = searchTerm)
+    ): Flow<List<AlbumCombo>> =
+        albumDao.flowAlbumCombos(sortParameter = sortParameter, sortOrder = sortOrder, searchTerm = searchTerm)
             .map { it.sortGenres().sortStyles() }
 
-    fun flowAlbumPojosByArtist(artist: String) = albumDao.flowAlbumPojosByArtist(artist)
+    fun flowAlbumCombosByArtist(artist: String) = albumDao.flowAlbumCombosByArtist(artist)
 
-    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksPojo?> =
+    fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksCombo?> =
         albumDao.flowAlbumWithTracks(albumId).map { it?.sorted() }
 
     fun flowGenres(): Flow<List<Genre>> = albumDao.flowGenres()
@@ -56,7 +55,7 @@ class AlbumRepository @Inject constructor(private val database: Database) {
 
     suspend fun getAlbum(albumId: UUID): Album? = albumDao.getAlbum(albumId)
 
-    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksPojo? =
+    suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksCombo? =
         albumDao.getAlbumWithTracks(albumId)?.sorted()
 
     suspend fun insertAlbums(albums: Collection<Album>) {
@@ -67,31 +66,35 @@ class AlbumRepository @Inject constructor(private val database: Database) {
 
     suspend fun listAlbums(): List<Album> = albumDao.listAlbums()
 
-    suspend fun listAlbumTrackPojos(albumIds: List<UUID>): List<TrackPojo> = albumDao.listTrackPojos(albumIds)
+    suspend fun listAlbumTrackCombos(albumIds: List<UUID>): List<TrackCombo> = albumDao.listTrackCombos(albumIds)
 
     suspend fun listDeletionMarkedAlbums(): List<Album> = albumDao.listDeletionMarkedAlbums()
 
     suspend fun listGenres(): List<Genre> = albumDao.listGenres()
 
-    suspend fun saveAlbum(album: Album) = database.withTransaction {
-        if (albumDao.albumExists(album.albumId)) albumDao.updateAlbums(album)
-        else albumDao.insertAlbums(album)
-    }
-
     suspend fun saveAlbumGenres(albumId: UUID, genres: Collection<Genre>) = database.withTransaction {
-        if (albumDao.albumExists(albumId)) albumDao.clearAlbumGenres(albumId)
-        if (genres.isNotEmpty()) albumDao.insertAlbumGenres(albumId, genres)
+        if (albumDao.albumExists(albumId)) albumDao.clearAlbumGenres(listOf(albumId))
+        if (genres.isNotEmpty()) albumDao.insertAlbumGenres(genres.map { AlbumGenre(albumId, it.genreName) })
     }
 
-    suspend fun saveAlbumPojo(pojo: AbstractAlbumPojo) = database.withTransaction {
-        if (albumDao.albumExists(pojo.album.albumId)) {
-            albumDao.updateAlbums(pojo.album)
-            albumDao.clearAlbumGenres(pojo.album.albumId)
-            albumDao.clearAlbumStyles(pojo.album.albumId)
-        } else albumDao.insertAlbums(pojo.album)
-        if (pojo.genres.isNotEmpty()) albumDao.insertAlbumGenres(pojo.album.albumId, pojo.genres)
-        if (pojo.styles.isNotEmpty()) albumDao.insertAlbumStyles(pojo.album.albumId, pojo.styles)
+    suspend fun saveAlbumCombos(combos: Iterable<AbstractAlbumCombo>) = database.withTransaction {
+        val existingIds = albumDao.listExistingAlbumIds(combos.map { it.album.albumId })
+        val existing = combos.filter { existingIds.contains(it.album.albumId) }
+        val nonExisting = combos.minus(existing.toSet())
+        val albumGenres = combos.flatMap { combo -> combo.genres.map { AlbumGenre(combo.album.albumId, it.genreName) } }
+        val albumStyles = combos.flatMap { combo -> combo.styles.map { AlbumStyle(combo.album.albumId, it.styleName) } }
+
+        if (existing.isNotEmpty()) {
+            albumDao.updateAlbums(*existing.map { it.album }.toTypedArray())
+            albumDao.clearAlbumGenres(existingIds)
+            albumDao.clearAlbumStyles(existingIds)
+        }
+        if (nonExisting.isNotEmpty()) albumDao.insertAlbums(*nonExisting.map { it.album }.toTypedArray())
+        if (albumGenres.isNotEmpty()) albumDao.insertAlbumGenres(albumGenres)
+        if (albumStyles.isNotEmpty()) albumDao.insertAlbumStyles(albumStyles)
     }
+
+    suspend fun saveAlbumCombo(combo: AbstractAlbumCombo) = saveAlbumCombos(listOf(combo))
 
     fun selectAlbums(selectionKey: String, albums: Iterable<Album>) {
         mutableFlowSelectedAlbums(selectionKey).also { flow ->
@@ -100,11 +103,13 @@ class AlbumRepository @Inject constructor(private val database: Database) {
         }
     }
 
-    suspend fun setAlbumIsDeleted(albumId: UUID, isDeleted: Boolean) = albumDao.setAlbumIsDeleted(albumId, isDeleted)
+    suspend fun setAlbumIsDeleted(albumId: UUID, isDeleted: Boolean) = albumDao.setIsDeleted(albumId, isDeleted)
 
-    suspend fun setAlbumIsHidden(albumId: UUID, value: Boolean) = albumDao.setAlbumIsHidden(albumId, value)
+    suspend fun setAlbumIsHidden(albumId: UUID, value: Boolean) = albumDao.setIsHidden(albumId, value)
 
-    suspend fun setAlbumIsLocal(albumId: UUID, isLocal: Boolean) = albumDao.setAlbumIsLocal(albumId, isLocal)
+    suspend fun setAlbumIsLocal(albumId: UUID, isLocal: Boolean) = albumDao.setIsLocal(listOf(albumId), isLocal)
+
+    suspend fun setAlbumsIsLocal(albumIds: Collection<UUID>, isLocal: Boolean) = albumDao.setIsLocal(albumIds, isLocal)
 
     fun toggleAlbumSelected(selectionKey: String, album: Album) {
         mutableFlowSelectedAlbums(selectionKey).also {
@@ -117,7 +122,12 @@ class AlbumRepository @Inject constructor(private val database: Database) {
         mutableFlowSelectedAlbums(selectionKey).value = emptyList()
     }
 
-    suspend fun updateAlbums(albums: Collection<Album>) = albumDao.updateAlbums(*albums.toTypedArray())
+    suspend fun updateAlbum(album: Album) = albumDao.updateAlbums(album)
+
+    suspend fun updateAlbumArt(albumId: UUID, albumArt: MediaStoreImage?) {
+        if (albumArt != null) albumDao.updateAlbumArt(albumId, albumArt.uri, albumArt.thumbnailUri)
+        else albumDao.clearAlbumArt(albumId)
+    }
 
     private fun mutableFlowSelectedAlbums(viewModelClass: String): MutableStateFlow<List<Album>> =
         _selectedAlbums[viewModelClass] ?: MutableStateFlow<List<Album>>(emptyList()).also {

@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.pojos
+package us.huseli.thoucylinder.dataclasses.combos
 
 import android.content.Context
 import android.net.Uri
@@ -8,25 +8,23 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.LastFmTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 
-data class QueueTrackPojo(
+data class QueueTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,
     @Embedded override val spotifyTrack: SpotifyTrack?,
-    @Embedded override val lastFmTrack: LastFmTrack?,
     @Embedded val spotifyAlbum: SpotifyAlbum? = null,
     @ColumnInfo("QueueTrack_uri") val uri: Uri,
     @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: UUID = UUID.randomUUID(),
     @ColumnInfo("QueueTrack_position") val position: Int = 0,
-) : AbstractTrackPojo() {
+) : AbstractTrackCombo() {
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
 
@@ -45,15 +43,11 @@ data class QueueTrackPojo(
             .setAlbumTitle(album?.title)
             .setDiscNumber(track.discNumber)
             .setReleaseYear(track.year ?: album?.year)
-            .setArtworkUri(
-                album?.albumArt?.uri
-                    ?: album?.lastFmFullImageUrl?.toUri()
-                    ?: album?.youtubePlaylist?.fullImage?.url?.toUri()
-            )
+            .setArtworkUri(album?.albumArt?.uri ?: album?.youtubePlaylist?.fullImage?.url?.toUri())
             .build()
     }
 
-    override fun equals(other: Any?) = other is QueueTrackPojo &&
+    override fun equals(other: Any?) = other is QueueTrackCombo &&
         other.track.trackId == track.trackId &&
         other.queueTrackId == queueTrackId &&
         other.uri == uri
@@ -65,12 +59,12 @@ data class QueueTrackPojo(
     override fun hashCode(): Int = 31 * (31 * track.trackId.hashCode() + uri.hashCode()) + queueTrackId.hashCode()
 }
 
-fun List<QueueTrackPojo>.reindexed(): List<QueueTrackPojo> = mapIndexed { index, pojo -> pojo.copy(position = index) }
+fun List<QueueTrackCombo>.reindexed(): List<QueueTrackCombo> = mapIndexed { index, combo -> combo.copy(position = index) }
 
-fun List<QueueTrackPojo>.plus(item: QueueTrackPojo, index: Int): List<QueueTrackPojo> =
+fun List<QueueTrackCombo>.plus(item: QueueTrackCombo, index: Int): List<QueueTrackCombo> =
     toMutableList().apply { add(index, item) }.toList()
 
-fun List<QueueTrackPojo>.toMediaItems(): List<MediaItem> = map { it.toMediaItem() }
+fun List<QueueTrackCombo>.toMediaItems(): List<MediaItem> = map { it.toMediaItem() }
 
-fun List<QueueTrackPojo>.containsWithPosition(other: QueueTrackPojo): Boolean =
+fun List<QueueTrackCombo>.containsWithPosition(other: QueueTrackCombo): Boolean =
     any { it == other && it.position == other.position }

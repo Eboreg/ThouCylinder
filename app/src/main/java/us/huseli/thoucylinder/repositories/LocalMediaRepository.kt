@@ -17,22 +17,22 @@ import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.padStart
+import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyTo
 import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.listCoverImages
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
-import us.huseli.thoucylinder.dataclasses.pojos.AlbumWithTracksPojo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.escapeQuotes
 import us.huseli.thoucylinder.getRelativePathWithoutFilename
-import us.huseli.thoucylinder.nullIfEmpty
-import us.huseli.thoucylinder.square
 import us.huseli.thoucylinder.toBitmap
 import java.io.File
 import javax.inject.Inject
@@ -48,12 +48,12 @@ class LocalMediaRepository @Inject constructor(
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
 
     @WorkerThread
-    fun createAlbumDocumentFile(album: Album): DocumentFile? =
-        settingsRepo.getLocalMusicDocumentFile()?.let { album.createDownloadDirDocumentFile(it, context) }
+    fun createAlbumDirectory(album: Album): DocumentFile? =
+        settingsRepo.getLocalMusicDirectory()?.let { album.createDirectory(it, context) }
 
     @WorkerThread
-    fun getAlbumDocumentFile(album: Album): DocumentFile? =
-        settingsRepo.getLocalMusicDocumentFile()?.let { album.getDownloadDirDocumentFile(it, context) }
+    fun getAlbumDirectory(album: Album): DocumentFile? =
+        settingsRepo.getLocalMusicDirectory()?.let { album.getDirectory(it, context) }
 
     fun setIsImporting(value: Boolean) {
         _isImportingLocalMedia.value = value
@@ -61,23 +61,29 @@ class LocalMediaRepository @Inject constructor(
 
     /** IMAGE RELATED METHODS ************************************************/
     @WorkerThread
-    fun collectAlbumArt(pojo: AlbumWithTracksPojo): List<Bitmap> =
-        pojo.tracks.listCoverImages(context).mapNotNull { it.toBitmap(context)?.square() }
+    fun collectNewLocalAlbumArt(combo: AlbumWithTracksCombo): List<Bitmap> = combo.tracks.listCoverImages(context)
+        .filter { it.uri != combo.album.albumArt?.uri }
+        .mapNotNull { it.toBitmap(context)?.square() }
+
+    @WorkerThread
+    fun collectNewLocalAlbumArtUris(combo: AlbumWithTracksCombo): List<Uri> = combo.tracks.listCoverImages(context)
+        .map { it.uri }
+        .filter { it != combo.album.albumArt?.uri }
 
     @WorkerThread
     fun deleteAlbumDirectoryAlbumArt(album: Album) {
-        getAlbumDocumentFile(album)?.also { album.albumArt?.deleteDirectoryFiles(context, it) }
+        getAlbumDirectory(album)?.also { album.albumArt?.deleteDirectoryFiles(context, it) }
     }
 
     @WorkerThread
-    fun deleteAlbumDirectoryAlbumArt(pojo: AlbumWithTracksPojo) {
-        deleteAlbumDirectoryAlbumArt(pojo.album)
-        pojo.tracks.listCoverImages(context, includeThumbnails = true).forEach { documentFile ->
+    fun deleteAlbumDirectoryAlbumArt(combo: AlbumWithTracksCombo) {
+        deleteAlbumDirectoryAlbumArt(combo.album)
+        combo.tracks.listCoverImages(context, includeThumbnails = true).forEach { documentFile ->
             if (documentFile.isFile && documentFile.canWrite()) documentFile.delete()
         }
     }
 
-    suspend fun getOrCreateAlbumArt(pojo: AbstractAlbumPojo) = pojo.getOrCreateAlbumArt(context)
+    suspend fun getOrCreateAlbumArt(combo: AbstractAlbumCombo) = combo.getOrCreateAlbumArt(context)
 
     @WorkerThread
     suspend fun saveInternalAlbumArtFiles(album: Album, imageUrl: String): MediaStoreImage? =
@@ -89,15 +95,15 @@ class LocalMediaRepository @Inject constructor(
     fun listNewLocalAlbums(
         treeDocumentFile: DocumentFile,
         existingTrackUris: Collection<Uri>,
-    ): List<AlbumWithTracksPojo> {
+    ): List<AlbumWithTracksCombo> {
         val albums = mutableSetOf<Album>()
         val tracks = mutableListOf<Track>()
-        val albumPojos = mutableListOf<AlbumWithTracksPojo>()
+        val albumCombos = mutableListOf<AlbumWithTracksCombo>()
 
         treeDocumentFile.listFiles().forEach { documentFile ->
             if (documentFile.isDirectory) {
                 // Go through subdirectories recursively:
-                albumPojos.addAll(listNewLocalAlbums(documentFile, existingTrackUris))
+                albumCombos.addAll(listNewLocalAlbums(documentFile, existingTrackUris))
             } else if (documentFile.isFile && !existingTrackUris.contains(documentFile.uri)) {
                 /**
                  * TODO: Seems like FFprobeKit doesn't get permission to access
@@ -164,20 +170,20 @@ class LocalMediaRepository @Inject constructor(
         }
 
         albums.forEach { album ->
-            val pojo = AlbumWithTracksPojo(
+            val combo = AlbumWithTracksCombo(
                 album = album,
                 tracks = tracks.filter { it.albumId == album.albumId }
                     .sortedBy { it.albumPosition }
                     .sortedBy { it.discNumber },
             )
-            val albumArt = collectAlbumArt(pojo)
+            val albumArt = collectNewLocalAlbumArt(combo)
                 .maxByOrNull { it.width * it.height }
-                ?.let { MediaStoreImage.fromBitmap(it, context, pojo.album) }
+                ?.let { MediaStoreImage.fromBitmap(it, context, combo.album) }
 
-            albumPojos.add(pojo.copy(album = album.copy(albumArt = albumArt)))
+            albumCombos.add(combo.copy(album = album.copy(albumArt = albumArt)))
         }
 
-        return albumPojos
+        return albumCombos
     }
 
     @WorkerThread
@@ -189,28 +195,28 @@ class LocalMediaRepository @Inject constructor(
     }
 
     @WorkerThread
-    fun tagAlbumTracks(pojo: AlbumWithTracksPojo) {
-        pojo.tracks.forEach { track -> tagTrack(track, pojo) }
+    fun tagAlbumTracks(combo: AlbumWithTracksCombo) {
+        combo.tracks.forEach { track -> tagTrack(track, combo) }
     }
 
     @WorkerThread
-    fun tagTrack(track: Track, albumPojo: AbstractAlbumPojo? = null) {
+    fun tagTrack(track: Track, albumCombo: AbstractAlbumCombo? = null) {
         val documentFile = track.getDocumentFile(context)
 
         if (documentFile != null) {
             if (!documentFile.isWritable(context))
                 Log.e(this::class.simpleName, "tagAlbumTracks: Cannot write to $documentFile")
             else
-                tagTrack(track = track, documentFile = documentFile, albumPojo = albumPojo)
+                tagTrack(track = track, documentFile = documentFile, albumCombo = albumCombo)
         }
     }
 
     @WorkerThread
-    fun tagTrack(track: Track, documentFile: DocumentFile, albumPojo: AbstractAlbumPojo? = null) {
+    fun tagTrack(track: Track, documentFile: DocumentFile, albumCombo: AbstractAlbumCombo? = null) {
         val rawFile = documentFile.toRawFile(context) ?: throw Error("Could not convert $documentFile to raw File")
         val path = documentFile.getAbsolutePath(context)
         val tmpFile = File(context.cacheDir, "${documentFile.baseName}.tmp.${documentFile.extension}")
-        val tagCommands = getTagMap(track, albumPojo)
+        val tagCommands = getTagMap(track, albumCombo)
             .map { (key, value) -> "-metadata \"$key=${value.escapeQuotes()}\"" }
             .joinToString(" ")
         val ffmpegCommand =
@@ -227,14 +233,14 @@ class LocalMediaRepository @Inject constructor(
 
 
     /** PRIVATE METHODS *******************************************************/
-    private fun getTagMap(track: Track, albumPojo: AbstractAlbumPojo? = null): Map<String, String> {
+    private fun getTagMap(track: Track, albumCombo: AbstractAlbumCombo? = null): Map<String, String> {
         val tags = mutableMapOf("title" to track.title)
 
-        (track.artist ?: albumPojo?.album?.artist)?.let { tags["artist"] = it }
-        albumPojo?.album?.artist?.let { tags["album_artist"] = it }
-        albumPojo?.album?.title?.let { tags["album"] = it }
+        (track.artist ?: albumCombo?.album?.artist)?.let { tags["artist"] = it }
+        albumCombo?.album?.artist?.let { tags["album_artist"] = it }
+        albumCombo?.album?.title?.let { tags["album"] = it }
         track.albumPosition?.let { tags["track"] = it.toString() }
-        (track.year ?: albumPojo?.album?.year)?.let { tags["date"] = it.toString() }
+        (track.year ?: albumCombo?.album?.year)?.let { tags["date"] = it.toString() }
 
         return tags
     }

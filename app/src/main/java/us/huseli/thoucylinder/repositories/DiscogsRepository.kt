@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
-import us.huseli.thoucylinder.Constants.DISCOGS_API_BASE_URL
+import us.huseli.thoucylinder.Constants.DISCOGS_API_ROOT
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMaster
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResults
@@ -42,7 +42,7 @@ class DiscogsRepository @Inject constructor() {
                 .map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }
                 .joinToString("&")
         }
-        val url = "$DISCOGS_API_BASE_URL/${path.trimStart('/')}?$paramString"
+        val url = "$DISCOGS_API_ROOT/${path.trimStart('/')}?$paramString"
         val headers = mapOf(
             "User-Agent" to CUSTOM_USER_AGENT,
             "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",

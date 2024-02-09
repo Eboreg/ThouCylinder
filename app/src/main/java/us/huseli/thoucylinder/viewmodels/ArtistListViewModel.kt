@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.net.toFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,12 +13,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.extensions.dpToPx
-import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.retaintheme.extensions.toBitmap
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.dataclasses.pojos.ArtistPojo
+import us.huseli.thoucylinder.asFullImageBitmap
+import us.huseli.thoucylinder.dataclasses.combos.ArtistPojo
 import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.matchDirectoriesRecursive
 import us.huseli.thoucylinder.matchFiles
@@ -47,22 +44,19 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
     }.asStateFlow()
 
     private suspend fun fetchArtistImage(artistPojo: ArtistPojo, context: Context): ImageBitmap? {
-        repos.settings.getLocalMusicDocumentFile()
+        repos.settings.getLocalMusicDirectory()
             ?.matchDirectoriesRecursive(Regex("^${artistPojo.name}"))
             ?.map { it.matchFiles(Regex("^artist\\..*", RegexOption.IGNORE_CASE), Regex("^image/.*")) }
             ?.flatten()
             ?.distinctBy { it.uri.path }
             ?.firstNotNullOfOrNull { it.toBitmap(context) }
-            ?.also { return it.asImageBitmap() }
+            ?.also { return it.asFullImageBitmap(context) }
 
         artistPojo.listAlbumArtUris()
-            .forEach { uri -> uri.toFile().toBitmap()?.asImageBitmap()?.also { return it } }
+            .forEach { uri -> uri.toFile().toBitmap()?.asFullImageBitmap(context)?.also { return it } }
 
         artistPojo.listFullImageUrls().forEach { url ->
-            url.getSquareBitmapByUrl()
-                ?.scaleToMaxSize(context.dpToPx(IMAGE_MAX_DP_FULL))
-                ?.asImageBitmap()
-                ?.also { return it }
+            url.getSquareBitmapByUrl()?.asFullImageBitmap(context)?.also { return it }
         }
 
         return null

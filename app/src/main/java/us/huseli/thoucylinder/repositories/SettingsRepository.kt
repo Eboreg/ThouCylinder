@@ -50,7 +50,7 @@ class SettingsRepository @Inject constructor(
         preferences.registerOnSharedPreferenceChangeListener(this)
     }
 
-    fun getLocalMusicDocumentFile(): DocumentFile? =
+    fun getLocalMusicDirectory(): DocumentFile? =
         _localMusicUri.value?.let { DocumentFile.fromTreeUri(context, it) }
 
     fun setAutoImportLocalMusic(value: Boolean) {

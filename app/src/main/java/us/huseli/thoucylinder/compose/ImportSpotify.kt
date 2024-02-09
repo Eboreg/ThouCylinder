@@ -69,27 +69,27 @@ fun ImportSpotify(
     val offset by viewModel.localOffset.collectAsStateWithLifecycle(0)
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val searchTerm by viewModel.searchTerm.collectAsStateWithLifecycle()
-    val selectedUserAlbums by viewModel.selectedAlbumPojos.collectAsStateWithLifecycle()
+    val selectedUserAlbums by viewModel.selectedAlbumCombos.collectAsStateWithLifecycle()
     val totalAlbumCount by viewModel.totalAlbumCount.collectAsStateWithLifecycle()
-    val albumPojos by viewModel.offsetAlbumPojos.collectAsStateWithLifecycle(emptyList())
+    val albumCombos by viewModel.offsetAlbumCombos.collectAsStateWithLifecycle(emptyList())
 
     LaunchedEffect(isAuthorized) {
         if (isAuthorized == true) viewModel.setOffset(0)
     }
 
-    LaunchedEffect(albumPojos.firstOrNull()) {
-        if (albumPojos.isNotEmpty()) listState.scrollToItem(0)
+    LaunchedEffect(albumCombos.firstOrNull()) {
+        if (albumCombos.isNotEmpty()) listState.scrollToItem(0)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         ImportSpotifyHeader(
-            isAuthorized = if (albumPojos.isEmpty()) isAuthorized else true,
+            isAuthorized = if (albumCombos.isEmpty()) isAuthorized else true,
             hasPrevious = offset > 0,
             hasNext = hasNext,
             importButtonEnabled = progress == null && selectedUserAlbums.isNotEmpty(),
-            selectAllEnabled = albumPojos.isNotEmpty(),
+            selectAllEnabled = albumCombos.isNotEmpty(),
             offset = offset,
-            currentAlbumCount = albumPojos.size,
+            currentAlbumCount = albumCombos.size,
             totalAlbumCount = filteredAlbumCount,
             isTotalAlbumCountExact = isAlbumCountExact,
             isAllSelected = isAllSelected,
@@ -127,7 +127,7 @@ fun ImportSpotify(
             backendSelection = backendSelection,
         )
 
-        if (albumPojos.isEmpty()) {
+        if (albumCombos.isEmpty()) {
             if (isAuthorized != true) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -141,12 +141,12 @@ fun ImportSpotify(
         }
 
         ItemList(
-            things = albumPojos,
+            things = albumCombos,
             cardHeight = 60.dp,
-            key = { _, pojo -> pojo.spotifyAlbum.id },
+            key = { _, combo -> combo.spotifyAlbum.id },
             gap = 5.dp,
             isSelected = { selectedUserAlbums.contains(it) },
-            onClick = { _, pojo -> viewModel.toggleSelected(pojo) },
+            onClick = { _, combo -> viewModel.toggleSelected(combo) },
             listState = listState,
             contentPadding = PaddingValues(vertical = 5.dp),
             trailingItem = {
@@ -158,13 +158,13 @@ fun ImportSpotify(
                     )
                 }
             },
-        ) { _, pojo ->
-            val imageBitmap = remember(pojo.spotifyAlbum) { mutableStateOf<ImageBitmap?>(null) }
-            val isImported = importedAlbumIds.contains(pojo.spotifyAlbum.id)
-            val isNotFound = notFoundAlbumIds.contains(pojo.spotifyAlbum.id)
+        ) { _, combo ->
+            val imageBitmap = remember(combo.spotifyAlbum) { mutableStateOf<ImageBitmap?>(null) }
+            val isImported = importedAlbumIds.contains(combo.spotifyAlbum.id)
+            val isNotFound = notFoundAlbumIds.contains(combo.spotifyAlbum.id)
 
-            LaunchedEffect(pojo.spotifyAlbum, isImported, isNotFound) {
-                if (!isImported && !isNotFound) imageBitmap.value = viewModel.getThumbnail(pojo.spotifyAlbum, context)
+            LaunchedEffect(combo.spotifyAlbum, isImported, isNotFound) {
+                if (!isImported && !isNotFound) imageBitmap.value = viewModel.getThumbnail(combo.spotifyAlbum, context)
                 else imageBitmap.value = null
             }
 
@@ -172,14 +172,14 @@ fun ImportSpotify(
                 imageBitmap = imageBitmap.value,
                 isImported = isImported,
                 isNotFound = isNotFound,
-                albumTitle = pojo.spotifyAlbum.name,
-                artist = pojo.artist,
+                albumTitle = combo.spotifyAlbum.name,
+                artist = combo.artist,
                 thirdRow = {
-                    val count = pojo.spotifyTrackPojos.size
+                    val count = combo.spotifyTrackCombos.size
 
                     Text(
                         text = pluralStringResource(R.plurals.x_tracks, count, count) +
-                            " • ${pojo.spotifyAlbum.year} • ${pojo.duration.sensibleFormat()}",
+                            " • ${combo.spotifyAlbum.year} • ${combo.duration.sensibleFormat()}",
                         style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
                     )
                 }

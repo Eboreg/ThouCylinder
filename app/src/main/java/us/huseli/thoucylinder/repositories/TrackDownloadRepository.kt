@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.DownloadTaskState
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.TrackDownloadTask
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumPojo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,19 +39,19 @@ class TrackDownloadRepository @Inject constructor(@ApplicationContext private va
     fun downloadTrack(
         track: Track,
         repos: Repositories,
-        dirDocumentFile: DocumentFile,
-        albumPojo: AbstractAlbumPojo? = null,
+        directory: DocumentFile,
+        albumCombo: AbstractAlbumCombo? = null,
         onError: (Throwable) -> Unit = {},
         onFinish: (Track) -> Unit = {},
     ): TrackDownloadTask {
         val task = TrackDownloadTask(
             scope = scope,
             track = track,
-            albumPojo = albumPojo,
+            albumCombo = albumCombo,
             repos = repos,
             onError = onError,
             onFinish = onFinish,
-            dirDocumentFile = dirDocumentFile,
+            directory = directory,
         )
 
         _tasks.value += task

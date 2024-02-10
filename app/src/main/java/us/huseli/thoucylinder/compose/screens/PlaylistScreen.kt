@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
-import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.BottomAppBarDefaults
@@ -35,9 +34,9 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.tracks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks

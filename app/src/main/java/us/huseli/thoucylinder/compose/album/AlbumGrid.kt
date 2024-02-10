@@ -91,7 +91,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
 
         if (downloadIsActive) {
             LinearProgressIndicator(
-                progress = downloadProgress?.toFloat() ?: 0f,
+                progress = { downloadProgress?.toFloat() ?: 0f },
                 modifier = Modifier.fillMaxWidth().height(2.dp),
             )
         }

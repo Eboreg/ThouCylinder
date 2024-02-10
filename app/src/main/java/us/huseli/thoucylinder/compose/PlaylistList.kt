@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material3.Icon
@@ -61,7 +62,7 @@ fun PlaylistList(
             Thumbnail(
                 image = imageBitmap.value,
                 shape = MaterialTheme.shapes.extraSmall,
-                placeholderIcon = Icons.Sharp.QueueMusic,
+                placeholderIcon = Icons.AutoMirrored.Sharp.QueueMusic,
             )
 
             Column(

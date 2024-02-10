@@ -120,7 +120,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
 
                     if (downloadIsActive) {
                         LinearProgressIndicator(
-                            progress = downloadProgress?.toFloat() ?: 0f,
+                            progress = { downloadProgress?.toFloat() ?: 0f },
                             modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }
@@ -171,7 +171,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
                         Column(modifier = Modifier.padding(bottom = 5.dp)) {
                             Text(text = "$statusText …")
                             LinearProgressIndicator(
-                                progress = progress.toFloat(),
+                                progress = { progress.toFloat() },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }

@@ -107,7 +107,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                 val iconModifier = Modifier.align(Alignment.Center).size(28.dp)
 
                 CircularProgressIndicator(
-                    progress = progress.toFloat(),
+                    progress = { progress.toFloat() },
                     modifier = Modifier.padding(vertical = 10.dp).size(28.dp),
                     color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 3.dp,

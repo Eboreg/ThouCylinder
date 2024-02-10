@@ -12,5 +12,5 @@ import us.huseli.thoucylinder.viewmodels.QueueViewModel
 fun CollapsedProgressBar(viewModel: QueueViewModel) {
     val currentProgress by viewModel.currentProgress.collectAsStateWithLifecycle(0f)
 
-    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), progress = currentProgress)
+    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), progress = { currentProgress })
 }

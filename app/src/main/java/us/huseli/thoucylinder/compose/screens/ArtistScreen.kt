@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
@@ -68,7 +69,7 @@ fun ArtistScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
-                    content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) }
+                    content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
                 )
                 Text(
                     text = artist,

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.PlayArrow
@@ -78,7 +79,7 @@ fun PlaylistScreen(
                 ) {
                     IconButton(
                         onClick = appCallbacks.onBackClick,
-                        content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                        content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                     )
                     Text(
                         text = playlist.name,

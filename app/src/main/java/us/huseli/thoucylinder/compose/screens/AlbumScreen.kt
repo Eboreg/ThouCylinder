@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.compose.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.ArrowBack
 import androidx.compose.material3.Icon
@@ -102,7 +102,7 @@ fun AlbumScreen(
                     ) {
                         IconButton(
                             onClick = appCallbacks.onBackClick,
-                            content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                            content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                             modifier = Modifier.width(40.dp),
                         )
                         combo.album.youtubeWebUrl?.also { youtubeUrl ->
@@ -128,68 +128,66 @@ fun AlbumScreen(
 
                 // Album cover, headlines, buttons, etc:
                 item {
-                    BoxWithConstraints(modifier = modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.height(140.dp),
-                        ) {
-                            Thumbnail(
-                                image = albumArt,
-                                shape = MaterialTheme.shapes.extraSmall,
-                                placeholderIcon = Icons.Sharp.Album,
-                                modifier = Modifier.fillMaxHeight(),
-                            )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.height(140.dp).padding(horizontal = 10.dp, vertical = 5.dp),
+                    ) {
+                        Thumbnail(
+                            image = albumArt,
+                            shape = MaterialTheme.shapes.extraSmall,
+                            placeholderIcon = Icons.Sharp.Album,
+                            modifier = Modifier.fillMaxHeight(),
+                        )
 
-                            Column(
-                                modifier = Modifier.fillMaxHeight(),
-                                verticalArrangement = Arrangement.SpaceEvenly,
-                            ) {
-                                Column {
+                        Column(
+                            modifier = Modifier.fillMaxHeight(),
+                            verticalArrangement = Arrangement.SpaceEvenly,
+                        ) {
+                            Column {
+                                Text(
+                                    text = combo.album.title,
+                                    style = if (combo.album.title.length > 20) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                combo.album.artist?.also { artist ->
                                     Text(
-                                        text = combo.album.title,
-                                        style = if (combo.album.title.length > 20) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                        text = artist,
+                                        style = if (artist.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    combo.album.artist?.also { artist ->
-                                        Text(
-                                            text = artist,
-                                            style = if (artist.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    AlbumBadges(
-                                        genres = combo.genres.map { it.genreName },
-                                        styles = combo.styles.map { it.styleName },
-                                        year = combo.yearString,
-                                        modifier = Modifier
-                                            .padding(vertical = 10.dp)
-                                            .fillMaxWidth()
-                                            .heightIn(max = 37.dp) // max 2 rows
-                                            .clipToBounds(),
-                                    )
                                 }
+                                AlbumBadges(
+                                    genres = combo.genres.map { it.genreName },
+                                    styles = combo.styles.map { it.styleName },
+                                    year = combo.yearString,
+                                    modifier = Modifier
+                                        .padding(vertical = 10.dp)
+                                        .fillMaxWidth()
+                                        .heightIn(max = 37.dp) // max 2 rows
+                                        .clipToBounds(),
+                                )
+                            }
 
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    AlbumButtons(
-                                        isLocal = combo.album.isLocal,
-                                        isInLibrary = combo.album.isInLibrary,
-                                        modifier = Modifier.align(Alignment.Bottom),
-                                        isDownloading = downloadIsActive,
-                                        isPartiallyDownloaded = combo.isPartiallyDownloaded,
-                                        callbacks = AlbumCallbacks(
-                                            combo = combo,
-                                            appCallbacks = appCallbacks,
-                                            context = context,
-                                            onPlayClick = { viewModel.playTrackCombos(trackCombos) },
-                                            onEnqueueClick = { viewModel.enqueueTrackCombos(trackCombos, context) },
-                                            onAddToPlaylistClick = {
-                                                appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = combo))
-                                            },
-                                        )
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                AlbumButtons(
+                                    isLocal = combo.album.isLocal,
+                                    isInLibrary = combo.album.isInLibrary,
+                                    modifier = Modifier.align(Alignment.Bottom),
+                                    isDownloading = downloadIsActive,
+                                    isPartiallyDownloaded = combo.isPartiallyDownloaded,
+                                    callbacks = AlbumCallbacks(
+                                        combo = combo,
+                                        appCallbacks = appCallbacks,
+                                        context = context,
+                                        onPlayClick = { viewModel.playTrackCombos(trackCombos) },
+                                        onEnqueueClick = { viewModel.enqueueTrackCombos(trackCombos, context) },
+                                        onAddToPlaylistClick = {
+                                            appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = combo))
+                                        },
                                     )
-                                }
+                                )
                             }
                         }
                     }
@@ -199,7 +197,7 @@ fun AlbumScreen(
                     item {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(top = 5.dp),
-                            progress = downloadProgress?.toFloat() ?: 0f,
+                            progress = { downloadProgress?.toFloat() ?: 0f },
                         )
                     }
                 }

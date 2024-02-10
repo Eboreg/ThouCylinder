@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +33,7 @@ fun AddToPlaylistDialog(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AlertDialog(onDismissRequest = onCancel, modifier = modifier) {
+    BasicAlertDialog(onDismissRequest = onCancel, modifier = modifier) {
         Surface(
             shape = MaterialTheme.shapes.extraSmall,
             color = MaterialTheme.colorScheme.surface,

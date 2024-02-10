@@ -15,7 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Clear
 import androidx.compose.material.icons.sharp.Search
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -111,7 +111,7 @@ inline fun CompactTextField(
                     }
                     trailingIcon(textFieldValue)
                 }
-                Divider(
+                HorizontalDivider(
                     modifier = Modifier.fillMaxWidth(),
                     color = if (isFocused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outlineVariant,
                 )

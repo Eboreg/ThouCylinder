@@ -14,7 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.extensions.nullIfBlank
 import us.huseli.thoucylinder.R
@@ -23,6 +23,7 @@ import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun EditAlbumTrackSection(
@@ -44,7 +45,7 @@ fun EditAlbumTrackSection(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             if (!editMode) {
-                Text(track.toString(showYear = true, albumCombo = albumCombo))
+                Text(track.toString(showYear = true, albumCombo = albumCombo).umlautify())
             } else {
                 Row {
                     OutlinedTextField(

@@ -16,20 +16,20 @@ data class MusicBrainzReleaseGroupSearch(
         val firstReleaseDate: String?,
         override val id: String,
         @SerializedName("primary-type")
-        val primaryType: MusicBrainzReleaseGroupPrimaryType,
+        val primaryType: MusicBrainzReleaseGroupPrimaryType?,
         @SerializedName("primary-type-id")
-        val primaryTypeId: String,
+        val primaryTypeId: String?,
         val releases: List<Release>,
         val score: Int,
         val title: String,
         @SerializedName("type-id")
-        val typeId: String,
+        val typeId: String?,
     ) : AbstractMusicBrainzItem() {
         data class Release(
             override val id: String,
-            val status: MusicBrainzReleaseStatus,
+            val status: MusicBrainzReleaseStatus?,
             @SerializedName("status-id")
-            val statusId: String,
+            val statusId: String?,
             val title: String,
         ) : AbstractMusicBrainzItem()
     }

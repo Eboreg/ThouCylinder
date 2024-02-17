@@ -34,19 +34,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
+import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -61,125 +64,131 @@ fun <T : AbstractTrackCombo> TrackGrid(
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     trackCallbacks: (Int, T) -> TrackCallbacks<T>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
+    progressIndicatorText: String? = null,
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
     SelectedTracksButtons(trackCount = selectedTrackCombos.size, callbacks = trackSelectionCallbacks)
 
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Adaptive(minSize = 160.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = contentPadding,
-        modifier = Modifier.padding(horizontal = 10.dp),
-    ) {
-        items(count = trackCombos.itemCount) { index ->
-            trackCombos[index]?.also { combo ->
-                val track = combo.track
-                val isSelected = selectedTrackCombos.contains(combo)
-                val (downloadProgress, downloadIsActive) =
-                    getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
-                val callbacks = trackCallbacks(index, combo)
+    Box {
+        progressIndicatorText?.also {
+            ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
+        }
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(minSize = 160.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = contentPadding,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        ) {
+            items(count = trackCombos.itemCount) { index ->
+                trackCombos[index]?.also { combo ->
+                    val track = combo.track
+                    val isSelected = selectedTrackCombos.contains(combo)
+                    val (downloadProgress, downloadIsActive) =
+                        getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
+                    val callbacks = trackCallbacks(index, combo)
 
-                callbacks.onEach?.invoke()
+                    callbacks.onEach?.invoke()
 
-                OutlinedCard(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    modifier = Modifier.combinedClickable(
-                        onClick = { callbacks.onTrackClick?.invoke() },
-                        onLongClick = { callbacks.onLongClick?.invoke() },
-                    ),
-                    border = CardDefaults.outlinedCardBorder()
-                        .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
-                ) {
-                    Box(modifier = Modifier.aspectRatio(1f)) {
-                        val imageBitmap = remember(track) { mutableStateOf<ImageBitmap?>(null) }
-
-                        LaunchedEffect(track) {
-                            imageBitmap.value = combo.getFullImageBitmap(context)
-                            viewModel.ensureTrackMetadata(track)
-                        }
-
-                        Thumbnail(
-                            image = imageBitmap.value,
-                            borderWidth = null,
-                            placeholderIcon = Icons.Sharp.MusicNote,
-                        )
-
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Sharp.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize().padding(10.dp),
-                                tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
-                            )
-                        }
-                    }
-
-                    if (downloadIsActive) {
-                        LinearProgressIndicator(
-                            progress = { downloadProgress?.toFloat() ?: 0f },
-                            modifier = Modifier.fillMaxWidth().height(2.dp),
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                top = if (downloadIsActive) 3.dp else 5.dp,
-                                bottom = 5.dp,
-                                start = 5.dp,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    OutlinedCard(
+                        shape = MaterialTheme.shapes.extraSmall,
+                        modifier = Modifier.combinedClickable(
+                            onClick = { callbacks.onTrackClick?.invoke() },
+                            onLongClick = { callbacks.onLongClick?.invoke() },
+                        ),
+                        border = CardDefaults.outlinedCardBorder()
+                            .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
-                            val titleLines = if (artist != null) 1 else 2
+                        Box(modifier = Modifier.aspectRatio(1f)) {
+                            val imageBitmap = remember(track) { mutableStateOf<ImageBitmap?>(null) }
 
-                            Text(
-                                text = track.title,
-                                maxLines = titleLines,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                            LaunchedEffect(track) {
+                                imageBitmap.value = combo.getFullImageBitmap(context)
+                                viewModel.ensureTrackMetadata(track)
+                            }
+
+                            Thumbnail(
+                                image = imageBitmap.value,
+                                borderWidth = null,
+                                placeholderIcon = Icons.Sharp.MusicNote,
                             )
-                            if (artist != null) {
-                                Text(
-                                    text = artist,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Sharp.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().padding(10.dp),
+                                    tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
                                 )
                             }
                         }
 
-                        TrackContextButtonWithMenu(
-                            isDownloadable = track.isDownloadable,
-                            isInLibrary = track.isInLibrary,
-                            callbacks = callbacks,
-                        )
-                    }
-
-                    trackDownloadTasks.find { it.track == track }?.also { download ->
-                        val status by download.downloadStatus.collectAsStateWithLifecycle()
-                        val progress by download.downloadProgress.collectAsStateWithLifecycle()
-                        val statusText = stringResource(status.stringId)
-
-                        Column(modifier = Modifier.padding(bottom = 5.dp)) {
-                            Text(text = "$statusText …")
+                        if (downloadIsActive) {
                             LinearProgressIndicator(
-                                progress = { progress.toFloat() },
-                                modifier = Modifier.fillMaxWidth(),
+                                progress = { downloadProgress?.toFloat() ?: 0f },
+                                modifier = Modifier.fillMaxWidth().height(2.dp),
                             )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    top = if (downloadIsActive) 3.dp else 5.dp,
+                                    bottom = 5.dp,
+                                    start = 5.dp,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
+                                val titleLines = if (artist != null) 1 else 2
+
+                                Text(
+                                    text = track.title.umlautify(),
+                                    maxLines = titleLines,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallHeader,
+                                )
+                                if (artist != null) {
+                                    Text(
+                                        text = artist.umlautify(),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                                    )
+                                }
+                            }
+
+                            TrackContextButtonWithMenu(
+                                isDownloadable = track.isDownloadable,
+                                isInLibrary = track.isInLibrary,
+                                callbacks = callbacks,
+                            )
+                        }
+
+                        trackDownloadTasks.find { it.track == track }?.also { download ->
+                            val status by download.downloadStatus.collectAsStateWithLifecycle()
+                            val progress by download.downloadProgress.collectAsStateWithLifecycle()
+                            val statusText = stringResource(status.stringId)
+
+                            Column(modifier = Modifier.padding(bottom = 5.dp)) {
+                                Text(text = "$statusText …")
+                                LinearProgressIndicator(
+                                    progress = { progress.toFloat() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    if (trackCombos.itemCount == 0 && onEmpty != null) onEmpty()
+        if (trackCombos.itemCount == 0 && onEmpty != null) onEmpty()
+    }
 }

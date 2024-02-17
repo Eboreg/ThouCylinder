@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.viewmodels
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,13 +14,21 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
 import us.huseli.thoucylinder.dataclasses.ImportProgressStatus
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.filterBySearchTerm
 import us.huseli.thoucylinder.dataclasses.musicBrainz.artistString
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.lastFm.getFullImage
+import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
+import us.huseli.thoucylinder.repositories.MusicBrainzRepository
+import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -33,10 +43,10 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
         }
     private val _isSearching = MutableStateFlow(false)
     private val _selectedTopAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
-    private val _importedAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _pastImportedAlbumIds = mutableSetOf<String>()
     private val _progress = MutableStateFlow<ImportProgressData?>(null)
+    private val _importedAlbumIds = MutableStateFlow<Map<String, UUID>>(emptyMap())
 
     val hasNext: Flow<Boolean> =
         combine(_filteredTopAlbums, repos.lastFm.allTopAlbumsFetched, _offset) { albums, allFetched, offset ->
@@ -51,13 +61,13 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
     val searchTerm: StateFlow<String> = _searchTerm.asStateFlow()
     val selectedTopAlbums = _selectedTopAlbums.asStateFlow()
     val totalFilteredAlbumCount: Flow<Int> = _filteredTopAlbums.map { it.size }
-    val username: StateFlow<String?> = repos.settings.lastFmUsername
-    val importedAlbumIds: StateFlow<List<String>> = _importedAlbumIds.asStateFlow()
+    val username: StateFlow<String?> = repos.lastFm.username
     val notFoundAlbumIds: StateFlow<List<String>> = _notFoundAlbumIds.asStateFlow()
     val isAllSelected: Flow<Boolean> = combine(offsetTopAlbums, _selectedTopAlbums) { userAlbums, selected ->
         userAlbums.isNotEmpty() && selected.map { it.mbid }.containsAll(userAlbums.map { it.mbid })
     }
     val progress = _progress.asStateFlow()
+    val importedAlbumIds = _importedAlbumIds.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -75,37 +85,30 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
 
     suspend fun getAlbumArt(album: LastFmTopAlbumsResponse.Album) = repos.lastFm.getThumbnail(album)
 
-    fun getSessionKey(authToken: String, onError: (Exception) -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            repos.lastFm.getSession(authToken)?.also {
-                repos.settings.setLastFmSessionKey(it.key)
-                repos.settings.setLastFmUsername(it.name)
-                repos.settings.setLastFmScrobble(true)
+    fun handleIntent(intent: Intent, context: Context) = viewModelScope.launch(Dispatchers.IO) {
+        intent.data?.getQueryParameter("token")?.also { authToken ->
+            try {
+                repos.lastFm.fetchSession(authToken)
+            } catch (e: Exception) {
+                repos.lastFm.setScrobble(false)
+                Log.e(javaClass.simpleName, "handleIntent: $e", e)
+                SnackbarEngine.addError(context.getString(R.string.last_fm_authorization_failed, e).umlautify())
             }
-        } catch (e: Exception) {
-            repos.settings.setLastFmScrobble(false)
-            Log.e(javaClass.simpleName, "getSessionKey: $e", e)
-            onError(e)
         }
     }
 
-    private fun updateProgressData(progress: Double? = null, status: ImportProgressStatus? = null) {
-        _progress.value = _progress.value?.let {
-            it.copy(progress = progress ?: it.progress, status = status ?: it.status)
-        }
-    }
-
-    fun importSelectedTopAlbums(onFinish: (importCount: Int, notFoundCount: Int) -> Unit) =
+    fun importSelectedTopAlbums(context: Context, onFinish: (importedIds: List<UUID>, notFoundCount: Int) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
             val selectedTopAlbums = _selectedTopAlbums.value
             var notFoundCount = 0
+            val importedIds = mutableListOf<UUID>()
 
             selectedTopAlbums.forEachIndexed { index, topAlbum ->
                 val progressBaseline = index.toDouble() / selectedTopAlbums.size
                 val progressMultiplier = 1.0 / selectedTopAlbums.size
 
                 _progress.value = ImportProgressData(
-                    item = topAlbum.name,
+                    item = topAlbum.name.umlautify(),
                     progress = progressBaseline,
                     status = ImportProgressStatus.MATCHING,
                 )
@@ -119,10 +122,18 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
                         progress = progressBaseline + (progressMultiplier * 0.9),
                         status = ImportProgressStatus.IMPORTING,
                     )
-                    repos.album.saveAlbumCombo(combo)
+
+                    val albumArt = topAlbum.image.getFullImage()
+                        ?.let { MediaStoreImage.fromUrls(it.url, topAlbum.image.getThumbnail()?.url ?: it.url) }
+                        ?.saveInternal(combo.album, context)
+
+                    repos.album.insertAlbumCombo(
+                        combo.copy(album = combo.album.copy(albumArt = albumArt ?: combo.album.albumArt))
+                    )
                     repos.track.insertTracks(combo.tracks)
                     updateProgressData(progress = progressBaseline + progressMultiplier)
-                    _importedAlbumIds.value += topAlbum.mbid
+                    _importedAlbumIds.value += topAlbum.mbid to combo.album.albumId
+                    importedIds.add(combo.album.albumId)
                 } else {
                     notFoundCount++
                     _notFoundAlbumIds.value += topAlbum.mbid
@@ -133,7 +144,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
 
             _progress.value = null
             if (selectedTopAlbums.isNotEmpty()) {
-                onFinish(selectedTopAlbums.size - notFoundCount, notFoundCount)
+                onFinish(importedIds, notFoundCount)
             }
         }
 
@@ -152,14 +163,14 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
 
     fun setSelectAll(value: Boolean) = viewModelScope.launch {
         if (value) _selectedTopAlbums.value = offsetTopAlbums.first().filter {
-            !_importedAlbumIds.value.contains(it.mbid) && !_notFoundAlbumIds.value.contains(it.mbid)
+            !_importedAlbumIds.value.containsKey(it.mbid) && !_notFoundAlbumIds.value.contains(it.mbid)
         }
         else _selectedTopAlbums.value = emptyList()
     }
 
     fun toggleSelected(album: LastFmTopAlbumsResponse.Album) {
         if (_selectedTopAlbums.value.contains(album)) _selectedTopAlbums.value -= album
-        else if (!_importedAlbumIds.value.contains(album.mbid) && !_notFoundAlbumIds.value.contains(album.mbid)) {
+        else if (!_importedAlbumIds.value.containsKey(album.mbid) && !_notFoundAlbumIds.value.contains(album.mbid)) {
             _selectedTopAlbums.value += album
         }
     }
@@ -172,10 +183,10 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
     ): AlbumWithTracksCombo? = repos.musicBrainz.getRelease(musicBrainzId)?.let { musicBrainzRelease ->
         val query = "${musicBrainzRelease.artistCredit.artistString()} - ${musicBrainzRelease.title}"
 
-        repos.youtube.getAlbumSearchResult(query, progressCallback)
-            .map { repos.musicBrainz.matchAlbumWithTracks(it, musicBrainzRelease) }
-            .filter { it.distance <= 1.0 }
-            .minByOrNull { it.distance }
+        repos.youtube.searchAlbumsWithTracks(query, progressCallback)
+            .map { musicBrainzRelease.matchAlbumWithTracks(it) }
+            .filter { it.score <= MusicBrainzRepository.MAX_ALBUM_MATCH_DISTANCE }
+            .minByOrNull { it.score }
             ?.albumCombo
             ?.let { combo ->
                 combo.copy(
@@ -183,5 +194,11 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) : Abs
                     tracks = combo.tracks.map { it.copy(isInLibrary = true) },
                 )
             }
+    }
+
+    private fun updateProgressData(progress: Double? = null, status: ImportProgressStatus? = null) {
+        _progress.value = _progress.value?.let {
+            it.copy(progress = progress ?: it.progress, status = status ?: it.status)
+        }
     }
 }

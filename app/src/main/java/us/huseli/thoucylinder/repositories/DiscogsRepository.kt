@@ -2,16 +2,12 @@ package us.huseli.thoucylinder.repositories
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
-import us.huseli.thoucylinder.Constants.DISCOGS_API_ROOT
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMaster
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResults
-import us.huseli.thoucylinder.getString
-import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +22,16 @@ class DiscogsRepository @Inject constructor() {
     private val apiKey = BuildConfig.discogsApiKey
     private val apiSecret = BuildConfig.discogsApiSecret
     private val gson: Gson = GsonBuilder().create()
+    private val responseCache = MutexCache<String, String> { url ->
+        val headers = mapOf(
+            "User-Agent" to CUSTOM_USER_AGENT,
+            "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",
+        )
+
+        Request(url = url, headers = headers)
+            .getString()
+            .replace(Regex("^data\\((.*)\\)$"), "$1")
+    }
 
     suspend fun getMaster(masterId: Int): DiscogsMaster? =
         gson.fromJson(request("masters/$masterId"), DiscogsMaster::class.java)
@@ -36,21 +42,10 @@ class DiscogsRepository @Inject constructor() {
         return gson.fromJson(request("database/search", params), DiscogsSearchResults::class.java)
     }
 
-    private suspend fun request(path: String, params: Map<String, String> = emptyMap()): String {
-        val paramString = withContext(Dispatchers.IO) {
-            params.plus("callback" to "data")
-                .map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }
-                .joinToString("&")
-        }
-        val url = "$DISCOGS_API_ROOT/${path.trimStart('/')}?$paramString"
-        val headers = mapOf(
-            "User-Agent" to CUSTOM_USER_AGENT,
-            "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",
-        )
+    private suspend fun request(path: String, params: Map<String, String> = emptyMap()): String =
+        responseCache.get(Request.getUrl("$API_ROOT/${path.trimStart('/')}", params.plus("callback" to "data")))
 
-        return Request.get(url = url, headers = headers)
-            .connect()
-            .getString()
-            .replace(Regex("^data\\((.*)\\)$"), "$1")
+    companion object {
+        const val API_ROOT = "https://api.discogs.com"
     }
 }

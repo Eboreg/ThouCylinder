@@ -6,25 +6,23 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import java.util.UUID
 
 data class PlaylistTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,
-    @Embedded override val spotifyTrack: SpotifyTrack?,
     @Embedded val playlist: Playlist,
-    @ColumnInfo(name = "PlaylistTrack_position") val position: Int,
+    @ColumnInfo("PlaylistTrack_position") val position: Int,
+    @ColumnInfo("PlaylistTrack_id") val id: UUID,
 ) : AbstractTrackCombo() {
-    fun toPlaylistTrack() =
-        PlaylistTrack(playlistId = playlist.playlistId, trackId = track.trackId, position = position)
-
     override fun equals(other: Any?) = other is PlaylistTrackCombo &&
-        other.track.trackId == track.trackId &&
-        other.playlist.playlistId == playlist.playlistId &&
+        other.id == id &&
         other.position == position
 
-    override fun hashCode(): Int = 31 * (31 * track.trackId.hashCode() + playlist.playlistId.hashCode()) + position
+    override fun hashCode() = 31 * (31 * super.hashCode() + position) + id.hashCode()
 }
 
-fun List<PlaylistTrackCombo>.toPlaylistTracks(): List<PlaylistTrack> = map { it.toPlaylistTrack() }
+fun List<PlaylistTrackCombo>.toPlaylistTracks(): List<PlaylistTrack> = map {
+    PlaylistTrack(playlistId = it.playlist.playlistId, trackId = it.track.trackId, position = it.position, id = it.id)
+}

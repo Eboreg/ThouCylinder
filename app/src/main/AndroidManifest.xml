@@ -37,7 +37,7 @@
         </receiver>
 
         <activity android:name=".MainActivity"
-            android:launchMode="standard"
+            android:launchMode="singleTop"
             android:exported="true"
             android:theme="@style/Theme.ThouCylinder.Starting"
             android:windowSoftInputMode="adjustResize">

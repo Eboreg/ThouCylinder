@@ -25,26 +25,26 @@ data class MusicBrainzRelease(
     val packaging: String?,
     @SerializedName("packaging-id")
     val packagingId: String?,
-    val quality: String,
+    val quality: String?,
     @SerializedName("release-group")
     val releaseGroup: ReleaseGroup,
-    val status: MusicBrainzReleaseStatus,
+    val status: MusicBrainzReleaseStatus?,
     @SerializedName("status-id")
-    val statusId: String,
+    val statusId: String?,
     val title: String,
 ) : AbstractMusicBrainzItem() {
     data class ReleaseGroup(
         @SerializedName("artist-credit")
         val artistCredit: List<MusicBrainzArtistCredit>,
-        val disambiguation: String,
+        val disambiguation: String?,
         @SerializedName("first-release-date")
         val firstReleaseDate: String?,
         val genres: List<MusicBrainzGenre>,
         override val id: String,
         @SerializedName("primary-type")
-        val primaryType: MusicBrainzReleaseGroupPrimaryType,
+        val primaryType: MusicBrainzReleaseGroupPrimaryType?,
         @SerializedName("primary-type-id")
-        val primaryTypeId: String,
+        val primaryTypeId: String?,
         val title: String,
     ) : AbstractMusicBrainzItem() {
         val year: Int?
@@ -55,9 +55,9 @@ data class MusicBrainzRelease(
     }
 
     data class Media(
-        val format: String,
+        val format: String?,
         @SerializedName("format-id")
-        val formatId: String,
+        val formatId: String?,
         val position: Int,
         @SerializedName("track-count")
         val trackCount: Int,
@@ -74,11 +74,11 @@ data class MusicBrainzRelease(
     }
 
     data class AlbumMatch(
-        val distance: Double,
+        val score: Double,
         val albumCombo: AlbumWithTracksCombo,
     )
 
-    val allGenres: List<MusicBrainzGenre>
+    private val allGenres: List<MusicBrainzGenre>
         get() = genres
             .asSequence()
             .plus(releaseGroup.genres)
@@ -93,10 +93,38 @@ data class MusicBrainzRelease(
             ?.takeIf { it.matches(Regex("^\\d{4}$")) }
             ?.toInt()
 
-    fun getAlbumDistance(combo: AlbumWithTracksCombo): Double {
+    fun matchAlbumWithTracks(combo: AlbumWithTracksCombo): AlbumMatch {
+        val medium = getBestMediumMatch(combo)?.medium
+
+        return AlbumMatch(
+            score = getAlbumDistance(combo),
+            albumCombo = combo.copy(
+                album = combo.album.copy(
+                    title = title,
+                    year = year,
+                    artist = artistCredit.artistString(),
+                    musicBrainzReleaseId = id,
+                    musicBrainzReleaseGroupId = releaseGroup.id,
+                ),
+                tracks = combo.tracks.mapIndexed { index, track ->
+                    val mbTrack = medium?.tracks?.getOrNull(index)
+                    track.copy(
+                        musicBrainzId = mbTrack?.id,
+                        artist = mbTrack?.artist ?: track.artist,
+                        year = mbTrack?.year ?: track.year,
+                        title = mbTrack?.title ?: track.title,
+                    )
+                },
+                tags = combo.tags.toSet().plus(allGenres.toInternal()).toList(),
+            ),
+        )
+    }
+
+    private fun getAlbumDistance(combo: AlbumWithTracksCombo): Double {
         /**
          * Test if relevant strings from this release and its tracks are contained in the corresponding strings of
-         * combo. Perfect match returns 0. If the numbers of tracks differ, the difference is added to the result.
+         * combo. Perfect match returns 0. If the numbers of tracks differ, the difference is factored into the result
+         * (by Media.getAlbumMatchScore()).
          */
         var result = 0.0
 
@@ -104,13 +132,13 @@ data class MusicBrainzRelease(
         if (!artistCredit.any { (combo.album.artist ?: combo.album.title).contains(it.name, true) }) result++
         if (!title.contains(combo.album.title, true)) result++
         if (combo.tracks.isNotEmpty()) {
-            getBestMediumMatch(combo)?.also { result += it.score.toDouble() / combo.tracks.size }
+            getBestMediumMatch(combo)?.also { result += (it.score.toDouble() / combo.tracks.size) * 2 }
         }
 
         return result
     }
 
-    fun getBestMediumMatch(combo: AlbumWithTracksCombo): Media.AlbumMatch? = media
+    private fun getBestMediumMatch(combo: AlbumWithTracksCombo): Media.AlbumMatch? = media
         .map { Media.AlbumMatch(medium = it, score = it.getAlbumMatchScore(combo)) }
         .minByOrNull { it.score }
 }

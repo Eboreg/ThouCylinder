@@ -59,7 +59,7 @@ class LibraryViewModel @Inject constructor(
     val isLoadingPlaylists = _isLoadingPlaylists.asStateFlow()
     val isLoadingTracks = _isLoadingTracks.asStateFlow()
     val listType = _listType.asStateFlow()
-    val playlists = repos.playlist.playlists
+    val playlists = repos.playlist.playlistsPojos
         .onStart { _isLoadingPlaylists.value = true }
         .onEach { _isLoadingPlaylists.value = false }
     val albumSortParameter = _albumSortParameter.asStateFlow()
@@ -71,7 +71,7 @@ class LibraryViewModel @Inject constructor(
 
     suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? =
         repos.playlist.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
-            album.getThumbnail(context)
+            album.albumArt?.getThumbnailImageBitmap(context)
         }
 
     fun setAlbumSearchTerm(value: String) {

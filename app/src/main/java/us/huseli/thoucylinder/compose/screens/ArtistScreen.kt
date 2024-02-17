@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +44,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
 import kotlin.math.max
 import kotlin.math.min
@@ -71,7 +72,7 @@ fun ArtistScreen(
                     content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
                 )
                 Text(
-                    text = artist,
+                    text = artist.umlautify(),
                     style = MaterialTheme.typography.headlineSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -130,6 +131,7 @@ fun ArtistScreen(
                                 Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                             },
                             albumDownloadTasks = albumDownloadTasks,
+                            getThumbnail = { viewModel.getAlbumThumbnail(it) },
                         )
                         DisplayType.GRID -> AlbumGrid(
                             combos = albumCombos,

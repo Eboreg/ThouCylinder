@@ -19,7 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -29,6 +29,7 @@ import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -138,7 +139,7 @@ fun TrackInfoBooleanRow(label: String, value: Boolean?, modifier: Modifier = Mod
     val iconModifier = Modifier.size(20.dp)
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
-        Text(text = label, modifier = Modifier.weight(0.4f))
+        Text(text = label.umlautify(), modifier = Modifier.weight(0.4f))
         when (value) {
             true -> Icon(Icons.Rounded.CheckCircle, null, tint = colors.Green, modifier = iconModifier)
             false -> Icon(Icons.Rounded.Cancel, null, tint = colors.Red, modifier = iconModifier)
@@ -150,7 +151,7 @@ fun TrackInfoBooleanRow(label: String, value: Boolean?, modifier: Modifier = Mod
 @Composable
 fun TrackInfoTextRow(label: String, value: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = label, modifier = Modifier.weight(0.4f))
-        Text(text = value, modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
+        Text(text = label.umlautify(), modifier = Modifier.weight(0.4f))
+        Text(text = value.umlautify(), modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
     }
 }

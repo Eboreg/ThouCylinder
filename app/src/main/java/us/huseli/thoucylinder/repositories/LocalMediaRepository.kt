@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -19,21 +18,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.padStart
-import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyTo
+import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.listCoverImages
+import us.huseli.thoucylinder.dataclasses.entities.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.escapeQuotes
 import us.huseli.thoucylinder.getRelativePathWithoutFilename
-import us.huseli.thoucylinder.toBitmap
+import us.huseli.thoucylinder.getSquareSize
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,7 +42,10 @@ import javax.inject.Singleton
 class LocalMediaRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepo: SettingsRepository,
+    database: Database,
 ) {
+    private val albumDao = database.albumDao()
+    private val trackDao = database.trackDao()
     private val _isImportingLocalMedia = MutableStateFlow(false)
 
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
@@ -53,7 +56,9 @@ class LocalMediaRepository @Inject constructor(
 
     @WorkerThread
     fun getAlbumDirectory(album: Album): DocumentFile? =
-        settingsRepo.getLocalMusicDirectory()?.let { album.getDirectory(it, context) }
+        settingsRepo.getLocalMusicDirectory()?.let {
+            album.getDirectory(it, context)
+        }
 
     fun setIsImporting(value: Boolean) {
         _isImportingLocalMedia.value = value
@@ -61,9 +66,11 @@ class LocalMediaRepository @Inject constructor(
 
     /** IMAGE RELATED METHODS ************************************************/
     @WorkerThread
-    fun collectNewLocalAlbumArt(combo: AlbumWithTracksCombo): List<Bitmap> = combo.tracks.listCoverImages(context)
-        .filter { it.uri != combo.album.albumArt?.uri }
-        .mapNotNull { it.toBitmap(context)?.square() }
+    suspend fun getBestNewLocalAlbumArt(combo: AlbumWithTracksCombo): MediaStoreImage? =
+        combo.tracks.listCoverImages(context)
+            .filter { it.uri != combo.album.albumArt?.uri }
+            .map { MediaStoreImage.fromUri(it.uri, context) }
+            .maxByOrNull { albumArt -> albumArt.getFullImageBitmap(context)?.getSquareSize() ?: 0 }
 
     @WorkerThread
     fun collectNewLocalAlbumArtUris(combo: AlbumWithTracksCombo): List<Uri> = combo.tracks.listCoverImages(context)
@@ -72,7 +79,9 @@ class LocalMediaRepository @Inject constructor(
 
     @WorkerThread
     fun deleteAlbumDirectoryAlbumArt(album: Album) {
-        getAlbumDirectory(album)?.also { album.albumArt?.deleteDirectoryFiles(context, it) }
+        getAlbumDirectory(album)?.also {
+            album.albumArt?.deleteDirectoryFiles(context, it)
+        }
     }
 
     @WorkerThread
@@ -83,34 +92,55 @@ class LocalMediaRepository @Inject constructor(
         }
     }
 
-    suspend fun getOrCreateAlbumArt(combo: AbstractAlbumCombo) = combo.getOrCreateAlbumArt(context)
-
     @WorkerThread
-    suspend fun saveInternalAlbumArtFiles(album: Album, imageUrl: String): MediaStoreImage? =
-        album.saveInternalAlbumArtFiles(imageUrl, context)
+    suspend fun saveInternalAlbumArtFiles(image: MediaStoreImage, album: Album): MediaStoreImage? =
+        image.saveInternal(album, context)
 
 
     /** AUDIO RELATED METHODS ************************************************/
-    @WorkerThread
-    fun listNewLocalAlbums(
-        treeDocumentFile: DocumentFile,
-        existingTrackUris: Collection<Uri>,
-    ): List<AlbumWithTracksCombo> {
+    suspend fun importNewLocalAlbums(treeDocumentFile: DocumentFile, existingTrackUris: Collection<Uri>) {
         val albums = mutableSetOf<Album>()
         val tracks = mutableListOf<Track>()
-        val albumCombos = mutableListOf<AlbumWithTracksCombo>()
+        val getAlbum: suspend (ID3Data, String?, String) -> Album = { id3, defaultArtist, defaultTitle ->
+            val artist = id3.albumArtist ?: defaultArtist
+            val title = id3.album ?: defaultTitle
+            val album = albums.find {
+                (it.title == title && it.artist == artist) ||
+                    (it.musicBrainzReleaseId != null && it.musicBrainzReleaseId == id3.musicBrainzReleaseId)
+            }
+
+            if (album != null) {
+                if (
+                    (id3.musicBrainzReleaseId != null && album.musicBrainzReleaseId == null) ||
+                    (id3.musicBrainzReleaseGroupId != null && album.musicBrainzReleaseGroupId == null)
+                ) {
+                    album.copy(
+                        musicBrainzReleaseId = id3.musicBrainzReleaseId ?: album.musicBrainzReleaseId,
+                        musicBrainzReleaseGroupId = id3.musicBrainzReleaseGroupId
+                            ?: album.musicBrainzReleaseGroupId,
+                    ).also { albumDao.updateAlbums(it) }
+                } else album
+            } else Album(
+                title = title,
+                artist = artist,
+                isInLibrary = true,
+                isLocal = true,
+                musicBrainzReleaseId = id3.musicBrainzReleaseId,
+                musicBrainzReleaseGroupId = id3.musicBrainzReleaseGroupId,
+            ).also {
+                albums.add(it)
+                albumDao.insertAlbums(it)
+            }
+        }
 
         treeDocumentFile.listFiles().forEach { documentFile ->
             if (documentFile.isDirectory) {
                 // Go through subdirectories recursively:
-                albumCombos.addAll(listNewLocalAlbums(documentFile, existingTrackUris))
+                importNewLocalAlbums(documentFile, existingTrackUris)
             } else if (documentFile.isFile && !existingTrackUris.contains(documentFile.uri)) {
-                /**
-                 * TODO: Seems like FFprobeKit doesn't get permission to access
-                 * the file even though we have read/write permissions through
-                 * the DocumentFile API. So we do this stupid copy to temp file
-                 * shit until we have a better solution.
-                 */
+                // TODO: Seems like FFprobeKit doesn't get permission to access the file even though we have read/write
+                // permissions through the DocumentFile API. So we do this stupid copy to temp file shit until we have
+                // a better solution.
                 val mimeTypeGuess = MimeTypeMap.getSingleton().getMimeTypeFromExtension(documentFile.extension)
 
                 // Just to avoid copying lots of irrelevant files:
@@ -120,9 +150,8 @@ class LocalMediaRepository @Inject constructor(
                     val metadata = tempFile.extractTrackMetadata(mediaInfo)
 
                     if (metadata?.mimeType?.startsWith("audio/") == true) {
-                        // Make an educated guess on artist/album names from path.
-                        // Segment 1 is most likely a standard directory like "Music",
-                        // so drop it:
+                        // Make an educated guess on artist/album names from path. Segment 1 is most likely a standard
+                        // directory like "Music", so drop it:
                         val pathSegments = documentFile.uri.getRelativePathWithoutFilename()?.split('/')?.drop(1)
                         val id3 = mediaInfo?.extractID3Data() ?: ID3Data()
                         val (pathArtist, pathTitle) = when (pathSegments?.size) {
@@ -137,33 +166,25 @@ class LocalMediaRepository @Inject constructor(
                                 ?.takeLast(2)
                                 ?.map { it.nullIfEmpty() }
                                 ?: listOf(null, null)
-                        val albumArtist = id3.albumArtist ?: pathArtist
-                        val albumTitle = id3.album ?: pathTitle ?: context.getString(R.string.unknown_album)
-                        val album = albums.find { it.artist == albumArtist && it.title == albumTitle }
-                            ?: Album(
-                                title = albumTitle,
-                                artist = albumArtist,
-                                isInLibrary = true,
-                                isLocal = true,
-                            ).also { albums.add(it) }
+                        val track = Track(
+                            title = id3.title ?: filenameTitle ?: context.getString(R.string.unknown_title),
+                            isInLibrary = true,
+                            artist = id3.artist ?: pathArtist,
+                            albumPosition = id3.trackNumber ?: filenameAlbumPosition?.toIntOrNull(),
+                            discNumber = id3.discNumber,
+                            year = id3.year,
+                            albumId = getAlbum(
+                                id3,
+                                pathArtist,
+                                pathTitle ?: context.getString(R.string.unknown_album)
+                            ).albumId,
+                            metadata = metadata,
+                            localUri = documentFile.uri,
+                            musicBrainzId = id3.musicBrainzTrackId,
+                        )
 
-                        try {
-                            tracks.add(
-                                Track(
-                                    title = id3.title ?: filenameTitle ?: context.getString(R.string.unknown_title),
-                                    isInLibrary = true,
-                                    artist = id3.artist ?: pathArtist,
-                                    albumPosition = id3.trackNumber ?: filenameAlbumPosition?.toIntOrNull(),
-                                    discNumber = id3.discNumber,
-                                    year = id3.year,
-                                    albumId = album.albumId,
-                                    metadata = metadata,
-                                    localUri = documentFile.uri,
-                                )
-                            )
-                        } catch (e: Exception) {
-                            Log.e(javaClass.simpleName, "listNewMediaStoreAlbums: $e, documentFile=$documentFile", e)
-                        }
+                        trackDao.insertTracks(track)
+                        tracks.add(track)
                     }
                 }
             }
@@ -172,18 +193,12 @@ class LocalMediaRepository @Inject constructor(
         albums.forEach { album ->
             val combo = AlbumWithTracksCombo(
                 album = album,
-                tracks = tracks.filter { it.albumId == album.albumId }
-                    .sortedBy { it.albumPosition }
-                    .sortedBy { it.discNumber },
+                tracks = tracks.filter { it.albumId == album.albumId }.stripTitleCommons(),
             )
-            val albumArt = collectNewLocalAlbumArt(combo)
-                .maxByOrNull { it.width * it.height }
-                ?.let { MediaStoreImage.fromBitmap(it, context, combo.album) }
+            val albumArt = getBestNewLocalAlbumArt(combo)
 
-            albumCombos.add(combo.copy(album = album.copy(albumArt = albumArt)))
+            if (albumArt != null) albumDao.updateAlbumArt(album.albumId, albumArt)
         }
-
-        return albumCombos
     }
 
     @WorkerThread
@@ -213,7 +228,7 @@ class LocalMediaRepository @Inject constructor(
 
     @WorkerThread
     fun tagTrack(track: Track, documentFile: DocumentFile, albumCombo: AbstractAlbumCombo? = null) {
-        val rawFile = documentFile.toRawFile(context) ?: throw Error("Could not convert $documentFile to raw File")
+        val rawFile = documentFile.toRawFile(context) ?: throw Exception("Could not convert $documentFile to raw File")
         val path = documentFile.getAbsolutePath(context)
         val tmpFile = File(context.cacheDir, "${documentFile.baseName}.tmp.${documentFile.extension}")
         val tagCommands = getTagMap(track, albumCombo)
@@ -236,11 +251,14 @@ class LocalMediaRepository @Inject constructor(
     private fun getTagMap(track: Track, albumCombo: AbstractAlbumCombo? = null): Map<String, String> {
         val tags = mutableMapOf("title" to track.title)
 
-        (track.artist ?: albumCombo?.album?.artist)?.let { tags["artist"] = it }
-        albumCombo?.album?.artist?.let { tags["album_artist"] = it }
-        albumCombo?.album?.title?.let { tags["album"] = it }
-        track.albumPosition?.let { tags["track"] = it.toString() }
-        (track.year ?: albumCombo?.album?.year)?.let { tags["date"] = it.toString() }
+        (track.artist ?: albumCombo?.album?.artist)?.also { tags["artist"] = it }
+        albumCombo?.album?.artist?.also { tags["album_artist"] = it }
+        albumCombo?.album?.title?.also { tags["album"] = it }
+        track.albumPosition?.also { tags["track"] = it.toString() }
+        (track.year ?: albumCombo?.album?.year)?.also { tags["date"] = it.toString() }
+        track.musicBrainzId?.also { tags["mb_track_id"] = it }
+        albumCombo?.album?.musicBrainzReleaseId?.also { tags["mb_release_id"] = it }
+        albumCombo?.album?.musicBrainzReleaseGroupId?.also { tags["mb_release_group_id"] = it }
 
         return tags
     }

@@ -17,9 +17,16 @@ data class LastFmImage(
     }
 
     companion object {
+        val fullImageSizePriority = listOf(Size.MEGA, Size.EXTRALARGE, Size.LARGE)
         val thumbnailSizePriority = listOf(Size.LARGE, Size.EXTRALARGE, Size.MEDIUM)
     }
 }
 
-fun List<LastFmImage>.getThumbnail(): LastFmImage? =
-    LastFmImage.thumbnailSizePriority.firstNotNullOfOrNull { size -> find { it.size == size && it.url.isNotEmpty() } }
+
+fun List<LastFmImage>.getImage(sizePriority: List<LastFmImage.Size>): LastFmImage? =
+    sizePriority.firstNotNullOfOrNull { size -> find { it.size == size && it.url.isNotEmpty() } }
+
+fun List<LastFmImage>.getFullImage(): LastFmImage? = getImage(LastFmImage.fullImageSizePriority)
+
+
+fun List<LastFmImage>.getThumbnail(): LastFmImage? = getImage(LastFmImage.thumbnailSizePriority)

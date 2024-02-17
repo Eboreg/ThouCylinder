@@ -22,6 +22,6 @@ data class AlbumCallbacks(
     val onEditClick: () -> Unit = { appCallbacks.onEditAlbumClick(combo) },
     val onEnqueueClick: () -> Unit,
     val onPlayClick: () -> Unit,
-    val onPlayOnSpotifyClick: (() -> Unit)? = combo.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
+    val onPlayOnSpotifyClick: (() -> Unit)? = combo.album.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
     val onPlayOnYoutubeClick: (() -> Unit)? = combo.album.youtubeWebUrl?.let { { uriHandler.openUri(it) } },
 )

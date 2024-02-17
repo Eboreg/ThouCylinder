@@ -42,12 +42,9 @@ fun AlbumArtAndTitlesColumn(
     Column(
         modifier = modifier.width(width).offset { IntOffset(x = offsetX, y = 0) },
         horizontalAlignment = Alignment.CenterHorizontally,
-        // verticalArrangement = Arrangement.spacedBy(15.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         AlbumArtColumn(imageBitmap = imageBitmap)
-        if (showTitles) {
-            TitlesColumn(isExpanded = true, title = title, artist = artist, alpha = contentAlpha)
-        }
+        if (showTitles) TitlesColumn(isExpanded = true, title = title, artist = artist, alpha = contentAlpha)
     }
 }

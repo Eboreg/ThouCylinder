@@ -16,8 +16,8 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.util.UUID
 import javax.inject.Inject
 

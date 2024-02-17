@@ -9,12 +9,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.ArrowBack
+import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
@@ -34,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,7 +42,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.thoucylinder.Constants.LASTFM_AUTH_URL
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.Umlautify
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
 
 @Composable
@@ -58,6 +60,7 @@ fun SettingsScreen(
     val lastFmUsername by viewModel.lastFmUsername.collectAsStateWithLifecycle()
     val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
     val lastFmScrobble by viewModel.lastFmScrobble.collectAsStateWithLifecycle()
+    val umlautify by viewModel.umlautify.collectAsStateWithLifecycle()
 
     var showLastFmUsernameDialog by rememberSaveable { mutableStateOf(false) }
     var showLocalMusicUriDialog by rememberSaveable { mutableStateOf(false) }
@@ -101,7 +104,7 @@ fun SettingsScreen(
             ) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
-                    content = { Icon(Icons.Sharp.ArrowBack, stringResource(R.string.go_back)) },
+                    content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                 )
                 Text(
                     text = stringResource(R.string.settings),
@@ -111,99 +114,111 @@ fun SettingsScreen(
         }
 
         Column(modifier = Modifier.verticalScroll(state = rememberScrollState())) {
-            Row(
-                modifier = Modifier
-                    .clickable { showLocalMusicUriDialog = true }
-                    .padding(vertical = 15.dp, horizontal = 10.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = stringResource(R.string.local_music_directory),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.directory_for_music_downloads_from_youtube),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        text = localMusicUri?.lastPathSegment ?: stringResource(R.string.none),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
+            StringSettingSection(
+                title = stringResource(R.string.local_music_directory),
+                description = stringResource(R.string.directory_for_music_downloads_from_youtube),
+                currentValue = localMusicUri?.lastPathSegment ?: stringResource(R.string.none),
+                onClick = { showLocalMusicUriDialog = true },
+            )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 15.dp, horizontal = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = stringResource(R.string.auto_import_local_music),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.this_also_requires_local_music_directory_to_be_set_see_above),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Switch(
-                    checked = autoImportLocalMusic == true,
-                    onCheckedChange = {
-                        viewModel.setAutoImportLocalMusic(it)
-                        if (it) viewModel.importNewLocalAlbums(context)
-                    },
-                )
-            }
+            BooleanSettingSection(
+                title = stringResource(R.string.auto_import_local_music),
+                description = stringResource(R.string.this_also_requires_local_music_directory_to_be_set_see_above),
+                checked = autoImportLocalMusic == true,
+                onCheckedChange = {
+                    viewModel.setAutoImportLocalMusic(it)
+                    if (it) viewModel.importNewLocalAlbums(context)
+                },
+            )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 15.dp, horizontal = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = stringResource(R.string.scrobble_to_last_fm),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.after_enabling_this_authorize_app_with_last_fm),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Switch(
-                    checked = lastFmScrobble,
-                    onCheckedChange = {
-                        if (it) uriHandler.openUri(LASTFM_AUTH_URL)
-                        else viewModel.disableLastFmScrobble()
-                    },
-                )
-            }
+            BooleanSettingSection(
+                title = stringResource(R.string.scrobble_to_last_fm),
+                description = stringResource(R.string.after_enabling_this_authorize_app_with_last_fm),
+                checked = lastFmScrobble,
+                onCheckedChange = {
+                    if (it) uriHandler.openUri(LASTFM_AUTH_URL)
+                    else viewModel.disableLastFmScrobble()
+                },
+            )
 
-            Row(
-                modifier = Modifier
-                    .clickable { showLastFmUsernameDialog = true }
-                    .padding(vertical = 15.dp, horizontal = 10.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = stringResource(R.string.last_fm_username),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.used_for_importing_your_top_albums),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        text = lastFmUsername ?: stringResource(R.string.none),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
+            StringSettingSection(
+                title = stringResource(R.string.last_fm_username),
+                description = stringResource(R.string.used_for_importing_your_top_albums),
+                currentValue = lastFmUsername ?: stringResource(R.string.none),
+                onClick = { showLastFmUsernameDialog = true },
+            )
+
+            BooleanSettingSection(
+                title = stringResource(R.string.umlautify),
+                description = Umlautify.transform(
+                    stringResource(R.string.puts_metal_umlauts_above_random_letters_because_it_s_cool),
+                    true,
+                ),
+                checked = umlautify,
+                onCheckedChange = { viewModel.setUmlautify(it) },
+            )
         }
     }
+}
+
+
+@Composable
+fun StringSettingSection(
+    title: String,
+    description: String,
+    currentValue: String,
+    onClick: () -> Unit,
+) {
+    SettingSection(onClick = onClick) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = currentValue,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+
+@Composable
+fun BooleanSettingSection(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    SettingSection {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = description, style = MaterialTheme.typography.bodyMedium)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+
+@Composable
+fun SettingSection(
+    onClick: (() -> Unit)? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 15.dp, horizontal = 10.dp)
+            .let { if (onClick != null) it.clickable { onClick() } else it },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        content = content,
+    )
 }
 
 

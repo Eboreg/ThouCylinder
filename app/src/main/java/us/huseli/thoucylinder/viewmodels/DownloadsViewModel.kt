@@ -33,8 +33,9 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
     ) = viewModelScope.launch(Dispatchers.IO) {
         repos.album.getAlbumWithTracks(albumId)?.also { combo ->
             repos.localMedia.createAlbumDirectory(combo.album)?.also { directory ->
-                val tracks = combo.tracks.filter { !it.isDownloaded }
-                    .map { ensureTrackMetadata(it, commit = false) }
+                val tracks = combo.tracks
+                    .filter { !it.isDownloaded }
+                    .map { repos.youtube.ensureTrackMetadata(it) }
                 val trackTasks = tracks.map { track ->
                     repos.download.downloadTrack(
                         track = track,
@@ -45,17 +46,15 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
                         onFinish = onTrackFinish,
                     )
                 }
-                val albumArt = combo.getOrCreateAlbumArt(context)
+                val albumArt = combo.album.albumArt?.saveInternal(combo.album, context)
 
                 albumArt?.saveToDirectory(context, directory)
                 repos.youtube.addAlbumDownloadTask(AlbumDownloadTask(combo.album, trackTasks, onFinish))
-                repos.album.saveAlbumCombo(
-                    combo.copy(
-                        album = combo.album.copy(
-                            isLocal = true,
-                            isInLibrary = true,
-                            albumArt = albumArt,
-                        )
+                repos.album.updateAlbum(
+                    combo.album.copy(
+                        isLocal = true,
+                        isInLibrary = true,
+                        albumArt = albumArt,
                     )
                 )
             }
@@ -65,7 +64,7 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
     fun downloadTrack(track: Track) = viewModelScope.launch(Dispatchers.IO) {
         repos.settings.getLocalMusicDirectory()?.also { directory ->
             repos.download.downloadTrack(
-                track = ensureTrackMetadata(track, commit = false),
+                track = repos.youtube.ensureTrackMetadata(track),
                 repos = repos,
                 directory = directory,
             )

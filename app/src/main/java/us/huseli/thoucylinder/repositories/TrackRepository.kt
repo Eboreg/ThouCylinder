@@ -3,15 +3,18 @@ package us.huseli.thoucylinder.repositories
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.WorkerThread
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
@@ -22,8 +25,11 @@ import javax.inject.Singleton
 @Singleton
 class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
     private val trackDao = database.trackDao()
+    private val selectedTrackCombos = mutableMapOf<String, MutableStateFlow<List<TrackCombo>>>()
 
-    private val _selectedTrackCombos = mutableMapOf<String, MutableStateFlow<List<TrackCombo>>>()
+    val thumbnailCache = MutexCache<MediaStoreImage, ImageBitmap> {
+        it.getThumbnailImageBitmap(context)
+    }
 
     suspend fun addToLibraryByAlbumId(albumId: UUID) = trackDao.setIsInLibraryByAlbumId(albumId, true)
 
@@ -39,8 +45,6 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     suspend fun deleteTracks(tracks: Collection<Track>) {
         if (tracks.isNotEmpty()) trackDao.deleteTracks(*tracks.toTypedArray())
     }
-
-    suspend fun deleteTracksByAlbumId(albumId: UUID) = trackDao.deleteTracksByAlbumId(albumId)
 
     suspend fun deleteTracksByAlbumId(albumIds: Collection<UUID>) =
         trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
@@ -96,7 +100,7 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
 
     /** PRIVATE METHODS *******************************************************/
     private fun mutableFlowSelectedTrackCombos(viewModelClass: String): MutableStateFlow<List<TrackCombo>> =
-        _selectedTrackCombos[viewModelClass] ?: MutableStateFlow<List<TrackCombo>>(emptyList()).also {
-            _selectedTrackCombos[viewModelClass] = it
+        selectedTrackCombos[viewModelClass] ?: MutableStateFlow<List<TrackCombo>>(emptyList()).also {
+            selectedTrackCombos[viewModelClass] = it
         }
 }

@@ -113,7 +113,7 @@ class TrackDownloadTask(
 
     private suspend fun run(context: Context): Track {
         val youtubeMetadata = repos.youtube.getBestMetadata(track)
-            ?: throw Error("Could not get Youtube metadata for $track")
+            ?: throw Exception("Could not get Youtube metadata for $track")
         val basename = track.generateBasename(includeArtist = albumCombo == null)
         val filename = "$basename.${youtubeMetadata.fileExtension}"
         val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
@@ -127,13 +127,17 @@ class TrackDownloadTask(
         )
 
         setStatus(DownloadStatus.TAGGING)
-        repos.localMedia.tagTrack(track = track, documentFile = DocumentFile.fromFile(tempFile), albumCombo = albumCombo)
+        repos.localMedia.tagTrack(
+            track = track,
+            documentFile = DocumentFile.fromFile(tempFile),
+            albumCombo = albumCombo,
+        )
         setProgress(0.8)
 
         setStatus(DownloadStatus.MOVING)
         directory.findFile(filename)?.delete()
         val documentFile = directory.createFile(youtubeMetadata.mimeType, basename)
-            ?: throw Error(
+            ?: throw Exception(
                 "DocumentFile.createFile() returned null. mimeType=${youtubeMetadata.mimeType}, " +
                     "basename=$basename, directory=$directory"
             )

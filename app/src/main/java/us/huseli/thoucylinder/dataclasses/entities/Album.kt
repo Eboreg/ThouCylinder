@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses.entities
 import android.content.Context
 import android.os.Parcelable
 import androidx.annotation.WorkerThread
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
@@ -17,7 +16,7 @@ import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import java.util.UUID
 
 @Entity(
@@ -35,11 +34,19 @@ data class Album(
     @ColumnInfo("Album_isHidden") val isHidden: Boolean = false,
     @ColumnInfo("Album_musicBrainzReleaseId") val musicBrainzReleaseId: String? = null,
     @ColumnInfo("Album_musicBrainzReleaseGroupId") val musicBrainzReleaseGroupId: String? = null,
+    @ColumnInfo("Album_spotifyId") val spotifyId: String? = null,
     @Embedded("Album_youtubePlaylist_") val youtubePlaylist: YoutubePlaylist? = null,
     @Embedded("Album_albumArt_") val albumArt: MediaStoreImage? = null,
+    @Embedded("Album_spotifyImage_") val spotifyImage: MediaStoreImage? = null,
 ) : Parcelable {
+    val isOnSpotify: Boolean
+        get() = spotifyId != null
+
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
+
+    val spotifyWebUrl: String?
+        get() = spotifyId?.let { "https://open.spotify.com/album/${it}" }
 
     val youtubeWebUrl: String?
         get() = youtubePlaylist?.let { "https://youtube.com/playlist?list=${it.id}" }
@@ -76,12 +83,6 @@ data class Album(
 
         return distances.min()
     }
-
-    suspend fun getThumbnail(context: Context): ImageBitmap? = albumArt?.getThumbnailImageBitmap(context)
-
-    @WorkerThread
-    suspend fun saveInternalAlbumArtFiles(imageUrl: String, context: Context): MediaStoreImage? =
-        MediaStoreImage.fromUrls(imageUrl).saveInternal(this, context)
 
     private fun getSubDirs(context: Context): List<String> =
         listOf(artist?.sanitizeFilename() ?: context.getString(R.string.unknown_artist), title.sanitizeFilename())

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package us.huseli.thoucylinder.compose.modalcover
 
 import android.content.res.Configuration
@@ -60,7 +62,6 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -75,6 +76,7 @@ import us.huseli.thoucylinder.compose.track.TrackContextMenu
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.getAverageColor
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import kotlin.math.roundToInt
 import kotlin.time.DurationUnit
@@ -294,7 +296,9 @@ fun BoxWithConstraintsScope.ModalCover(
                         Modifier
                             .offset(x = if (previousTrackCombo != null) -this@ModalCover.maxWidth else 0.dp)
                             .offset { IntOffset(x = horizontalSwipeState.offset.value.roundToInt(), y = 0) }
-                            .width(this@ModalCover.maxWidth * (1 + listOfNotNull(nextTrackCombo, previousTrackCombo).size))
+                            .width(
+                                this@ModalCover.maxWidth * (1 + listOfNotNull(nextTrackCombo, previousTrackCombo).size)
+                            )
                     else Modifier
 
                 // Album art (+ previous/left album art + titles for portrait):

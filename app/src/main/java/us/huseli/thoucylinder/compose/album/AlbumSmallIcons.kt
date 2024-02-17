@@ -29,7 +29,7 @@ fun AlbumSmallIcons(combo: AbstractAlbumCombo, modifier: Modifier = Modifier) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    if (combo.isOnSpotify) {
+    if (combo.album.isOnSpotify) {
         Icon(
             painter = painterResource(R.drawable.spotify),
             contentDescription = null,

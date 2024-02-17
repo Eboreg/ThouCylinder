@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.PlayArrow
@@ -18,9 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.extensions.sensibleFormat
@@ -29,29 +27,36 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
-import us.huseli.thoucylinder.viewmodels.LibraryViewModel
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 
 @Composable
 fun PlaylistList(
     playlists: List<PlaylistPojo>,
-    viewModel: LibraryViewModel,
+    isLoading: Boolean,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
-    onEmpty: (@Composable () -> Unit)? = null,
+    getImage: suspend (UUID) -> ImageBitmap?,
 ) {
-    val context = LocalContext.current
-
     ItemList(
         things = playlists,
         onClick = { _, pojo -> onPlaylistClick(pojo) },
         cardHeight = 60.dp,
         key = { _, pojo -> pojo.playlistId },
-        onEmpty = onEmpty,
+        onEmpty = {
+            if (!isLoading) Text(
+                text = stringResource(R.string.no_playlists_found),
+                modifier = Modifier.padding(10.dp),
+            )
+        },
+        progressIndicatorText = if (isLoading) stringResource(R.string.loading_playlists) else null,
     ) { _, playlist ->
         val imageBitmap = remember(playlist) { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(playlist) {
-            viewModel.getPlaylistImage(playlist.playlistId, context)?.also { imageBitmap.value = it }
+            getImage(playlist.playlistId)?.also { imageBitmap.value = it }
         }
 
         Row(
@@ -74,7 +79,7 @@ fun PlaylistList(
                 )
 
                 Text(
-                    text = playlist.name,
+                    text = playlist.name.umlautify(),
                     maxLines = 2,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                     overflow = TextOverflow.Ellipsis,

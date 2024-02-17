@@ -7,19 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
-import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
-import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumArtist
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbumGenre
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyArtist
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrackArtist
-import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
@@ -27,8 +19,7 @@ import java.util.concurrent.Executors
 
 @androidx.room.Database(
     entities = [
-        Genre::class,
-        Style::class,
+        Tag::class,
         Track::class,
         Album::class,
         Playlist::class,
@@ -36,17 +27,10 @@ import java.util.concurrent.Executors
         YoutubeSearchToken::class,
         YoutubeQueryTrack::class,
         QueueTrack::class,
-        AlbumGenre::class,
-        AlbumStyle::class,
-        SpotifyAlbum::class,
-        SpotifyAlbumArtist::class,
-        SpotifyAlbumGenre::class,
-        SpotifyArtist::class,
-        SpotifyTrack::class,
-        SpotifyTrackArtist::class,
+        AlbumTag::class,
     ],
     exportSchema = false,
-    version = 75,
+    version = 83,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -56,7 +40,6 @@ abstract class Database : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
-    abstract fun spotifyDao(): SpotifyDao
 
     companion object {
         fun build(context: Context): Database {
@@ -67,7 +50,13 @@ abstract class Database : RoomDatabase() {
             if (BuildConfig.DEBUG) {
                 class Callback : QueryCallback {
                     override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
-                        Log.i("Database", "$sqlQuery\nbindArgs=$bindArgs")
+                        if (
+                            !sqlQuery.startsWith("BEGIN DEFERRED TRANSACTION") &&
+                            !sqlQuery.startsWith("TRANSACTION SUCCESSFUL") &&
+                            !sqlQuery.startsWith("END TRANSACTION") &&
+                            !sqlQuery.contains("room_table_modification_log") &&
+                            !sqlQuery.startsWith("DROP TRIGGER IF EXISTS")
+                        ) Log.i("Database", "$sqlQuery\nbindArgs=$bindArgs")
                     }
                 }
 

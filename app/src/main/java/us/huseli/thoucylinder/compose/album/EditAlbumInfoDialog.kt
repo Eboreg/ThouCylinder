@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -38,12 +38,12 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.AutocompleteChip
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.SmallButton
-import us.huseli.thoucylinder.dataclasses.entities.Genre
+import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 import java.util.UUID
 
-data class GenreUI(
-    val genre: Genre,
+data class TagUI(
+    val tag: Tag,
     val focus: Boolean = false,
 )
 
@@ -56,7 +56,7 @@ fun EditAlbumInfoDialog(
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
     val albumWithTracks by viewModel.flowAlbumWithTracks(albumId).collectAsStateWithLifecycle(null)
-    val allGenres by viewModel.allGenres.collectAsStateWithLifecycle(emptyList())
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle(emptyList())
     val density = LocalDensity.current
     val levenshtein = LevenshteinDistance()
     val totalAreaSize by viewModel.totalAreaSize.collectAsStateWithLifecycle(DpSize.Zero)
@@ -66,12 +66,12 @@ fun EditAlbumInfoDialog(
         var title by rememberSaveable { mutableStateOf(combo.album.title) }
         var artist by rememberSaveable { mutableStateOf(combo.album.artist) }
         var year by rememberSaveable { mutableStateOf(combo.album.year) }
-        var genres by rememberSaveable { mutableStateOf(combo.genres.map { GenreUI(it) }) }
-        val allGenreNames by remember(allGenres, genres) {
+        var tags by rememberSaveable { mutableStateOf(combo.tags.map { TagUI(it) }) }
+        val allTagNames by remember(allTags, tags) {
             mutableStateOf(
-                allGenres.map { it.genreName }
+                allTags.map { it.name }
                     .toSet()
-                    .plus(genres.map { it.genre.genreName })
+                    .plus(tags.map { it.tag.name })
             )
         }
 
@@ -91,10 +91,10 @@ fun EditAlbumInfoDialog(
                     onClick = {
                         val newCombo = combo.copy(
                             album = combo.album.copy(artist = artist, title = title, year = year),
-                            genres = genres.map { it.genre },
+                            tags = tags.map { it.tag },
                         )
 
-                        viewModel.saveAlbumCombo(newCombo)
+                        viewModel.updateAlbumCombo(newCombo)
                         viewModel.tagAlbumTracks(newCombo)
                         onClose()
                     },
@@ -132,31 +132,31 @@ fun EditAlbumInfoDialog(
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        genres.forEachIndexed { index, genreUI ->
+                        tags.forEachIndexed { index, tagUI ->
                             AutocompleteChip(
-                                text = genreUI.genre.genreName,
+                                text = tagUI.tag.name,
                                 onSave = {
-                                    genres = genres.toMutableList().apply {
-                                        removeAt(index)
-                                        if (it.isNotEmpty()) add(index, GenreUI(Genre(it)))
+                                    tags = tags.toMutableList().apply {
+                                        val tagUi = removeAt(index)
+                                        if (it.isNotEmpty()) add(index, tagUi.copy(tag = tagUi.tag.copy(name = it)))
                                     }
                                 },
                                 onDelete = {
-                                    genres = genres.toMutableList().apply { removeAt(index) }
+                                    tags = tags.toMutableList().apply { removeAt(index) }
                                 },
-                                getSuggestions = { genreName ->
-                                    allGenreNames.filter { it.contains(genreName, true) }
-                                        .sortedBy { levenshtein.apply(genreName.lowercase(), it.lowercase()) }
+                                getSuggestions = { tagName ->
+                                    allTagNames.filter { it.contains(tagName, true) }
+                                        .sortedBy { levenshtein.apply(tagName.lowercase(), it.lowercase()) }
                                         .slice(0, 10)
                                 },
-                                focus = genreUI.focus,
+                                focus = tagUI.focus,
                                 totalAreaSize = totalAreaSize,
                                 dialogSize = dialogSize,
                             )
                         }
                         SmallButton(
                             onClick = {
-                                genres = genres.toMutableList().apply { add(GenreUI(Genre(""), true)) }
+                                tags = tags.toMutableList().apply { add(TagUI(Tag(name = ""), true)) }
                             },
                             text = stringResource(R.string.add_new),
                             leadingIcon = Icons.Sharp.AddCircle,

@@ -23,7 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 import java.util.UUID
 
@@ -42,8 +43,12 @@ fun EditAlbumCoverDialog(
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val albumArts by viewModel.flowAlbumArt2(albumId, context).collectAsStateWithLifecycle()
+    val albumArts by viewModel.flowAlbumArt(albumId, context).collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoadingAlbumArt.collectAsStateWithLifecycle()
+    val close: () -> Unit = {
+        viewModel.cancelAlbumArtFetch(albumId)
+        onClose()
+    }
     val selectFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             viewModel.saveAlbumArtFromUri(
@@ -51,10 +56,12 @@ fun EditAlbumCoverDialog(
                 uri = uri,
                 context = context,
                 onSuccess = {
-                    onClose()
-                    SnackbarEngine.addInfo(context.getString(R.string.updated_album_cover))
+                    close()
+                    SnackbarEngine.addInfo(context.getString(R.string.updated_album_cover).umlautify())
                 },
-                onFail = { SnackbarEngine.addError(context.getString(R.string.could_not_open_the_selected_image)) },
+                onFail = {
+                    SnackbarEngine.addError(context.getString(R.string.could_not_open_the_selected_image).umlautify())
+                },
             )
         }
     }
@@ -64,7 +71,7 @@ fun EditAlbumCoverDialog(
         title = { Text(stringResource(R.string.select_album_cover)) },
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = MaterialTheme.shapes.small,
-        onDismissRequest = onClose,
+        onDismissRequest = close,
         dismissButton = {
             TextButton(
                 onClick = { selectFileLauncher.launch(arrayOf("image/*")) },
@@ -73,12 +80,12 @@ fun EditAlbumCoverDialog(
             TextButton(
                 onClick = {
                     viewModel.saveAlbumArt(albumId, null, context)
-                    onClose()
+                    close()
                 },
                 content = { Text(stringResource(R.string.clear)) },
             )
             TextButton(
-                onClick = onClose,
+                onClick = close,
                 content = { Text(text = stringResource(R.string.cancel)) },
             )
         },
@@ -89,11 +96,11 @@ fun EditAlbumCoverDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(albumArts) { albumArt ->
+                items(albumArts.toList()) { albumArt ->
                     Column(
                         modifier = Modifier.fillMaxSize().clickable {
                             viewModel.saveAlbumArt(albumId, albumArt, context)
-                            onClose()
+                            close()
                         },
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {

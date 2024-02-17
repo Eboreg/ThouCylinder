@@ -1,11 +1,13 @@
 package us.huseli.thoucylinder.compose
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,13 +18,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +58,7 @@ fun AddToPlaylistDialog(
                             modifier = Modifier.fillMaxHeight().padding(horizontal = 10.dp, vertical = 5.dp),
                         ) {
                             Text(
-                                text = playlist.name,
+                                text = playlist.name.umlautify(),
                                 style = MaterialTheme.typography.bodyLarge,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -87,4 +90,36 @@ fun AddToPlaylistDialog(
             }
         }
     }
+}
+
+
+@Composable
+fun AddDuplicatesToPlaylistDialog(
+    duplicateCount: Int,
+    onAddDuplicatesClick: () -> Unit,
+    onSkipDuplicatesCount: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AlertDialog(
+        shape = MaterialTheme.shapes.small,
+        onDismissRequest = onCancel,
+        confirmButton = {
+            TextButton(onClick = onAddDuplicatesClick) { Text(stringResource(R.string.add_anyway)) }
+            TextButton(onClick = onSkipDuplicatesCount) { Text(stringResource(R.string.skip)) }
+        },
+        modifier = modifier,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    pluralStringResource(
+                        id = R.plurals.x_selected_tracks_already_in_playlist,
+                        count = duplicateCount,
+                        duplicateCount,
+                    )
+                )
+                Text(stringResource(R.string.what_do_you_want_to_do))
+            }
+        },
+    )
 }

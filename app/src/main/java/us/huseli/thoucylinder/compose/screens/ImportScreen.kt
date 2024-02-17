@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.SkipNext
 import androidx.compose.material.icons.sharp.SkipPrevious
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -22,19 +21,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.ImportLastFm
 import us.huseli.thoucylinder.compose.ImportSpotify
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
+import java.util.UUID
 
 enum class ImportBackend { SPOTIFY, LAST_FM }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportScreen(modifier: Modifier = Modifier, onGotoSettingsClick: () -> Unit, onGotoLibraryClick: () -> Unit) {
+fun ImportScreen(
+    modifier: Modifier = Modifier,
+    onGotoSettingsClick: () -> Unit,
+    onGotoLibraryClick: () -> Unit,
+    onGotoAlbumClick: (UUID) -> Unit,
+) {
     var backend by rememberSaveable { mutableStateOf(ImportBackend.SPOTIFY) }
     val backendSelection = @Composable {
         Row(
@@ -59,11 +63,13 @@ fun ImportScreen(modifier: Modifier = Modifier, onGotoSettingsClick: () -> Unit,
             ImportBackend.SPOTIFY -> ImportSpotify(
                 onGotoLibraryClick = onGotoLibraryClick,
                 backendSelection = backendSelection,
+                onGotoAlbumClick = onGotoAlbumClick,
             )
             ImportBackend.LAST_FM -> ImportLastFm(
                 onGotoSettingsClick = onGotoSettingsClick,
                 onGotoLibraryClick = onGotoLibraryClick,
                 backendSelection = backendSelection,
+                onGotoAlbumClick = onGotoAlbumClick,
             )
         }
     }
@@ -101,7 +107,7 @@ fun ProgressSection(progress: ImportProgressData?) {
         ) {
             Text(text = "$statusText ${progress.item} …", style = MaterialTheme.typography.labelLarge)
             LinearProgressIndicator(
-                progress = progress.progress.toFloat(),
+                progress = { progress.progress.toFloat() },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

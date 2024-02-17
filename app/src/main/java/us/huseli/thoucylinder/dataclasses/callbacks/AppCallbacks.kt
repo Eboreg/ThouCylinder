@@ -4,8 +4,8 @@ import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
 import java.util.UUID
 
 data class AppCallbacks(
@@ -17,7 +17,7 @@ data class AppCallbacks(
     val onCancelAlbumDownloadClick: (UUID) -> Unit,
     val onCreatePlaylistClick: () -> Unit,
     val onDeleteAlbumComboClick: (AbstractAlbumCombo) -> Unit,
-    val onDeletePlaylistClick: (PlaylistPojo) -> Unit,
+    val onDeletePlaylistClick: (Playlist) -> Unit,
     val onDownloadAlbumClick: (Album) -> Unit,
     val onDownloadTrackClick: (Track) -> Unit,
     val onEditAlbumClick: (AbstractAlbumCombo) -> Unit,

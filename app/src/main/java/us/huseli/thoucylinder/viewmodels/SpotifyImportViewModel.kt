@@ -1,11 +1,10 @@
 package us.huseli.thoucylinder.viewmodels
 
-import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
-import com.spotify.sdk.android.auth.AuthorizationResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,69 +13,53 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.ContextMutexCache
+import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
 import us.huseli.thoucylinder.dataclasses.ImportProgressStatus
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.SpotifyAlbumCombo
-import us.huseli.thoucylinder.dataclasses.combos.filterBySearchTerm
+import us.huseli.thoucylinder.dataclasses.combos.YoutubePlaylistCombo
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyResponseAlbumItem
+import us.huseli.thoucylinder.dataclasses.spotify.filterBySearchTerm
+import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
+import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
 
-data class SpotifyAlbumMatch(
-    val albumWithTracksCombo: AlbumWithTracksCombo,
-    val spotifyAlbumCombo: SpotifyAlbumCombo,
-    val youtubeAlbumCombo: AlbumWithTracksCombo,
-    val levenshtein: Double,
-)
-
 @HiltViewModel
 class SpotifyImportViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
     private val _localOffset = MutableStateFlow(0)
-    private val _selectedAlbumCombos = MutableStateFlow<List<SpotifyAlbumCombo>>(emptyList())
-    private val _thumbnailCache = ContextMutexCache<SpotifyAlbum, String, ImageBitmap>(
-        keyFromInstance = { spotifyAlbum -> spotifyAlbum.id },
-        fetchMethod = { spotifyAlbum, context -> spotifyAlbum.getThumbnailImageBitmap(context) }
-    )
+    private val _selectedSpotifyAlbums = MutableStateFlow<List<SpotifyResponseAlbumItem.Album>>(emptyList())
     private val _progress = MutableStateFlow<ImportProgressData?>(null)
-    private val _importedAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _searchTerm = MutableStateFlow("")
-    private val _albumCombos = repos.spotify.userAlbumCombos.map { combos ->
-        combos.filter { !_pastImportedAlbumIds.contains(it.spotifyAlbum.id) }
+    private val _spotifyAlbums = combine(repos.spotify.userAlbums, _searchTerm) { albums, term ->
+        albums.filterBySearchTerm(term).filter { !_pastImportedAlbumIds.contains(it.id) }
     }
-    private val _filteredAlbumCombos: Flow<List<SpotifyAlbumCombo>> =
-        combine(_albumCombos, _searchTerm) { combos, term -> combos.filterBySearchTerm(term) }
     private val _pastImportedAlbumIds = mutableSetOf<String>()
     private val _isSearching = MutableStateFlow(false)
+    private val _importedAlbumIds = MutableStateFlow<Map<String, UUID>>(emptyMap())
 
-    val offsetAlbumCombos: Flow<List<SpotifyAlbumCombo>> = combine(_filteredAlbumCombos, _localOffset) { combos, offset ->
-        combos.subList(min(offset, max(combos.lastIndex, 0)), min(offset + 50, combos.size))
+    val offsetSpotifyAlbums = combine(_spotifyAlbums, _localOffset) { albums, offset ->
+        albums.subList(min(offset, max(albums.lastIndex, 0)), min(offset + 50, albums.size))
     }
-
     val localOffset: StateFlow<Int> = _localOffset.asStateFlow()
-    val selectedAlbumCombos: StateFlow<List<SpotifyAlbumCombo>> = _selectedAlbumCombos.asStateFlow()
-    val isAllSelected: Flow<Boolean> = combine(offsetAlbumCombos, _selectedAlbumCombos) { userAlbums, selected ->
-        userAlbums.isNotEmpty() && selected.map { it.spotifyAlbum.id }
-            .containsAll(userAlbums.map { it.spotifyAlbum.id })
+    val selectedSpotifyAlbums: StateFlow<List<SpotifyResponseAlbumItem.Album>> = _selectedSpotifyAlbums.asStateFlow()
+    val isAllSelected: Flow<Boolean> = combine(offsetSpotifyAlbums, _selectedSpotifyAlbums) { userAlbums, selected ->
+        userAlbums.isNotEmpty() && selected.map { it.id }.containsAll(userAlbums.map { it.id })
     }
-    val isAuthorized: Flow<Boolean?> = repos.spotify.isAuthorized
+    val authorizationStatus: Flow<SpotifyOAuth2.AuthorizationStatus> = repos.spotify.oauth2.authorizationStatus
     val progress: StateFlow<ImportProgressData?> = _progress.asStateFlow()
-    val importedAlbumIds: StateFlow<List<String>> = _importedAlbumIds.asStateFlow()
     val nextAlbumIdx = repos.spotify.nextUserAlbumIdx
     val notFoundAlbumIds: StateFlow<List<String>> = _notFoundAlbumIds.asStateFlow()
-    val requestCode = repos.spotify.requestCode
     val searchTerm: StateFlow<String> = _searchTerm.asStateFlow()
     val filteredAlbumCount: Flow<Int?> = combine(
         _searchTerm,
-        _filteredAlbumCombos,
+        _spotifyAlbums,
         repos.spotify.totalUserAlbumCount,
     ) { term, filteredAlbums, totalCount ->
         if (term == "") totalCount?.minus(_pastImportedAlbumIds.size)
@@ -90,6 +73,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         combine(filteredAlbumCount, _localOffset) { total, offset -> total == null || total > offset + 50 }
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
     val totalAlbumCount: StateFlow<Int?> = repos.spotify.totalUserAlbumCount
+    val importedAlbumIds = _importedAlbumIds.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -97,28 +81,38 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         }
     }
 
-    fun authorize(activity: Activity) = repos.spotify.authorize(activity)
+    suspend fun getThumbnail(spotifyAlbum: SpotifyResponseAlbumItem.Album): ImageBitmap? =
+        repos.spotify.thumbnailCache.getOrNull(spotifyAlbum)
 
-    suspend fun getThumbnail(spotifyAlbum: SpotifyAlbum, context: Context): ImageBitmap? =
-        _thumbnailCache.get(spotifyAlbum, context)
+    fun getAuthUrl() = repos.spotify.oauth2.getAuthUrl()
 
-    fun importSelectedAlbums(onFinish: (importCount: Int, notFoundCount: Int) -> Unit) =
+    fun handleIntent(intent: Intent, context: Context) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            repos.spotify.oauth2.handleIntent(intent)
+        } catch (e: Exception) {
+            Log.e(javaClass.simpleName, "handleIntent: $e", e)
+            SnackbarEngine.addError(context.getString(R.string.spotify_authorization_failed, e).umlautify())
+        }
+    }
+
+    fun importSelectedAlbums(onFinish: (importedIds: List<UUID>, notFoundCount: Int) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
-            val selectedCombos = _selectedAlbumCombos.value
+            val selectedAlbums = _selectedSpotifyAlbums.value
             var notFoundCount = 0
+            val importedIds = mutableListOf<UUID>()
 
-            selectedCombos.forEachIndexed { index, spotifyCombo ->
-                val progressBaseline = index.toDouble() / selectedCombos.size
-                val progressMultiplier = 1.0 / selectedCombos.size
+            selectedAlbums.forEachIndexed { index, spotifyAlbum ->
+                val progressBaseline = index.toDouble() / selectedAlbums.size
+                val progressMultiplier = 1.0 / selectedAlbums.size
                 val importProgressData = ImportProgressData(
-                    item = spotifyCombo.spotifyAlbum.name,
+                    item = spotifyAlbum.name.umlautify(),
                     progress = progressBaseline,
                     status = ImportProgressStatus.MATCHING,
                 )
 
                 _progress.value = importProgressData
 
-                val match = findAlbumOnYoutube(spotifyCombo) { progress ->
+                val match = findAlbumOnYoutube(spotifyAlbum) { progress ->
                     _progress.value = importProgressData.copy(
                         progress = progressBaseline + (progress * progressMultiplier * 0.9)
                     )
@@ -130,75 +124,39 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
                         status = ImportProgressStatus.IMPORTING,
                     )
 
-                    // Main "source of truth" for each track must be Youtube, since
-                    // that's where we get the audio from. But if the durations are
-                    // close enough, we copy Spotify's track info as it's
-                    // generally better.
-                    val tracks = match.youtubeAlbumCombo.tracks.mapIndexed { trackIdx, trackYoutube ->
-                        val spotifyTrackCombo = match.spotifyAlbumCombo.spotifyTrackCombos.getOrNull(trackIdx)
-                        val (title, artist) =
-                            if (spotifyTrackCombo?.hasSimilarDuration(trackYoutube) == true)
-                                Pair(spotifyTrackCombo.track.name, spotifyTrackCombo.artist)
-                            else Pair(trackYoutube.title, trackYoutube.artist)
-                        trackYoutube.copy(title = title, artist = artist, isInLibrary = true)
-                    }
-                    val spotifyTrackCombos =
-                        match.spotifyAlbumCombo.spotifyTrackCombos.mapIndexed { trackIdx, spotifyTrackCombo ->
-                            tracks.getOrNull(trackIdx)
-                                ?.let { spotifyTrackCombo.copy(track = spotifyTrackCombo.track.copy(trackId = it.trackId)) }
-                                ?: spotifyTrackCombo
-                        }
-                    val imageUrl = match.spotifyAlbumCombo.spotifyAlbum.fullImage?.url
-                        ?: match.youtubeAlbumCombo.album.youtubePlaylist?.fullImage?.url
+                    val spotifyAlbumArt = spotifyAlbum.images.toMediaStoreImage()
                     val albumArt =
-                        imageUrl?.let {
-                            repos.localMedia.saveInternalAlbumArtFiles(
-                                match.albumWithTracksCombo.album,
-                                it
-                            )
-                        }
-                    val albumCombo = match.youtubeAlbumCombo.copy(
-                        album = match.albumWithTracksCombo.album.copy(
-                            youtubePlaylist = match.youtubeAlbumCombo.album.youtubePlaylist,
-                            albumArt = albumArt,
-                        ),
-                        tracks = tracks.map { it.copy(albumId = match.albumWithTracksCombo.album.albumId) },
-                        spotifyAlbum = match.spotifyAlbumCombo.spotifyAlbum,
-                    )
-                    val spotifyAlbumCombo = match.spotifyAlbumCombo.copy(
-                        spotifyTrackCombos = spotifyTrackCombos,
+                        (spotifyAlbumArt ?: match.playlistCombo.playlist.getMediaStoreImage())
+                            ?.let { repos.localMedia.saveInternalAlbumArtFiles(it, match.albumCombo.album) }
+                    val albumCombo = match.albumCombo.copy(
+                        album = match.albumCombo.album.copy(albumArt = albumArt),
                     )
 
-                    repos.album.saveAlbumCombo(albumCombo)
+                    repos.album.insertAlbumCombo(albumCombo)
                     repos.track.insertTracks(albumCombo.tracks)
-                    repos.spotify.saveSpotifyAlbumCombo(spotifyAlbumCombo)
                     _progress.value = importProgressData.copy(
                         progress = progressBaseline + progressMultiplier,
                         status = ImportProgressStatus.IMPORTING,
                     )
-                    _importedAlbumIds.value += spotifyCombo.spotifyAlbum.id
+                    _importedAlbumIds.value += spotifyAlbum.id to albumCombo.album.albumId
+                    importedIds.add(albumCombo.album.albumId)
                 } else {
                     notFoundCount++
-                    _notFoundAlbumIds.value += spotifyCombo.spotifyAlbum.id
+                    _notFoundAlbumIds.value += spotifyAlbum.id
                 }
 
-                _selectedAlbumCombos.value -= spotifyCombo
+                _selectedSpotifyAlbums.value -= spotifyAlbum
             }
 
             _progress.value = null
-            if (selectedCombos.isNotEmpty()) {
-                onFinish(selectedCombos.size - notFoundCount, notFoundCount)
+            if (selectedAlbums.isNotEmpty()) {
+                onFinish(importedIds, notFoundCount)
             }
         }
 
-    fun setAuthorizationResponse(value: AuthorizationResponse) {
-        Log.i(javaClass.simpleName, "setAuthorizationResponse: type=${value.type}, error=${value.error}")
-        repos.spotify.setAuthorizationResponse(value)
-    }
-
     fun setOffset(offset: Int) {
         _localOffset.value = offset
-        _selectedAlbumCombos.value = emptyList()
+        _selectedSpotifyAlbums.value = emptyList()
         fetchUserAlbumsIfNeeded()
     }
 
@@ -210,25 +168,26 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
     }
 
     fun setSelectAll(value: Boolean) = viewModelScope.launch {
-        if (value) _selectedAlbumCombos.value = offsetAlbumCombos.first().filter {
-            !_importedAlbumIds.value.contains(it.spotifyAlbum.id) && !_notFoundAlbumIds.value.contains(it.spotifyAlbum.id)
+        if (value) _selectedSpotifyAlbums.value = offsetSpotifyAlbums.first().filter {
+            !_importedAlbumIds.value.containsKey(it.id) &&
+                !_notFoundAlbumIds.value.contains(it.id)
         }
-        else _selectedAlbumCombos.value = emptyList()
+        else _selectedSpotifyAlbums.value = emptyList()
     }
 
-    fun toggleSelected(spotifyCombo: SpotifyAlbumCombo) {
-        if (_selectedAlbumCombos.value.contains(spotifyCombo)) _selectedAlbumCombos.value -= spotifyCombo
+    fun toggleSelected(spotifyAlbum: SpotifyResponseAlbumItem.Album) {
+        if (_selectedSpotifyAlbums.value.contains(spotifyAlbum)) _selectedSpotifyAlbums.value -= spotifyAlbum
         else if (
-            !_importedAlbumIds.value.contains(spotifyCombo.spotifyAlbum.id) &&
-            !_notFoundAlbumIds.value.contains(spotifyCombo.spotifyAlbum.id)
-        ) _selectedAlbumCombos.value += spotifyCombo
+            !_importedAlbumIds.value.containsKey(spotifyAlbum.id) &&
+            !_notFoundAlbumIds.value.contains(spotifyAlbum.id)
+        ) _selectedSpotifyAlbums.value += spotifyAlbum
     }
 
 
     /** PRIVATE FUNCTIONS *****************************************************/
     private fun fetchUserAlbumsIfNeeded() = viewModelScope.launch(Dispatchers.IO) {
         while (
-            _filteredAlbumCombos.first().size < _localOffset.value + 100 &&
+            _spotifyAlbums.first().size < _localOffset.value + 100 &&
             !repos.spotify.allUserAlbumsFetched.value
         ) {
             _isSearching.value = true
@@ -238,53 +197,10 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
     }
 
     private suspend fun findAlbumOnYoutube(
-        spotifyCombo: SpotifyAlbumCombo,
+        responseAlbum: SpotifyResponseAlbumItem.Album,
         progressCallback: (Double) -> Unit = {},
-    ): SpotifyAlbumMatch? {
-        val album = Album(
-            title = spotifyCombo.spotifyAlbum.name,
-            isLocal = false,
-            isInLibrary = true,
-            artist = spotifyCombo.artist.takeIf { it.isNotEmpty() },
-            year = spotifyCombo.spotifyAlbum.year,
-        )
-        val combo = AlbumWithTracksCombo(
-            album = album,
-            genres = spotifyCombo.genres,
-            tracks = spotifyCombo.spotifyTrackCombos.map {
-                Track(
-                    isInLibrary = true,
-                    artist = it.artist,
-                    albumId = album.albumId,
-                    albumPosition = it.track.trackNumber,
-                    title = it.track.name,
-                    discNumber = it.track.discNumber,
-                )
-            },
-            spotifyAlbum = spotifyCombo.spotifyAlbum.copy(albumId = album.albumId),
-        )
-
-        // First sort by Levenshtein distance, then put those with equal or
-        // higher track count than combo in front. #1 should be best match:
-        return repos.youtube.getAlbumSearchResult(spotifyCombo.searchQuery, progressCallback)
-            .asSequence()
-            .map {
-                if (it.tracks.size > spotifyCombo.spotifyTrackCombos.size)
-                    it.copy(tracks = it.tracks.subList(0, spotifyCombo.spotifyTrackCombos.size))
-                else it
-            }
-            .map {
-                SpotifyAlbumMatch(
-                    spotifyAlbumCombo = spotifyCombo.copy(
-                        spotifyAlbum = spotifyCombo.spotifyAlbum.copy(albumId = album.albumId),
-                    ),
-                    youtubeAlbumCombo = it,
-                    levenshtein = combo.getLevenshteinDistance(it),
-                    albumWithTracksCombo = combo,
-                )
-            }
-            .filter { it.levenshtein < 10.0 }
-            .sortedBy { it.levenshtein }
-            .minByOrNull { it.youtubeAlbumCombo.tracks.size <= it.spotifyAlbumCombo.spotifyTrackCombos.size }
-    }
+    ): YoutubePlaylistCombo.AlbumMatch? =
+        repos.youtube.matchAlbumWithTracks(responseAlbum.toAlbumCombo(isInLibrary = true), progressCallback)
+            .filter { it.score < 1.0 }
+            .minByOrNull { it.score }
 }

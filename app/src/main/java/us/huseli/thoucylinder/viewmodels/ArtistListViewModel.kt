@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.core.net.toFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,11 +12,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.extensions.toBitmap
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.dataclasses.combos.ArtistPojo
-import us.huseli.thoucylinder.getSquareBitmapByUrl
+import us.huseli.thoucylinder.getBitmap
+import us.huseli.thoucylinder.getBitmapByUrl
 import us.huseli.thoucylinder.matchDirectoriesRecursive
 import us.huseli.thoucylinder.matchFiles
 import us.huseli.thoucylinder.toBitmap
@@ -53,10 +52,10 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
             ?.also { return it.asFullImageBitmap(context) }
 
         artistPojo.listAlbumArtUris()
-            .forEach { uri -> uri.toFile().toBitmap()?.asFullImageBitmap(context)?.also { return it } }
+            .forEach { uri -> uri.getBitmap(context)?.asFullImageBitmap(context)?.also { return it } }
 
         artistPojo.listFullImageUrls().forEach { url ->
-            url.getSquareBitmapByUrl()?.asFullImageBitmap(context)?.also { return it }
+            url.getBitmapByUrl()?.asFullImageBitmap(context)?.also { return it }
         }
 
         return null

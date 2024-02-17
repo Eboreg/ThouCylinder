@@ -1,90 +1,69 @@
 package us.huseli.thoucylinder.repositories
 
-import android.app.Activity
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.preference.PreferenceManager
-import com.spotify.sdk.android.auth.AuthorizationClient
-import com.spotify.sdk.android.auth.AuthorizationRequest
-import com.spotify.sdk.android.auth.AuthorizationResponse
+import androidx.compose.ui.graphics.ImageBitmap
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import us.huseli.retaintheme.extensions.toInstant
-import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_ACCESS_TOKEN
-import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES
-import us.huseli.thoucylinder.Constants.SPOTIFY_REDIRECT_URL
-import us.huseli.thoucylinder.Constants.SPOTIFY_USER_ALBUMS_URL
+import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.extensions.filterValuesNotNull
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
+import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.getSpotifyAlbums
-import us.huseli.thoucylinder.dataclasses.combos.SpotifyAlbumCombo
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyResponseAlbumItem
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifySearchResponse
+import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
+import us.huseli.thoucylinder.dataclasses.spotify.toSpotifyAlbumResponse
+import us.huseli.thoucylinder.fromJson
+import java.net.URLEncoder
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 @Singleton
-class SpotifyRepository @Inject constructor(
-    database: Database,
-    @ApplicationContext context: Context,
-) : SharedPreferences.OnSharedPreferenceChangeListener {
-    private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val spotifyDao = database.spotifyDao()
-
-    private val _accessToken = MutableStateFlow(preferences.getString(PREF_SPOTIFY_ACCESS_TOKEN, null))
-    private val _accessTokenExpires = MutableStateFlow(
-        preferences.getLong(PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES, 0).takeIf { it > 0 }?.toInstant()
-    )
-    private val _allUserAlbumsFetched = MutableStateFlow(false)
-    private val _nextUserAlbumIdx = MutableStateFlow(0)
-    private val _requestInstants = MutableStateFlow<List<Instant>>(emptyList())
-    private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
-    private val _userAlbumCombos = MutableStateFlow<List<SpotifyAlbumCombo>>(emptyList())
-
-    val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
-    val isAuthorized: Flow<Boolean?> = _accessTokenExpires.map { it?.let { it > Instant.now() } }
-    val nextUserAlbumIdx: StateFlow<Int> = _nextUserAlbumIdx.asStateFlow()
-    val requestCode = Random.nextInt(1, 10000)
-    val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
-    val userAlbumCombos: StateFlow<List<SpotifyAlbumCombo>> = _userAlbumCombos.asStateFlow()
-
-    init {
-        preferences.registerOnSharedPreferenceChangeListener(this)
+class SpotifyRepository @Inject constructor(database: Database, @ApplicationContext context: Context) {
+    private val albumDao = database.albumDao()
+    private val apiResponseCache = MutexCache<String, String> { url ->
+        if (lastMinuteRequestCount < REQUEST_LIMIT_PER_MINUTE) {
+            oauth2.getToken()?.accessToken?.let { accessToken ->
+                Request(url = url, headers = mapOf("Authorization" to "Bearer $accessToken"))
+                    .getString()
+                    .also { requestInstants.value += Instant.now() }
+            }
+        } else null
     }
-
     private val lastMinuteRequestCount: Int
         get() {
             val oneMinuteAgo = Instant.now().minusSeconds(60)
-            return _requestInstants.value.filter { it >= oneMinuteAgo }.size
+            return requestInstants.value.filter { it >= oneMinuteAgo }.size
         }
+    private val requestInstants = MutableStateFlow<List<Instant>>(emptyList())
 
-    fun authorize(activity: Activity) {
-        if (!isAuthorized()) {
-            val request = AuthorizationRequest.Builder(
-                BuildConfig.spotifyClientId,
-                AuthorizationResponse.Type.TOKEN,
-                SPOTIFY_REDIRECT_URL,
-            ).setScopes(arrayOf("user-library-read")).build()
-            AuthorizationClient.openLoginActivity(activity, requestCode, request)
-        }
+    private val _allUserAlbumsFetched = MutableStateFlow(false)
+    private val _nextUserAlbumIdx = MutableStateFlow(0)
+    private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
+    private val _userAlbums = MutableStateFlow<List<SpotifyResponseAlbumItem.Album>>(emptyList())
+
+    val oauth2 = SpotifyOAuth2(context)
+    val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
+    val nextUserAlbumIdx: StateFlow<Int> = _nextUserAlbumIdx.asStateFlow()
+    val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
+    val userAlbums: StateFlow<List<SpotifyResponseAlbumItem.Album>> = _userAlbums.asStateFlow()
+    val thumbnailCache = MutexCache<SpotifyResponseAlbumItem.Album, ImageBitmap> {
+        it.images.toMediaStoreImage()?.getThumbnailImageBitmap(context)
     }
-
-    suspend fun listImportedAlbumIds() = spotifyDao.listImportedAlbumIds()
 
     suspend fun fetchNextUserAlbums(): Boolean {
         if (!_allUserAlbumsFetched.value) {
-            val url = "$SPOTIFY_USER_ALBUMS_URL?limit=50&offset=${_nextUserAlbumIdx.value}"
+            val url = "${API_ROOT}/me/albums?limit=50&offset=${_nextUserAlbumIdx.value}"
 
-            apiRequest(url)?.getSpotifyAlbums()?.also { response ->
-                _userAlbumCombos.value += response.items.map { it.toSpotifyAlbumCombo() }
+            apiResponseCache.getOrNull(url, cacheNulls = false)?.toSpotifyAlbumResponse()?.also { response ->
+                _userAlbums.value += response.items.map { it.album }
                 _nextUserAlbumIdx.value += response.items.size
                 _allUserAlbumsFetched.value = response.next == null
                 _totalUserAlbumCount.value = response.total
@@ -94,42 +73,27 @@ class SpotifyRepository @Inject constructor(
         return false
     }
 
-    suspend fun getSpotifyAlbum(albumId: UUID): SpotifyAlbum? = spotifyDao.getSpotifyAlbum(albumId)
+    suspend fun listImportedAlbumIds() = albumDao.listImportedSpotifyIds()
 
-    suspend fun saveSpotifyAlbumCombo(combo: SpotifyAlbumCombo) = spotifyDao.upsertSpotifyAlbumCombo(combo)
+    suspend fun searchAlbumArt(album: Album): List<MediaStoreImage> = album.spotifyImage?.let { listOf(it) }
+        ?: searchAlbums(album)
+            ?.albums
+            ?.items
+            ?.filter { album.getLevenshteinDistance(it.toAlbum(isInLibrary = false)) < 10 }
+            ?.mapNotNull { it.images.toMediaStoreImage() }
+        ?: emptyList()
 
-    fun setAuthorizationResponse(value: AuthorizationResponse) {
-        if (value.type == AuthorizationResponse.Type.TOKEN) {
-            _accessToken.value = value.accessToken
-            _accessTokenExpires.value = Instant.now().plusSeconds(value.expiresIn.toLong())
-        } else {
-            _accessToken.value = null
-            _accessTokenExpires.value = null
-            if (value.error != null) SnackbarEngine.addError(value.error)
+    private fun getSearchQuery(params: Map<String, String?>): String = params.filterValuesNotNull()
+        .map { (key, value) -> "$key:${URLEncoder.encode(value, "UTF-8")}" }
+        .joinToString(" ")
+
+    private suspend fun searchAlbums(album: Album): SpotifySearchResponse? {
+        val query = withContext(Dispatchers.IO) {
+            URLEncoder.encode(getSearchQuery(mapOf("album" to album.title, "artist" to album.artist)), "UTF-8")
         }
-        preferences.edit()
-            .putString(PREF_SPOTIFY_ACCESS_TOKEN, _accessToken.value)
-            .putLong(PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES, _accessTokenExpires.value?.epochSecond ?: 0)
-            .apply()
-    }
+        val url = "$API_ROOT/search?q=$query&type=album"
 
-    private fun apiRequest(url: String): Request? {
-        return if (lastMinuteRequestCount < REQUEST_LIMIT_PER_MINUTE) {
-            _accessToken.value?.let { accessToken ->
-                Request.get(url = url, headers = mapOf("Authorization" to "Bearer $accessToken"))
-                    .also { _requestInstants.value += Instant.now() }
-            }
-        } else null
-    }
-
-    private fun isAuthorized() = _accessTokenExpires.value?.let { it > Instant.now() } == true
-
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        when (key) {
-            PREF_SPOTIFY_ACCESS_TOKEN -> _accessToken.value = preferences.getString(PREF_SPOTIFY_ACCESS_TOKEN, null)
-            PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES -> _accessTokenExpires.value =
-                preferences.getLong(PREF_SPOTIFY_ACCESS_TOKEN_EXPIRES, 0).takeIf { it > 0 }?.toInstant()
-        }
+        return apiResponseCache.getOrNull(url)?.fromJson<SpotifySearchResponse>()
     }
 
     companion object {
@@ -137,5 +101,6 @@ class SpotifyRepository @Inject constructor(
         // the error 429" -- https://community.spotify.com/t5/Spotify-for-Developers/Web-API-ratelimit/td-p/5330410
         // So let's be overly cautious.
         const val REQUEST_LIMIT_PER_MINUTE = 50
+        const val API_ROOT = "https://api.spotify.com/v1"
     }
 }

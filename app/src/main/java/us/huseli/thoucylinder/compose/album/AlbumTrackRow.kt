@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -28,6 +27,8 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.track.TrackContextButtonWithMenu
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 import kotlin.time.Duration
 
 data class AlbumTrackRowData(
@@ -74,14 +75,14 @@ fun AlbumTrackRow(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = data.title,
+                            text = data.title.umlautify(),
                             maxLines = if (data.artist == null || !data.showArtist) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
                         if (data.artist != null && data.showArtist) {
                             Text(
-                                text = data.artist,
+                                text = data.artist.umlautify(),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
@@ -121,7 +122,7 @@ fun AlbumTrackRow(
                                 modifier = Modifier.width(110.dp),
                             )
                             LinearProgressIndicator(
-                                progress = progress.toFloat(),
+                                progress = { progress.toFloat() },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }

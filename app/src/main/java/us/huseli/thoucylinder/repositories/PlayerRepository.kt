@@ -136,7 +136,7 @@ class PlayerRepository @Inject constructor(
         scope.launch {
             /**
              * However, continuously monitor _track_ data from the database, in case URIs change because a track has
-             * been downloaded or locally deleted.
+             * been downloaded, locally deleted, got their Youtube URLs updated, etc.
              */
             queueDao.flowTracksInQueue().distinctUntilChanged().collect { tracks ->
                 queueMutex.withLock {
@@ -218,6 +218,23 @@ class PlayerRepository @Inject constructor(
     }
 
     fun addListener(listener: PlayerRepositoryListener) = listeners.add(listener)
+
+    fun getNextTrack(): QueueTrackCombo? = player?.let {
+        val nextMediaItem =
+            if (it.mediaItemCount > it.currentMediaItemIndex + 1)
+                it.getMediaItemAt(it.currentMediaItemIndex + 1)
+            else null
+
+        findQueueTrackByMediaItem(nextMediaItem)
+    }
+
+    fun getPreviousTrack(): QueueTrackCombo? = player?.let {
+        val previousMediaItem =
+            if (it.currentMediaItemIndex > 0) it.getMediaItemAt(it.currentMediaItemIndex - 1)
+            else null
+
+        findQueueTrackByMediaItem(previousMediaItem)
+    }
 
     fun insertNext(combos: List<QueueTrackCombo>) {
         if (combos.isNotEmpty()) player?.addMediaItems(nextItemIndex, combos.toMediaItems())
@@ -324,6 +341,11 @@ class PlayerRepository @Inject constructor(
         }
     }
 
+    fun stop() {
+        _lastAction = LastAction.STOP
+        player?.stop()
+    }
+
     fun toggleRepeat() {
         player?.repeatMode = when (player?.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
@@ -346,25 +368,8 @@ class PlayerRepository @Inject constructor(
 
 
     /** PRIVATE METHODS ******************************************************/
-    private fun findQueueItemByMediaItem(mediaItem: MediaItem?): QueueTrackCombo? =
+    private fun findQueueTrackByMediaItem(mediaItem: MediaItem?): QueueTrackCombo? =
         mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
-
-    fun getNextTrack(): QueueTrackCombo? = player?.let {
-        val nextMediaItem =
-            if (it.mediaItemCount > it.currentMediaItemIndex + 1)
-                it.getMediaItemAt(it.currentMediaItemIndex + 1)
-            else null
-
-        findQueueItemByMediaItem(nextMediaItem)
-    }
-
-    fun getPreviousTrack(): QueueTrackCombo? = player?.let {
-        val previousMediaItem =
-            if (it.currentMediaItemIndex > 0) it.getMediaItemAt(it.currentMediaItemIndex - 1)
-            else null
-
-        findQueueItemByMediaItem(previousMediaItem)
-    }
 
     private fun saveCurrentPosition() =
         player?.also { preferences.edit().putLong(PREF_CURRENT_TRACK_POSITION, it.currentPosition).apply() }
@@ -406,7 +411,7 @@ class PlayerRepository @Inject constructor(
             queueMutex.withLock {
                 saveCurrentPosition()
                 saveQueueIndex()
-                val combo = findQueueItemByMediaItem(mediaItem)
+                val combo = findQueueTrackByMediaItem(mediaItem)
                 if (combo != _currentCombo.value) {
                     Log.i("PlayerRepository", "current track URI: ${combo?.uri}")
                     _currentCombo.value = combo

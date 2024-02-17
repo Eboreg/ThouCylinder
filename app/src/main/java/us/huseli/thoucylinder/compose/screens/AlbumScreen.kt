@@ -28,7 +28,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,6 +49,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
 @Composable
@@ -110,7 +111,7 @@ fun AlbumScreen(
                                 Text(text = stringResource(R.string.youtube))
                             }
                         }
-                        combo.spotifyWebUrl?.also { spotifyUrl ->
+                        combo.album.spotifyWebUrl?.also { spotifyUrl ->
                             LargeIconBadge(modifier = Modifier.clickable { uriHandler.openUri(spotifyUrl) }) {
                                 Icon(painterResource(R.drawable.spotify), null, modifier = Modifier.height(16.dp))
                                 Text(text = stringResource(R.string.spotify))
@@ -129,7 +130,7 @@ fun AlbumScreen(
                 item {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.height(140.dp).padding(horizontal = 10.dp, vertical = 5.dp),
+                        modifier = Modifier.height(150.dp).padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
                         Thumbnail(
                             image = albumArt,
@@ -144,30 +145,29 @@ fun AlbumScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = combo.album.title,
+                                    text = combo.album.title.umlautify(),
                                     style = if (combo.album.title.length > 20) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 combo.album.artist?.also { artist ->
                                     Text(
-                                        text = artist,
+                                        text = artist.umlautify(),
                                         style = if (artist.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                AlbumBadges(
-                                    genres = combo.genres.map { it.genreName },
-                                    styles = combo.styles.map { it.styleName },
-                                    year = combo.yearString,
-                                    modifier = Modifier
-                                        .padding(vertical = 10.dp)
-                                        .fillMaxWidth()
-                                        .heightIn(max = 37.dp) // max 2 rows
-                                        .clipToBounds(),
-                                )
                             }
+
+                            AlbumBadges(
+                                tags = combo.tags.map { it.name },
+                                year = combo.yearString,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 37.dp) // max 2 rows
+                                    .clipToBounds(),
+                            )
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 AlbumButtons(

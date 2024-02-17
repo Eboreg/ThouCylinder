@@ -21,7 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,7 +60,9 @@ fun QueueScreen(
         SelectedTracksButtons(
             trackCount = selectedTracks.size,
             callbacks = TrackSelectionCallbacks(
-                onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(queueTracks = selectedTracks)) },
+                onAddToPlaylistClick = {
+                    appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTracks.map { it.track }))
+                },
                 onPlayClick = { viewModel.playQueueTracks(selectedTracks) },
                 onEnqueueClick = { viewModel.enqueueQueueTracks(selectedTracks, context) },
                 onUnselectAllClick = { viewModel.unselectAllQueueTracks() },
@@ -93,11 +95,7 @@ fun QueueScreen(
                     val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
                     LaunchedEffect(combo.track.trackId) {
-                        thumbnail.value = viewModel.getTrackThumbnail(
-                            track = combo.track,
-                            album = combo.album,
-                            context = context,
-                        )
+                        thumbnail.value = viewModel.getTrackThumbnail(track = combo.track, album = combo.album)
                         viewModel.ensureTrackMetadata(combo.track)
                     }
 
@@ -110,15 +108,10 @@ fun QueueScreen(
                             else null
 
                         TrackListRow(
-                            title = combo.track.title,
-                            isDownloadable = combo.track.isDownloadable,
-                            isInLibrary = combo.track.isInLibrary,
-                            downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
+                            combo = combo,
+                            showArtist = true,
                             thumbnail = thumbnail.value,
-                            containerColor = containerColor,
-                            reorderableState = reorderableState,
-                            artist = combo.artist,
-                            duration = combo.track.metadata?.duration,
+                            isSelected = isSelected,
                             callbacks = TrackCallbacks(
                                 combo = combo,
                                 appCallbacks = appCallbacks,
@@ -129,7 +122,6 @@ fun QueueScreen(
                                 },
                                 onLongClick = { viewModel.selectQueueTracksFromLastSelected(to = combo) },
                             ),
-                            isSelected = selectedTracks.contains(combo),
                             extraContextMenuItems = {
                                 DropdownMenuItem(
                                     text = { Text(text = stringResource(R.string.remove_from_queue)) },
@@ -137,6 +129,9 @@ fun QueueScreen(
                                     onClick = { viewModel.removeFromQueue(combo) },
                                 )
                             },
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
+                            containerColor = containerColor,
+                            reorderableState = reorderableState,
                         )
                     }
                 }

@@ -17,6 +17,9 @@ data class ID3Data(
     val discNumber: Int? = null,
     val duration: Duration? = null,
     val bitrate: Int? = null,
+    val musicBrainzTrackId: String? = null,
+    val musicBrainzReleaseId: String? = null,
+    val musicBrainzReleaseGroupId: String? = null,
 )
 
 
@@ -33,5 +36,8 @@ fun MediaInformation.extractID3Data(): ID3Data {
         discNumber = tags?.getIntOrNull("disc"),
         duration = formatProperties?.getDoubleOrNull("duration")?.seconds,
         bitrate = formatProperties?.getIntOrNull("bit_rate"),
+        musicBrainzTrackId = tags?.getStringOrNull("mb_track_id"),
+        musicBrainzReleaseId = tags?.getStringOrNull("mb_release_id"),
+        musicBrainzReleaseGroupId = tags?.getStringOrNull("mb_release_group_id"),
     )
 }

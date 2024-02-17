@@ -8,9 +8,6 @@ import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import us.huseli.retaintheme.extensions.square
-import us.huseli.thoucylinder.Constants.URL_CONNECT_TIMEOUT
-import us.huseli.thoucylinder.Constants.URL_READ_TIMEOUT
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -18,54 +15,78 @@ import java.net.URLConnection
 import java.net.URLEncoder
 import kotlin.text.Charsets.UTF_8
 
-class Request(
+data class Request(
     private val url: String,
     private val headers: Map<String, String> = emptyMap(),
     private val method: Method = Method.GET,
-    private val body: ByteArray? = null,
+    private val body: String? = null,
 ) {
+    constructor(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        params: Map<String, String> = emptyMap(),
+        method: Method = Method.GET,
+        body: String? = null,
+    ) : this(url = getUrl(url, params), headers = headers, method = method, body = body)
+
     enum class Method(val value: String) { GET("GET"), POST("POST") }
-
-    private val urlObject = URL(url)
-
-    suspend fun getString(): String =
-        withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
 
     suspend fun connect(): URLConnection = withContext(Dispatchers.IO) {
         Log.i("Request", "${method.value} $url")
-        urlObject.openConnection().apply {
+        URL(url).openConnection().apply {
             if (BuildConfig.DEBUG) {
                 connectTimeout = 0
                 readTimeout = 0
             } else {
-                connectTimeout = URL_CONNECT_TIMEOUT
-                readTimeout = URL_READ_TIMEOUT
+                connectTimeout = CONNECT_TIMEOUT
+                readTimeout = READ_TIMEOUT
             }
             (this as? HttpURLConnection)?.requestMethod = method.value
             headers.forEach { (key, value) -> setRequestProperty(key, value) }
             if (body != null && method == Method.POST) {
+                val binaryBody = body.toByteArray(UTF_8)
                 doOutput = true
-                (this as? HttpURLConnection)?.setFixedLengthStreamingMode(body.size)
-                getOutputStream().write(body, 0, body.size)
+                (this as? HttpURLConnection)?.setFixedLengthStreamingMode(binaryBody.size)
+                getOutputStream().write(binaryBody, 0, binaryBody.size)
             }
         }
+    }
+
+    suspend fun getBitmap(): Bitmap? =
+        withContext(Dispatchers.IO) { getInputStream().use { BitmapFactory.decodeStream(it) } }
+
+    suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
+        getString().let { gson.fromJson(it, jsonResponseType) ?: emptyMap<String, Any>() }
+    }
+
+    suspend inline fun <reified T> getObject(): T? =
+        withContext(Dispatchers.IO) { gson.fromJson(getString(), T::class.java) }
+
+    suspend fun getString(): String = try {
+        withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
+    } catch (e: Exception) {
+        Log.e(javaClass.simpleName, "getString [url=$url]: $e", e)
+        throw e
     }
 
     private suspend fun getInputStream(): InputStream =
         withContext(Dispatchers.IO) { connect().run { getInputStream() } }
 
     companion object {
+        const val READ_TIMEOUT = 10_000
+        const val CONNECT_TIMEOUT = 4_050
+
         val gson: Gson = GsonBuilder().create()
         val jsonResponseType = object : TypeToken<Map<String, *>>() {}
 
-        fun get(url: String, headers: Map<String, String> = emptyMap()) =
-            Request(url = url, headers = headers, method = Method.GET)
+        fun getUrl(url: String, params: Map<String, String> = emptyMap()) =
+            if (params.isNotEmpty()) encodeQuery(params).let { if (url.contains("?")) "$url&$it" else "$url?$it" } else url
 
         fun postJson(url: String, headers: Map<String, String> = emptyMap(), json: Map<String, *>) =
             Request(
                 url = url,
                 headers = headers.plus("Content-Type" to "application/json"),
-                body = gson.toJson(json).toByteArray(UTF_8),
+                body = gson.toJson(json),
                 method = Method.POST,
             )
 
@@ -73,30 +94,11 @@ class Request(
             Request(
                 url = url,
                 headers = headers.plus("Content-Type" to "application/x-www-form-urlencoded"),
-                body = formData
-                    .map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }
-                    .joinToString("&")
-                    .toByteArray(UTF_8),
+                body = encodeQuery(formData),
                 method = Method.POST,
             )
+
+        private fun encodeQuery(params: Map<String, String>) =
+            params.map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }.joinToString("&")
     }
 }
-
-suspend fun URLConnection.getString(): String = try {
-    withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
-} catch (e: Exception) {
-    Log.e(javaClass.simpleName, "getString [url=$url]: $e", e)
-    throw e
-}
-
-suspend fun <T> URLConnection.getObject(responseType: TypeToken<T>): T? =
-    getString().let { Request.gson.fromJson(it, responseType) }
-
-suspend fun URLConnection.getJson(): Map<String, *> = getString().let {
-    Request.gson.fromJson(it, Request.jsonResponseType) ?: emptyMap<String, Any>()
-}
-
-suspend fun URLConnection.getBitmap(): Bitmap? =
-    withContext(Dispatchers.IO) { getInputStream().use { BitmapFactory.decodeStream(it) } }
-
-suspend fun URLConnection.getSquareBitmap(): Bitmap? = getBitmap()?.square()

@@ -14,33 +14,33 @@ enum class MusicBrainzReleaseGroupPrimaryType {
 data class MusicBrainzReleaseGroup(
     @SerializedName("artist-credit")
     val artistCredit: List<MusicBrainzArtistCredit>,
-    val disambiguation: String,
+    val disambiguation: String?,
     @SerializedName("first-release-date")
     val firstReleaseDate: String?,
     val genres: List<MusicBrainzGenre>,
     override val id: String,
     @SerializedName("primary-type")
-    val primaryType: MusicBrainzReleaseGroupPrimaryType,
+    val primaryType: MusicBrainzReleaseGroupPrimaryType?,
     @SerializedName("primary-type-id")
-    val primaryTypeId: String,
+    val primaryTypeId: String?,
     val releases: List<Release>,
     val title: String,
 ) : AbstractMusicBrainzItem() {
     data class Release(
         @SerializedName("artist-credit")
         val artistCredit: List<MusicBrainzArtistCredit>,
-        val country: String,
+        val country: String?,
         val date: String?,
-        val disambiguation: String,
+        val disambiguation: String?,
         val genres: List<MusicBrainzGenre>,
         override val id: String,
         val packaging: String?,
         @SerializedName("packaging-id")
         val packagingId: String?,
-        val quality: String,
-        val status: MusicBrainzReleaseStatus,
+        val quality: String?,
+        val status: MusicBrainzReleaseStatus?,
         @SerializedName("status-id")
-        val statusId: String,
+        val statusId: String?,
         val title: String,
     ) : AbstractMusicBrainzItem()
 

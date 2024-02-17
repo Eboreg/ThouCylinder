@@ -20,8 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.extensions.nullIfBlank
@@ -36,6 +34,8 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun <T : AbstractAlbumCombo> AlbumList(
@@ -46,9 +46,10 @@ fun <T : AbstractAlbumCombo> AlbumList(
     albumDownloadTasks: List<AlbumDownloadTask>,
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
+    progressIndicatorText: String? = null,
     onEmpty: @Composable (() -> Unit)? = null,
+    getThumbnail: suspend (Album) -> ImageBitmap?,
 ) {
-    val context = LocalContext.current
     val isSelected = { combo: T -> selectedAlbums.contains(combo.album) }
 
     Column {
@@ -62,10 +63,11 @@ fun <T : AbstractAlbumCombo> AlbumList(
             onEmpty = onEmpty,
             listState = listState,
             cardHeight = 70.dp,
+            progressIndicatorText = progressIndicatorText,
         ) { _, combo ->
             val (downloadProgress, downloadIsActive) =
                 getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
-            val imageBitmap = remember(combo.album) { mutableStateOf<ImageBitmap?>(null) }
+            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
                 pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
                 combo.yearString,
@@ -73,8 +75,9 @@ fun <T : AbstractAlbumCombo> AlbumList(
             ).joinToString(" • ").nullIfBlank()
             val callbacks = albumCallbacks(combo)
 
-            LaunchedEffect(combo.album) {
-                imageBitmap.value = combo.album.albumArt?.getThumbnailImageBitmap(context)
+            LaunchedEffect(combo.album.albumArt) {
+                // imageBitmap.value = combo.album.albumArt?.getThumbnailImageBitmap(context)
+                imageBitmap.value = getThumbnail(combo.album)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -96,7 +99,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
                             verticalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             Text(
-                                text = combo.album.title,
+                                text = combo.album.title.umlautify(),
                                 maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -104,7 +107,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
                             if (showArtist) {
                                 combo.album.artist?.also { artist ->
                                     Text(
-                                        text = artist,
+                                        text = artist.umlautify(),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,

@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.youtube
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

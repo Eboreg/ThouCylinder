@@ -1,9 +1,10 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.youtube
 
 import android.net.Uri
 import android.os.Parcelable
 import androidx.core.net.toUri
 import kotlinx.parcelize.Parcelize
+import us.huseli.thoucylinder.dataclasses.TrackMetadata
 
 @Parcelize
 data class YoutubeMetadata(
@@ -78,8 +79,19 @@ data class YoutubeMetadata(
 
 
 data class YoutubeMetadataList(val metadata: MutableList<YoutubeMetadata> = mutableListOf()) {
-    fun getBest(mimeTypeFilter: Regex? = null, mimeTypeExclude: Regex? = null): YoutubeMetadata? =
-        metadata.filter { mimeTypeFilter?.matches(it.mimeType) ?: true }
+    fun getBest(
+        mimeTypeFilter: Regex? = null,
+        mimeTypeExclude: Regex? = null,
+        preferredMimetypes: List<String> = emptyList(),
+    ): YoutubeMetadata? {
+        // First run through the preferred MIME types, returning the best metadata if found.
+        for (mimeType in preferredMimetypes) {
+            metadata.filter { it.mimeType == mimeType }.maxByOrNull { it.quality }?.also { return it }
+        }
+        // If no metadata with preferred MIME type found, go through them all.
+        return metadata
+            .filter { mimeTypeFilter?.matches(it.mimeType) ?: true }
             .filter { mimeTypeExclude == null || !mimeTypeExclude.matches(it.mimeType) }
             .maxByOrNull { it.quality }
+    }
 }

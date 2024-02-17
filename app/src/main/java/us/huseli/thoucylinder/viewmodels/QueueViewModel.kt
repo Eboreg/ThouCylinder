@@ -15,6 +15,7 @@ import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.umlautify
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -52,7 +53,7 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     fun enqueueQueueTracks(combos: List<QueueTrackCombo>, context: Context) {
         repos.player.moveNext(combos)
         SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size)
+            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size).umlautify()
         )
     }
 

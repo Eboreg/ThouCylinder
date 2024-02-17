@@ -8,6 +8,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 
 abstract class AbstractTrackListViewModel(
@@ -21,12 +22,12 @@ abstract class AbstractTrackListViewModel(
     fun enqueueTrackCombos(combos: List<AbstractTrackCombo>, context: Context) = viewModelScope.launch {
         repos.player.insertNext(getQueueTrackCombos(combos, repos.player.nextItemIndex))
         SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size)
+            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size).umlautify()
         )
     }
 
     fun playPlaylist(playlistId: UUID, startTrackId: UUID? = null) = viewModelScope.launch {
-        val combos = getQueueTrackCombos(repos.playlist.listPlaylistTracks(playlistId))
+        val combos = getQueueTrackCombos(repos.playlist.listPlaylistTrackCombos(playlistId))
         val startIndex =
             startTrackId?.let { trackId -> combos.indexOfFirst { it.track.trackId == trackId }.takeIf { it > -1 } } ?: 0
 
@@ -61,7 +62,6 @@ abstract class AbstractTrackListViewModel(
                 uri = uri,
                 position = index,
                 album = trackCombo.album,
-                spotifyTrack = trackCombo.spotifyTrack,
             )
         }
     }

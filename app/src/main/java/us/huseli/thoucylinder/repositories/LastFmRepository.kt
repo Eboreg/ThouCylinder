@@ -1,10 +1,8 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.preference.PreferenceManager
 import com.thoughtworks.xstream.XStream
 import com.thoughtworks.xstream.security.AnyTypePermission
@@ -25,23 +23,21 @@ import us.huseli.retaintheme.extensions.join
 import us.huseli.retaintheme.extensions.md5
 import us.huseli.retaintheme.extensions.toHex
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.Constants.LASTFM_API_ROOT
-import us.huseli.thoucylinder.Constants.LASTFM_PAGE_LIMIT
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.Request
+import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
-import us.huseli.thoucylinder.dataclasses.lastFm.getLastFmTopAlbums
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
-import us.huseli.thoucylinder.getSquareBitmapByUrl
-import us.huseli.thoucylinder.getString
+import us.huseli.thoucylinder.fromJson
+import us.huseli.thoucylinder.getBitmapByUrl
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -49,17 +45,20 @@ import kotlin.time.Duration.Companion.seconds
 @Singleton
 class LastFmRepository @Inject constructor(
     database: Database,
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     playerRepo: PlayerRepository,
-) : SharedPreferences.OnSharedPreferenceChangeListener, PlayerRepositoryListener {
+) : PlayerRepositoryListener {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val albumDao = database.albumDao()
     private val scrobbleMutex = Mutex()
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var scrobbleJob: Job? = null
+    private val albumArtCache = MutexCache<String, ImageBitmap> { url ->
+        url.getBitmapByUrl()?.asFullImageBitmap(context)
+    }
+    private val apiResponseCache = MutexCache<String, String> { url -> Request(url).getString() }
 
     private val _allTopAlbumsFetched = MutableStateFlow(false)
-    private val _albumArtCache = MutexCache<String, ImageBitmap> { it.getSquareBitmapByUrl()?.asImageBitmap() }
     private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
     private val _nextTopAlbumPage = MutableStateFlow(1)
     private val _username = MutableStateFlow(preferences.getString(PREF_LASTFM_USERNAME, null))
@@ -70,6 +69,8 @@ class LastFmRepository @Inject constructor(
 
     val allTopAlbumsFetched: StateFlow<Boolean> = _allTopAlbumsFetched.asStateFlow()
     val topAlbums: StateFlow<List<LastFmTopAlbumsResponse.Album>> = _topAlbums.asStateFlow()
+    val username: StateFlow<String?> = _username.asStateFlow()
+    val scrobble: StateFlow<Boolean> = _scrobble.asStateFlow()
 
     data class Session(
         val name: String,
@@ -78,7 +79,6 @@ class LastFmRepository @Inject constructor(
 
     init {
         playerRepo.addListener(this)
-        preferences.registerOnSharedPreferenceChangeListener(this)
 
         scope.launch {
             combine(_sessionKey, _scrobble) { sessionKey, scrobble -> Pair(sessionKey, scrobble) }
@@ -124,19 +124,24 @@ class LastFmRepository @Inject constructor(
                     )
                 )
 
-                Request.get(url).getLastFmTopAlbums()?.also {
-                    _nextTopAlbumPage.value += 1
-                    _topAlbums.value += it
-                    if (it.isEmpty() || _nextTopAlbumPage.value >= LASTFM_PAGE_LIMIT) _allTopAlbumsFetched.value = true
-                    return true
-                }
+                apiResponseCache.getOrNull(url)
+                    ?.fromJson<LastFmTopAlbumsResponse>()
+                    ?.topalbums
+                    ?.album
+                    ?.filter { it.mbid.isNotEmpty() }
+                    ?.also {
+                        _nextTopAlbumPage.value += 1
+                        _topAlbums.value += it
+                        if (it.isEmpty() || _nextTopAlbumPage.value >= PAGE_LIMIT) _allTopAlbumsFetched.value = true
+                        return true
+                    }
             }
         }
         return false
     }
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun getSession(authToken: String): Session? {
+    suspend fun fetchSession(authToken: String): Session? {
         val xstream = XStream()
         val body = postAndGetString(method = "auth.getSession", params = mapOf("token" to authToken))
 
@@ -146,22 +151,42 @@ class LastFmRepository @Inject constructor(
             xstream.ignoreUnknownElements()
             xstream.addPermission(AnyTypePermission.ANY)
             (xstream.fromXML(body) as? List<Session>)?.firstOrNull()
+        }?.also { session ->
+            _username.value = session.name
+            _sessionKey.value = session.key
+            _scrobble.value = true
+            preferences
+                .edit()
+                .putString(PREF_LASTFM_SESSION_KEY, session.key)
+                .putString(PREF_LASTFM_USERNAME, session.name)
+                .putBoolean(PREF_LASTFM_SCROBBLE, true)
+                .apply()
         }
     }
 
     suspend fun getThumbnail(album: LastFmTopAlbumsResponse.Album): ImageBitmap? =
-        album.image.getThumbnail()?.let { image -> _albumArtCache.get(image.url) }
+        album.image.getThumbnail()?.let { image -> albumArtCache.getOrNull(image.url) }
 
     suspend fun listImportedAlbumIds(): List<String> = albumDao.listMusicBrainzReleaseIds()
 
+    fun setScrobble(value: Boolean) {
+        _scrobble.value = value
+        preferences.edit().putBoolean(PREF_LASTFM_SCROBBLE, value).apply()
+    }
+
+    fun setUsername(value: String?) {
+        if (value != _username.value) {
+            _username.value = value
+            _topAlbums.value = emptyList()
+            _allTopAlbumsFetched.value = false
+            _nextTopAlbumPage.value = 1
+            preferences.edit().putString(PREF_LASTFM_USERNAME, value).apply()
+        }
+    }
 
     /** PRIVATE METHODS *******************************************************/
-    private fun getApiUrl(params: Map<String, String> = emptyMap()): String {
-        val allParams = params.plus("api_key" to BuildConfig.lastFmApiKey)
-        val paramsString = allParams.toList().joinToString("&") { (key, value) -> "$key=$value" }
-
-        return "$LASTFM_API_ROOT?$paramsString"
-    }
+    private fun getApiUrl(params: Map<String, String> = emptyMap()): String =
+        Request.getUrl(API_ROOT, params.plus("api_key" to BuildConfig.lastFmApiKey))
 
     private fun getSignature(params: Map<String, String>): String {
         return params
@@ -176,23 +201,14 @@ class LastFmRepository @Inject constructor(
     private suspend fun postAndGetString(method: String, params: Map<String, String>): String? {
         return try {
             Request.postFormData(
-                url = LASTFM_API_ROOT,
+                url = API_ROOT,
                 formData = withSignature(
                     params.plus("method" to method).plus("api_key" to BuildConfig.lastFmApiKey)
                 ),
-            ).connect().getString()
+            ).getString()
         } catch (e: Exception) {
             Log.e(javaClass.simpleName, "postAndGetString $method: $e", e)
             null
-        }
-    }
-
-    private fun setUsername(value: String) {
-        if (value != _username.value) {
-            _username.value = value
-            _topAlbums.value = emptyList()
-            _allTopAlbumsFetched.value = false
-            _nextTopAlbumPage.value = 1
         }
     }
 
@@ -210,7 +226,7 @@ class LastFmRepository @Inject constructor(
                             artist = artist,
                             track = it.track.title,
                             duration = it.track.duration?.inWholeSeconds?.toInt(),
-                            album = it.album?.title ?: it.spotifyAlbum?.name,
+                            album = it.album?.title,
                             trackNumber = it.track.albumPosition,
                             albumArtist = it.album?.artist,
                             mbid = it.track.musicBrainzId,
@@ -249,11 +265,9 @@ class LastFmRepository @Inject constructor(
         }
     }
 
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        when (key) {
-            PREF_LASTFM_SESSION_KEY -> _sessionKey.value = preferences.getString(key, null)
-            PREF_LASTFM_USERNAME -> preferences.getString(key, null)?.also { setUsername(it) }
-            PREF_LASTFM_SCROBBLE -> _scrobble.value = preferences.getBoolean(key, false)
-        }
+    companion object {
+        // Don't know if Last.fm has any hard quota limit, but better not overdo it:
+        const val PAGE_LIMIT = 20
+        const val API_ROOT = "https://ws.audioscrobbler.com/2.0/"
     }
 }

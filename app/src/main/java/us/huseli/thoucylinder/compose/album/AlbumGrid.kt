@@ -37,6 +37,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun <T : AbstractAlbumCombo> AlbumGrid(
@@ -47,6 +48,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     albumDownloadTasks: List<AlbumDownloadTask>,
+    progressIndicatorText: String? = null,
     onEmpty: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -61,15 +63,16 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         isSelected = isSelected,
+        progressIndicatorText = progressIndicatorText,
     ) { _, combo ->
         val (downloadProgress, downloadIsActive) =
             getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
         val callbacks = albumCallbacks(combo)
 
         Box(modifier = Modifier.aspectRatio(1f)) {
-            val imageBitmap = remember(combo.album) { mutableStateOf<ImageBitmap?>(null) }
+            val imageBitmap = remember(combo.album.albumArt) { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(combo.album) {
+            LaunchedEffect(combo.album.albumArt) {
                 imageBitmap.value = combo.album.albumArt?.getFullImageBitmap(context)
             }
 
@@ -112,7 +115,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = combo.album.title,
+                    text = combo.album.title.umlautify(),
                     maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -120,7 +123,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
                 if (showArtist) {
                     combo.album.artist?.also { artist ->
                         Text(
-                            text = artist,
+                            text = artist.umlautify(),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,

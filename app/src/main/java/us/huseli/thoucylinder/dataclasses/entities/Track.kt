@@ -17,14 +17,13 @@ import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.retaintheme.extensions.stripCommonFixes
-import us.huseli.retaintheme.extensions.zipPadded
 import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
-import us.huseli.thoucylinder.dataclasses.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
+import us.huseli.thoucylinder.getBitmapByUrl
 import us.huseli.thoucylinder.getParentDirectory
-import us.huseli.thoucylinder.getSquareBitmapByUrl
 import us.huseli.thoucylinder.matchFiles
 import java.util.UUID
 import kotlin.time.Duration
@@ -52,6 +51,7 @@ data class Track(
     @ColumnInfo("Track_year") val year: Int? = null,
     @ColumnInfo("Track_localUri") val localUri: Uri? = null,
     @ColumnInfo("Track_musicBrainzId") val musicBrainzId: String? = null,
+    @ColumnInfo("Track_spotifyId") val spotifyId: String? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
@@ -71,11 +71,17 @@ data class Track(
     val isDownloaded: Boolean
         get() = localUri != null
 
+    val isOnSpotify: Boolean
+        get() = spotifyId != null
+
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
     val playUri: Uri?
         get() = localUri ?: youtubeVideo?.metadata?.uri
+
+    val spotifyWebUrl: String?
+        get() = spotifyId?.let { "https://open.spotify.com/track/${it}" }
 
     val youtubeWebUrl: String?
         get() = youtubeVideo?.let { "https://youtu.be/${it.id}" }
@@ -93,6 +99,7 @@ data class Track(
     fun getDocumentFile(context: Context): DocumentFile? =
         localUri?.let { DocumentFileCompat.fromUri(context, it) }
 
+    @Suppress("unused")
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
         val distances = mutableListOf<Int>()
@@ -131,7 +138,7 @@ data class Track(
         else albumPosition?.toString() ?: ""
 
     suspend fun getThumbnail(context: Context): ImageBitmap? = image?.getThumbnailImageBitmap(context)
-        ?: youtubeVideo?.thumbnail?.url?.getSquareBitmapByUrl()?.asThumbnailImageBitmap(context)
+        ?: youtubeVideo?.thumbnail?.url?.getBitmapByUrl()?.asThumbnailImageBitmap(context)
 
     fun toString(
         showAlbumPosition: Boolean = true,
@@ -187,11 +194,5 @@ fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean
         .distinctBy { it.uri.path }
 }
 
-fun Iterable<Track>.stripTitleCommons(): List<Track> =
-    zip(map { it.title }.stripCommonFixes()).map { (track, title) -> track.copy(title = title) }
-
-fun Iterable<Track>.getLevenshteinDistance(other: Iterable<Track>, albumArtist: String? = null): Double {
-    return stripTitleCommons().zipPadded(other.stripTitleCommons(), Track(title = ""))
-        .map { (t1, t2) -> t1.getLevenshteinDistance(t2, albumArtist) }
-        .average()
-}
+fun Iterable<Track>.stripTitleCommons(): List<Track> = zip(map { it.title }.stripCommonFixes())
+    .map { (track, title) -> track.copy(title = title.replace(Regex(" \\([^)]*$"), "")) }

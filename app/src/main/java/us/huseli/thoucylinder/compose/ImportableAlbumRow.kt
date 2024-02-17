@@ -9,7 +9,6 @@ import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Cancel
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material3.Badge
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,22 +16,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportableAlbumRow(
     imageBitmap: ImageBitmap?,
     isImported: Boolean,
     isNotFound: Boolean,
     albumTitle: String,
-    artist: String,
+    artist: String?,
     thirdRow: @Composable () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -59,19 +58,21 @@ fun ImportableAlbumRow(
                 if (isImported || isNotFound) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified
 
             Text(
-                text = albumTitle,
+                text = albumTitle.umlautify(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 color = textColor,
             )
-            Text(
-                text = artist,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-                color = textColor,
-            )
+            artist?.also {
+                Text(
+                    text = artist.umlautify(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                    color = textColor,
+                )
+            }
             if (isImported) {
                 Badge(
                     containerColor = LocalBasicColors.current.Green,

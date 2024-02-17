@@ -49,7 +49,7 @@ enum class TrackSortParameter : SortParameter<AbstractTrackCombo> {
 
     companion object {
         fun withLabels(context: Context): Map<TrackSortParameter, String> =
-            entries.associateWith { context.getString(it.stringRes) }
+            entries.associateWith { context.getString(it.stringRes).umlautify() }
     }
 }
 
@@ -72,7 +72,7 @@ enum class AlbumSortParameter : SortParameter<Album> {
 
     companion object {
         fun withLabels(context: Context): Map<AlbumSortParameter, String> =
-            entries.associateWith { context.getString(it.stringRes) }
+            entries.associateWith { context.getString(it.stringRes).umlautify() }
     }
 }
 

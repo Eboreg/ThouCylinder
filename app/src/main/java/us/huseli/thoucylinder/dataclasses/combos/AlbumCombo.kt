@@ -5,11 +5,8 @@ import androidx.room.Junction
 import androidx.room.Relation
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
-import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
-import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
+import us.huseli.thoucylinder.dataclasses.entities.Tag
 
 
 data class AlbumCombo(
@@ -17,45 +14,23 @@ data class AlbumCombo(
     override val durationMs: Long? = null,
     override val minYear: Int? = null,
     override val maxYear: Int? = null,
-    override val trackCount: Int,
-    override val isPartiallyDownloaded: Boolean,
+    override val trackCount: Int = 0,
+    override val isPartiallyDownloaded: Boolean = false,
     @Relation(
-        entity = Genre::class,
+        entity = Tag::class,
         parentColumn = "Album_albumId",
-        entityColumn = "Genre_genreName",
+        entityColumn = "Tag_name",
         associateBy = Junction(
-            value = AlbumGenre::class,
-            parentColumn = "AlbumGenre_albumId",
-            entityColumn = "AlbumGenre_genreName",
+            value = AlbumTag::class,
+            parentColumn = "AlbumTag_albumId",
+            entityColumn = "AlbumTag_tagName",
         )
     )
-    override val genres: List<Genre> = emptyList(),
-    @Relation(
-        entity = Style::class,
-        parentColumn = "Album_albumId",
-        entityColumn = "Style_styleName",
-        associateBy = Junction(
-            value = AlbumStyle::class,
-            parentColumn = "AlbumStyle_albumId",
-            entityColumn = "AlbumStyle_styleName",
-        )
-    )
-    override val styles: List<Style> = emptyList(),
-    @Relation(parentColumn = "Album_albumId", entityColumn = "SpotifyAlbum_albumId")
-    override val spotifyAlbum: SpotifyAlbum? = null,
+    override val tags: List<Tag> = emptyList(),
 ) : AbstractAlbumCombo() {
-    fun sorted(): AlbumCombo = copy(
-        genres = genres.sortedBy { it.genreName.length },
-        styles = styles.sortedBy { it.styleName.length },
-    )
-
-    fun sortGenres() = copy(genres = genres.sortedBy { it.genreName.length })
-
-    fun sortStyles() = copy(styles = styles.sortedBy { it.styleName.length })
+    fun sortTags() = copy(tags = tags.sortedBy { it.name.length })
 
     override fun toString() = album.toString()
 }
 
-fun Collection<AlbumCombo>.sortGenres() = map { it.sortGenres() }
-
-fun Collection<AlbumCombo>.sortStyles() = map { it.sortStyles() }
+fun Collection<AlbumCombo>.sortTags() = map { it.sortTags() }

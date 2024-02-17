@@ -6,40 +6,23 @@ import androidx.room.Relation
 import us.huseli.retaintheme.extensions.sumOfOrNull
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumGenre
-import us.huseli.thoucylinder.dataclasses.entities.AlbumStyle
-import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.entities.Style
+import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
+import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.getLevenshteinDistance
 
 data class AlbumWithTracksCombo(
     @Embedded override val album: Album,
     @Relation(
-        entity = Genre::class,
+        entity = Tag::class,
         parentColumn = "Album_albumId",
-        entityColumn = "Genre_genreName",
+        entityColumn = "Tag_name",
         associateBy = Junction(
-            value = AlbumGenre::class,
-            parentColumn = "AlbumGenre_albumId",
-            entityColumn = "AlbumGenre_genreName",
+            value = AlbumTag::class,
+            parentColumn = "AlbumTag_albumId",
+            entityColumn = "AlbumTag_tagName",
         )
     )
-    override val genres: List<Genre> = emptyList(),
-    @Relation(
-        entity = Style::class,
-        parentColumn = "Album_albumId",
-        entityColumn = "Style_styleName",
-        associateBy = Junction(
-            value = AlbumStyle::class,
-            parentColumn = "AlbumStyle_albumId",
-            entityColumn = "AlbumStyle_styleName",
-        )
-    )
-    override val styles: List<Style> = emptyList(),
-    @Relation(parentColumn = "Album_albumId", entityColumn = "SpotifyAlbum_albumId")
-    override val spotifyAlbum: SpotifyAlbum? = null,
+    override val tags: List<Tag> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
     val tracks: List<Track> = emptyList(),
 ) : AbstractAlbumCombo() {
@@ -66,18 +49,11 @@ data class AlbumWithTracksCombo(
     override val isPartiallyDownloaded: Boolean
         get() = tracks.any { it.isDownloaded } && tracks.any { !it.isDownloaded }
 
-    fun getLevenshteinDistance(other: AlbumWithTracksCombo): Double {
-        /** N.B. May be misleading if `other` has a different amount of tracks. */
-        return album.getLevenshteinDistance(other.album).toDouble().div(tracks.size) +
-            tracks.getLevenshteinDistance(other.tracks, album.artist)
-    }
-
     fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
 
     fun sorted(): AlbumWithTracksCombo = copy(
         tracks = tracks.sorted(),
-        genres = genres.sortedBy { it.genreName.length },
-        styles = styles.sortedBy { it.styleName.length },
+        tags = tags.sortedBy { it.name.length },
     )
 
     override fun toString() = album.toString()

@@ -11,22 +11,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.Constants.MUSICBRAINZ_GENRES_URL
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractPlaylist
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Genre
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
-import us.huseli.thoucylinder.getString
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import java.time.Instant
 import java.util.UUID
@@ -36,11 +31,12 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     private val repos: Repositories,
 ) : DownloadsViewModel(repos), PlayerRepositoryListener {
-    private var deletedPlaylist: AbstractPlaylist? = null
-    private var deletedPlaylistTracks: List<PlaylistTrackCombo> = emptyList()
+    private var deletedPlaylist: Playlist? = null
+    private var deletedPlaylistTracks: List<PlaylistTrack> = emptyList()
 
-    val playlists = repos.playlist.playlists
+    val playlists = repos.playlist.playlistsPojos
     val isWelcomeDialogShown = repos.settings.isWelcomeDialogShown
+    val umlautify = repos.settings.umlautify
 
     init {
         repos.player.addListener(this)
@@ -51,21 +47,25 @@ class AppViewModel @Inject constructor(
         repos.track.addToLibraryByAlbumId(albumId)
     }
 
-    fun addSelectionToPlaylist(selection: Selection, playlistPojo: PlaylistPojo) =
+    fun addSelectionToPlaylist(
+        selection: Selection,
+        playlistId: UUID,
+        includeDuplicates: Boolean = true,
+        onFinish: (added: Int) -> Unit = {},
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        onFinish(repos.playlist.addSelectionToPlaylist(selection, playlistId, includeDuplicates))
+    }
+
+    fun createPlaylist(playlist: Playlist, selection: Selection? = null) =
         viewModelScope.launch(Dispatchers.IO) {
-            repos.playlist.addSelectionToPlaylist(selection, playlistPojo, playlistPojo.trackCount)
+            repos.playlist.insertPlaylist(playlist)
+            selection?.also { repos.playlist.addSelectionToPlaylist(it, playlist.playlistId) }
         }
 
-    fun createPlaylist(playlist: AbstractPlaylist, selection: Selection? = null) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.playlist.insertPlaylist(playlist.toPlaylist())
-            selection?.also { repos.playlist.addSelectionToPlaylist(it, playlist, 0) }
-        }
-
-    fun deletePlaylist(pojo: AbstractPlaylist, onFinish: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
-        deletedPlaylist = pojo
-        deletedPlaylistTracks = repos.playlist.listPlaylistTracks(pojo.playlistId)
-        repos.playlist.deletePlaylist(pojo)
+    fun deletePlaylist(playlist: Playlist, onFinish: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
+        deletedPlaylist = playlist
+        deletedPlaylistTracks = repos.playlist.listPlaylistTracks(playlist.playlistId)
+        repos.playlist.deletePlaylist(playlist)
         onFinish()
     }
 
@@ -89,7 +89,12 @@ class AppViewModel @Inject constructor(
         updateGenreList()
     }
 
+    suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) =
+        repos.playlist.getDuplicatePlaylistTrackCount(playlistId, selection)
+
     suspend fun getTrackAlbum(albumId: UUID?): Album? = albumId?.let { repos.album.getAlbum(it) }
+
+    suspend fun listSelectionTracks(selection: Selection) = repos.playlist.listSelectionTracks(selection)
 
     fun markAlbumForDeletion(albumId: UUID, onFinish: () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
         repos.album.setAlbumIsDeleted(albumId, true)
@@ -106,6 +111,12 @@ class AppViewModel @Inject constructor(
             onFinish()
         }
 
+    fun setAlbumIsInLibrary(albumId: UUID, value: Boolean, onFinish: () -> Unit = {}) =
+        viewModelScope.launch(Dispatchers.IO) {
+            repos.album.setAlbumIsInLibrary(albumId, value)
+            onFinish()
+        }
+
     fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
 
     fun setLocalMusicUri(value: Uri) = repos.settings.setLocalMusicUri(value)
@@ -114,13 +125,13 @@ class AppViewModel @Inject constructor(
 
     fun setWelcomeDialogShown(value: Boolean) = repos.settings.setWelcomeDialogShown(value)
 
-    fun undoDeletePlaylist(onFinish: (AbstractPlaylist) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
-        deletedPlaylist?.also { pojo ->
-            repos.playlist.insertPlaylist(pojo)
-            repos.playlist.insertPlaylistTracks(deletedPlaylistTracks.map { it.toPlaylistTrack() })
+    fun undoDeletePlaylist(onFinish: (UUID) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
+        deletedPlaylist?.also { playlist ->
+            repos.playlist.insertPlaylist(playlist)
+            repos.playlist.insertPlaylistTracks(deletedPlaylistTracks)
             deletedPlaylist = null
             deletedPlaylistTracks = emptyList()
-            onFinish(pojo)
+            onFinish(playlist.playlistId)
         }
     }
 
@@ -130,10 +141,8 @@ class AppViewModel @Inject constructor(
 
     /** PRIVATE METHODS ******************************************************/
     private suspend fun deleteLocalAlbumFiles(combo: AlbumWithTracksCombo) {
-        withContext(Dispatchers.IO) {
-            repos.localMedia.deleteAlbumDirectoryAlbumArt(combo)
-            repos.track.deleteTrackFiles(combo.tracks)
-        }
+        repos.localMedia.deleteAlbumDirectoryAlbumArt(combo)
+        repos.track.deleteTrackFiles(combo.tracks)
         repos.track.clearLocalUris(combo.tracks.map { it.trackId })
     }
 
@@ -182,16 +191,13 @@ class AppViewModel @Inject constructor(
     private suspend fun updateGenreList() {
         /** Fetches Musicbrainz' complete genre list. */
         try {
-            val existingGenreNames = repos.album.listGenres().map { it.genreName }.toSet()
-            val mbGenreNames = Request.get(MUSICBRAINZ_GENRES_URL)
-                .connect()
-                .getString()
-                .split('\n')
-                .map { it.capitalized() }
-                .toSet()
-            val newGenres = mbGenreNames.minus(existingGenreNames).map { Genre(it) }
+            val existingGenreNames = repos.album.listTags().map { it.name }.toSet()
+            val mbGenreNames = repos.musicBrainz.listAllGenres()
+            val newTags = mbGenreNames
+                .minus(existingGenreNames)
+                .map { Tag(name = it, isMusicBrainzGenre = true) }
 
-            repos.album.insertGenres(newGenres)
+            repos.album.insertTags(newTags)
         } catch (e: Exception) {
             Log.e(javaClass.simpleName, "updateGenreList: $e", e)
         }
@@ -212,7 +218,7 @@ class AppViewModel @Inject constructor(
                 currentCombo != null &&
                 (currentCombo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
             ) {
-                val track = ensureTrackMetadata(currentCombo.track)
+                val track = ensureTrackMetadata(currentCombo.track, forceReload = true)
                 val playUri = track.playUri
 
                 if (playUri != null && playUri != currentCombo.uri) {
@@ -220,8 +226,20 @@ class AppViewModel @Inject constructor(
                         repos.player.updateTrack(currentCombo.copy(track = track, uri = playUri))
                         if (lastAction == PlayerRepository.LastAction.PLAY) repos.player.play(currentCombo.position)
                     }
+                    // The rest of the album probably has outdated URLs, too:
+                    currentCombo.album?.albumId?.also { albumId ->
+                        repos.album.getAlbumWithTracks(albumId)?.tracks?.forEach {
+                            if (it.trackId != currentCombo.track.trackId) ensureTrackMetadata(it)
+                        }
+                    }
+                    return@launch
                 }
-            } else if (lastAction == PlayerRepository.LastAction.PLAY) SnackbarEngine.addError(error.toString())
+            }
+
+            if (lastAction == PlayerRepository.LastAction.PLAY) {
+                SnackbarEngine.addError(error.toString())
+                repos.player.stop()
+            }
         }
     }
 }

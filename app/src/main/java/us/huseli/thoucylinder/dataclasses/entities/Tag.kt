@@ -6,8 +6,9 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
-@Entity
 @Parcelize
-data class Genre(
-    @ColumnInfo("Genre_genreName") @PrimaryKey val genreName: String,
+@Entity
+data class Tag(
+    @ColumnInfo("Tag_name") @PrimaryKey val name: String,
+    @ColumnInfo("Tag_isMusicBrainzGenre") val isMusicBrainzGenre: Boolean = false,
 ) : Parcelable

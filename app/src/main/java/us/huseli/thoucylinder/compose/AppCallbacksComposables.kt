@@ -4,12 +4,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
@@ -22,7 +26,8 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import java.util.UUID
 
@@ -45,10 +50,12 @@ fun AppCallbacksComposables(
     val context = LocalContext.current
     val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
 
-    val displayAddedToPlaylistMessage: (UUID) -> Unit = { playlistId ->
+    val displayAddedToPlaylistMessage: (UUID, Int) -> Unit = { playlistId, trackCount ->
         SnackbarEngine.addInfo(
-            message = context.getString(R.string.selection_was_added_to_playlist),
-            actionLabel = context.getString(R.string.go_to_playlist),
+            message = context.resources
+                .getQuantityString(R.plurals.x_tracks_added_to_playlist, trackCount, trackCount)
+                .umlautify(),
+            actionLabel = context.getString(R.string.go_to_playlist).umlautify(),
             onActionPerformed = { onPlaylistClick(playlistId) },
         )
     }
@@ -67,9 +74,9 @@ fun AppCallbacksComposables(
                 onFinish = { hasErrors ->
                     SnackbarEngine.addInfo(
                         message = if (hasErrors)
-                            context.getString(R.string.album_was_downloaded_with_errors, album)
-                        else context.getString(R.string.album_was_downloaded, album),
-                        actionLabel = context.getString(R.string.go_to_album),
+                            context.getString(R.string.album_was_downloaded_with_errors, album).umlautify()
+                        else context.getString(R.string.album_was_downloaded, album).umlautify(),
+                        actionLabel = context.getString(R.string.go_to_album).umlautify(),
                         onActionPerformed = { onAlbumClick(album.albumId) },
                     )
                 },
@@ -83,30 +90,70 @@ fun AppCallbacksComposables(
     if (addToPlaylist) {
         addToPlaylistSelection?.also { selection ->
             val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+            val scope = rememberCoroutineScope()
+            var playlistId by rememberSaveable { mutableStateOf<UUID?>(null) }
+            var duplicateCount by rememberSaveable { mutableIntStateOf(0) }
 
-            AddToPlaylistDialog(
-                playlists = playlists,
-                onSelect = { playlistPojo ->
-                    onCancel()
-                    viewModel.addSelectionToPlaylist(selection, playlistPojo)
-                    displayAddedToPlaylistMessage(playlistPojo.playlistId)
-                },
-                onCancel = onCancel,
-                onCreateNewClick = onOpenCreatePlaylistDialog,
-            )
+            if (duplicateCount > 0 && playlistId != null) {
+                AddDuplicatesToPlaylistDialog(
+                    duplicateCount = duplicateCount,
+                    onAddDuplicatesClick = {
+                        onCancel()
+                        playlistId?.also {
+                            viewModel.addSelectionToPlaylist(selection, it, true) { added ->
+                                displayAddedToPlaylistMessage(it, added)
+                            }
+                        }
+                    },
+                    onSkipDuplicatesCount = {
+                        onCancel()
+                        playlistId?.also {
+                            viewModel.addSelectionToPlaylist(selection, it, false) { added ->
+                                displayAddedToPlaylistMessage(it, added)
+                            }
+                        }
+                    },
+                    onCancel = onCancel,
+                )
+            } else {
+                AddToPlaylistDialog(
+                    playlists = playlists,
+                    onSelect = { pojo ->
+                        playlistId = pojo.playlistId
+                        scope.launch {
+                            duplicateCount = viewModel.getDuplicatePlaylistTrackCount(pojo.playlistId, selection)
+
+                            if (duplicateCount == 0) {
+                                onCancel()
+                                viewModel.addSelectionToPlaylist(selection, pojo.playlistId) { added ->
+                                    displayAddedToPlaylistMessage(pojo.playlistId, added)
+                                }
+                            }
+                        }
+                    },
+                    onCancel = onCancel,
+                    onCreateNewClick = onOpenCreatePlaylistDialog,
+                )
+            }
         }
     }
 
     if (createPlaylist) {
+        val scope = rememberCoroutineScope()
+
         CreatePlaylistDialog(
             onSave = { name ->
-                val playlistPojo = PlaylistPojo(name = name)
+                val playlist = Playlist(name = name)
 
-                viewModel.createPlaylist(playlistPojo, addToPlaylistSelection)
+                viewModel.createPlaylist(playlist, addToPlaylistSelection)
 
-                if (addToPlaylistSelection != null)
-                    displayAddedToPlaylistMessage(playlistPojo.playlistId)
-                else onPlaylistClick(playlistPojo.playlistId)
+                if (addToPlaylistSelection != null) scope.launch(Dispatchers.IO) {
+                    displayAddedToPlaylistMessage(
+                        playlist.playlistId,
+                        viewModel.listSelectionTracks(addToPlaylistSelection).size,
+                    )
+                }
+                else onPlaylistClick(playlist.playlistId)
 
                 onCancel()
             },
@@ -116,10 +163,10 @@ fun AppCallbacksComposables(
 
     deleteAlbumCombo?.also { combo ->
         if (!combo.album.isLocal && !combo.isPartiallyDownloaded) {
-            viewModel.markAlbumForDeletion(combo.album.albumId) {
+            viewModel.setAlbumIsInLibrary(combo.album.albumId, false) {
                 SnackbarEngine.addInfo(
-                    message = context.getString(R.string.removed_album_from_library, combo.album.title),
-                    actionLabel = context.getString(R.string.undo),
+                    message = context.getString(R.string.removed_album_from_library, combo.album.title).umlautify(),
+                    actionLabel = context.getString(R.string.undo).umlautify(),
                     onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) },
                 )
             }
@@ -130,12 +177,13 @@ fun AppCallbacksComposables(
                 onCancel = onCancel,
                 onDeleteAlbumAndFilesClick = {
                     viewModel.markAlbumForDeletion(combo.album.albumId) {
-                        val message = context.getString(R.string.removed_album_and_local_files, combo.album.title)
+                        val message =
+                            context.getString(R.string.removed_album_and_local_files, combo.album.title).umlautify()
 
                         if (combo.album.isOnYoutube) {
                             SnackbarEngine.addInfo(
                                 message = message,
-                                actionLabel = context.getString(R.string.undelete_album),
+                                actionLabel = context.getString(R.string.undelete_album).umlautify(),
                                 onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) }
                             )
                         } else {
@@ -146,15 +194,18 @@ fun AppCallbacksComposables(
                 },
                 onDeleteFilesClick = {
                     viewModel.deleteLocalAlbumFiles(combo.album.albumId) {
-                        SnackbarEngine.addInfo(context.getString(R.string.deleted_album_local_files, combo.album.title))
+                        SnackbarEngine.addInfo(
+                            context.getString(R.string.deleted_album_local_files, combo.album.title).umlautify(),
+                        )
                     }
                     onCancel()
                 },
                 onDeleteAlbumClick = {
                     viewModel.setAlbumIsHidden(combo.album.albumId, true) {
                         SnackbarEngine.addInfo(
-                            message = context.getString(R.string.removed_from_the_library, combo.album.title),
-                            actionLabel = context.getString(R.string.undo),
+                            message = context.getString(R.string.removed_from_the_library, combo.album.title)
+                                .umlautify(),
+                            actionLabel = context.getString(R.string.undo).umlautify(),
                             onActionPerformed = { viewModel.setAlbumIsHidden(combo.album.albumId, false) },
                         )
                     }
@@ -198,7 +249,7 @@ fun AppCallbacksComposables(
             year = combo.track.year ?: album?.year,
             localPath = localPath,
             onClose = onCancel,
-            isOnSpotify = combo.isOnSpotify,
+            isOnSpotify = combo.track.isOnSpotify,
         )
     }
 }

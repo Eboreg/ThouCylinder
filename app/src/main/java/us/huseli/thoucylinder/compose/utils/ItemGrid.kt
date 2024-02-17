@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.compose.utils
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -26,30 +28,37 @@ fun <T> ItemGrid(
     onLongClick: ((Int, T) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     isSelected: (T) -> Boolean = { false },
-    onEmpty: @Composable () -> Unit,
+    progressIndicatorText: String? = null,
+    onEmpty: (@Composable () -> Unit)? = null,
     cardContent: @Composable ColumnScope.(Int, T) -> Unit,
 ) {
-    if (things.isEmpty()) onEmpty()
+    if (things.isEmpty()) onEmpty?.invoke()
 
-    LazyVerticalGrid(
-        modifier = modifier.padding(horizontal = 10.dp),
-        columns = GridCells.Adaptive(minSize = 160.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = contentPadding,
-    ) {
-        itemsIndexed(things, key = key) { index, thing ->
-            OutlinedCard(
-                shape = MaterialTheme.shapes.extraSmall,
-                modifier = Modifier.combinedClickable(
-                    onClick = { onClick(index, thing) },
-                    onLongClick = { onLongClick?.invoke(index, thing) },
-                ),
-                content = { cardContent(index, thing) },
-                border = CardDefaults.outlinedCardBorder().let {
-                    if (isSelected(thing)) it.copy(width = it.width + 2.dp) else it
-                },
-            )
+    Box {
+        progressIndicatorText?.also {
+            ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
+        }
+
+        LazyVerticalGrid(
+            modifier = modifier.padding(horizontal = 10.dp),
+            columns = GridCells.Adaptive(minSize = 160.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = contentPadding,
+        ) {
+            itemsIndexed(things, key = key) { index, thing ->
+                OutlinedCard(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onClick(index, thing) },
+                        onLongClick = { onLongClick?.invoke(index, thing) },
+                    ),
+                    content = { cardContent(index, thing) },
+                    border = CardDefaults.outlinedCardBorder().let {
+                        if (isSelected(thing)) it.copy(width = it.width + 2.dp) else it
+                    },
+                )
+            }
         }
     }
 }

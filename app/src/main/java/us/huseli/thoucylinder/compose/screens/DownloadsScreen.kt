@@ -27,7 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,6 +39,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.DownloadsViewModel
 
 @Composable
@@ -57,11 +58,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         val state by task.state.collectAsStateWithLifecycle()
 
         LaunchedEffect(task.track) {
-            thumbnail.value = viewModel.getTrackThumbnail(
-                track = task.track,
-                albumCombo = task.albumCombo,
-                context = context,
-            )
+            thumbnail.value = viewModel.getTrackThumbnail(track = task.track, album = task.albumCombo?.album)
         }
 
         Row(
@@ -81,13 +78,13 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                 )
                 Text(
-                    text = task.track.title,
+                    text = task.track.title.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (state == DownloadTaskState.ERROR) task.error?.also { error ->
                     Text(
-                        text = error.toString(),
+                        text = error.toString().umlautify(),
                         maxLines = 1,
                         style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                         color = LocalBasicColors.current.Red,
@@ -95,7 +92,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     )
                 } else (task.track.artist ?: task.albumCombo?.album?.artist)?.also {
                     Text(
-                        text = it,
+                        text = it.umlautify(),
                         maxLines = 1,
                         style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                         overflow = TextOverflow.Ellipsis,

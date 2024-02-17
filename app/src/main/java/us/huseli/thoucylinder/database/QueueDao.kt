@@ -33,12 +33,10 @@ interface QueueDao {
 
     @Query(
         """
-        SELECT Track.*, Album.*, SpotifyTrack.*, SpotifyAlbum.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
+        SELECT Track.*, Album.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
         FROM QueueTrack  
             JOIN Track ON Track_trackId = QueueTrack_trackId
             LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
-            LEFT JOIN SpotifyAlbum ON Track_albumId = SpotifyAlbum_albumId
         ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )

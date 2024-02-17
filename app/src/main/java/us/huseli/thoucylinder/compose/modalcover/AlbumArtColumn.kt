@@ -15,7 +15,9 @@ import us.huseli.thoucylinder.compose.utils.Thumbnail
 @Composable
 fun AlbumArtColumn(imageBitmap: ImageBitmap?) {
     val configuration = LocalConfiguration.current
-    val thumbnailMaxHeight = if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 250.dp else 270.dp
+    val thumbnailMaxHeight =
+        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 250.dp
+        else (configuration.screenHeightDp * 0.4).dp
 
     Thumbnail(
         modifier = Modifier.sizeIn(maxHeight = thumbnailMaxHeight),

@@ -6,7 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.entities.Album
 
@@ -24,7 +24,7 @@ fun DeleteAlbumDialog(
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
-        title = { Text(text = "Delete $album") },
+        title = { Text(text = stringResource(R.string.delete_x, album)) },
         confirmButton = {
             TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album_and_delete_files)) }
             TextButton(onClick = onDeleteAlbumClick) { Text(stringResource(R.string.only_remove_album)) }

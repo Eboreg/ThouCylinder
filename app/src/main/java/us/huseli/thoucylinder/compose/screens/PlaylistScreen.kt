@@ -5,8 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material.icons.sharp.Delete
@@ -18,30 +17,35 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.track.TrackList
+import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.tracks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
 import kotlin.math.max
 import kotlin.math.min
@@ -50,7 +54,6 @@ import kotlin.math.min
 fun PlaylistScreen(
     modifier: Modifier = Modifier,
     viewModel: PlaylistViewModel = hiltViewModel(),
-    listState: LazyListState = rememberLazyListState(),
     appCallbacks: AppCallbacks,
 ) {
     val colors = LocalBasicColors.current
@@ -60,7 +63,12 @@ fun PlaylistScreen(
     val playlistOrNull by viewModel.playlist.collectAsStateWithLifecycle(null)
     val selectedTrackCombos by viewModel.selectedPlaylistTrackCombos.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val trackCombos: LazyPagingItems<PlaylistTrackCombo> = viewModel.trackCombos.collectAsLazyPagingItems()
+    val trackCombos by viewModel.trackCombos.collectAsStateWithLifecycle()
+
+    val reorderableState = rememberReorderableLazyListState(
+        onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
+        onDragEnd = { from, to -> viewModel.onMoveTrackFinished(from, to) },
+    )
 
     var latestSelectedTrackIndex by rememberSaveable(selectedTrackCombos) { mutableStateOf<Int?>(null) }
 
@@ -81,7 +89,7 @@ fun PlaylistScreen(
                         content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                     )
                     Text(
-                        text = playlist.name,
+                        text = playlist.name.umlautify(),
                         style = MaterialTheme.typography.headlineSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -108,35 +116,11 @@ fun PlaylistScreen(
             }
 
             TrackList(
-                trackCombos = trackCombos,
-                viewModel = viewModel,
-                listState = listState,
+                listState = reorderableState.listState,
+                modifier = Modifier.reorderable(reorderableState),
+                itemCount = trackCombos.size,
                 selectedTrackCombos = selectedTrackCombos,
-                trackDownloadTasks = trackDownloadTasks,
                 onEmpty = { Text(stringResource(R.string.this_playlist_is_empty), modifier = Modifier.padding(10.dp)) },
-                trackCallbacks = { index: Int, combo: PlaylistTrackCombo ->
-                    TrackCallbacks(
-                        combo = combo,
-                        appCallbacks = appCallbacks,
-                        context = context,
-                        onTrackClick = {
-                            if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(combo)
-                            else viewModel.playPlaylist(startAt = combo)
-                        },
-                        onEnqueueClick = { viewModel.enqueueTrackCombo(combo, context) },
-                        onLongClick = {
-                            viewModel.selectPlaylistTrackCombos(
-                                latestSelectedTrackIndex?.let { index2 ->
-                                    (min(index, index2)..max(index, index2)).mapNotNull { idx -> trackCombos[idx] }
-                                } ?: listOf(combo)
-                            )
-                        },
-                        onEach = {
-                            if (combo.track.trackId == latestSelectedTrackCombo?.track?.trackId)
-                                latestSelectedTrackIndex = index
-                        },
-                    )
-                },
                 trackSelectionCallbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = {
                         appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
@@ -150,8 +134,56 @@ fun PlaylistScreen(
                         onClick = { viewModel.removeTrackCombos(selectedTrackCombos) },
                         text = stringResource(R.string.remove),
                     )
+                },
+            ) {
+                itemsIndexed(trackCombos, key = { _, combo -> combo.id }) { index, combo ->
+                    val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+
+                    LaunchedEffect(combo.track.trackId) {
+                        thumbnail.value = viewModel.getTrackThumbnail(track = combo.track, album = combo.album)
+                        viewModel.ensureTrackMetadata(combo.track)
+                    }
+
+                    ReorderableItem(reorderableState = reorderableState, key = combo.id) { isDragging ->
+                        val isSelected = selectedTrackCombos.contains(combo)
+                        val containerColor =
+                            if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
+                            else null
+
+                        TrackListRow(
+                            combo = combo,
+                            showArtist = true,
+                            thumbnail = thumbnail.value,
+                            isSelected = isSelected,
+                            containerColor = containerColor,
+                            reorderableState = reorderableState,
+                            callbacks = TrackCallbacks(
+                                combo = combo,
+                                appCallbacks = appCallbacks,
+                                context = context,
+                                onTrackClick = {
+                                    if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(combo)
+                                    else viewModel.playPlaylist(startAt = combo)
+                                },
+                                onEnqueueClick = { viewModel.enqueueTrackCombo(combo, context) },
+                                onLongClick = {
+                                    viewModel.selectPlaylistTrackCombos(
+                                        latestSelectedTrackIndex?.let { index2 ->
+                                            (min(index, index2)..max(index, index2))
+                                                .mapNotNull { idx -> trackCombos[idx] }
+                                        } ?: listOf(combo)
+                                    )
+                                },
+                                onEach = {
+                                    if (combo.track.trackId == latestSelectedTrackCombo?.track?.trackId)
+                                        latestSelectedTrackIndex = index
+                                },
+                            ),
+                            downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
+                        )
+                    }
                 }
-            )
+            }
         }
     }
 }

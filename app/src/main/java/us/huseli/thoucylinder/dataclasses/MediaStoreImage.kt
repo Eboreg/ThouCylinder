@@ -21,13 +21,14 @@ import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
-import us.huseli.thoucylinder.getSquareBitmap
+import us.huseli.thoucylinder.getBitmap
+import us.huseli.thoucylinder.getBitmapByUrl
 import java.io.File
 
 @Parcelize
 @WorkerThread
-data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
-    constructor(uri: Uri) : this(uri, uri)
+data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri, val hash: Int) : Parcelable {
+    constructor(uri: Uri, hash: Int) : this(uri, uri, hash)
 
     fun deleteDirectoryFiles(context: Context, directory: DocumentFile) {
         listOf("cover.jpg", "cover-thumbnail.jpg").forEach { filename ->
@@ -40,7 +41,7 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
         if (thumbnailUri.isRawFile) thumbnailUri.toFile().delete()
     }
 
-    suspend fun getFullBitmap(context: Context): Bitmap? = uri.getSquareBitmap(context)
+    suspend fun getFullBitmap(context: Context): Bitmap? = uri.getBitmap(context)?.square()
 
     suspend fun getFullImageBitmap(context: Context) = getFullBitmap(context)?.asFullImageBitmap(context)
 
@@ -65,7 +66,7 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
         }
     }
 
-    private suspend fun getThumbnailBitmap(context: Context): Bitmap? = thumbnailUri.getSquareBitmap(context)
+    private suspend fun getThumbnailBitmap(context: Context): Bitmap? = thumbnailUri.getBitmap(context)?.square()
 
     companion object {
         fun fromBitmap(bitmap: Bitmap, context: Context, album: Album): MediaStoreImage {
@@ -85,11 +86,22 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri) : Parcelable {
             return MediaStoreImage(
                 uri = fullImageFile.toUri(),
                 thumbnailUri = thumbnailFile.toUri(),
+                hash = fullBitmap.hashCode(),
             )
         }
 
-        fun fromUrls(fullImageUrl: String, thumbnailUrl: String? = fullImageUrl) =
-            MediaStoreImage(uri = Uri.parse(fullImageUrl), thumbnailUri = Uri.parse(thumbnailUrl ?: fullImageUrl))
+        suspend fun fromUri(fullImageUri: Uri, context: Context) = MediaStoreImage(
+            uri = fullImageUri,
+            hash = fullImageUri.getBitmap(context).hashCode(),
+        )
+
+        suspend fun fromUrls(fullImageUrl: String, thumbnailUrl: String? = fullImageUrl): MediaStoreImage {
+            return MediaStoreImage(
+                uri = Uri.parse(fullImageUrl),
+                thumbnailUri = Uri.parse(thumbnailUrl ?: fullImageUrl),
+                hash = fullImageUrl.getBitmapByUrl().hashCode(),
+            )
+        }
 
         private fun createDocumentFile(dir: DocumentFile, filename: String): DocumentFile? =
             dir.createFile("image/jpeg", filename)

@@ -7,6 +7,7 @@ import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.umlautify
 
 abstract class AbstractAlbumListViewModel(
     selectionKey: String,
@@ -23,7 +24,9 @@ abstract class AbstractAlbumListViewModel(
         if (combos.isNotEmpty()) {
             repos.player.insertNext(combos)
             SnackbarEngine.addInfo(
-                context.resources.getQuantityString(R.plurals.x_albums_enqueued_next, albums.size, albums.size)
+                context.resources
+                    .getQuantityString(R.plurals.x_albums_enqueued_next, albums.size, albums.size)
+                    .umlautify()
             )
         }
     }

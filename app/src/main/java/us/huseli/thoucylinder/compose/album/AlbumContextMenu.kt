@@ -2,6 +2,8 @@ package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
+import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.BookmarkBorder
 import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material.icons.sharp.Download
@@ -9,8 +11,6 @@ import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material.icons.sharp.PlayArrow
-import androidx.compose.material.icons.sharp.PlaylistAdd
-import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -23,7 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
@@ -73,7 +73,7 @@ fun AlbumContextMenu(
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.enqueue)) },
-            leadingIcon = { Icon(Icons.Sharp.PlaylistPlay, null) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
             onClick = {
                 callbacks.onEnqueueClick()
                 onDismissRequest()
@@ -91,7 +91,7 @@ fun AlbumContextMenu(
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
-            leadingIcon = { Icon(Icons.Sharp.PlaylistAdd, null) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
                 callbacks.onAddToPlaylistClick()
                 onDismissRequest()

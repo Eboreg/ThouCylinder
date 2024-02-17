@@ -19,14 +19,13 @@ import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import java.util.UUID
 
 @Dao
 interface TrackDao {
-    @RawQuery(observedEntities = [Track::class, Album::class, SpotifyTrack::class])
+    @RawQuery(observedEntities = [Track::class, Album::class])
     fun _pageTrackCombos(query: SupportSQLiteQuery): PagingSource<Int, TrackCombo>
 
     /** Public methods ********************************************************/
@@ -44,10 +43,8 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
-        FROM Track
-            LEFT JOIN Album ON Track_albumId = Album_albumId 
-            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+        SELECT DISTINCT Track.*, Album.*
+        FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId 
         WHERE Track_albumId = :albumId
         ORDER BY Track_albumPosition
         """
@@ -82,10 +79,8 @@ interface TrackDao {
         return _pageTrackCombos(
             SimpleSQLiteQuery(
                 """
-                SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
-                FROM Track
-                    LEFT JOIN Album ON Track_albumId = Album_albumId
-                    LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+                SELECT DISTINCT Track.*, Album.*
+                FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId
                 WHERE Track_isInLibrary = 1 AND Album_isHidden != 1 
                     ${searchQuery?.let { "AND $it" } ?: ""}
                 ORDER BY ${sortParameter.sqlColumn} ${sortOrder.sql}
@@ -96,10 +91,8 @@ interface TrackDao {
 
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, SpotifyTrack.*
-        FROM Track
-            LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN SpotifyTrack ON Track_trackId = SpotifyTrack_trackId
+        SELECT DISTINCT Track.*, Album.*
+        FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId
         WHERE (
             LOWER(Track_artist) = LOWER(:artist) OR (Track_artist IS NULL AND LOWER(Album_artist) = LOWER(:artist))
         ) AND Track_isInLibrary = 1

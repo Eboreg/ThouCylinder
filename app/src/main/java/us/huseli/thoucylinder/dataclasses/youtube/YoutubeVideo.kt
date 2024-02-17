@@ -1,8 +1,9 @@
-package us.huseli.thoucylinder.dataclasses
+package us.huseli.thoucylinder.dataclasses.youtube
 
 import android.os.Parcelable
 import androidx.room.Embedded
 import kotlinx.parcelize.Parcelize
+import us.huseli.retaintheme.extensions.stripCommonFixes
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -22,3 +23,6 @@ data class YoutubeVideo(
     val expiresAt: Instant?
         get() = metadata?.uri?.getQueryParameter("expire")?.toLong()?.let { Instant.ofEpochSecond(it) }
 }
+
+fun Iterable<YoutubeVideo>.stripTitleCommons(): List<YoutubeVideo> = zip(map { it.title }.stripCommonFixes())
+    .map { (video, title) -> video.copy(title = title.replace(Regex(" \\([^)]*$"), "")) }

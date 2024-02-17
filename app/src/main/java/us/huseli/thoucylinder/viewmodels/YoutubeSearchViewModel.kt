@@ -36,14 +36,13 @@ class YoutubeSearchViewModel @Inject constructor(
             combos.filter { combo -> selected.map { it.albumId }.contains(combo.album.albumId) }
         }
 
-    fun matchMusicBrainz(combo: AlbumWithTracksCombo) = viewModelScope.launch(Dispatchers.IO) {
+    fun updateFromMusicBrainz(combo: AlbumWithTracksCombo) = viewModelScope.launch(Dispatchers.IO) {
         if (combo.album.musicBrainzReleaseId == null) {
             val match = repos.musicBrainz.matchAlbumWithTracks(combo)
 
             if (match != null) {
-                repos.album.updateAlbum(match.album)
+                repos.album.updateAlbumCombo(match)
                 repos.track.updateTracks(match.tracks)
-                repos.album.saveAlbumGenres(match.album.albumId, match.genres)
                 if (match.album.musicBrainzReleaseId != null) {
                     repos.musicBrainz.getReleaseCoverArt(match.album.musicBrainzReleaseId)?.also {
                         repos.album.updateAlbumArt(match.album.albumId, it)
@@ -61,9 +60,9 @@ class YoutubeSearchViewModel @Inject constructor(
                 _isSearchingAlbums.value = true
 
                 viewModelScope.launch(Dispatchers.IO) {
-                    val combos = repos.youtube.getAlbumSearchResult(query)
+                    val combos = repos.youtube.searchAlbumsWithTracks(query)
 
-                    repos.album.insertAlbums(combos.map { it.album })
+                    repos.album.insertAlbumCombos(combos)
                     repos.track.insertTracks(combos.flatMap { it.tracks })
                     _albumCombos.value = combos
                     _isSearchingAlbums.value = false

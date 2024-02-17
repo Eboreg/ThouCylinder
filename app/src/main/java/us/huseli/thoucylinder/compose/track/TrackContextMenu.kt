@@ -1,14 +1,14 @@
 package us.huseli.thoucylinder.compose.track
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
+import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
-import androidx.compose.material.icons.sharp.PlaylistAdd
-import androidx.compose.material.icons.sharp.PlaylistPlay
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -21,28 +21,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 
 @Composable
-fun TrackContextMenu(
+inline fun TrackContextMenu(
     isShown: Boolean,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
     callbacks: TrackCallbacks<*>,
-    onDismissRequest: () -> Unit,
+    crossinline onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
-    extraItems: (@Composable () -> Unit)? = null,
+    crossinline extraItems: @Composable () -> Unit = {},
 ) {
     DropdownMenu(
         modifier = modifier,
         expanded = isShown,
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { onDismissRequest() },
         offset = offset,
     ) {
         if (isDownloadable) {
@@ -58,7 +58,7 @@ fun TrackContextMenu(
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
-            leadingIcon = { Icon(Icons.Sharp.PlaylistAdd, null) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
                 callbacks.onAddToPlaylistClick()
                 onDismissRequest()
@@ -68,7 +68,7 @@ fun TrackContextMenu(
         callbacks.onEnqueueClick?.also { onEnqueueClick ->
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.enqueue)) },
-                leadingIcon = { Icon(Icons.Sharp.PlaylistPlay, null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
                 onClick = {
                     onEnqueueClick()
                     onDismissRequest()
@@ -142,20 +142,20 @@ fun TrackContextMenu(
             )
         }
 
-        extraItems?.invoke()
+        extraItems()
     }
 }
 
 
 @Composable
-fun TrackContextButtonWithMenu(
+inline fun TrackContextButtonWithMenu(
     isDownloadable: Boolean,
     isInLibrary: Boolean,
     callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
-    extraItems: (@Composable () -> Unit)? = null,
+    crossinline extraItems: @Composable () -> Unit = {},
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 

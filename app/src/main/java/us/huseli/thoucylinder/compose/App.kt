@@ -52,6 +52,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
@@ -72,6 +73,7 @@ fun App(
 
     val currentTrackCombo by queueViewModel.currentCombo.collectAsStateWithLifecycle(null)
     val isWelcomeDialogShown by viewModel.isWelcomeDialogShown.collectAsStateWithLifecycle()
+    val umlautify by viewModel.umlautify.collectAsStateWithLifecycle()
 
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
@@ -84,9 +86,8 @@ fun App(
     var editAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
     var deleteAlbumCombo by rememberSaveable { mutableStateOf<AbstractAlbumCombo?>(null) }
 
-    LaunchedEffect(Unit) {
-        viewModel.doStartupTasks(context)
-    }
+    // This is just to forcefully recompose stuff when the value changes:
+    LaunchedEffect(umlautify) {}
 
     /** Weird onBackPressedCallback shit begin */
     val onBackPressedCallback = remember {
@@ -121,7 +122,10 @@ fun App(
     }
 
     val appCallbacks = AppCallbacks(
-        onAddAlbumToLibraryClick = { combo -> viewModel.addAlbumToLibrary(combo.album.albumId) },
+        onAddAlbumToLibraryClick = { combo ->
+            viewModel.addAlbumToLibrary(combo.album.albumId)
+            SnackbarEngine.addInfo(context.getString(R.string.added_x_to_the_library, combo.album.title).umlautify())
+        },
         onAddToPlaylistClick = { selection ->
             addToPlaylistSelection = selection
             addToPlaylist = true
@@ -134,17 +138,17 @@ fun App(
         onBackClick = { if (!navController.popBackStack()) navController.navigate(LibraryDestination.route) },
         onCancelAlbumDownloadClick = { viewModel.cancelAlbumDownload(it) },
         onCreatePlaylistClick = { createPlaylist = true },
-        onDeletePlaylistClick = { pojo ->
-            viewModel.deletePlaylist(pojo) {
+        onDeletePlaylistClick = { playlist ->
+            viewModel.deletePlaylist(playlist) {
                 SnackbarEngine.addInfo(
-                    message = context.getString(R.string.the_playlist_was_removed),
-                    actionLabel = context.getString(R.string.undo),
+                    message = context.getString(R.string.the_playlist_was_removed).umlautify(),
+                    actionLabel = context.getString(R.string.undo).umlautify(),
                     onActionPerformed = {
-                        viewModel.undoDeletePlaylist { pojo ->
+                        viewModel.undoDeletePlaylist { playlistId ->
                             SnackbarEngine.addInfo(
-                                message = context.getString(R.string.the_playlist_was_restored),
-                                actionLabel = context.getString(R.string.go_to_playlist),
-                                onActionPerformed = { onPlaylistClick(pojo.playlistId) },
+                                message = context.getString(R.string.the_playlist_was_restored).umlautify(),
+                                actionLabel = context.getString(R.string.go_to_playlist).umlautify(),
+                                onActionPerformed = { onPlaylistClick(playlistId) },
                             )
                         }
                     }
@@ -246,6 +250,7 @@ fun App(
                 ImportScreen(
                     onGotoLibraryClick = { navController.navigate(LibraryDestination.route) },
                     onGotoSettingsClick = { navController.navigate(SettingsDestination.route) },
+                    onGotoAlbumClick = onAlbumClick,
                 )
             }
 

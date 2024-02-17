@@ -24,16 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.retaintheme.extensions.getActivity
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.screens.PaginationSection
 import us.huseli.thoucylinder.compose.screens.ProgressSection
@@ -43,7 +42,11 @@ import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
+import java.util.UUID
 import kotlin.math.max
 
 @Composable
@@ -52,16 +55,19 @@ fun ImportSpotify(
     viewModel: SpotifyImportViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
     onGotoLibraryClick: () -> Unit,
+    onGotoAlbumClick: (UUID) -> Unit,
     backendSelection: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val activity = context.getActivity()
+    val uriHandler = LocalUriHandler.current
 
     val filteredAlbumCount by viewModel.filteredAlbumCount.collectAsStateWithLifecycle(null)
     val hasNext by viewModel.hasNext.collectAsStateWithLifecycle(false)
     val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
     val isAllSelected by viewModel.isAllSelected.collectAsStateWithLifecycle(false)
-    val isAuthorized by viewModel.isAuthorized.collectAsStateWithLifecycle(null)
+    val authorizationStatus by viewModel.authorizationStatus.collectAsStateWithLifecycle(
+        SpotifyOAuth2.AuthorizationStatus.UNKNOWN
+    )
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val isAlbumCountExact by viewModel.isAlbumCountExact.collectAsStateWithLifecycle(false)
     val nextAlbumIdx by viewModel.nextAlbumIdx.collectAsStateWithLifecycle()
@@ -69,38 +75,43 @@ fun ImportSpotify(
     val offset by viewModel.localOffset.collectAsStateWithLifecycle(0)
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val searchTerm by viewModel.searchTerm.collectAsStateWithLifecycle()
-    val selectedUserAlbums by viewModel.selectedAlbumCombos.collectAsStateWithLifecycle()
+    val selectedUserAlbums by viewModel.selectedSpotifyAlbums.collectAsStateWithLifecycle()
     val totalAlbumCount by viewModel.totalAlbumCount.collectAsStateWithLifecycle()
-    val albumCombos by viewModel.offsetAlbumCombos.collectAsStateWithLifecycle(emptyList())
+    val spotifyAlbums by viewModel.offsetSpotifyAlbums.collectAsStateWithLifecycle(emptyList())
 
-    LaunchedEffect(isAuthorized) {
-        if (isAuthorized == true) viewModel.setOffset(0)
+    LaunchedEffect(authorizationStatus) {
+        // if (authorizationStatus == SpotifyRepository.AuthorizationStatus.AUTHORIZED) viewModel.setOffset(0)
+        viewModel.setOffset(0)
     }
 
-    LaunchedEffect(albumCombos.firstOrNull()) {
-        if (albumCombos.isNotEmpty()) listState.scrollToItem(0)
+    LaunchedEffect(spotifyAlbums.firstOrNull()) {
+        if (spotifyAlbums.isNotEmpty()) listState.scrollToItem(0)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         ImportSpotifyHeader(
-            isAuthorized = if (albumCombos.isEmpty()) isAuthorized else true,
+            authorizationStatus = authorizationStatus,
             hasPrevious = offset > 0,
             hasNext = hasNext,
             importButtonEnabled = progress == null && selectedUserAlbums.isNotEmpty(),
-            selectAllEnabled = albumCombos.isNotEmpty(),
+            selectAllEnabled = spotifyAlbums.isNotEmpty(),
             offset = offset,
-            currentAlbumCount = albumCombos.size,
+            currentAlbumCount = spotifyAlbums.size,
             totalAlbumCount = filteredAlbumCount,
             isTotalAlbumCountExact = isAlbumCountExact,
             isAllSelected = isAllSelected,
             progress = progress,
             searchTerm = searchTerm,
             onImportClick = {
-                viewModel.importSelectedAlbums { importCount, notFoundCount ->
+                viewModel.importSelectedAlbums { importedIds, notFoundCount ->
                     val strings = mutableListOf<String>()
-                    if (importCount > 0) {
+                    if (importedIds.isNotEmpty()) {
                         strings.add(
-                            context.resources.getQuantityString(R.plurals.x_albums_imported, importCount, importCount)
+                            context.resources.getQuantityString(
+                                R.plurals.x_albums_imported,
+                                importedIds.size,
+                                importedIds.size,
+                            ).umlautify()
                         )
                     }
                     if (notFoundCount > 0) {
@@ -112,23 +123,32 @@ fun ImportSpotify(
                             )
                         )
                     }
-                    if (strings.isNotEmpty()) SnackbarEngine.addInfo(
-                        message = strings.joinToString(" "),
-                        actionLabel = context.getString(R.string.go_to_library),
-                        onActionPerformed = onGotoLibraryClick,
-                    )
+                    if (strings.isNotEmpty()) {
+                        val actionLabel =
+                            if (importedIds.size == 1) context.getString(R.string.go_to_album).umlautify()
+                            else context.getString(R.string.go_to_library).umlautify()
+
+                        SnackbarEngine.addInfo(
+                            message = strings.joinToString(" ").umlautify(),
+                            actionLabel = actionLabel,
+                            onActionPerformed = {
+                                if (importedIds.size == 1) onGotoAlbumClick(importedIds[0])
+                                else onGotoLibraryClick()
+                            },
+                        )
+                    }
                 }
             },
             onPreviousClick = { viewModel.setOffset(max(offset - 50, 0)) },
             onNextClick = { viewModel.setOffset(offset + 50) },
             onSelectAllClick = { viewModel.setSelectAll(it) },
             onSearch = { viewModel.setSearchTerm(it) },
-            onAuthorizeClick = { activity?.also { viewModel.authorize(it) } },
+            onAuthorizeClick = { uriHandler.openUri(viewModel.getAuthUrl()) },
             backendSelection = backendSelection,
         )
 
-        if (albumCombos.isEmpty()) {
-            if (isAuthorized != true) {
+        if (spotifyAlbums.isEmpty()) {
+            if (authorizationStatus == SpotifyOAuth2.AuthorizationStatus.UNAUTHORIZED) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.padding(horizontal = 30.dp, vertical = 10.dp)
@@ -141,12 +161,17 @@ fun ImportSpotify(
         }
 
         ItemList(
-            things = albumCombos,
+            things = spotifyAlbums,
             cardHeight = 60.dp,
-            key = { _, combo -> combo.spotifyAlbum.id },
+            key = { _, album -> album.id },
             gap = 5.dp,
             isSelected = { selectedUserAlbums.contains(it) },
-            onClick = { _, combo -> viewModel.toggleSelected(combo) },
+            onClick = { _, album ->
+                val importedAlbumId = importedAlbumIds[album.id]
+
+                if (importedAlbumId != null) onGotoAlbumClick(importedAlbumId)
+                else viewModel.toggleSelected(album)
+            },
             listState = listState,
             contentPadding = PaddingValues(vertical = 5.dp),
             trailingItem = {
@@ -158,13 +183,13 @@ fun ImportSpotify(
                     )
                 }
             },
-        ) { _, combo ->
-            val imageBitmap = remember(combo.spotifyAlbum) { mutableStateOf<ImageBitmap?>(null) }
-            val isImported = importedAlbumIds.contains(combo.spotifyAlbum.id)
-            val isNotFound = notFoundAlbumIds.contains(combo.spotifyAlbum.id)
+        ) { _, album ->
+            val imageBitmap = remember(album) { mutableStateOf<ImageBitmap?>(null) }
+            val isImported = importedAlbumIds.containsKey(album.id)
+            val isNotFound = notFoundAlbumIds.contains(album.id)
 
-            LaunchedEffect(combo.spotifyAlbum, isImported, isNotFound) {
-                if (!isImported && !isNotFound) imageBitmap.value = viewModel.getThumbnail(combo.spotifyAlbum, context)
+            LaunchedEffect(album, isImported, isNotFound) {
+                if (!isImported && !isNotFound) imageBitmap.value = viewModel.getThumbnail(album)
                 else imageBitmap.value = null
             }
 
@@ -172,14 +197,14 @@ fun ImportSpotify(
                 imageBitmap = imageBitmap.value,
                 isImported = isImported,
                 isNotFound = isNotFound,
-                albumTitle = combo.spotifyAlbum.name,
-                artist = combo.artist,
+                albumTitle = album.name,
+                artist = album.artist,
                 thirdRow = {
-                    val count = combo.spotifyTrackCombos.size
+                    val count = album.tracks.items.size
 
                     Text(
                         text = pluralStringResource(R.plurals.x_tracks, count, count) +
-                            " • ${combo.spotifyAlbum.year} • ${combo.duration.sensibleFormat()}",
+                            " • ${album.year} • ${album.duration.sensibleFormat()}",
                         style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
                     )
                 }
@@ -193,7 +218,7 @@ fun ImportSpotify(
 @Composable
 fun ImportSpotifyHeader(
     modifier: Modifier = Modifier,
-    isAuthorized: Boolean?,
+    authorizationStatus: SpotifyOAuth2.AuthorizationStatus,
     hasPrevious: Boolean,
     hasNext: Boolean,
     importButtonEnabled: Boolean,
@@ -232,7 +257,7 @@ fun ImportSpotifyHeader(
                 ) {
                     backendSelection()
 
-                    if (isAuthorized == true) {
+                    if (authorizationStatus == SpotifyOAuth2.AuthorizationStatus.AUTHORIZED) {
                         if (!isLandscape) {
                             SmallButton(
                                 onClick = onImportClick,
@@ -284,7 +309,7 @@ fun ImportSpotifyHeader(
                                 modifier = Modifier.align(Alignment.CenterVertically).padding(start = 10.dp),
                             )
                         }
-                    } else {
+                    } else if (authorizationStatus != SpotifyOAuth2.AuthorizationStatus.UNKNOWN) {
                         SmallButton(onClick = onAuthorizeClick, text = stringResource(R.string.authorize))
                     }
                 }

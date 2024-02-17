@@ -14,8 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +44,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
 import kotlin.math.max
 import kotlin.math.min
@@ -114,52 +116,35 @@ fun YoutubeSearchScreen(
                 selectedAlbumCombos = selectedAlbumCombos,
                 isSearching = isSearchingAlbums,
                 albumDownloadTasks = albumDownloadTasks,
+                getThumbnail = { viewModel.getAlbumThumbnail(it) },
                 albumCallbacks = { combo: AlbumWithTracksCombo ->
                     AlbumCallbacks(
                         combo = combo,
                         appCallbacks = appCallbacks,
                         context = context,
-                        onPlayClick = {
-                            viewModel.ensureAlbumTracksMetadataAsync(combo) { viewModel.playTrackCombos(it.trackCombos) }
-                        },
-                        onEnqueueClick = {
-                            viewModel.ensureAlbumTracksMetadataAsync(combo) {
-                                viewModel.enqueueTrackCombos(it.trackCombos, context)
-                            }
-                        },
-                        onAddToPlaylistClick = {
-                            viewModel.ensureAlbumTracksMetadataAsync(combo) {
-                                appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = it))
-                            }
-                        },
+                        onPlayClick = { viewModel.playTrackCombos(combo.trackCombos) },
+                        onEnqueueClick = { viewModel.enqueueTrackCombos(combo.trackCombos, context) },
+                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = combo)) },
                         onAlbumLongClick = {
                             viewModel.selectAlbumsFromLastSelected(combo.album, albumCombos.map { it.album })
                         },
                         onAlbumClick = {
                             if (selectedAlbumCombos.isNotEmpty()) viewModel.toggleSelected(combo.album)
                             else {
-                                viewModel.matchMusicBrainz(combo)
+                                viewModel.updateFromMusicBrainz(combo)
                                 appCallbacks.onAlbumClick(combo.album.albumId)
                             }
                         },
                     )
                 },
                 albumSelectionCallbacks = AlbumSelectionCallbacks(
-                    onPlayClick = {
-                        viewModel.ensureTrackComboMetadataAsync(selectedAlbumCombos.flatMap { it.trackCombos }) {
-                            viewModel.playTrackCombos(it)
-                        }
-                    },
+                    onPlayClick = { viewModel.playTrackCombos(selectedAlbumCombos.flatMap { it.trackCombos }) },
                     onEnqueueClick = {
-                        viewModel.ensureTrackComboMetadataAsync(selectedAlbumCombos.flatMap { it.trackCombos }) {
-                            viewModel.enqueueTrackCombos(it, context)
-                        }
+                        viewModel.enqueueTrackCombos(selectedAlbumCombos.flatMap { it.trackCombos }, context)
                     },
                     onUnselectAllClick = { viewModel.unselectAllAlbums() },
                     onAddToPlaylistClick = {
-                        viewModel.ensureAlbumTracksMetadataAsync(selectedAlbumCombos) {
-                            appCallbacks.onAddToPlaylistClick(Selection(albumsWithTracks = it))
-                        }
+                        appCallbacks.onAddToPlaylistClick(Selection(albumsWithTracks = selectedAlbumCombos))
                     },
                     onSelectAllClick = { viewModel.selectAlbums(albumCombos.map { it.album }) },
                 ),
@@ -175,14 +160,8 @@ fun YoutubeSearchScreen(
                         combo = combo,
                         appCallbacks = appCallbacks,
                         context = context,
-                        onEnqueueClick = {
-                            viewModel.ensureTrackComboMetadataAsync(combo) { viewModel.enqueueTrackCombo(it, context) }
-                        },
-                        onAddToPlaylistClick = {
-                            viewModel.ensureTrackComboMetadataAsync(combo) {
-                                appCallbacks.onAddToPlaylistClick(Selection(track = it.track))
-                            }
-                        },
+                        onEnqueueClick = { viewModel.enqueueTrackCombo(combo, context) },
+                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(track = combo.track)) },
                         onLongClick = {
                             viewModel.selectTrackCombos(
                                 latestSelectedTrackIndex?.let { index2 ->
@@ -191,10 +170,8 @@ fun YoutubeSearchScreen(
                             )
                         },
                         onTrackClick = {
-                            viewModel.ensureTrackComboMetadataAsync(combo) {
-                                if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(it)
-                                else viewModel.playTrackCombo(it)
-                            }
+                            if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(combo)
+                            else viewModel.playTrackCombo(combo)
                         },
                         onEach = {
                             if (combo.track.trackId == latestSelectedTrackCombo?.track?.trackId)
@@ -205,18 +182,10 @@ fun YoutubeSearchScreen(
                 trackDownloadTasks = trackDownloadTasks,
                 trackSelectionCallbacks = TrackSelectionCallbacks(
                     onAddToPlaylistClick = {
-                        viewModel.ensureTrackComboMetadataAsync(selectedTrackCombos) { combos ->
-                            appCallbacks.onAddToPlaylistClick(Selection(tracks = combos.tracks()))
-                        }
+                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
                     },
-                    onPlayClick = {
-                        viewModel.ensureTrackComboMetadataAsync(selectedTrackCombos) { viewModel.playTrackCombos(it) }
-                    },
-                    onEnqueueClick = {
-                        viewModel.ensureTrackComboMetadataAsync(selectedTrackCombos) {
-                            viewModel.enqueueTrackCombos(it, context)
-                        }
-                    },
+                    onPlayClick = { viewModel.playTrackCombos(selectedTrackCombos) },
+                    onEnqueueClick = { viewModel.enqueueTrackCombos(selectedTrackCombos, context) },
                     onUnselectAllClick = { viewModel.unselectAllTrackCombos() },
                 ),
             )
@@ -236,6 +205,7 @@ fun AlbumSearchResults(
     isSearching: Boolean,
     selectedAlbumCombos: List<AlbumWithTracksCombo>,
     albumDownloadTasks: List<AlbumDownloadTask>,
+    getThumbnail: suspend (Album) -> ImageBitmap?,
 ) {
     when (displayType) {
         DisplayType.LIST -> {
@@ -248,6 +218,7 @@ fun AlbumSearchResults(
                     if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                 },
                 albumDownloadTasks = albumDownloadTasks,
+                getThumbnail = getThumbnail,
             )
         }
         DisplayType.GRID -> {

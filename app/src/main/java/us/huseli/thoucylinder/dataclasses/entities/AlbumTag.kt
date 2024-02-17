@@ -7,26 +7,26 @@ import androidx.room.Index
 import java.util.UUID
 
 @Entity(
-    primaryKeys = ["AlbumStyle_albumId", "AlbumStyle_styleName"],
-    indices = [Index("AlbumStyle_styleName")],
+    primaryKeys = ["AlbumTag_albumId", "AlbumTag_tagName"],
+    indices = [Index("AlbumTag_tagName")],
     foreignKeys = [
         ForeignKey(
             entity = Album::class,
             parentColumns = ["Album_albumId"],
-            childColumns = ["AlbumStyle_albumId"],
+            childColumns = ["AlbumTag_albumId"],
             onDelete = ForeignKey.CASCADE,
             onUpdate = ForeignKey.CASCADE,
         ),
         ForeignKey(
-            entity = Style::class,
-            parentColumns = ["Style_styleName"],
-            childColumns = ["AlbumStyle_styleName"],
+            entity = Tag::class,
+            parentColumns = ["Tag_name"],
+            childColumns = ["AlbumTag_tagName"],
             onDelete = ForeignKey.CASCADE,
             onUpdate = ForeignKey.CASCADE,
         )
     ],
 )
-data class AlbumStyle(
-    @ColumnInfo("AlbumStyle_albumId") val albumId: UUID,
-    @ColumnInfo("AlbumStyle_styleName") val styleName: String,
+data class AlbumTag(
+    @ColumnInfo("AlbumTag_albumId") val albumId: UUID,
+    @ColumnInfo("AlbumTag_tagName") val tagName: String,
 )

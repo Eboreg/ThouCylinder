@@ -18,10 +18,14 @@ import com.anggrayudi.storage.file.fullName
 import com.anggrayudi.storage.file.isWritable
 import com.anggrayudi.storage.file.mimeType
 import com.anggrayudi.storage.file.openInputStream
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import us.huseli.retaintheme.extensions.nullIfEmpty
+import us.huseli.retaintheme.extensions.pow
 import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.retaintheme.extensions.square
 import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
@@ -30,8 +34,8 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
-
 
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     val splitKeys = keys.split(".", limit = 2)
@@ -66,9 +70,9 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
 /** STRING ********************************************************************/
 fun String.escapeQuotes() = replace("\"", "\\\"")
 
-suspend fun String.getSquareBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
+suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     try {
-        Request.get(this@getSquareBitmapByUrl).connect().getSquareBitmap()
+        Request(this@getBitmapByUrl).getBitmap()
     } catch (e: FileNotFoundException) {
         Log.e("String", "getBitmapByUrl: $e", e)
         null
@@ -77,6 +81,13 @@ suspend fun String.getSquareBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO)
         null
     }
 }
+
+val gson: Gson = GsonBuilder().create()
+
+fun <T> String.fromJson(typeOfT: TypeToken<T>): T = gson.fromJson(this, typeOfT)
+
+/** "Should not be used if the desired type is a generic type." */
+inline fun <reified T> String.fromJson(): T = gson.fromJson(this, T::class.java)
 
 
 /** MEDIAFORMAT ***************************************************************/
@@ -112,7 +123,7 @@ fun JSONObject.getIntOrNull(name: String): Int? =
 fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble(name) else null
 
 
-/** IMAGEBITMAP ***************************************************************/
+/** BITMAP/IMAGEBITMAP ********************************************************/
 fun ImageBitmap.getAverageColor(): Color {
     val pixelMap = toPixelMap()
     var redSum = 0f
@@ -140,6 +151,8 @@ fun ImageBitmap.getAverageColor(): Color {
     )
 }
 
+fun ImageBitmap.getSquareSize() = min(width, height).pow(2)
+
 fun Bitmap.asFullImageBitmap(context: Context): ImageBitmap =
     square().scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context).asImageBitmap()
 
@@ -148,22 +161,22 @@ fun Bitmap.asThumbnailImageBitmap(context: Context): ImageBitmap =
 
 
 /** URI ***********************************************************************/
-fun Uri.getRelativePath() = lastPathSegment?.substringAfterLast(':')?.nullIfEmpty()
+fun Uri.getRelativePath(): String? = lastPathSegment?.substringAfterLast(':')?.nullIfEmpty()
 
-fun Uri.getRelativePathWithoutFilename() = getRelativePath()?.substringBeforeLast('/')?.nullIfEmpty()
+fun Uri.getRelativePathWithoutFilename(): String? = getRelativePath()?.substringBeforeLast('/')?.nullIfEmpty()
 
-suspend fun Uri.getSquareBitmap(context: Context): Bitmap? = withContext(Dispatchers.IO) {
+suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.IO) {
     try {
-        if (this@getSquareBitmap.scheme?.startsWith("http") == true) {
-            Request(this@getSquareBitmap.toString()).connect().getSquareBitmap()
+        if (this@getBitmap.scheme?.startsWith("http") == true) {
+            Request(this@getBitmap.toString()).getBitmap()
         } else {
-            this@getSquareBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it).square() }
+            this@getBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it) }
         }
     } catch (e: FileNotFoundException) {
-        Log.e("Uri", "getSquareBitmap: $e", e)
+        Log.e("Uri", "getBitmap: $e", e)
         null
     } catch (e: IOException) {
-        Log.e("Uri", "getSquareBitmap: $e", e)
+        Log.e("Uri", "getBitmap: $e", e)
         null
     }
 }

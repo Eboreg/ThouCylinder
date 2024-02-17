@@ -26,7 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,7 +43,9 @@ import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.dataclasses.ImportProgressData
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.LastFmViewModel
+import java.util.UUID
 import kotlin.math.max
 
 @Composable
@@ -53,12 +55,12 @@ fun ImportLastFm(
     listState: LazyListState = rememberLazyListState(),
     onGotoSettingsClick: () -> Unit,
     onGotoLibraryClick: () -> Unit,
+    onGotoAlbumClick: (UUID) -> Unit,
     backendSelection: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
 
     val hasNext by viewModel.hasNext.collectAsStateWithLifecycle(false)
-    val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
     val isAllSelected by viewModel.isAllSelected.collectAsStateWithLifecycle(false)
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val notFoundAlbumIds by viewModel.notFoundAlbumIds.collectAsStateWithLifecycle()
@@ -69,6 +71,7 @@ fun ImportLastFm(
     val topAlbums by viewModel.offsetTopAlbums.collectAsStateWithLifecycle(emptyList())
     val totalAlbumCount by viewModel.totalFilteredAlbumCount.collectAsStateWithLifecycle(0)
     val username by viewModel.username.collectAsStateWithLifecycle()
+    val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.setOffset(0)
@@ -93,11 +96,15 @@ fun ImportLastFm(
             selectAllEnabled = topAlbums.isNotEmpty(),
             onSelectAllClick = { viewModel.setSelectAll(it) },
             onImportClick = {
-                viewModel.importSelectedTopAlbums { importCount, notFoundCount ->
+                viewModel.importSelectedTopAlbums(context) { importedIds, notFoundCount ->
                     val strings = mutableListOf<String>()
-                    if (importCount > 0) {
+                    if (importedIds.isNotEmpty()) {
                         strings.add(
-                            context.resources.getQuantityString(R.plurals.x_albums_imported, importCount, importCount)
+                            context.resources.getQuantityString(
+                                R.plurals.x_albums_imported,
+                                importedIds.size,
+                                importedIds.size,
+                            ).umlautify()
                         )
                     }
                     if (notFoundCount > 0) {
@@ -109,11 +116,20 @@ fun ImportLastFm(
                             )
                         )
                     }
-                    if (strings.isNotEmpty()) SnackbarEngine.addInfo(
-                        message = strings.joinToString(" "),
-                        actionLabel = context.getString(R.string.go_to_library),
-                        onActionPerformed = onGotoLibraryClick,
-                    )
+                    if (strings.isNotEmpty()) {
+                        val actionLabel =
+                            if (importedIds.size == 1) context.getString(R.string.go_to_album).umlautify()
+                            else context.getString(R.string.go_to_library).umlautify()
+
+                        SnackbarEngine.addInfo(
+                            message = strings.joinToString(" "),
+                            actionLabel = actionLabel,
+                            onActionPerformed = {
+                                if (importedIds.size == 1) onGotoAlbumClick(importedIds[0])
+                                else onGotoLibraryClick()
+                            },
+                        )
+                    }
                 }
             },
             importButtonEnabled = progress == null && selectedTopAlbums.isNotEmpty(),
@@ -128,11 +144,14 @@ fun ImportLastFm(
             contentPadding = PaddingValues(vertical = 5.dp),
             listState = listState,
             isSelected = { selectedTopAlbums.contains(it) },
-            onClick = { _, topAlbum -> viewModel.toggleSelected(topAlbum) },
+            onClick = { _, topAlbum ->
+                val importedAlbumId = importedAlbumIds[topAlbum.mbid]
+
+                if (importedAlbumId != null) onGotoAlbumClick(importedAlbumId)
+                else viewModel.toggleSelected(topAlbum)
+            },
             trailingItem = {
-                if (isSearching) {
-                    ObnoxiousProgressIndicator()
-                }
+                if (isSearching) ObnoxiousProgressIndicator()
                 if (username == null) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

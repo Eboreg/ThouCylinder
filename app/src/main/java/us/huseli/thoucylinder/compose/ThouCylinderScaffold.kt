@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.BugReport
 import androidx.compose.material.icons.sharp.Download
 import androidx.compose.material.icons.sharp.FileUpload
 import androidx.compose.material.icons.sharp.LibraryMusic
 import androidx.compose.material.icons.sharp.Menu
-import androidx.compose.material.icons.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
@@ -35,7 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -53,6 +53,7 @@ import us.huseli.thoucylinder.MenuItemId
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SettingsDestination
+import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun ThouCylinderScaffold(
@@ -81,7 +82,7 @@ fun ThouCylinderScaffold(
     }
     val baseMenuItems = mutableListOf(
         MenuItem(MenuItemId.LIBRARY, Icons.Sharp.LibraryMusic, stringResource(R.string.library)),
-        MenuItem(MenuItemId.QUEUE, Icons.Sharp.QueueMusic, stringResource(R.string.queue)),
+        MenuItem(MenuItemId.QUEUE, Icons.AutoMirrored.Sharp.QueueMusic, stringResource(R.string.queue)),
         MenuItem(MenuItemId.SEARCH_YOUTUBE, painterResource(R.drawable.youtube), stringResource(R.string.search)),
         MenuItem(MenuItemId.IMPORT, Icons.Sharp.FileUpload, stringResource(R.string.import_str)),
     )
@@ -107,7 +108,7 @@ fun ThouCylinderScaffold(
                 drawerItems.forEach { item ->
                     NavigationDrawerItem(
                         shape = RectangleShape,
-                        label = { item.description?.also { Text(it) } },
+                        label = { item.description?.also { Text(it.umlautify()) } },
                         selected = activeMenuItemId == item.id,
                         onClick = {
                             scope.launch { drawerState.close() }

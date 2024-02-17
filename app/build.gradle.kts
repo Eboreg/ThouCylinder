@@ -39,7 +39,6 @@ android {
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
         val spotifyClientId = secretsProperties["spotifyClientId"] as String
-        val spotifyClientSecret = secretsProperties["spotifyClientSecret"] as String
         val lastFmApiKey = secretsProperties["lastFmApiKey"] as String
         val lastFmApiSecret = secretsProperties["lastFmApiSecret"] as String
 
@@ -60,7 +59,6 @@ android {
         buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
         buildConfigField("String", "spotifyClientId", "\"$spotifyClientId\"")
-        buildConfigField("String", "spotifyClientSecret", "\"$spotifyClientSecret\"")
         buildConfigField("String", "lastFmApiKey", "\"$lastFmApiKey\"")
         buildConfigField("String", "lastFmApiSecret", "\"$lastFmApiSecret\"")
         signingConfig = signingConfigs.getByName("release")
@@ -103,19 +101,13 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
-
-    packaging {
-        resources {
-            // excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
 }
 
 val lifecycleVersion = "2.7.0"
 val roomVersion = "2.6.1"
 val daggerVersion = "2.50"
 val media3Version = "1.2.1"
-val pagingVersion = "3.3.0-alpha02"
+val pagingVersion = "3.3.0-alpha03"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
@@ -131,7 +123,7 @@ dependencies {
 
     // Compose related:
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
@@ -158,7 +150,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:4.1.0")
+    implementation("com.github.Eboreg:RetainTheme:4.1.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
@@ -174,9 +166,6 @@ dependencies {
 
     // Reorder:
     implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
-
-    // Spotify:
-    implementation("com.spotify.android:auth:2.1.1")
 
     // Levenshtein string distance:
     implementation("org.apache.commons:commons-text:1.11.0")

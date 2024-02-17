@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.ViewList
 import androidx.compose.material.icons.sharp.GridView
-import androidx.compose.material.icons.sharp.ViewList
 import androidx.compose.material3.BottomAppBarDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -17,7 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.isInLandscapeMode
@@ -65,7 +64,6 @@ fun ListSettingsRow(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListTypeChips(
     current: ListType,
@@ -129,7 +127,7 @@ fun ListDisplayTypeButton(
         content = {
             val icon = when (current) {
                 DisplayType.LIST -> Icons.Sharp.GridView
-                DisplayType.GRID -> Icons.Sharp.ViewList
+                DisplayType.GRID -> Icons.AutoMirrored.Sharp.ViewList
             }
 
             Icon(icon, null, modifier = Modifier.size(24.dp))

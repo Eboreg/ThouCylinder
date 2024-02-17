@@ -7,6 +7,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,8 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.umlautify
 
 @Suppress("AnimateAsStateLabel")
 @OptIn(ExperimentalFoundationApi::class)
@@ -29,10 +32,10 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = if (isExpanded) Alignment.CenterHorizontally else Alignment.Start,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.padding(top = 10.dp).fillMaxWidth(),
     ) {
         Text(
-            text = title,
+            text = title.umlautify(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -42,7 +45,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
         )
         if (artist != null) {
             Text(
-                text = artist,
+                text = artist.umlautify(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,

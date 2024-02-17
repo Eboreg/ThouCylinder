@@ -31,27 +31,26 @@ import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
-import kotlin.time.Duration
+import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackListRow(
-    title: String,
-    artist: String?,
-    duration: Duration?,
+inline fun <T : AbstractTrackCombo> TrackListRow(
+    combo: T,
     thumbnail: ImageBitmap?,
+    showArtist: Boolean,
     isSelected: Boolean,
-    isDownloadable: Boolean,
-    isInLibrary: Boolean,
     callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
     downloadTask: TrackDownloadTask? = null,
-    extraContextMenuItems: (@Composable () -> Unit)? = null,
+    crossinline extraContextMenuItems: @Composable () -> Unit = {},
 ) {
+    val artist = if (showArtist) combo.artist else null
     val (downloadProgress, downloadIsActive) = getDownloadProgress(downloadTask)
 
     callbacks.onEach?.invoke()
@@ -83,14 +82,14 @@ fun TrackListRow(
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(
-                            text = title,
+                            text = combo.track.title.umlautify(),
                             maxLines = if (artist == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
                         if (artist != null) {
                             Text(
-                                text = artist,
+                                text = artist.umlautify(),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
@@ -98,7 +97,7 @@ fun TrackListRow(
                         }
                     }
 
-                    if (duration != null) {
+                    combo.track.duration?.also { duration ->
                         Text(
                             text = duration.sensibleFormat(),
                             modifier = Modifier.padding(start = 5.dp),
@@ -107,10 +106,10 @@ fun TrackListRow(
                     }
 
                     TrackContextButtonWithMenu(
-                        isDownloadable = isDownloadable,
+                        isDownloadable = combo.track.isDownloadable,
                         callbacks = callbacks,
                         extraItems = extraContextMenuItems,
-                        isInLibrary = isInLibrary,
+                        isInLibrary = combo.track.isInLibrary,
                     )
 
                     if (reorderableState != null) {
@@ -125,7 +124,7 @@ fun TrackListRow(
                 Row(modifier = Modifier.height(2.dp).fillMaxWidth()) {
                     if (downloadIsActive) {
                         LinearProgressIndicator(
-                            progress = downloadProgress?.toFloat() ?: 0f,
+                            progress = { downloadProgress?.toFloat() ?: 0f },
                             modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }

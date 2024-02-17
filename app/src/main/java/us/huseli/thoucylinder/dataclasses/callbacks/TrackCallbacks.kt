@@ -20,7 +20,7 @@ data class TrackCallbacks<out T : AbstractTrackCombo>(
     val onShowInfoClick: () -> Unit = { appCallbacks.onShowTrackInfoClick(combo) },
     val onTrackClick: (() -> Unit)? = null,
     val onPlayOnYoutubeClick: (() -> Unit)? = combo.track.youtubeWebUrl?.let { { uriHandler.openUri(it) } },
-    val onPlayOnSpotifyClick: (() -> Unit)? = combo.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
+    val onPlayOnSpotifyClick: (() -> Unit)? = combo.track.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
     val onEach: (() -> Unit)? = null,
     val onEditTrackClick: () -> Unit = { appCallbacks.onEditTrackClick(combo.track) },
 )

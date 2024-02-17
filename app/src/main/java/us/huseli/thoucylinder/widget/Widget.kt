@@ -38,6 +38,7 @@ import androidx.glance.unit.ColorProvider
 import us.huseli.thoucylinder.MainActivity
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.repositories.PlayerRepository
+import us.huseli.thoucylinder.umlautify
 
 @SuppressLint("RestrictedApi")
 @Composable
@@ -53,8 +54,10 @@ fun Widget(playerRepo: PlayerRepository) {
     val bitmap = remember { mutableStateOf<Bitmap?>(null) }
     val backgroundColor =
         if (bitmap.value != null) ColorProvider(R.color.widget_background) else GlanceTheme.colors.background
-    val currentTrackString = currentCombo?.let { listOfNotNull(it.artist, it.track.title) }?.joinToString(" • ")
-        ?: context.getString(R.string.no_track_playing)
+    val currentTrackString = currentCombo
+        ?.let { listOfNotNull(it.artist, it.track.title) }
+        ?.joinToString(" • ")
+        ?: context.getString(R.string.no_track_playing).umlautify()
 
     LaunchedEffect(currentCombo) {
         bitmap.value = currentCombo?.getFullBitmap(context)
@@ -83,11 +86,11 @@ fun Widget(playerRepo: PlayerRepository) {
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
             ) {
                 Text(
-                    text = currentTrackString,
+                    text = currentTrackString.umlautify(),
                     style = TextStyle(
                         color = GlanceTheme.colors.onBackground,
                         textAlign = TextAlign.Center,
-                        fontSize = 14.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                     ),
                     maxLines = 1,

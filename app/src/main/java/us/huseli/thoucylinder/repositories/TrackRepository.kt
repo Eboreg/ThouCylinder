@@ -3,20 +3,18 @@ package us.huseli.thoucylinder.repositories
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.WorkerThread
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import us.huseli.thoucylinder.MutexCache
+import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import java.util.UUID
 import javax.inject.Inject
@@ -25,15 +23,15 @@ import javax.inject.Singleton
 @Singleton
 class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
     private val trackDao = database.trackDao()
-    private val selectedTrackCombos = mutableMapOf<String, MutableStateFlow<List<TrackCombo>>>()
-
-    val thumbnailCache = MutexCache<MediaStoreImage, ImageBitmap> {
-        it.getThumbnailImageBitmap(context)
-    }
+    private val selectedTrackIds = mutableMapOf<String, MutableStateFlow<List<UUID>>>()
 
     suspend fun addToLibraryByAlbumId(albumId: UUID) = trackDao.setIsInLibraryByAlbumId(albumId, true)
 
-    suspend fun clearLocalUris(trackIds: Collection<UUID>) = trackDao.clearLocalUris(trackIds)
+    suspend fun clearLocalUris(trackIds: Collection<UUID>) {
+        if (trackIds.isNotEmpty()) trackDao.clearLocalUris(trackIds)
+    }
+
+    suspend fun clearTracks() = trackDao.clearTracks()
 
     suspend fun deleteTempTracks() = trackDao.deleteTempTracks()
 
@@ -46,61 +44,79 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
         if (tracks.isNotEmpty()) trackDao.deleteTracks(*tracks.toTypedArray())
     }
 
-    suspend fun deleteTracksByAlbumId(albumIds: Collection<UUID>) =
-        trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
-
-    fun flowSelectedTrackCombos(viewModelClass: String): StateFlow<List<TrackCombo>> =
-        mutableFlowSelectedTrackCombos(viewModelClass).asStateFlow()
-
-    fun flowTrackComboPager(sortParameter: TrackSortParameter, sortOrder: SortOrder, searchTerm: String) =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm) }
-
-    fun flowTrackCombosByAlbumId(albumId: UUID) = trackDao.flowTrackCombosByAlbumId(albumId)
-
-    suspend fun insertTracks(tracks: Collection<Track>) {
-        if (tracks.isNotEmpty()) trackDao.insertTracks(*tracks.toTypedArray())
+    suspend fun deleteTracksByAlbumId(albumIds: Collection<UUID>) {
+        if (albumIds.isNotEmpty()) trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
     }
 
-    suspend fun listTracks(): List<Track> = trackDao.listLibraryTracks()
+    fun flowSelectedTrackIds(viewModelClass: String): StateFlow<List<UUID>> =
+        mutableFlowSelectedTrackIds(viewModelClass).asStateFlow()
+
+    fun flowTagPojos(availabilityFilter: AvailabilityFilter) = trackDao.flowTagPojos(availabilityFilter)
+
+    fun flowTrackComboPager(
+        sortParameter: TrackSortParameter,
+        sortOrder: SortOrder,
+        searchTerm: String,
+        tagNames: List<String>,
+        availabilityFilter: AvailabilityFilter,
+    ) = Pager(config = PagingConfig(pageSize = 100)) {
+        trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm, tagNames, availabilityFilter)
+    }
+
+    suspend fun listTrackCombosById(trackIds: Collection<UUID>) =
+        if (trackIds.isNotEmpty()) trackDao.listTrackCombosById(*trackIds.toTypedArray()) else emptyList()
 
     suspend fun listTrackLocalUris(): List<Uri> = trackDao.listLocalUris()
 
-    fun pageTrackCombosByArtist(artist: String): Pager<Int, TrackCombo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombosByArtist(artist) }
+    suspend fun listTracks(): List<Track> = trackDao.listLibraryTracks()
 
-    fun selectTrackCombos(selectionKey: String, combos: Iterable<TrackCombo>) {
-        mutableFlowSelectedTrackCombos(selectionKey).also {
-            val currentIds = it.value.map { combo -> combo.track.trackId }
-            it.value += combos.filter { combo -> !currentIds.contains(combo.track.trackId) }
+    suspend fun listTracksById(trackIds: Collection<UUID>) =
+        if (trackIds.isNotEmpty()) trackDao.listTracksById(*trackIds.toTypedArray()) else emptyList()
+
+    fun pageTrackCombosByArtist(artistId: UUID): Pager<Int, TrackCombo> =
+        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombosByArtist(artistId) }
+
+    fun selectTrackIds(selectionKey: String, trackIds: Iterable<UUID>) {
+        mutableFlowSelectedTrackIds(selectionKey).also {
+            val currentIds = it.value
+            it.value += trackIds.filter { trackId -> !currentIds.contains(trackId) }
         }
     }
 
-    fun toggleTrackComboSelected(selectionKey: String, track: TrackCombo): Boolean {
-        return mutableFlowSelectedTrackCombos(selectionKey).let {
-            if (it.value.contains(track)) {
-                it.value -= track
+    suspend fun setAlbumTracks(albumId: UUID, tracks: Collection<Track>) = trackDao.setAlbumTracks(albumId, tracks)
+
+    fun toggleTrackIdSelected(selectionKey: String, trackId: UUID): Boolean {
+        return mutableFlowSelectedTrackIds(selectionKey).let {
+            if (it.value.contains(trackId)) {
+                it.value -= trackId
                 false
             } else {
-                it.value += track
+                it.value += trackId
                 true
             }
         }
     }
 
-    fun unselectAllTrackCombos(selectionKey: String) {
-        mutableFlowSelectedTrackCombos(selectionKey).value = emptyList()
+    fun unselectAllTrackIds(selectionKey: String) {
+        mutableFlowSelectedTrackIds(selectionKey).value = emptyList()
     }
 
-    suspend fun updateTrack(track: Track) = updateTracks(listOf(track))
+    fun unselectTrackIds(selectionKey: String, trackIds: Collection<UUID>) {
+        mutableFlowSelectedTrackIds(selectionKey).value -= trackIds
+    }
 
-    suspend fun updateTracks(tracks: Collection<Track>) {
-        if (tracks.isNotEmpty()) trackDao.updateTracks(*tracks.toTypedArray())
+    suspend fun updateTrack(track: Track) = trackDao.updateTracks(track)
+
+    suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
+
+    suspend fun upsertTracks(tracks: Collection<Track>) {
+        if (tracks.isNotEmpty()) trackDao.upsertTracks(*tracks.toTypedArray())
     }
 
 
     /** PRIVATE METHODS *******************************************************/
-    private fun mutableFlowSelectedTrackCombos(viewModelClass: String): MutableStateFlow<List<TrackCombo>> =
-        selectedTrackCombos[viewModelClass] ?: MutableStateFlow<List<TrackCombo>>(emptyList()).also {
-            selectedTrackCombos[viewModelClass] = it
+    private fun mutableFlowSelectedTrackIds(viewModelClass: String): MutableStateFlow<List<UUID>> =
+        selectedTrackIds[viewModelClass] ?: MutableStateFlow<List<UUID>>(emptyList()).also {
+            selectedTrackIds[viewModelClass] = it
         }
 }

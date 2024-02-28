@@ -26,7 +26,9 @@ import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.track.TrackContextButtonWithMenu
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import kotlin.time.Duration
@@ -35,12 +37,13 @@ data class AlbumTrackRowData(
     val title: String,
     val isDownloadable: Boolean,
     val isInLibrary: Boolean,
-    val artist: String? = null,
+    val artists: List<TrackArtistCredit>,
     val duration: Duration? = null,
     val downloadTask: TrackDownloadTask? = null,
     val showArtist: Boolean = true,
     val isSelected: Boolean = false,
     val position: String,
+    val isPlayable: Boolean,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -51,9 +54,16 @@ fun AlbumTrackRow(
     modifier: Modifier = Modifier,
     positionColumnWidth: Dp = 40.dp,
 ) {
+    val artistString = data.artists.joined()
     val surfaceColor =
         if (data.isSelected) MaterialTheme.colorScheme.primaryContainer
         else Color.Transparent
+    val textColor =
+        if (data.isPlayable) Color.Unspecified
+        else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+    val textColorSecondary =
+        if (data.isPlayable) MaterialTheme.colorScheme.onSurfaceVariant
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 
     Column(
         modifier = modifier.combinedClickable(
@@ -72,27 +82,29 @@ fun AlbumTrackRow(
                         modifier = Modifier.width(positionColumnWidth),
                         style = ThouCylinderTheme.typographyExtended.listNormalTitle,
                         textAlign = TextAlign.End,
+                        color = textColor,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = data.title.umlautify(),
-                            maxLines = if (data.artist == null || !data.showArtist) 2 else 1,
+                            maxLines = if (artistString == null || !data.showArtist) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
+                            color = textColor,
                         )
-                        if (data.artist != null && data.showArtist) {
-                            Text(
-                                text = data.artist.umlautify(),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
-                            )
-                        }
+                        if (data.showArtist && artistString != null) Text(
+                            text = artistString,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                            color = textColorSecondary,
+                        )
                     }
                     data.duration?.also {
                         Text(
                             text = it.sensibleFormat(),
                             style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                            color = textColor,
                         )
                     }
 
@@ -101,6 +113,7 @@ fun AlbumTrackRow(
                         callbacks = callbacks,
                         hideAlbum = true,
                         isInLibrary = data.isInLibrary,
+                        trackArtists = data.artists,
                     )
                 }
 

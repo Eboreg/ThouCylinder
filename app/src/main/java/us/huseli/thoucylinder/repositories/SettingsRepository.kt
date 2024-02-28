@@ -16,6 +16,7 @@ import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.Constants.PREF_UMLAUTIFY
 import us.huseli.thoucylinder.Constants.PREF_WELCOME_DIALOG_SHOWN
 import us.huseli.thoucylinder.Umlautify
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,8 +45,13 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         if (_umlautify.value) Umlautify.enabled = true
     }
 
-    fun getLocalMusicDirectory(): DocumentFile? =
-        _localMusicUri.value?.let { DocumentFile.fromTreeUri(context, it) }
+    fun createAlbumDirectory(albumCombo: AbstractAlbumCombo): DocumentFile? =
+        getLocalMusicDirectory()?.let { albumCombo.createDirectory(it, context) }
+
+    fun getAlbumDirectory(albumCombo: AbstractAlbumCombo): DocumentFile? =
+        getLocalMusicDirectory()?.let { albumCombo.getDirectory(it, context) }
+
+    fun getLocalMusicDirectory(): DocumentFile? = _localMusicUri.value?.let { DocumentFile.fromTreeUri(context, it) }
 
     fun setAutoImportLocalMusic(value: Boolean) {
         _autoImportLocalMusic.value = value

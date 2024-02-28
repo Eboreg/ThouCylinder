@@ -46,17 +46,19 @@ import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
+import java.util.UUID
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T : AbstractTrackCombo> TrackGrid(
     trackCombos: LazyPagingItems<T>,
-    selectedTrackCombos: List<T>,
+    selectedTrackIds: List<UUID>,
     trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: AbstractBaseViewModel,
     gridState: LazyGridState = rememberLazyGridState(),
@@ -69,7 +71,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
 ) {
     val context = LocalContext.current
 
-    SelectedTracksButtons(trackCount = selectedTrackCombos.size, callbacks = trackSelectionCallbacks)
+    SelectedTracksButtons(trackCount = selectedTrackIds.size, callbacks = trackSelectionCallbacks)
 
     Box {
         progressIndicatorText?.also {
@@ -86,9 +88,9 @@ fun <T : AbstractTrackCombo> TrackGrid(
             items(count = trackCombos.itemCount) { index ->
                 trackCombos[index]?.also { combo ->
                     val track = combo.track
-                    val isSelected = selectedTrackCombos.contains(combo)
+                    val isSelected = selectedTrackIds.contains(combo.track.trackId)
                     val (downloadProgress, downloadIsActive) =
-                        getDownloadProgress(trackDownloadTasks.find { it.track.trackId == track.trackId })
+                        getDownloadProgress(trackDownloadTasks.find { it.trackCombo.track.trackId == track.trackId })
                     val callbacks = trackCallbacks(index, combo)
 
                     callbacks.onEach?.invoke()
@@ -145,8 +147,8 @@ fun <T : AbstractTrackCombo> TrackGrid(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                val artist = track.artist?.takeIf { it.isNotBlank() && showArtist }
-                                val titleLines = if (artist != null) 1 else 2
+                                val artistString = if (showArtist) combo.artists.joined() else null
+                                val titleLines = if (artistString != null) 1 else 2
 
                                 Text(
                                     text = track.title.umlautify(),
@@ -154,24 +156,23 @@ fun <T : AbstractTrackCombo> TrackGrid(
                                     overflow = TextOverflow.Ellipsis,
                                     style = ThouCylinderTheme.typographyExtended.listSmallHeader,
                                 )
-                                if (artist != null) {
-                                    Text(
-                                        text = artist.umlautify(),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
-                                    )
-                                }
+                                if (artistString != null) Text(
+                                    text = artistString.umlautify(),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                                )
                             }
 
                             TrackContextButtonWithMenu(
                                 isDownloadable = track.isDownloadable,
                                 isInLibrary = track.isInLibrary,
                                 callbacks = callbacks,
+                                trackArtists = combo.artists,
                             )
                         }
 
-                        trackDownloadTasks.find { it.track == track }?.also { download ->
+                        trackDownloadTasks.find { it.trackCombo.track == track }?.also { download ->
                             val status by download.downloadStatus.collectAsStateWithLifecycle()
                             val progress by download.downloadProgress.collectAsStateWithLifecycle()
                             val statusText = stringResource(status.stringId)

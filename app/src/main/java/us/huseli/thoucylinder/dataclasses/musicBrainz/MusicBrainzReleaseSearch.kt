@@ -47,6 +47,16 @@ data class MusicBrainzReleaseSearch(
             @SerializedName("track-count")
             val trackCount: Int,
         )
+
+        fun matches(artist: String?, album: String): Boolean {
+            val artistCredits = artistCredit.joined()
+            val albumMatch = album.contains(title, true) || title.contains(album, true)
+            val artistMatch = artist?.let {
+                it.contains(artistCredits, true) || artistCredits.contains(it, true)
+            } ?: album.contains(artistCredits, true)
+
+            return albumMatch && artistMatch
+        }
     }
 
     val releaseIds: List<String>

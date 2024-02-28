@@ -10,7 +10,8 @@ import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
-import us.huseli.thoucylinder.dataclasses.combos.toPlaylistTracks
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID
 import javax.inject.Inject
 
@@ -19,12 +20,10 @@ class PlaylistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repos: Repositories,
 ) : AbstractTrackListViewModel("PlaylistViewModel", repos) {
-    private val _selectedTrackCombos = MutableStateFlow<List<PlaylistTrackCombo>>(emptyList())
     private val _trackCombos = MutableStateFlow<List<PlaylistTrackCombo>>(emptyList())
 
     val playlistId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_PLAYLIST)!!)
     val playlist = repos.playlist.flowPlaylist(playlistId)
-    val selectedPlaylistTrackCombos = _selectedTrackCombos.asStateFlow()
     val trackCombos = _trackCombos.asStateFlow()
 
     init {
@@ -45,24 +44,13 @@ class PlaylistViewModel @Inject constructor(
 
     fun playPlaylist(startAt: PlaylistTrackCombo? = null) = playPlaylist(playlistId, startAt?.track?.trackId)
 
-    fun removeTrackCombos(combos: List<PlaylistTrackCombo>) = viewModelScope.launch {
-        repos.playlist.removePlaylistTracks(combos.toPlaylistTracks())
-        _selectedTrackCombos.value -= combos
+    fun removeTrackCombos(ids: List<UUID>) = launchOnIOThread {
+        repos.playlist.removePlaylistTracks(playlistId, ids)
+        unselectTracks(ids)
     }
 
-    fun selectPlaylistTrackCombos(combos: List<PlaylistTrackCombo>) {
-        val currentIds = _selectedTrackCombos.value.map { combo -> combo.track.trackId }
-        _selectedTrackCombos.value += combos.filter { combo -> !currentIds.contains(combo.track.trackId) }
-    }
+    override suspend fun listSelectedTrackCombos(): List<PlaylistTrackCombo> =
+        repos.playlist.listPlaylistTrackCombosById(selectedTrackIds.value)
 
-    fun toggleSelected(combo: PlaylistTrackCombo) {
-        if (_selectedTrackCombos.value.contains(combo))
-            _selectedTrackCombos.value -= combo
-        else
-            _selectedTrackCombos.value += combo
-    }
-
-    override fun unselectAllTrackCombos() {
-        _selectedTrackCombos.value = emptyList()
-    }
+    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
 }

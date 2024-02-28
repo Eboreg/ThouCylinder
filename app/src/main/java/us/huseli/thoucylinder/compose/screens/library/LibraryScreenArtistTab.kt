@@ -15,16 +15,17 @@ import us.huseli.thoucylinder.compose.ArtistList
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.ArtistListViewModel
+import java.util.UUID
 
 @Composable
 fun LibraryScreenArtistTab(
     displayType: DisplayType,
     isImporting: Boolean,
     viewModel: ArtistListViewModel = hiltViewModel(),
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (UUID) -> Unit,
 ) {
     val context = LocalContext.current
-    val artistPojos by viewModel.artistPojos.collectAsStateWithLifecycle(emptyList())
+    val artistCombos by viewModel.artistCombos.collectAsStateWithLifecycle(emptyList())
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val progressIndicatorText =
         if (isImporting) stringResource(R.string.importing_local_artists)
@@ -41,13 +42,13 @@ fun LibraryScreenArtistTab(
         DisplayType.LIST -> ArtistList(
             onArtistClick = onArtistClick,
             progressIndicatorText = progressIndicatorText,
-            artistPojos = artistPojos,
+            artistCombos = artistCombos,
             onEmpty = onEmpty,
             imageFlow = { viewModel.flowArtistImage(it, context) },
         )
         DisplayType.GRID -> ArtistGrid(
             onArtistClick = onArtistClick,
-            artistPojos = artistPojos,
+            artistCombos = artistCombos,
             progressIndicatorText = progressIndicatorText,
             onEmpty = onEmpty,
             imageFlow = { viewModel.flowArtistImage(it, context) },

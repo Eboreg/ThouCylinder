@@ -33,28 +33,30 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 
 @Composable
 fun <T : AbstractAlbumCombo> AlbumGrid(
     combos: List<T>,
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
-    selectedAlbums: List<Album>,
+    selectedAlbumIds: List<UUID>,
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     albumDownloadTasks: List<AlbumDownloadTask>,
-    progressIndicatorText: String? = null,
+    progressIndicatorStringRes: Int? = null,
     onEmpty: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val isSelected: (T) -> Boolean = { selectedAlbums.contains(it.album) }
+    val isSelected: (T) -> Boolean = { selectedAlbumIds.contains(it.album.albumId) }
 
-    SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
+    SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
         things = combos,
@@ -63,11 +65,12 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         isSelected = isSelected,
-        progressIndicatorText = progressIndicatorText,
+        progressIndicatorText = progressIndicatorStringRes?.let { stringResource(it) },
     ) { _, combo ->
         val (downloadProgress, downloadIsActive) =
             getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
         val callbacks = albumCallbacks(combo)
+        val artistString = combo.artists.joined()
 
         Box(modifier = Modifier.aspectRatio(1f)) {
             val imageBitmap = remember(combo.album.albumArt) { mutableStateOf<ImageBitmap?>(null) }
@@ -116,20 +119,16 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
             ) {
                 Text(
                     text = combo.album.title.umlautify(),
-                    maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
+                    maxLines = if (artistString != null && showArtist) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 )
-                if (showArtist) {
-                    combo.album.artist?.also { artist ->
-                        Text(
-                            text = artist.umlautify(),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-                        )
-                    }
-                }
+                if (showArtist && artistString != null) Text(
+                    text = artistString.umlautify(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AlbumSmallIcons(combo = combo)
                 }
@@ -140,6 +139,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
                 isInLibrary = combo.album.isInLibrary,
                 isPartiallyDownloaded = combo.isPartiallyDownloaded,
                 callbacks = callbacks,
+                albumArtists = combo.artists,
             )
         }
     }

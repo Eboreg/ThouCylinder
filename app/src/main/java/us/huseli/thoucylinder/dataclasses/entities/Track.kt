@@ -13,10 +13,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
-import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
-import us.huseli.retaintheme.extensions.stripCommonFixes
 import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
@@ -36,15 +34,14 @@ import kotlin.time.Duration
             childColumns = ["Track_albumId"],
             onDelete = ForeignKey.SET_NULL,
             onUpdate = ForeignKey.CASCADE,
-        )
+        ),
     ],
-    indices = [Index("Track_albumId"), Index("Track_title"), Index("Track_artist"), Index("Track_isInLibrary")],
+    indices = [Index("Track_albumId"), Index("Track_title"), Index("Track_isInLibrary")],
 )
 data class Track(
     @ColumnInfo("Track_trackId") @PrimaryKey val trackId: UUID = UUID.randomUUID(),
     @ColumnInfo("Track_title") val title: String,
     @ColumnInfo("Track_isInLibrary") val isInLibrary: Boolean = true,
-    @ColumnInfo("Track_artist") val artist: String? = null,
     @ColumnInfo("Track_albumId") val albumId: UUID? = null,
     @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
     @ColumnInfo("Track_discNumber") val discNumber: Int? = null,
@@ -56,10 +53,10 @@ data class Track(
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
 ) : Comparable<Track> {
-    private val albumPositionNonNull: Int
+    val albumPositionNonNull: Int
         get() = albumPosition ?: 0
 
-    private val discNumberNonNull: Int
+    val discNumberNonNull: Int
         get() = discNumber ?: 1
 
     val duration: Duration?
@@ -77,6 +74,9 @@ data class Track(
     val isOnYoutube: Boolean
         get() = youtubeVideo != null
 
+    val isPlayable: Boolean
+        get() = playUri != null
+
     val playUri: Uri?
         get() = localUri ?: youtubeVideo?.metadata?.uri
 
@@ -86,7 +86,7 @@ data class Track(
     val youtubeWebUrl: String?
         get() = youtubeVideo?.let { "https://youtu.be/${it.id}" }
 
-    fun generateBasename(includeArtist: Boolean = false): String {
+    fun generateBasename(includeArtist: Boolean = false, artist: String? = null): String {
         var name = ""
         if (albumPosition != null) name += "${String.format("%02d", albumPosition)} - "
         if (artist != null && includeArtist) name += "$artist - "
@@ -96,10 +96,9 @@ data class Track(
     }
 
     @WorkerThread
-    fun getDocumentFile(context: Context): DocumentFile? =
-        localUri?.let { DocumentFileCompat.fromUri(context, it) }
+    fun getDocumentFile(context: Context): DocumentFile? = localUri?.let { DocumentFileCompat.fromUri(context, it) }
 
-    @Suppress("unused")
+    /*
     fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
         val levenshtein = LevenshteinDistance()
         val distances = mutableListOf<Int>()
@@ -129,6 +128,7 @@ data class Track(
 
         return distances.min()
     }
+     */
 
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()
@@ -142,24 +142,13 @@ data class Track(
 
     fun toString(
         showAlbumPosition: Boolean = true,
-        showArtist: Boolean = true,
         showYear: Boolean = false,
-        showArtistIfSameAsAlbumArtist: Boolean = false,
         albumCombo: AlbumWithTracksCombo? = null,
     ): String {
         var string = ""
         if (showAlbumPosition) {
             if (albumCombo != null) string += getPositionString(albumCombo.discCount) + ". "
             else if (albumPosition != null) string += "$albumPosition. "
-        }
-        if (showArtist) {
-            val trackArtist = artist
-            val albumArtist = albumCombo?.album?.artist
-
-            if (trackArtist != null && (showArtistIfSameAsAlbumArtist || trackArtist != albumArtist))
-                string += "$trackArtist - "
-            else if (albumArtist != null && showArtistIfSameAsAlbumArtist)
-                string += "$albumArtist - "
         }
         string += title
         if (year != null && showYear) string += " ($year)"
@@ -175,7 +164,7 @@ data class Track(
         return title.compareTo(other.title)
     }
 
-    override fun toString(): String = toString(showAlbumPosition = true, showArtist = true, showYear = false)
+    override fun toString(): String = toString(showAlbumPosition = true, showYear = false)
 }
 
 @WorkerThread
@@ -193,6 +182,3 @@ fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean
         .flatten()
         .distinctBy { it.uri.path }
 }
-
-fun Iterable<Track>.stripTitleCommons(): List<Track> = zip(map { it.title }.stripCommonFixes())
-    .map { (track, title) -> track.copy(title = title.replace(Regex(" \\([^)]*$"), "")) }

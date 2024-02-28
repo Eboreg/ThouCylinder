@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.musicBrainz
 
 import com.google.gson.annotations.SerializedName
+import us.huseli.thoucylinder.dataclasses.interfaces.IExternalTrack
 
 data class MusicBrainzTrack(
     @SerializedName("artist-credit")
@@ -10,8 +11,8 @@ data class MusicBrainzTrack(
     val number: String,
     val position: Int,
     val recording: Recording,
-    val title: String,
-) : AbstractMusicBrainzItem() {
+    override val title: String,
+) : AbstractMusicBrainzItem(), IExternalTrack {
     data class Recording(
         @SerializedName("artist-credit")
         val artistCredit: List<MusicBrainzArtistCredit>,
@@ -25,7 +26,7 @@ data class MusicBrainzTrack(
     ) : AbstractMusicBrainzItem()
 
     val artist: String?
-        get() = artistCredit.artistString().takeIf { it.isNotEmpty() }
+        get() = artistCredit.joined().takeIf { it.isNotEmpty() }
 
     val year: Int?
         get() = recording.firstReleaseDate

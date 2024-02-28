@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.annotations.SerializedName
-import java.time.Instant
 
 data class BaseOAuth2Token(
     @SerializedName("access_token")
@@ -23,16 +22,22 @@ data class OAuth2Token(
     val tokenType: String,
     val scope: String,
     val refreshToken: String,
-    val expires: Instant,
+    val expires: Long,
 ) {
-    fun expiresSoon() = expires.isBefore(Instant.now().plusSeconds(60L * 5))
-    fun isExpired() = expires.isBefore(Instant.now())
+    fun expiresSoon() = expires < System.currentTimeMillis().plus(60 * 5)
+    fun isExpired() = expires < System.currentTimeMillis()
     fun toJson(): String = gson.toJson(this)
 
     companion object {
         val gson: Gson = GsonBuilder().create()
 
-        fun fromJson(value: String): OAuth2Token = gson.fromJson(value, OAuth2Token::class.java)
+        fun fromJson(value: String): OAuth2Token? {
+            return try {
+                gson.fromJson(value, OAuth2Token::class.java)
+            } catch (e: Exception) {
+                null
+            }
+        }
 
         fun fromBaseJson(value: String): OAuth2Token {
             val base = gson.fromJson(value, BaseOAuth2Token::class.java)
@@ -42,7 +47,7 @@ data class OAuth2Token(
                 tokenType = base.tokenType,
                 scope = base.scope,
                 refreshToken = base.refreshToken,
-                expires = Instant.now().plusSeconds(base.expiresIn.toLong()),
+                expires = System.currentTimeMillis().plus(base.expiresIn * 1000),
             )
         }
     }

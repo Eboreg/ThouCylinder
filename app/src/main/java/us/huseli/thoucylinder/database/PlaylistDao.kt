@@ -7,9 +7,10 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
@@ -38,8 +39,8 @@ interface PlaylistDao {
     )
     suspend fun deleteOrphanPlaylistTracks()
 
-    @Delete
-    suspend fun deletePlaylistTracks(vararg tracks: PlaylistTrack)
+    @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_id IN (:ids)")
+    suspend fun deletePlaylistTracks(vararg ids: UUID)
 
     @Query(
         """
@@ -59,13 +60,16 @@ interface PlaylistDao {
     @Query("SELECT * FROM Playlist")
     fun flowPlaylists(): Flow<List<Playlist>>
 
+    @Transaction
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
+        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
+            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
         FROM Track 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
             LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
         WHERE Playlist_playlistId = :playlistId
         ORDER BY PlaylistTrack_position
         """
@@ -92,22 +96,44 @@ interface PlaylistDao {
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
     suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
 
+    @Transaction
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
-        FROM Track
+        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
+            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
+        FROM Track 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
-            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId
+            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
             LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
         WHERE Playlist_playlistId = :playlistId
+        GROUP BY PlaylistTrack_id
         ORDER BY PlaylistTrack_position
         """
     )
     suspend fun listTrackCombos(playlistId: UUID): List<PlaylistTrackCombo>
 
+    @Transaction
+    @Query(
+        """
+        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
+            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
+        FROM Track 
+            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
+            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
+            LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
+        WHERE PlaylistTrack_id IN (:ids)
+        GROUP BY PlaylistTrack_id
+        ORDER BY PlaylistTrack_position
+        """
+    )
+    suspend fun listTrackCombosById(vararg ids: UUID): List<PlaylistTrackCombo>
+
     @Query("SELECT Track.* FROM PlaylistTrack JOIN Track ON Track_trackId = PlaylistTrack_trackId WHERE PlaylistTrack_playlistId = :playlistId")
     suspend fun listTracks(playlistId: UUID): List<Track>
 
+    @Transaction
     suspend fun moveTrack(playlistId: UUID, from: Int, to: Int) {
         val tracks = _listPlaylistTracks(playlistId)
         val updatedTracks = tracks
@@ -115,7 +141,7 @@ interface PlaylistDao {
             .apply { add(to, removeAt(from)) }
             .mapIndexed { index, track -> track.copy(position = index) }
 
-        _updateTracks(*updatedTracks.filter { !tracks.contains(it) }.toTypedArray())
+        if (updatedTracks.isNotEmpty()) _updateTracks(*updatedTracks.filter { !tracks.contains(it) }.toTypedArray())
     }
 
     @Query("UPDATE Playlist SET Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")

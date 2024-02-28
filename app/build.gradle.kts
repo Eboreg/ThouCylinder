@@ -117,7 +117,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
 
     // Material:
-    implementation("androidx.compose.material:material:1.6.1") // for swipeable
+    implementation("androidx.compose.material:material:1.6.2") // for swipeable
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
@@ -126,7 +126,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("androidx.paging:paging-compose-android:$pagingVersion")
 
     // Lifecycle:
@@ -150,7 +150,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:4.1.1")
+    implementation("com.github.Eboreg:RetainTheme:4.2.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

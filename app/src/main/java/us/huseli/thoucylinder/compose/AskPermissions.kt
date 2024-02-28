@@ -35,7 +35,7 @@ fun AskMusicImportPermissions(viewModel: SettingsViewModel = hiltViewModel()) {
                 viewModel.setAutoImportLocalMusic(true)
                 viewModel.setLocalMusicUri(uri)
                 isDialogShown = false
-                viewModel.importNewLocalAlbums(context)
+                viewModel.importNewLocalAlbumsAsync(context)
             },
             cancelButtonText = stringResource(R.string.don_t_import),
             onDismissRequest = { isDialogShown = false },

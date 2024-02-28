@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import us.huseli.thoucylinder.compose.App
@@ -44,7 +46,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             Log.i(javaClass.simpleName, "setContent recomposed")
             ThouCylinderTheme {
-                App(startDestination = startDestination)
+                App(startDestination = startDestination, modifier = Modifier.safeDrawingPadding())
             }
         }
     }

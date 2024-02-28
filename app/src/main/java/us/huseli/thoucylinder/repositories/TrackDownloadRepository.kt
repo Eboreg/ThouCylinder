@@ -13,6 +13,7 @@ import us.huseli.thoucylinder.DownloadTaskState
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,7 +38,7 @@ class TrackDownloadRepository @Inject constructor(@ApplicationContext private va
     }
 
     fun downloadTrack(
-        track: Track,
+        trackCombo: AbstractTrackCombo,
         repos: Repositories,
         directory: DocumentFile,
         albumCombo: AbstractAlbumCombo? = null,
@@ -46,7 +47,7 @@ class TrackDownloadRepository @Inject constructor(@ApplicationContext private va
     ): TrackDownloadTask {
         val task = TrackDownloadTask(
             scope = scope,
-            track = track,
+            trackCombo = trackCombo,
             albumCombo = albumCombo,
             repos = repos,
             onError = onError,

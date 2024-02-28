@@ -21,27 +21,28 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.combos.ArtistPojo
+import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 
 @Composable
 fun ArtistGrid(
-    artistPojos: List<ArtistPojo>,
+    artistCombos: List<ArtistCombo>,
     progressIndicatorText: String? = null,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    imageFlow: (ArtistPojo) -> Flow<ImageBitmap?>,
+    imageFlow: (ArtistCombo) -> Flow<ImageBitmap?>,
 ) {
     ItemGrid(
-        things = artistPojos,
-        onClick = { _, artistPojo -> onArtistClick(artistPojo.name) },
+        things = artistCombos,
+        onClick = { _, combo -> onArtistClick(combo.artist.id) },
         contentPadding = contentPadding,
         progressIndicatorText = progressIndicatorText,
         onEmpty = onEmpty,
-    ) { _, artist ->
-        val imageBitmap by imageFlow(artist).collectAsStateWithLifecycle(null)
+    ) { _, combo ->
+        val imageBitmap by imageFlow(combo).collectAsStateWithLifecycle(null)
 
         Thumbnail(
             image = imageBitmap,
@@ -52,14 +53,14 @@ fun ArtistGrid(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.padding(horizontal = 5.dp, vertical = 10.dp).weight(1f)) {
                 Text(
-                    text = artist.name.umlautify(),
+                    text = combo.artist.name.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listSmallHeader,
                 )
                 Text(
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
-                    text = pluralStringResource(R.plurals.x_tracks, artist.trackCount, artist.trackCount),
+                    text = pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
                 )
             }
         }

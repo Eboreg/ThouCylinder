@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.combos
+package us.huseli.thoucylinder.dataclasses.pojos
 
 import androidx.room.ColumnInfo
 import java.time.Instant

@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.lastFm
 
 import com.google.gson.annotations.SerializedName
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 
 data class LastFmImage(
     val size: Size,
@@ -22,11 +23,12 @@ data class LastFmImage(
     }
 }
 
-
-fun List<LastFmImage>.getImage(sizePriority: List<LastFmImage.Size>): LastFmImage? =
+fun Iterable<LastFmImage>.getImage(sizePriority: List<LastFmImage.Size>): LastFmImage? =
     sizePriority.firstNotNullOfOrNull { size -> find { it.size == size && it.url.isNotEmpty() } }
 
-fun List<LastFmImage>.getFullImage(): LastFmImage? = getImage(LastFmImage.fullImageSizePriority)
+fun Iterable<LastFmImage>.getFullImage(): LastFmImage? = getImage(LastFmImage.fullImageSizePriority)
 
+fun Iterable<LastFmImage>.getThumbnail(): LastFmImage? = getImage(LastFmImage.thumbnailSizePriority)
 
-fun List<LastFmImage>.getThumbnail(): LastFmImage? = getImage(LastFmImage.thumbnailSizePriority)
+fun Iterable<LastFmImage>.toMediaStoreImage(): MediaStoreImage? = getFullImage()
+    ?.let { MediaStoreImage.fromUrls(it.url, getThumbnail()?.url ?: it.url) }

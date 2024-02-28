@@ -5,25 +5,25 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.DpSize
-import androidx.lifecycle.viewModelScope
 import androidx.media3.common.PlaybackException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.Selection
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.repositories.PlayerRepository
-import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -31,6 +31,7 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     private val repos: Repositories,
 ) : DownloadsViewModel(repos), PlayerRepositoryListener {
+    private val allArtists = MutableStateFlow<List<Artist>>(emptyList())
     private var deletedPlaylist: Playlist? = null
     private var deletedPlaylistTracks: List<PlaylistTrack> = emptyList()
 
@@ -40,10 +41,13 @@ class AppViewModel @Inject constructor(
 
     init {
         repos.player.addListener(this)
+        launchOnIOThread {
+            repos.artist.flowArtists().collect { artists -> allArtists.value = artists }
+        }
     }
 
-    fun addAlbumToLibrary(albumId: UUID) = viewModelScope.launch(Dispatchers.IO) {
-        repos.album.addToLibrary(albumId)
+    fun addAlbumToLibrary(albumId: UUID) = launchOnIOThread {
+        repos.album.addAlbumToLibrary(albumId)
         repos.track.addToLibraryByAlbumId(albumId)
     }
 
@@ -52,70 +56,61 @@ class AppViewModel @Inject constructor(
         playlistId: UUID,
         includeDuplicates: Boolean = true,
         onFinish: (added: Int) -> Unit = {},
-    ) = viewModelScope.launch(Dispatchers.IO) {
+    ) = launchOnIOThread {
         onFinish(repos.playlist.addSelectionToPlaylist(selection, playlistId, includeDuplicates))
     }
 
-    fun createPlaylist(playlist: Playlist, selection: Selection? = null) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.playlist.insertPlaylist(playlist)
-            selection?.also { repos.playlist.addSelectionToPlaylist(it, playlist.playlistId) }
-        }
+    fun createPlaylist(playlist: Playlist, selection: Selection? = null) = launchOnIOThread {
+        repos.playlist.insertPlaylist(playlist)
+        selection?.also { repos.playlist.addSelectionToPlaylist(it, playlist.playlistId) }
+    }
 
-    fun deletePlaylist(playlist: Playlist, onFinish: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
+    fun deletePlaylist(playlist: Playlist, onFinish: () -> Unit = {}) = launchOnIOThread {
         deletedPlaylist = playlist
         deletedPlaylistTracks = repos.playlist.listPlaylistTracks(playlist.playlistId)
         repos.playlist.deletePlaylist(playlist)
         onFinish()
     }
 
-    fun deleteLocalAlbumFiles(albumId: UUID, onFinish: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
-        repos.album.setAlbumIsLocal(albumId, false)
-        repos.album.getAlbumWithTracks(albumId)?.also { combo ->
+    fun deleteLocalAlbumFiles(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+
+        repos.album.setAlbumsIsLocal(albumIds, false)
+        repos.album.listAlbumsWithTracks(albumIds).forEach { combo ->
             deleteLocalAlbumFiles(combo)
-            onFinish()
         }
+        onFinish()
     }
 
-    fun doStartupTasks(context: Context) = viewModelScope.launch(Dispatchers.IO) {
-        val existingTracks = repos.track.listTracks()
-
-        if (repos.settings.autoImportLocalMusic.value == true) importNewLocalAlbums(context, existingTracks)
-        deleteOrphanTracksAndAlbums(existingTracks)
+    fun doStartupTasks(context: Context) = launchOnIOThread {
+        updateGenreList()
+        if (repos.settings.autoImportLocalMusic.value == true) importNewLocalAlbums(context)
+        findOrphansAndDuplicates()
         repos.playlist.deleteOrphanPlaylistTracks()
         repos.track.deleteTempTracks()
         repos.album.deleteTempAlbums()
         deleteMarkedAlbums()
-        updateGenreList()
+        repos.artist.deleteOrphans()
     }
 
     suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) =
         repos.playlist.getDuplicatePlaylistTrackCount(playlistId, selection)
 
-    suspend fun getTrackAlbum(albumId: UUID?): Album? = albumId?.let { repos.album.getAlbum(it) }
+    suspend fun getAlbumCombo(albumId: UUID): AlbumCombo? = repos.album.getAlbumCombo(albumId)
 
-    suspend fun listSelectionTracks(selection: Selection) = repos.playlist.listSelectionTracks(selection)
-
-    fun markAlbumForDeletion(albumId: UUID, onFinish: () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
-        repos.album.setAlbumIsDeleted(albumId, true)
-        repos.album.setAlbumIsLocal(albumId, false)
-        repos.album.getAlbumWithTracks(albumId)?.also { combo ->
-            deleteLocalAlbumFiles(combo)
-            onFinish()
-        }
+    fun hideAlbums(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+        repos.album.setAlbumsIsHidden(albumIds, true)
+        onFinish()
     }
 
-    fun setAlbumIsHidden(albumId: UUID, value: Boolean, onFinish: () -> Unit = {}) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.album.setAlbumIsHidden(albumId, value)
-            onFinish()
+    fun hideAlbumsAndDeleteFiles(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+        repos.album.setAlbumsIsHidden(albumIds, true)
+        repos.album.listAlbumsWithTracks(albumIds).forEach { combo ->
+            deleteLocalAlbumFiles(combo)
         }
+        onFinish()
+    }
 
-    fun setAlbumIsInLibrary(albumId: UUID, value: Boolean, onFinish: () -> Unit = {}) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.album.setAlbumIsInLibrary(albumId, value)
-            onFinish()
-        }
+    suspend fun listSelectionTracks(selection: Selection) = repos.playlist.listSelectionTracks(selection)
 
     fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
 
@@ -125,7 +120,7 @@ class AppViewModel @Inject constructor(
 
     fun setWelcomeDialogShown(value: Boolean) = repos.settings.setWelcomeDialogShown(value)
 
-    fun undoDeletePlaylist(onFinish: (UUID) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
+    fun undoDeletePlaylist(onFinish: (UUID) -> Unit) = launchOnIOThread {
         deletedPlaylist?.also { playlist ->
             repos.playlist.insertPlaylist(playlist)
             repos.playlist.insertPlaylistTracks(deletedPlaylistTracks)
@@ -135,69 +130,74 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun unmarkAlbumForDeletion(albumId: UUID) = viewModelScope.launch {
-        repos.album.setAlbumIsDeleted(albumId, false)
+    fun unhideAlbums(albumIds: Collection<UUID>) = launchOnIOThread {
+        repos.album.setAlbumsIsHidden(albumIds, false)
     }
+
 
     /** PRIVATE METHODS ******************************************************/
     private suspend fun deleteLocalAlbumFiles(combo: AlbumWithTracksCombo) {
-        repos.localMedia.deleteAlbumDirectoryAlbumArt(combo)
-        repos.track.deleteTrackFiles(combo.tracks)
-        repos.track.clearLocalUris(combo.tracks.map { it.trackId })
+        repos.localMedia.deleteAlbumDirectoryAlbumArt(
+            albumCombo = combo,
+            albumDirectory = repos.settings.getAlbumDirectory(combo),
+            tracks = combo.trackCombos.map { it.track },
+        )
+        repos.track.deleteTrackFiles(combo.trackCombos.map { it.track })
+        repos.track.clearLocalUris(combo.trackCombos.map { it.track.trackId })
     }
 
     private suspend fun deleteMarkedAlbums() {
-        val albums = repos.album.listDeletionMarkedAlbums()
+        val combos = repos.album.listDeletionMarkedAlbumCombos()
 
-        albums.forEach {
-            it.albumArt?.deleteInternalFiles()
-            repos.localMedia.deleteAlbumDirectoryAlbumArt(it)
+        combos.forEach {
+            it.album.albumArt?.deleteInternalFiles()
+            repos.localMedia.deleteAlbumDirectoryAlbumArt(
+                albumCombo = it,
+                albumDirectory = repos.settings.getAlbumDirectory(it),
+            )
         }
-        repos.track.deleteTracksByAlbumId(albums.map { it.albumId })
-        repos.album.deleteAlbums(albums)
+        if (combos.isNotEmpty()) {
+            repos.track.deleteTracksByAlbumId(combos.map { it.album.albumId })
+            repos.album.deleteAlbums(combos.map { it.album })
+        }
     }
 
-    private suspend fun deleteOrphanTracksAndAlbums(allTracks: List<Track>) {
-        val allAlbums = repos.album.listAlbums()
-        val albumMultimap = allAlbums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
-        // Collect tracks that have no existing media files:
-        val orphanTracks = repos.localMedia.listOrphanTracks(allTracks)
-        // Separate those that have Youtube connection from those that don't:
-        val (realOrphanTracks, youtubeOnlyTracks) = orphanTracks.partition { it.youtubeVideo == null }
-        // And albums that _only_ have orphan tracks in them:
-        val realOrphanAlbumCombos = albumMultimap
-            .filter { (_, tracks) -> realOrphanTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
-            .map { (album, tracks) -> AlbumWithTracksCombo(album = album, tracks = tracks) }
-        val youtubeOnlyAlbums = albumMultimap
-            .filter { (_, tracks) -> youtubeOnlyTracks.map { it.trackId }.containsAll(tracks.map { it.trackId }) }
-            .keys
+    private suspend fun findOrphansAndDuplicates() {
+        val allTracks = repos.track.listTracks()
+        val allAlbumCombos = repos.album.listAlbumCombos()
+        val allAlbumMultimap =
+            allAlbumCombos.associateWith { combo -> allTracks.filter { it.albumId == combo.album.albumId } }
+        val nonAlbumDuplicateTracks = allTracks
+            .combineEquals { a, b -> a.localUri == b.localUri && a.youtubeVideo?.id == b.youtubeVideo?.id }
+            .filter { tracks -> tracks.size > 1 }
+            .map { tracks -> tracks.filter { it.albumId == null } }
+            .flatten()
+        // Collect tracks with non-working localUris:
+        val brokenUriTracks = repos.localMedia.listTracksWithBrokenLocalUris(allTracks)
+        val nonLocalTracks = brokenUriTracks + allTracks.filter { it.localUri == null }
+        // Collect albums that have isLocal=true but should have false:
+        val noLongerLocalAlbums = allAlbumMultimap
+            .filterKeys { it.album.isLocal }
+            .filterValues { nonLocalTracks.containsAll(it) }
 
-        // Delete the totally orphaned tracks and albums:
-        realOrphanAlbumCombos.forEach {
-            it.album.albumArt?.deleteInternalFiles()
-            repos.localMedia.deleteAlbumDirectoryAlbumArt(it)
-        }
-        repos.track.deleteTracks(realOrphanTracks)
-        repos.album.deleteAlbums(realOrphanAlbumCombos.map { it.album })
-        // Update the Youtube-only tracks and albums if needed:
-        youtubeOnlyAlbums.filter { it.isLocal }.takeIf { it.isNotEmpty() }?.also { albums ->
-            repos.album.setAlbumsIsLocal(albums.map { it.albumId }, false)
-        }
-        youtubeOnlyTracks.filter { it.localUri != null }.takeIf { it.isNotEmpty() }?.also { tracks ->
-            repos.track.clearLocalUris(tracks.map { it.trackId })
-        }
+        // Delete non-album tracks that have duplicates on albums:
+        repos.track.deleteTracks(nonAlbumDuplicateTracks)
+        // Update tracks with broken localUris:
+        repos.track.clearLocalUris(brokenUriTracks.map { it.trackId })
+        // Update albums that should have isLocal=true, but don't:
+        repos.album.setAlbumsIsLocal(noLongerLocalAlbums.keys.map { it.album.albumId }, false)
     }
 
     private suspend fun updateGenreList() {
         /** Fetches Musicbrainz' complete genre list. */
         try {
             val existingGenreNames = repos.album.listTags().map { it.name }.toSet()
-            val mbGenreNames = repos.musicBrainz.listAllGenres()
+            val mbGenreNames = repos.musicBrainz.listAllGenreNames()
             val newTags = mbGenreNames
                 .minus(existingGenreNames)
                 .map { Tag(name = it, isMusicBrainzGenre = true) }
 
-            repos.album.insertTags(newTags)
+            if (newTags.isNotEmpty()) repos.album.insertTags(newTags)
         } catch (e: Exception) {
             Log.e(javaClass.simpleName, "updateGenreList: $e", e)
         }
@@ -210,13 +210,11 @@ class AppViewModel @Inject constructor(
         currentCombo: QueueTrackCombo?,
         lastAction: PlayerRepository.LastAction,
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val metadataIsOld = currentCombo?.track?.youtubeVideo?.expiresAt?.isBefore(Instant.now())
-
+        launchOnIOThread {
             if (
                 error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
                 currentCombo != null &&
-                (currentCombo.track.youtubeVideo?.metadata == null || metadataIsOld == true)
+                (currentCombo.track.youtubeVideo?.metadataRefreshNeeded == true)
             ) {
                 val track = ensureTrackMetadata(currentCombo.track, forceReload = true)
                 val playUri = track.playUri
@@ -228,17 +226,19 @@ class AppViewModel @Inject constructor(
                     }
                     // The rest of the album probably has outdated URLs, too:
                     currentCombo.album?.albumId?.also { albumId ->
-                        repos.album.getAlbumWithTracks(albumId)?.tracks?.forEach {
-                            if (it.trackId != currentCombo.track.trackId) ensureTrackMetadata(it)
+                        repos.album.getAlbumWithTracks(albumId)?.trackCombos?.forEach {
+                            if (it.track.trackId != currentCombo.track.trackId) {
+                                ensureTrackMetadata(it.track, forceReload = true)
+                            }
                         }
                     }
-                    return@launch
+                    return@launchOnIOThread
                 }
             }
 
             if (lastAction == PlayerRepository.LastAction.PLAY) {
                 SnackbarEngine.addError(error.toString())
-                repos.player.stop()
+                withContext(Dispatchers.Main) { repos.player.stop() }
             }
         }
     }

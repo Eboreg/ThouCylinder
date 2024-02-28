@@ -29,8 +29,8 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 
@@ -40,20 +40,18 @@ fun AutocompleteChip(
     onSave: (String) -> Unit,
     onDelete: () -> Unit,
     getSuggestions: (String) -> List<String>,
-    totalAreaSize: DpSize,
-    dialogSize: DpSize,
+    totalAreaHeight: Dp,
     modifier: Modifier = Modifier,
+    rootOffsetY: Dp = 0.dp,
     focus: Boolean = false,
 ) {
     val density = LocalDensity.current
-    val dialogTop = (totalAreaSize.height - dialogSize.height) / 2
     val focusRequester = remember { FocusRequester() }
     var editMode by rememberSaveable { mutableStateOf(focus) }
     var positionInRoot by remember { mutableStateOf(DpOffset.Zero) }
     var suggestions by remember { mutableStateOf(getSuggestions(text)) }
 
-    val absolutePosition = dialogTop + positionInRoot.y
-    val maxPopupHeight = totalAreaSize.height - absolutePosition - 32.dp
+    val maxPopupHeight = totalAreaHeight - (rootOffsetY + positionInRoot.y) - 32.dp
 
     LaunchedEffect(editMode) {
         if (editMode) focusRequester.requestFocus()
@@ -79,10 +77,8 @@ fun AutocompleteChip(
                     },
                 showClearIcon = false,
                 focusRequester = focusRequester,
-                onFocusChanged = { if (!it.isFocused) editMode = false },
-                onChange = {
-                    suggestions = getSuggestions(it.text)
-                }
+                onFocusChange = { if (!it.isFocused) editMode = false },
+                onValueChange = { suggestions = getSuggestions(it.text) },
             )
         },
         trailingIcon = {

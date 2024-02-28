@@ -11,25 +11,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.ThouCylinderTheme
-import us.huseli.thoucylinder.compose.utils.CompactSearchTextField
+import us.huseli.thoucylinder.viewmodels.AppViewModel
+import us.huseli.thoucylinder.viewmodels.DebugViewModel
 
 @Composable
-fun DebugScreen() {
+fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppViewModel = hiltViewModel()) {
     val density = LocalDensity.current
+    val context = LocalContext.current
+    // val spotifyRecommendations by viewModel.spotifyRecommendations.collectAsStateWithLifecycle()
+    // val spotifyRelatedArtists by viewModel.spotifyRelatedArtists.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.padding(10.dp).verticalScroll(state = rememberScrollState())) {
-        CompactSearchTextField(value = "blurg")
+        // spotifyRecommendations.forEach { Row { Text("${it.artist} - ${it.name}") } }
+        // spotifyRelatedArtists.forEach { Row { Text(it.name) } }
+
+        Button(
+            onClick = { viewModel.clearDatabase() },
+            content = { Text("Clear DB") }
+        )
+        Button(
+            onClick = { appViewModel.doStartupTasks(context) },
+            content = { Text("Do startup tasks") }
+        )
+
         Text("1 dp = ${with(density) { 1.dp.toPx() }} px")
         Text("1 px = ${with(density) { 1.toDp() }} dp")
+
         Row {
             ColorSample(Modifier.weight(0.5f), "background", MaterialTheme.colorScheme.background)
             ColorSample(Modifier.weight(0.5f), "error", MaterialTheme.colorScheme.error)

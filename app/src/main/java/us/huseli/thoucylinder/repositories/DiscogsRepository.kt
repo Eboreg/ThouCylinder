@@ -4,10 +4,10 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
-import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.DiscogsMaster
 import us.huseli.thoucylinder.dataclasses.DiscogsSearchResults
+import us.huseli.thoucylinder.getMutexCache
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +22,7 @@ class DiscogsRepository @Inject constructor() {
     private val apiKey = BuildConfig.discogsApiKey
     private val apiSecret = BuildConfig.discogsApiSecret
     private val gson: Gson = GsonBuilder().create()
-    private val responseCache = MutexCache<String, String> { url ->
+    private val responseCache = getMutexCache("DiscogsRepository.responseCache") { url ->
         val headers = mapOf(
             "User-Agent" to CUSTOM_USER_AGENT,
             "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",

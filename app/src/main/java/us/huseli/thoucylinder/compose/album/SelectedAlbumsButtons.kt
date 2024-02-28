@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
+import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Close
+import androidx.compose.material.icons.sharp.Delete
+import androidx.compose.material.icons.sharp.PlayArrow
 import androidx.compose.material.icons.sharp.SelectAll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
@@ -49,15 +53,19 @@ fun SelectedAlbumsButtons(
                 )
                 SmallOutlinedButton(
                     onClick = callbacks.onAddToPlaylistClick,
-                    text = stringResource(R.string.add_to_playlist),
-                )
-                SmallOutlinedButton(
-                    onClick = callbacks.onPlayClick,
-                    text = stringResource(R.string.play),
+                    content = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, stringResource(R.string.add_to_playlist)) },
                 )
                 SmallOutlinedButton(
                     onClick = callbacks.onEnqueueClick,
-                    text = stringResource(R.string.enqueue),
+                    content = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, stringResource(R.string.enqueue)) },
+                )
+                SmallOutlinedButton(
+                    onClick = callbacks.onDeleteClick,
+                    content = { Icon(Icons.Sharp.Delete, stringResource(R.string.delete)) },
+                )
+                SmallOutlinedButton(
+                    onClick = callbacks.onPlayClick,
+                    content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                 )
                 extraButtons?.invoke()
             }

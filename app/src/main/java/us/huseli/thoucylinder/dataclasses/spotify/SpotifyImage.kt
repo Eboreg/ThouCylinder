@@ -5,7 +5,7 @@ import us.huseli.thoucylinder.Constants.IMAGE_MIN_PX_THUMBNAIL
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import kotlin.math.min
 
-data class SpotifyAlbumArt(
+data class SpotifyImage(
     val url: String,
     val height: Int?,
     val width: Int?,
@@ -14,10 +14,10 @@ data class SpotifyAlbumArt(
         get() = min(width ?: 0, height ?: 0).pow(2)
 }
 
-fun Collection<SpotifyAlbumArt>.getThumbnailUrl(): String? =
+fun Collection<SpotifyImage>.getThumbnailUrl(): String? =
     filter { it.size >= IMAGE_MIN_PX_THUMBNAIL }.minByOrNull { it.size }?.url
 
-fun Collection<SpotifyAlbumArt>.getFullImageUrl(): String? = maxByOrNull { it.size }?.url
+fun Collection<SpotifyImage>.getFullImageUrl(): String? = maxByOrNull { it.size }?.url
 
-suspend fun Collection<SpotifyAlbumArt>.toMediaStoreImage() =
+fun Collection<SpotifyImage>.toMediaStoreImage() =
     getFullImageUrl()?.let { MediaStoreImage.fromUrls(it, getThumbnailUrl()) }

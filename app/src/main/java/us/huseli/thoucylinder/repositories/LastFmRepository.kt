@@ -26,11 +26,11 @@ import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
-import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.PlayerRepositoryListener
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
@@ -38,6 +38,7 @@ import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.getMutexCache
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -53,10 +54,8 @@ class LastFmRepository @Inject constructor(
     private val scrobbleMutex = Mutex()
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var scrobbleJob: Job? = null
-    private val albumArtCache = MutexCache<String, ImageBitmap> { url ->
-        url.getBitmapByUrl()?.asFullImageBitmap(context)
-    }
-    private val apiResponseCache = MutexCache<String, String> { url -> Request(url).getString() }
+    private val apiResponseCache =
+        getMutexCache("LastFmRepository.apiResponseCache") { url -> Request(url).getString() }
 
     private val _allTopAlbumsFetched = MutableStateFlow(false)
     private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
@@ -165,7 +164,7 @@ class LastFmRepository @Inject constructor(
     }
 
     suspend fun getThumbnail(album: LastFmTopAlbumsResponse.Album): ImageBitmap? =
-        album.image.getThumbnail()?.let { image -> albumArtCache.getOrNull(image.url) }
+        album.image.getThumbnail()?.let { image -> image.url.getBitmapByUrl()?.asFullImageBitmap(context) }
 
     suspend fun listImportedAlbumIds(): List<String> = albumDao.listMusicBrainzReleaseIds()
 
@@ -221,14 +220,14 @@ class LastFmRepository @Inject constructor(
         _sessionKey.value?.also { sessionKey ->
             if (_scrobble.value) {
                 val nowPlaying = combo?.let {
-                    it.artist?.let { artist ->
+                    it.artists.joined()?.let { artist ->
                         LastFmNowPlaying(
                             artist = artist,
                             track = it.track.title,
                             duration = it.track.duration?.inWholeSeconds?.toInt(),
                             album = it.album?.title,
                             trackNumber = it.track.albumPosition,
-                            albumArtist = it.album?.artist,
+                            albumArtist = it.albumArtist,
                             mbid = it.track.musicBrainzId,
                         )
                     }
@@ -246,7 +245,7 @@ class LastFmRepository @Inject constructor(
     }
 
     override suspend fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {
-        val artist = combo.artist
+        val artist = combo.artists.joined()
         val duration = combo.track.duration
 
         if (artist != null && duration != null && duration > 30.seconds && _scrobble.value) {
@@ -255,7 +254,7 @@ class LastFmRepository @Inject constructor(
                     track = combo.track.title,
                     artist = artist,
                     album = combo.album?.title,
-                    albumArtist = combo.album?.artist,
+                    albumArtist = combo.albumArtist,
                     mbid = combo.track.musicBrainzId,
                     trackNumber = combo.track.albumPosition,
                     duration = combo.track.duration?.inWholeSeconds?.toInt(),

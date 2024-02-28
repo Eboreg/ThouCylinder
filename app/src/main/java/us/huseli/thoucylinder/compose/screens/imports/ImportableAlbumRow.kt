@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.compose
+package us.huseli.thoucylinder.compose.screens.imports
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,7 +32,7 @@ fun ImportableAlbumRow(
     isNotFound: Boolean,
     albumTitle: String,
     artist: String?,
-    thirdRow: @Composable () -> Unit,
+    thirdRow: (@Composable () -> Unit)? = null,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Thumbnail(
@@ -84,7 +84,7 @@ fun ImportableAlbumRow(
                     content = { Text(text = stringResource(R.string.no_match_found)) },
                 )
             } else {
-                thirdRow()
+                thirdRow?.invoke()
             }
         }
     }

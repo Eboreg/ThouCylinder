@@ -32,6 +32,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.umlautify
@@ -50,7 +51,6 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
     downloadTask: TrackDownloadTask? = null,
     crossinline extraContextMenuItems: @Composable () -> Unit = {},
 ) {
-    val artist = if (showArtist) combo.artist else null
     val (downloadProgress, downloadIsActive) = getDownloadProgress(downloadTask)
 
     callbacks.onEach?.invoke()
@@ -81,20 +81,20 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
+                        val artistString = if (showArtist) combo.artists.joined() else null
+
                         Text(
                             text = combo.track.title.umlautify(),
-                            maxLines = if (artist == null) 2 else 1,
+                            maxLines = if (artistString == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
-                        if (artist != null) {
-                            Text(
-                                text = artist.umlautify(),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
-                            )
-                        }
+                        if (artistString != null) Text(
+                            text = artistString.umlautify(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
+                        )
                     }
 
                     combo.track.duration?.also { duration ->
@@ -110,6 +110,7 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                         callbacks = callbacks,
                         extraItems = extraContextMenuItems,
                         isInLibrary = combo.track.isInLibrary,
+                        trackArtists = combo.artists,
                     )
 
                     if (reorderableState != null) {

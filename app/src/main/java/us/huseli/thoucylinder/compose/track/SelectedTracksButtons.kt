@@ -47,14 +47,18 @@ fun SelectedTracksButtons(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     content = { Text(trackCount.toString(), fontWeight = FontWeight.Bold) },
                 )
-                SmallOutlinedButton(
-                    onClick = callbacks.onPlayClick,
-                    text = stringResource(R.string.play),
-                )
-                SmallOutlinedButton(
-                    onClick = callbacks.onEnqueueClick,
-                    text = stringResource(R.string.enqueue),
-                )
+                callbacks.onPlayClick?.also { onPlayClick ->
+                    SmallOutlinedButton(
+                        onClick = onPlayClick,
+                        text = stringResource(R.string.play),
+                    )
+                }
+                callbacks.onEnqueueClick?.also { onEnqueueClick ->
+                    SmallOutlinedButton(
+                        onClick = onEnqueueClick,
+                        text = stringResource(R.string.enqueue),
+                    )
+                }
                 SmallOutlinedButton(
                     onClick = callbacks.onAddToPlaylistClick,
                     text = stringResource(R.string.add_to_playlist),

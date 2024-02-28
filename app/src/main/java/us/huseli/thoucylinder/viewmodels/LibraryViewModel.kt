@@ -11,17 +11,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flattenMerge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import us.huseli.thoucylinder.AlbumSortParameter
+import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
 import java.util.UUID
 import javax.inject.Inject
 
@@ -40,18 +43,38 @@ class LibraryViewModel @Inject constructor(
     private val _trackSortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _albumSearchTerm = MutableStateFlow("")
     private val _trackSearchTerm = MutableStateFlow("")
+    private val _selectedAlbumTagPojos = MutableStateFlow<List<TagPojo>>(emptyList())
+    private val _selectedTrackTagPojos = MutableStateFlow<List<TagPojo>>(emptyList())
+    private val _availabilityFilter = MutableStateFlow(AvailabilityFilter.ALL)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val albumCombos: Flow<List<AlbumCombo>> =
-        combine(_albumSortParameter, _albumSortOrder, _albumSearchTerm) { sortParameter, sortOrder, searchTerm ->
-            repos.album.flowAlbumCombos(sortParameter, sortOrder, searchTerm)
-        }.flattenMerge().onStart { _isLoadingAlbums.value = true }.onEach { _isLoadingAlbums.value = false }
+    override val albumCombos = combine(
+        _albumSortParameter,
+        _albumSortOrder,
+        _albumSearchTerm,
+        _selectedAlbumTagPojos,
+        _availabilityFilter,
+    ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
+        repos.album.flowAlbumCombos(sortParameter, sortOrder, searchTerm, tagPojos.map { it.name }, availability)
+    }.flattenMerge().onEach { _isLoadingAlbums.value = false }.distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagingTrackCombos: Flow<PagingData<TrackCombo>> =
-        combine(_trackSortParameter, _trackSortOrder, _trackSearchTerm) { sortParameter, sortOrder, searchTerm ->
-            repos.track.flowTrackComboPager(sortParameter, sortOrder, searchTerm).flow.cachedIn(viewModelScope)
-        }.flattenMerge().onStart { _isLoadingTracks.value = true }.onEach { _isLoadingTracks.value = false }
+        combine(
+            _trackSortParameter,
+            _trackSortOrder,
+            _trackSearchTerm,
+            _selectedTrackTagPojos,
+            _availabilityFilter,
+        ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
+            repos.track.flowTrackComboPager(
+                sortParameter = sortParameter,
+                sortOrder = sortOrder,
+                searchTerm = searchTerm,
+                tagNames = tagPojos.map { it.name },
+                availabilityFilter = availability,
+            ).flow.cachedIn(viewModelScope)
+        }.flattenMerge().onEach { _isLoadingTracks.value = false }.distinctUntilChanged()
 
     val displayType = _displayType.asStateFlow()
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
@@ -68,6 +91,13 @@ class LibraryViewModel @Inject constructor(
     val trackSortOrder = _trackSortOrder.asStateFlow()
     val albumSearchTerm = _albumSearchTerm.asStateFlow()
     val trackSearchTerm = _trackSearchTerm.asStateFlow()
+    val selectedAlbumTagPojos = _selectedAlbumTagPojos.asStateFlow()
+    val selectedTrackTagPojos = _selectedTrackTagPojos.asStateFlow()
+    val availabilityFilter = _availabilityFilter.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val albumTagPojos = availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val trackTagPojos = availabilityFilter.flatMapMerge { repos.track.flowTagPojos(it) }
 
     suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? =
         repos.playlist.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
@@ -83,12 +113,24 @@ class LibraryViewModel @Inject constructor(
         _albumSortOrder.value = sortOrder
     }
 
+    fun setAvailabilityFilter(value: AvailabilityFilter) {
+        _availabilityFilter.value = value
+    }
+
     fun setDisplayType(value: DisplayType) {
         _displayType.value = value
     }
 
     fun setListType(value: ListType) {
         _listType.value = value
+    }
+
+    fun setSelectedAlbumTagPojos(value: List<TagPojo>) {
+        _selectedAlbumTagPojos.value = value
+    }
+
+    fun setSelectedTrackTagPojos(value: List<TagPojo>) {
+        _selectedTrackTagPojos.value = value
     }
 
     fun setTrackSearchTerm(value: String) {

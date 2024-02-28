@@ -37,6 +37,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import us.huseli.thoucylinder.MainActivity
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.umlautify
 
@@ -55,7 +56,7 @@ fun Widget(playerRepo: PlayerRepository) {
     val backgroundColor =
         if (bitmap.value != null) ColorProvider(R.color.widget_background) else GlanceTheme.colors.background
     val currentTrackString = currentCombo
-        ?.let { listOfNotNull(it.artist, it.track.title) }
+        ?.let { listOfNotNull(it.artists.joined(), it.track.title) }
         ?.joinToString(" • ")
         ?: context.getString(R.string.no_track_playing).umlautify()
 

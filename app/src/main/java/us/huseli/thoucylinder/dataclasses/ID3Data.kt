@@ -20,6 +20,7 @@ data class ID3Data(
     val musicBrainzTrackId: String? = null,
     val musicBrainzReleaseId: String? = null,
     val musicBrainzReleaseGroupId: String? = null,
+    val musicBrainzArtistId: String? = null,
 )
 
 
@@ -39,5 +40,6 @@ fun MediaInformation.extractID3Data(): ID3Data {
         musicBrainzTrackId = tags?.getStringOrNull("mb_track_id"),
         musicBrainzReleaseId = tags?.getStringOrNull("mb_release_id"),
         musicBrainzReleaseGroupId = tags?.getStringOrNull("mb_release_group_id"),
+        musicBrainzArtistId = tags?.getStringOrNull("mb_artist_id"),
     )
 }

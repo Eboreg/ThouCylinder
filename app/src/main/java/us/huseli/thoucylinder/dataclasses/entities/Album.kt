@@ -1,34 +1,23 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
-import android.content.Context
 import android.os.Parcelable
-import androidx.annotation.WorkerThread
-import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.anggrayudi.storage.file.CreateMode
-import com.anggrayudi.storage.file.makeFolder
 import kotlinx.parcelize.Parcelize
-import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.extensions.sanitizeFilename
-import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import java.util.UUID
 
-@Entity(
-    indices = [Index("Album_isInLibrary")],
-)
+@Entity(indices = [Index("Album_isInLibrary")])
 @Parcelize
 data class Album(
     @PrimaryKey @ColumnInfo("Album_albumId") val albumId: UUID = UUID.randomUUID(),
     @ColumnInfo("Album_title") val title: String,
     @ColumnInfo("Album_isInLibrary") val isInLibrary: Boolean,
     @ColumnInfo("Album_isLocal") val isLocal: Boolean,
-    @ColumnInfo("Album_artist") val artist: String? = null,
     @ColumnInfo("Album_year") val year: Int? = null,
     @ColumnInfo("Album_isDeleted") val isDeleted: Boolean = false,
     @ColumnInfo("Album_isHidden") val isHidden: Boolean = false,
@@ -39,9 +28,6 @@ data class Album(
     @Embedded("Album_albumArt_") val albumArt: MediaStoreImage? = null,
     @Embedded("Album_spotifyImage_") val spotifyImage: MediaStoreImage? = null,
 ) : Parcelable {
-    val isOnSpotify: Boolean
-        get() = spotifyId != null
-
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
 
@@ -51,41 +37,5 @@ data class Album(
     val youtubeWebUrl: String?
         get() = youtubePlaylist?.let { "https://youtube.com/playlist?list=${it.id}" }
 
-    @WorkerThread
-    fun createDirectory(downloadRoot: DocumentFile, context: Context): DocumentFile? =
-        downloadRoot.makeFolder(context, getSubDirs(context).joinToString("/"), CreateMode.REUSE)
-
-    @WorkerThread
-    fun getDirectory(downloadRoot: DocumentFile, context: Context): DocumentFile? {
-        var ret: DocumentFile? = downloadRoot
-        getSubDirs(context).forEach { dirname ->
-            ret = ret?.findFile(dirname)?.takeIf { it.isDirectory }
-        }
-        return ret
-    }
-
-    fun getLevenshteinDistance(other: Album): Int {
-        val levenshtein = LevenshteinDistance()
-        val distances = mutableListOf<Int>()
-
-        distances.add(levenshtein.apply(title.lowercase(), other.title.lowercase()))
-        if (artist != null) {
-            distances.add(levenshtein.apply("$artist - $title".lowercase(), other.title.lowercase()))
-            if (other.artist != null) distances.add(
-                levenshtein.apply(
-                    "$artist - $title".lowercase(),
-                    "${other.artist} - ${other.title}".lowercase()
-                )
-            )
-        }
-        if (other.artist != null)
-            distances.add(levenshtein.apply(title.lowercase(), "${other.artist} - ${other.title}".lowercase()))
-
-        return distances.min()
-    }
-
-    private fun getSubDirs(context: Context): List<String> =
-        listOf(artist?.sanitizeFilename() ?: context.getString(R.string.unknown_artist), title.sanitizeFilename())
-
-    override fun toString(): String = artist?.let { "$it - $title" } ?: title
+    override fun toString(): String = title
 }

@@ -4,7 +4,7 @@ data class DiscogsMaster(val data: Data) {
     data class Data(
         val title: String,
         val year: Int? = null,
-        val id: Int,
+        val id: String,
         val artists: List<Artist>,
         val tracklist: List<Track>,
         val styles: List<String>? = emptyList(),

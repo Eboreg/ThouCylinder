@@ -49,8 +49,10 @@ interface YoutubeSearchDao {
 
     @Transaction
     suspend fun insertTracksForQuery(query: String, tracks: List<Track>) {
-        _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
-        tracks.forEach { track -> _insertQueryTrack(query, track.trackId) }
+        if (tracks.isNotEmpty()) {
+            _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
+            tracks.forEach { track -> _insertQueryTrack(query, track.trackId) }
+        }
     }
 
     @Query(

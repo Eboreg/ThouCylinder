@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.lastFm
 
+import us.huseli.thoucylinder.dataclasses.interfaces.IExternalAlbum
+
 data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
     data class TopAlbums(val album: List<Album>)
 
@@ -10,7 +12,14 @@ data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
         val artist: Artist,
         val image: List<LastFmImage>,
         val playcount: String?,
-    )
+    ) : IExternalAlbum {
+        override val id: String
+            get() = mbid
+        override val title: String
+            get() = name
+        override val artistName: String
+            get() = artist.name
+    }
 
     data class Artist(
         val url: String,

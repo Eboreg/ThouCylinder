@@ -5,10 +5,16 @@ import androidx.room.Junction
 import androidx.room.Relation
 import us.huseli.retaintheme.extensions.sumOfOrNull
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
 import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import kotlin.math.abs
+import kotlin.math.max
+
+enum class TrackMergeStrategy { KEEP_LEAST, KEEP_MOST, KEEP_SELF, KEEP_OTHER }
 
 data class AlbumWithTracksCombo(
     @Embedded override val album: Album,
@@ -23,38 +29,123 @@ data class AlbumWithTracksCombo(
         )
     )
     override val tags: List<Tag> = emptyList(),
+    @Relation(parentColumn = "Album_albumId", entityColumn = "AlbumArtist_albumId")
+    override val artists: List<AlbumArtistCredit> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
-    val tracks: List<Track> = emptyList(),
+    val trackCombos: List<TrackCombo> = emptyList<TrackCombo>().let { combos ->
+        combos.map { it.copy(albumArtist = artists.joined()) }
+    },
 ) : AbstractAlbumCombo() {
-    val discCount: Int
-        get() = tracks.mapNotNull { it.discNumber }.maxOrNull() ?: 1
+    data class AlbumMatch(
+        val distance: Double,
+        val albumCombo: AlbumWithTracksCombo,
+    )
 
-    val trackCombos: List<TrackCombo>
-        get() = tracks.map { TrackCombo(track = it, album = album) }
+    val discCount: Int
+        get() = trackCombos.mapNotNull { it.track.discNumber }.maxOrNull() ?: 1
 
     override val trackCount: Int
-        get() = tracks.size
+        get() = trackCombos.size
 
     override val durationMs: Long?
-        get() = tracks.sumOfOrNull {
-            it.metadata?.durationMs ?: it.youtubeVideo?.durationMs ?: it.youtubeVideo?.metadata?.durationMs
+        get() = trackCombos.sumOfOrNull {
+            it.track.metadata?.durationMs
+                ?: it.track.youtubeVideo?.durationMs
+                ?: it.track.youtubeVideo?.metadata?.durationMs
         }
 
     override val minYear: Int?
-        get() = tracks.mapNotNull { it.year }.minOrNull()
+        get() = trackCombos.mapNotNull { it.track.year }.minOrNull()
 
     override val maxYear: Int?
-        get() = tracks.mapNotNull { it.year }.maxOrNull()
+        get() = trackCombos.mapNotNull { it.track.year }.maxOrNull()
 
     override val isPartiallyDownloaded: Boolean
-        get() = tracks.any { it.isDownloaded } && tracks.any { !it.isDownloaded }
+        get() = trackCombos.any { it.track.isDownloaded } && trackCombos.any { !it.track.isDownloaded }
 
-    fun indexOfTrack(track: Track): Int = tracks.map { it.trackId }.indexOf(track.trackId)
+    val isUnplayable: Boolean
+        get() = trackCombos.all { !it.track.isPlayable }
 
-    fun sorted(): AlbumWithTracksCombo = copy(
-        tracks = tracks.sorted(),
-        tags = tags.sortedBy { it.name.length },
-    )
+    val unplayableTrackCount: Int
+        get() = trackCombos.count { !it.track.isPlayable }
+
+    private fun getDistance(other: AlbumWithTracksCombo): Double {
+        var result = 0.0
+
+        // +1 if _none_ of the credited artists match:
+        if (!artists.any { (other.artists.joined() ?: other.album.title).contains(it.name, true) }) result++
+        if (!album.title.contains(other.album.title, true)) result++
+        result += getTracksDistance(other.trackCombos.map { it.track })
+
+        return result
+    }
+
+    fun indexOfTrack(track: Track): Int = trackCombos.map { it.track.trackId }.indexOf(track.trackId)
+
+    fun match(other: AlbumWithTracksCombo) = AlbumMatch(distance = getDistance(other), albumCombo = this)
+
+    fun updateWith(other: AlbumWithTracksCombo, strategy: TrackMergeStrategy): AlbumWithTracksCombo {
+        /**
+         * Returns a copy of self, with all basic data changed to that of `other`. Nullable foreign keys and embedded
+         * objects such as spotifyId and youtubePlaylist are taken from `other` if not null there, or otherwise kept.
+         */
+        val mergedAlbum = other.album.copy(
+            musicBrainzReleaseId = other.album.musicBrainzReleaseId ?: album.musicBrainzReleaseId,
+            musicBrainzReleaseGroupId = other.album.musicBrainzReleaseGroupId ?: album.musicBrainzReleaseGroupId,
+            albumId = album.albumId,
+            spotifyId = other.album.spotifyId ?: album.spotifyId,
+            youtubePlaylist = other.album.youtubePlaylist ?: album.youtubePlaylist,
+            albumArt = other.album.albumArt ?: album.albumArt,
+            spotifyImage = other.album.spotifyImage ?: album.spotifyImage,
+        )
+        val mergedTrackCombos = mutableListOf<TrackCombo>()
+
+        for (i in 0 until max(trackCombos.size, other.trackCombos.size)) {
+            val thisTrackCombo = trackCombos.getOrNull(i)
+            val otherTrackCombo = other.trackCombos.getOrNull(i)
+
+            if (thisTrackCombo != null && otherTrackCombo != null) {
+                mergedTrackCombos.add(
+                    otherTrackCombo.copy(
+                        track = otherTrackCombo.track.copy(
+                            musicBrainzId = otherTrackCombo.track.musicBrainzId ?: thisTrackCombo.track.musicBrainzId,
+                            trackId = thisTrackCombo.track.trackId,
+                            albumId = thisTrackCombo.track.albumId,
+                            localUri = otherTrackCombo.track.localUri ?: thisTrackCombo.track.localUri,
+                            spotifyId = otherTrackCombo.track.spotifyId ?: thisTrackCombo.track.spotifyId,
+                            youtubeVideo = otherTrackCombo.track.youtubeVideo ?: thisTrackCombo.track.youtubeVideo,
+                            metadata = otherTrackCombo.track.metadata ?: thisTrackCombo.track.metadata,
+                            image = otherTrackCombo.track.image ?: thisTrackCombo.track.image,
+                        ),
+                        album = mergedAlbum,
+                        artists = otherTrackCombo.artists.map { it.copy(trackId = thisTrackCombo.track.trackId) },
+                    )
+                )
+            } else if (
+                thisTrackCombo != null &&
+                (strategy == TrackMergeStrategy.KEEP_SELF || strategy == TrackMergeStrategy.KEEP_MOST)
+            ) mergedTrackCombos.add(thisTrackCombo)
+            else if (
+                otherTrackCombo != null &&
+                (strategy == TrackMergeStrategy.KEEP_OTHER || strategy == TrackMergeStrategy.KEEP_MOST)
+            ) mergedTrackCombos.add(otherTrackCombo.copy(album = mergedAlbum))
+        }
+
+        return AlbumWithTracksCombo(
+            album = mergedAlbum,
+            tags = tags.toSet().plus(other.tags).toList(),
+            trackCombos = mergedTrackCombos,
+            artists = other.artists.map { it.copy(albumId = album.albumId) },
+        )
+    }
+
+    private fun getTracksDistanceSum(otherTracks: Collection<Track>): Double = otherTracks.zip(trackCombos)
+        .filter { (other, our) -> !other.title.contains(our.track.title, true) }
+        .size.toDouble() + abs(trackCombos.size - otherTracks.size)
+
+    private fun getTracksDistance(otherTracks: Collection<Track>): Double = otherTracks.takeIf { it.isNotEmpty() }
+        ?.let { (getTracksDistanceSum(it) / otherTracks.size) * 2 }
+        ?: 0.0
 
     override fun toString() = album.toString()
 }

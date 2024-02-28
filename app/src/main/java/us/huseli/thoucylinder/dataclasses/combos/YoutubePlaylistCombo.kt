@@ -1,8 +1,10 @@
 package us.huseli.thoucylinder.dataclasses.combos
 
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.stripTitleCommons
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.youtube.stripTitleCommons
@@ -13,35 +15,42 @@ data class YoutubePlaylistCombo(
     val videos: List<YoutubeVideo>,
 ) {
     data class AlbumMatch(
-        val score: Double,
+        val distance: Double,
         val albumCombo: AlbumWithTracksCombo,
         val playlistCombo: YoutubePlaylistCombo,
     )
 
     fun matchAlbumWithTracks(combo: AlbumWithTracksCombo): AlbumMatch =
-        AlbumMatch(score = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
+        AlbumMatch(distance = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
 
-    suspend fun toAlbumCombo(isInLibrary: Boolean): AlbumWithTracksCombo {
+    suspend fun toAlbumCombo(isInLibrary: Boolean, getArtist: suspend (String) -> Artist): AlbumWithTracksCombo {
         val album = Album(
             title = playlist.title,
-            artist = playlist.artist,
             isInLibrary = isInLibrary,
             isLocal = false,
             youtubePlaylist = playlist,
             albumArt = playlist.getMediaStoreImage(),
         )
+        val albumArtist = playlist.artist?.let { getArtist(it) }
+            ?.let { AlbumArtistCredit(artist = it, albumId = album.albumId) }
+        val albumArtists = albumArtist?.let { listOf(it) } ?: emptyList()
 
         return AlbumWithTracksCombo(
             album = album,
-            tracks = videos.mapIndexed { index, video ->
-                Track(
-                    title = playlist.artist?.let {
-                        video.title.replace(Regex("^$it (- )?", RegexOption.IGNORE_CASE), "")
-                    } ?: video.title,
-                    isInLibrary = isInLibrary,
-                    albumId = album.albumId,
-                    albumPosition = index + 1,
-                    youtubeVideo = video,
+            artists = albumArtists,
+            trackCombos = videos.mapIndexed { index, video ->
+                TrackCombo(
+                    track = Track(
+                        title = playlist.artist?.let {
+                            video.title.replace(Regex("^$it (- )?", RegexOption.IGNORE_CASE), "")
+                        } ?: video.title,
+                        isInLibrary = isInLibrary,
+                        albumId = album.albumId,
+                        albumPosition = index + 1,
+                        youtubeVideo = video,
+                    ),
+                    album = album,
+                    artists = emptyList(),
                 )
             }.stripTitleCommons(),
         )
@@ -54,28 +63,29 @@ data class YoutubePlaylistCombo(
          * album, the difference is factored into the result. The result is arbitrarily weighted.
          */
         var result = 0.0
+        val albumArtistString = combo.artists.joined()
+        val trimTitle: (String, String?) -> String = { title, artistString ->
+            artistString?.let { title.replace(Regex("^$it( - *)?", RegexOption.IGNORE_CASE), "") } ?: title
+        }
 
         val videos = videos
             .stripTitleCommons()
             .mapIndexed { index, video ->
-                // Remove any "[artist] - " strings in the video titles:
-                (combo.tracks.getOrNull(index)?.artist ?: combo.album.artist)?.let {
-                    video.copy(title = video.title.replace(Regex("^$it( - *)?", RegexOption.IGNORE_CASE), ""))
-                } ?: video
+                // Remove any leading "[artist] - " strings in the video titles:
+                val trackArtistString = combo.trackCombos.getOrNull(index)?.artists?.joined()
+                video.copy(title = trimTitle(trimTitle(video.title, albumArtistString), trackArtistString))
             }
-        // Strip "[artist] - " from playlist title too:
-        val playlistTitle =
-            combo.album.artist?.let { playlist.title.replace(Regex("^$it( - *)?", RegexOption.IGNORE_CASE), "") }
-                ?: playlist.title
+        // Strip leading "[artist] - " from playlist title too:
+        val playlistTitle = trimTitle(playlist.title, albumArtistString)
         // +1 for each missing or non-matching video:
         val videosTotal = videos
-            .zip(combo.tracks)
-            .filter { (video, track) -> !video.title.contains(track.title, true) }
-            .size + max(combo.tracks.size - videos.size, 0)
+            .zip(combo.trackCombos)
+            .filter { (video, combo) -> !video.title.contains(combo.track.title, true) }
+            .size + max(combo.trackCombos.size - videos.size, 0)
 
-        if (playlist.artist != null && combo.album.artist != null && playlist.artist != combo.album.artist) result++
+        if (playlist.artist != null && albumArtistString != null && playlist.artist != albumArtistString) result++
         if (!playlistTitle.contains(combo.album.title, true)) result++
-        if (combo.tracks.isNotEmpty()) result += (videosTotal.toDouble() / combo.tracks.size) * 2
+        if (combo.trackCombos.isNotEmpty()) result += (videosTotal.toDouble() / combo.trackCombos.size) * 2
 
         return result
     }
@@ -88,8 +98,8 @@ data class YoutubePlaylistCombo(
          */
         return combo.copy(
             album = combo.album.copy(youtubePlaylist = playlist),
-            tracks = combo.tracks.zip(videos).map { (track, video) ->
-                track.copy(youtubeVideo = video)
+            trackCombos = combo.trackCombos.zip(videos).map { (trackCombo, video) ->
+                trackCombo.copy(track = trackCombo.track.copy(youtubeVideo = video))
             },
         )
     }

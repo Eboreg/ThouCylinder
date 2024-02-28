@@ -50,9 +50,9 @@ inline fun CompactTextField(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     focusRequester: FocusRequester = remember { FocusRequester() },
     crossinline trailingIcon: @Composable (TextFieldValue) -> Unit = {},
-    crossinline onChange: (TextFieldValue) -> Unit = {},
+    crossinline onValueChange: (TextFieldValue) -> Unit = {},
     crossinline onImeAction: (TextFieldValue) -> Unit = {},
-    crossinline onFocusChanged: (FocusState) -> Unit = {},
+    crossinline onFocusChange: (FocusState) -> Unit = {},
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -63,7 +63,7 @@ inline fun CompactTextField(
         interactionSource = interactionSource,
         onValueChange = {
             textFieldValue = it
-            onChange(it)
+            onValueChange(it)
             if (continuousUpdate) onImeAction(it)
         },
         modifier = modifier
@@ -71,7 +71,7 @@ inline fun CompactTextField(
             .padding(0.dp)
             .onFocusChanged {
                 isFocused = it.isFocused
-                onFocusChanged(it)
+                onFocusChange(it)
             }
             .focusRequester(focusRequester),
         singleLine = true,
@@ -103,7 +103,7 @@ inline fun CompactTextField(
                             contentDescription = null,
                             modifier = Modifier.size(30.dp).padding(start = 5.dp).clickable {
                                 textFieldValue = TextFieldValue("")
-                                onChange(textFieldValue)
+                                onValueChange(textFieldValue)
                                 onImeAction(textFieldValue)
                             },
                             tint = MaterialTheme.colorScheme.outline,
@@ -150,9 +150,9 @@ inline fun CompactTextField(
         interactionSource = interactionSource,
         focusRequester = focusRequester,
         trailingIcon = { trailingIcon(it.text) },
-        onChange = { onChange(it.text) },
+        onValueChange = { onChange(it.text) },
         onImeAction = { onImeAction(it.text) },
-        onFocusChanged = onFocusChanged,
+        onFocusChange = onFocusChanged,
         keyboardOptions = keyboardOptions,
     )
 }

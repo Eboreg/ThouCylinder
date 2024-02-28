@@ -72,7 +72,7 @@ fun SettingsScreen(
             onSave = { uri ->
                 viewModel.setLocalMusicUri(uri)
                 showLocalMusicUriDialog = false
-                if (autoImportLocalMusic == true) viewModel.importNewLocalAlbums(context)
+                if (autoImportLocalMusic == true) viewModel.importNewLocalAlbumsAsync(context)
             },
         )
     }
@@ -127,7 +127,7 @@ fun SettingsScreen(
                 checked = autoImportLocalMusic == true,
                 onCheckedChange = {
                     viewModel.setAutoImportLocalMusic(it)
-                    if (it) viewModel.importNewLocalAlbums(context)
+                    if (it) viewModel.importNewLocalAlbumsAsync(context)
                 },
             )
 

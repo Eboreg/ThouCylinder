@@ -13,15 +13,20 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.anggrayudi.storage.extension.openInputStream
 import com.anggrayudi.storage.file.fullName
 import com.anggrayudi.storage.file.isWritable
 import com.anggrayudi.storage.file.mimeType
 import com.anggrayudi.storage.file.openInputStream
+import com.anggrayudi.storage.file.openOutputStream
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import us.huseli.retaintheme.extensions.nullIfEmpty
@@ -66,6 +71,22 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     return null
 }
 
+fun ViewModel.launchOnIOThread(block: suspend CoroutineScope.() -> Unit) =
+    viewModelScope.launch(Dispatchers.IO, block = block)
+
+fun ViewModel.launchOnMainThread(block: suspend CoroutineScope.() -> Unit) =
+    viewModelScope.launch(Dispatchers.Main, block = block)
+
+inline fun <S, T : S, K> Iterable<T>.distinctWith(operation: (acc: S, T) -> S, selector: (T) -> K): List<S> {
+    /** Produces distinct values selected by `selector` while also running a "reduce" operation. */
+    val result = mutableMapOf<K, S>()
+    forEach { item ->
+        val key = selector(item)
+        result[key] = result[key]?.let { operation(it, item) } ?: item
+    }
+    return result.values.toList()
+}
+
 
 /** STRING ********************************************************************/
 fun String.escapeQuotes() = replace("\"", "\\\"")
@@ -73,7 +94,7 @@ fun String.escapeQuotes() = replace("\"", "\\\"")
 suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     try {
         Request(this@getBitmapByUrl).getBitmap()
-    } catch (e: FileNotFoundException) {
+    } catch (e: HTTPResponseError) {
         Log.e("String", "getBitmapByUrl: $e", e)
         null
     } catch (e: IOException) {
@@ -172,7 +193,7 @@ suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.I
         } else {
             this@getBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it) }
         }
-    } catch (e: FileNotFoundException) {
+    } catch (e: HTTPResponseError) {
         Log.e("Uri", "getBitmap: $e", e)
         null
     } catch (e: IOException) {
@@ -258,7 +279,6 @@ fun DocumentFile.getParentDirectory(context: Context): DocumentFile? =
         DocumentFile.fromTreeUri(context, parentUri)
     }
 
-
 @WorkerThread
 fun DocumentFile.deleteWithEmptyParentDirs(context: Context) {
     if (isFile && isWritable(context)) {
@@ -277,13 +297,24 @@ fun DocumentFile.deleteWithEmptyParentDirs(context: Context) {
     }
 }
 
-
 @WorkerThread
 fun DocumentFile.copyTo(context: Context, directory: File, filename: String = fullName): File =
-    File(directory, filename).also { outfile ->
-        outfile.outputStream().use { outputStream ->
-            openInputStream(context)?.use { inputStream ->
-                outputStream.write(inputStream.readBytes())
-            }
+    File(directory, filename).also { outfile -> copyTo(outfile, context) }
+
+@WorkerThread
+fun DocumentFile.copyTo(outFile: File, context: Context) {
+    outFile.outputStream().use { outputStream ->
+        openInputStream(context)?.use { inputStream ->
+            outputStream.write(inputStream.readBytes())
         }
     }
+}
+
+@WorkerThread
+fun DocumentFile.copyFrom(inFile: File, context: Context) {
+    openOutputStream(context, append = false)?.use { outputStream ->
+        inFile.inputStream().use { inputStream ->
+            outputStream.write(inputStream.readBytes())
+        }
+    }
+}

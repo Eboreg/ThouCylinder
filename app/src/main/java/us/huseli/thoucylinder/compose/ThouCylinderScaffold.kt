@@ -8,14 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.QueueMusic
-import androidx.compose.material.icons.sharp.BugReport
-import androidx.compose.material.icons.sharp.Download
-import androidx.compose.material.icons.sharp.FileUpload
-import androidx.compose.material.icons.sharp.LibraryMusic
-import androidx.compose.material.icons.sharp.Menu
-import androidx.compose.material.icons.sharp.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -34,24 +26,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.res.painterResource
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import us.huseli.retaintheme.compose.MenuItem
 import us.huseli.retaintheme.compose.ResponsiveScaffold
 import us.huseli.retaintheme.compose.SnackbarHosts
-import us.huseli.retaintheme.extensions.clone
 import us.huseli.thoucylinder.AddDestination
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.DebugDestination
 import us.huseli.thoucylinder.DownloadsDestination
 import us.huseli.thoucylinder.ImportDestination
 import us.huseli.thoucylinder.LibraryDestination
-import us.huseli.thoucylinder.MenuItemId
 import us.huseli.thoucylinder.QueueDestination
-import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.RecommendationsDestination
 import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.umlautify
 
@@ -77,26 +64,11 @@ fun ThouCylinderScaffold(
             MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
             MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
             MenuItemId.MENU -> scope.launch { drawerState.open() }
+            MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
         }
         isCoverExpanded = false
     }
-    val baseMenuItems = mutableListOf(
-        MenuItem(MenuItemId.LIBRARY, Icons.Sharp.LibraryMusic, stringResource(R.string.library)),
-        MenuItem(MenuItemId.QUEUE, Icons.AutoMirrored.Sharp.QueueMusic, stringResource(R.string.queue)),
-        MenuItem(MenuItemId.SEARCH_YOUTUBE, painterResource(R.drawable.youtube), stringResource(R.string.search)),
-        MenuItem(MenuItemId.IMPORT, Icons.Sharp.FileUpload, stringResource(R.string.import_str)),
-    )
-    val menuItems =
-        listOf(MenuItem(MenuItemId.MENU, Icons.Sharp.Menu, stringResource(R.string.menu))).plus(baseMenuItems.clone())
-    val drawerItems = baseMenuItems.clone().plus(
-        listOf(
-            MenuItem(MenuItemId.DOWNLOADS, Icons.Sharp.Download, stringResource(R.string.downloads)),
-            MenuItem(MenuItemId.SETTINGS, Icons.Sharp.Settings, stringResource(R.string.settings)),
-        )
-    ).toMutableList()
-
-    if (BuildConfig.DEBUG)
-        drawerItems.add(MenuItem(MenuItemId.DEBUG, Icons.Sharp.BugReport, stringResource(R.string.debug)))
+    val menuItems = getMenuItems().filter { !it.debugOnly || BuildConfig.DEBUG }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -105,7 +77,7 @@ fun ThouCylinderScaffold(
                 drawerShape = RectangleShape,
                 modifier = Modifier.width(IntrinsicSize.Min),
             ) {
-                drawerItems.forEach { item ->
+                menuItems.filter { it.showInDrawer }.forEach { item ->
                     NavigationDrawerItem(
                         shape = RectangleShape,
                         label = { item.description?.also { Text(it.umlautify()) } },
@@ -123,11 +95,11 @@ fun ThouCylinderScaffold(
         ResponsiveScaffold(
             portraitMenuModifier = Modifier.height(80.dp),
             activeMenuItemId = activeMenuItemId,
-            menuItems = menuItems,
+            menuItems = menuItems.filter { it.showInMainMenu },
             onMenuItemClick = onMenuItemClick,
             landscapeMenu = { innerPadding ->
                 NavigationRail(modifier = Modifier.padding(innerPadding)) {
-                    menuItems.forEach { item ->
+                    menuItems.filter { it.showInMainMenu }.forEach { item ->
                         NavigationRailItem(
                             selected = activeMenuItemId == item.id,
                             onClick = { onMenuItemClick(item.id) },

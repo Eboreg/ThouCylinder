@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.paging.compose.LazyPagingItems
@@ -25,11 +26,12 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.viewmodels.AbstractTrackListViewModel
+import java.util.UUID
 
 @Composable
-fun <T : AbstractTrackCombo> TrackList(
+fun TrackList(
     itemCount: Int,
-    selectedTrackCombos: List<T>,
+    selectedTrackIds: List<UUID>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
@@ -39,7 +41,7 @@ fun <T : AbstractTrackCombo> TrackList(
 ) {
     Column {
         SelectedTracksButtons(
-            trackCount = selectedTrackCombos.size,
+            trackCount = selectedTrackIds.size,
             callbacks = trackSelectionCallbacks,
             extraButtons = extraTrackSelectionButtons,
         )
@@ -69,7 +71,7 @@ fun <T : AbstractTrackCombo> TrackList(
 fun <T : AbstractTrackCombo> TrackList(
     trackCombos: LazyPagingItems<out T>,
     viewModel: AbstractTrackListViewModel,
-    selectedTrackCombos: List<T>,
+    selectedTrackIds: List<UUID>,
     trackDownloadTasks: List<TrackDownloadTask>,
     trackCallbacks: (Int, T) -> TrackCallbacks<T>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
@@ -80,13 +82,15 @@ fun <T : AbstractTrackCombo> TrackList(
     extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+
     Box {
         progressIndicatorText?.also {
             ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
         }
         TrackList(
             itemCount = trackCombos.itemCount,
-            selectedTrackCombos = selectedTrackCombos,
+            selectedTrackIds = selectedTrackIds,
             trackSelectionCallbacks = trackSelectionCallbacks,
             listState = listState,
             modifier = modifier,
@@ -95,19 +99,19 @@ fun <T : AbstractTrackCombo> TrackList(
         ) {
             items(count = trackCombos.itemCount) { index ->
                 trackCombos[index]?.also { combo ->
-                    val thumbnail = remember(combo) { mutableStateOf<ImageBitmap?>(null) }
+                    val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
 
-                    LaunchedEffect(combo) {
-                        thumbnail.value = viewModel.getTrackThumbnail(track = combo.track, album = combo.album)
+                    LaunchedEffect(combo.track.image, combo.album?.albumArt) {
+                        thumbnail.value = viewModel.getTrackThumbnail(combo, context)
                         viewModel.ensureTrackMetadata(combo.track)
                     }
 
                     TrackListRow(
                         combo = combo,
                         showArtist = showArtist,
-                        isSelected = selectedTrackCombos.contains(combo),
+                        isSelected = selectedTrackIds.contains(combo.track.trackId),
                         callbacks = trackCallbacks(index, combo),
-                        downloadTask = trackDownloadTasks.find { it.track.trackId == combo.track.trackId },
+                        downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == combo.track.trackId },
                         thumbnail = thumbnail.value,
                     )
                 }

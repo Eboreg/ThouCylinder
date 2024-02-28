@@ -14,7 +14,7 @@ data class YoutubePlaylist(
     @Embedded("fullImage_") val fullImage: YoutubeImage? = null,
     val videoCount: Int = 0,
 ) : Parcelable {
-    suspend fun getMediaStoreImage(): MediaStoreImage? {
+    fun getMediaStoreImage(): MediaStoreImage? {
         val fullImageUrl = fullImage?.url ?: thumbnail?.url
         val thumbnailUrl = thumbnail?.url ?: fullImage?.url
 

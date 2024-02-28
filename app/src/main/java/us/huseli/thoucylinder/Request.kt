@@ -8,12 +8,12 @@ import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLConnection
 import java.net.URLEncoder
 import kotlin.text.Charsets.UTF_8
+
+class HTTPResponseError(val code: Int, message: String?) : Exception("HTTP $code: ${message ?: "No message"}")
 
 data class Request(
     private val url: String,
@@ -31,9 +31,9 @@ data class Request(
 
     enum class Method(val value: String) { GET("GET"), POST("POST") }
 
-    suspend fun connect(): URLConnection = withContext(Dispatchers.IO) {
+    suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
         Log.i("Request", "${method.value} $url")
-        URL(url).openConnection().apply {
+        (URL(url).openConnection() as HttpURLConnection).apply {
             if (BuildConfig.DEBUG) {
                 connectTimeout = 0
                 readTimeout = 0
@@ -41,19 +41,20 @@ data class Request(
                 connectTimeout = CONNECT_TIMEOUT
                 readTimeout = READ_TIMEOUT
             }
-            (this as? HttpURLConnection)?.requestMethod = method.value
+            requestMethod = method.value
             headers.forEach { (key, value) -> setRequestProperty(key, value) }
             if (body != null && method == Method.POST) {
                 val binaryBody = body.toByteArray(UTF_8)
                 doOutput = true
-                (this as? HttpURLConnection)?.setFixedLengthStreamingMode(binaryBody.size)
-                getOutputStream().write(binaryBody, 0, binaryBody.size)
+                setFixedLengthStreamingMode(binaryBody.size)
+                outputStream.write(binaryBody, 0, binaryBody.size)
             }
+            if (responseCode >= 400) throw HTTPResponseError(responseCode, responseMessage)
         }
     }
 
     suspend fun getBitmap(): Bitmap? =
-        withContext(Dispatchers.IO) { getInputStream().use { BitmapFactory.decodeStream(it) } }
+        withContext(Dispatchers.IO) { connect().inputStream.use { BitmapFactory.decodeStream(it) } }
 
     suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
         getString().let { gson.fromJson(it, jsonResponseType) ?: emptyMap<String, Any>() }
@@ -63,14 +64,11 @@ data class Request(
         withContext(Dispatchers.IO) { gson.fromJson(getString(), T::class.java) }
 
     suspend fun getString(): String = try {
-        withContext(Dispatchers.IO) { getInputStream().use { it.bufferedReader().readText() } }
+        withContext(Dispatchers.IO) { connect().inputStream.use { it.bufferedReader().readText() } }
     } catch (e: Exception) {
         Log.e(javaClass.simpleName, "getString [url=$url]: $e", e)
         throw e
     }
-
-    private suspend fun getInputStream(): InputStream =
-        withContext(Dispatchers.IO) { connect().run { getInputStream() } }
 
     companion object {
         const val READ_TIMEOUT = 10_000

@@ -1,13 +1,17 @@
 package us.huseli.thoucylinder.dataclasses.musicBrainz
 
 import com.google.gson.annotations.SerializedName
+import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import java.util.UUID
 
 data class MusicBrainzArtistCredit(
-    val artist: Artist,
+    val artist: MusicBrainzArtist,
     val joinphrase: String?,
     val name: String,
 ) {
-    data class Artist(
+    data class MusicBrainzArtist(
         val disambiguation: String?,
         val genres: List<MusicBrainzGenre>?,
         override val id: String,
@@ -18,6 +22,16 @@ data class MusicBrainzArtistCredit(
         @SerializedName("type-id")
         val typeId: String?,
     ) : AbstractMusicBrainzItem()
+
+    fun toNativeAlbumArtist(artist: Artist, albumId: UUID, position: Int) =
+        AlbumArtistCredit(artist = artist, albumId = albumId)
+            .copy(position = position, musicBrainzId = this.artist.id, joinPhrase = joinphrase ?: "/")
+
+    fun toNativeTrackArtist(artist: Artist, trackId: UUID, position: Int) =
+        TrackArtistCredit(artist = artist, trackId = trackId)
+            .copy(position = position, musicBrainzId = this.artist.id, joinPhrase = joinphrase ?: "/")
 }
 
-fun Iterable<MusicBrainzArtistCredit>.artistString(): String = joinToString("/") { it.name }
+fun List<MusicBrainzArtistCredit>.joined(): String = mapIndexed { index, artistCredit ->
+    artistCredit.name + if (index < lastIndex) artistCredit.joinphrase ?: "/" else ""
+}.joinToString("")

@@ -31,24 +31,29 @@ interface QueueDao {
     @Query("SELECT Track.* FROM QueueTrack JOIN Track ON Track_trackId = QueueTrack_trackId")
     fun flowTracksInQueue(): Flow<List<Track>>
 
+    @Transaction
     @Query(
         """
-        SELECT Track.*, Album.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position 
+        SELECT Track.*, Album.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position,
+            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
         FROM QueueTrack  
             JOIN Track ON Track_trackId = QueueTrack_trackId
             LEFT JOIN Album ON Track_albumId = Album_albumId
+            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
+        GROUP BY QueueTrack_queueTrackId
         ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )
-    @Transaction
     suspend fun getQueue(): List<QueueTrackCombo>
 
     @Transaction
     suspend fun upsertQueueTracks(vararg queueTracks: QueueTrack) {
-        val ids = _listQueueTrackIds()
-        queueTracks.partition { ids.contains(it.queueTrackId) }.also { (toUpdate, toInsert) ->
-            _updateQueueTracks(*toUpdate.toTypedArray())
-            _insertQueueTracks(*toInsert.toTypedArray())
+        if (queueTracks.isNotEmpty()) {
+            val ids = _listQueueTrackIds()
+            queueTracks.partition { ids.contains(it.queueTrackId) }.also { (toUpdate, toInsert) ->
+                _updateQueueTracks(*toUpdate.toTypedArray())
+                _insertQueueTracks(*toInsert.toTypedArray())
+            }
         }
     }
 }

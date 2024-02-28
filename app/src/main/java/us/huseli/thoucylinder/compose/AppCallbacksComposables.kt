@@ -10,13 +10,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import us.huseli.thoucylinder.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.album.DeleteAlbumDialog
+import us.huseli.thoucylinder.compose.album.DeleteAlbumsDialog
 import us.huseli.thoucylinder.compose.album.EditAlbumMethodDialog
 import us.huseli.thoucylinder.compose.screens.LocalMusicUriDialog
 import us.huseli.thoucylinder.compose.track.EditTrackDialog
@@ -24,9 +23,11 @@ import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
+import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import java.util.UUID
@@ -38,8 +39,8 @@ fun AppCallbacksComposables(
     onPlaylistClick: (UUID) -> Unit,
     onAlbumClick: (UUID) -> Unit,
     onOpenCreatePlaylistDialog: () -> Unit,
-    deleteAlbumCombo: AbstractAlbumCombo? = null,
-    editTrack: Track? = null,
+    deleteAlbumCombos: Collection<AbstractAlbumCombo>? = null,
+    editTrackCombo: AbstractTrackCombo? = null,
     editAlbum: Album? = null,
     addDownloadedAlbum: Album? = null,
     createPlaylist: Boolean = false,
@@ -161,52 +162,62 @@ fun AppCallbacksComposables(
         )
     }
 
-    deleteAlbumCombo?.also { combo ->
-        if (!combo.album.isLocal && !combo.isPartiallyDownloaded) {
-            viewModel.setAlbumIsInLibrary(combo.album.albumId, false) {
+    deleteAlbumCombos?.also { combos ->
+        val albumIds = combos.map { it.album.albumId }
+
+        if (combos.all { !it.album.isLocal && !it.isPartiallyDownloaded }) {
+            viewModel.hideAlbums(albumIds) {
                 SnackbarEngine.addInfo(
-                    message = context.getString(R.string.removed_album_from_library, combo.album.title).umlautify(),
+                    message = context.resources.getQuantityString(
+                        R.plurals.removed_x_albums_from_library,
+                        combos.size,
+                        combos.size,
+                    ).umlautify(),
                     actionLabel = context.getString(R.string.undo).umlautify(),
-                    onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) },
+                    onActionPerformed = { viewModel.unhideAlbums(albumIds) },
                 )
             }
             onCancel()
         } else {
-            DeleteAlbumDialog(
-                album = combo.album,
+            DeleteAlbumsDialog(
+                count = combos.size,
                 onCancel = onCancel,
-                onDeleteAlbumAndFilesClick = {
-                    viewModel.markAlbumForDeletion(combo.album.albumId) {
-                        val message =
-                            context.getString(R.string.removed_album_and_local_files, combo.album.title).umlautify()
-
-                        if (combo.album.isOnYoutube) {
-                            SnackbarEngine.addInfo(
-                                message = message,
-                                actionLabel = context.getString(R.string.undelete_album).umlautify(),
-                                onActionPerformed = { viewModel.unmarkAlbumForDeletion(combo.album.albumId) }
-                            )
-                        } else {
-                            SnackbarEngine.addInfo(message)
-                        }
-                    }
-                    onCancel()
-                },
-                onDeleteFilesClick = {
-                    viewModel.deleteLocalAlbumFiles(combo.album.albumId) {
+                onDeleteAlbumsClick = {
+                    viewModel.hideAlbums(albumIds) {
                         SnackbarEngine.addInfo(
-                            context.getString(R.string.deleted_album_local_files, combo.album.title).umlautify(),
+                            message = context.resources.getQuantityString(
+                                R.plurals.removed_x_albums_from_library,
+                                albumIds.size,
+                                albumIds.size,
+                            ).umlautify(),
+                            actionLabel = context.getString(R.string.undo).umlautify(),
+                            onActionPerformed = { viewModel.unhideAlbums(albumIds) },
                         )
                     }
                     onCancel()
                 },
-                onDeleteAlbumClick = {
-                    viewModel.setAlbumIsHidden(combo.album.albumId, true) {
+                onDeleteAlbumsAndFilesClick = {
+                    viewModel.hideAlbumsAndDeleteFiles(albumIds) {
                         SnackbarEngine.addInfo(
-                            message = context.getString(R.string.removed_from_the_library, combo.album.title)
-                                .umlautify(),
-                            actionLabel = context.getString(R.string.undo).umlautify(),
-                            onActionPerformed = { viewModel.setAlbumIsHidden(combo.album.albumId, false) },
+                            message = context.resources.getQuantityString(
+                                R.plurals.removed_x_albums_and_local_files,
+                                albumIds.size,
+                                albumIds.size,
+                            ).umlautify(),
+                            actionLabel = context.getString(R.string.undelete_album).umlautify(),
+                            onActionPerformed = { viewModel.unhideAlbums(albumIds) },
+                        )
+                    }
+                    onCancel()
+                },
+                onDeleteFilesClick = {
+                    viewModel.deleteLocalAlbumFiles(albumIds) {
+                        SnackbarEngine.addInfo(
+                            context.resources.getQuantityString(
+                                R.plurals.deleted_local_album_files,
+                                albumIds.size,
+                                albumIds.size,
+                            ).umlautify(),
                         )
                     }
                     onCancel()
@@ -219,24 +230,17 @@ fun AppCallbacksComposables(
         EditAlbumMethodDialog(albumId = album.albumId, onClose = onCancel)
     }
 
-    editTrack?.also { track ->
-        EditTrackDialog(
-            track = track,
-            onCancel = onCancel,
-            onSave = {
-                viewModel.saveTrack(it)
-                onCancel()
-            },
-        )
+    editTrackCombo?.also { combo ->
+        EditTrackDialog(trackCombo = combo, onClose = onCancel)
     }
 
     infoTrackCombo?.also { combo ->
-        var album by rememberSaveable { mutableStateOf(combo.album) }
+        var albumCombo by rememberSaveable { mutableStateOf<AlbumCombo?>(null) }
         var localPath by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.ensureTrackMetadata(combo.track)
-            album = combo.album ?: viewModel.getTrackAlbum(combo.track.albumId)
+            combo.track.albumId?.also { albumCombo = viewModel.getAlbumCombo(it) }
             localPath = combo.track.getLocalAbsolutePath(context)
         }
 
@@ -244,9 +248,9 @@ fun AppCallbacksComposables(
             isDownloaded = combo.track.isDownloaded,
             isOnYoutube = combo.track.isOnYoutube,
             metadata = combo.track.metadata,
-            albumTitle = album?.title,
-            albumArtist = album?.artist,
-            year = combo.track.year ?: album?.year,
+            albumTitle = albumCombo?.album?.title,
+            albumArtist = albumCombo?.artists?.joined(),
+            year = combo.track.year ?: albumCombo?.album?.year,
             localPath = localPath,
             onClose = onCancel,
             isOnSpotify = combo.track.isOnSpotify,

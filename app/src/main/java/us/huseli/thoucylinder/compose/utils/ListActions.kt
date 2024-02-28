@@ -11,9 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.Sort
 import androidx.compose.material.icons.sharp.ArrowDownward
 import androidx.compose.material.icons.sharp.ArrowUpward
+import androidx.compose.material.icons.sharp.FilterList
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,11 +26,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun <SortParameter : Enum<SortParameter>> ListActions(
@@ -39,10 +43,28 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
     sortOrder: SortOrder,
     sortParameters: Map<SortParameter, String>,
     sortDialogTitle: String,
+    tagPojos: List<TagPojo>,
+    selectedTagPojos: List<TagPojo>,
+    availabilityFilter: AvailabilityFilter,
     onSort: (parameter: SortParameter, order: SortOrder) -> Unit,
     onSearch: (String) -> Unit,
+    onTagsChange: (List<TagPojo>) -> Unit,
+    onAvailabilityFilterChange: (AvailabilityFilter) -> Unit,
 ) {
     var isSortDialogOpen by rememberSaveable { mutableStateOf(false) }
+
+    var isFilterDialogOpen by rememberSaveable { mutableStateOf(false) }
+
+    if (isFilterDialogOpen) {
+        ListFilterDialog(
+            tagPojos = tagPojos,
+            selectedTagPojos = selectedTagPojos,
+            onCancelClick = { isFilterDialogOpen = false },
+            availabilityFilter = availabilityFilter,
+            onAvailabilityFilterChange = onAvailabilityFilterChange,
+            onTagsChange = onTagsChange,
+        )
+    }
 
     if (isSortDialogOpen) {
         ListSortDialog(
@@ -90,6 +112,18 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
                     )
                 }
             }
+
+            InputChip(
+                selected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
+                onClick = { isFilterDialogOpen = true },
+                label = {
+                    Icon(
+                        imageVector = Icons.Sharp.FilterList,
+                        contentDescription = stringResource(R.string.tags),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            )
 
             CompactSearchTextField(
                 value = initialSearchTerm,

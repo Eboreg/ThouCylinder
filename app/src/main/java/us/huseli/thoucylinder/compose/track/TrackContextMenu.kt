@@ -21,14 +21,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 
 @Composable
 inline fun TrackContextMenu(
+    trackArtists: Collection<TrackArtistCredit>,
     isShown: Boolean,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
@@ -76,12 +79,18 @@ inline fun TrackContextMenu(
             )
         }
 
-        callbacks.onArtistClick?.also { onArtistClick ->
+        trackArtists.forEach { trackArtist ->
             DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.go_to_artist)) },
+                text = {
+                    Text(
+                        text = stringResource(R.string.go_to_x, trackArtist.name),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
                 onClick = {
-                    onArtistClick()
+                    callbacks.onArtistClick(trackArtist.artistId)
                     onDismissRequest()
                 },
             )
@@ -149,6 +158,7 @@ inline fun TrackContextMenu(
 
 @Composable
 inline fun TrackContextButtonWithMenu(
+    trackArtists: Collection<TrackArtistCredit>,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
     callbacks: TrackCallbacks<*>,
@@ -165,6 +175,7 @@ inline fun TrackContextButtonWithMenu(
         content = {
             Icon(Icons.Sharp.MoreVert, null)
             TrackContextMenu(
+                trackArtists = trackArtists,
                 callbacks = callbacks,
                 onDismissRequest = { isMenuShown = false },
                 isShown = isMenuShown,

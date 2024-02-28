@@ -39,8 +39,14 @@ data class YoutubeMetadata(
         durationMs = durationMs,
     )
 
+    private val expiresAt: Long?
+        get() = uri.getQueryParameter("expire")?.toLong()?.times(1000)
+
     val fileExtension: String
         get() = (codecs.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
+
+    val isOld: Boolean
+        get() = expiresAt?.let { it < System.currentTimeMillis() } ?: false
 
     val quality: Long
         get() = bitrate.toLong() * sampleRate.toLong()

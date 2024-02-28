@@ -3,9 +3,7 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,8 +14,18 @@ import kotlinx.coroutines.sync.withLock
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.abstr.joined
+import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
+import us.huseli.thoucylinder.dataclasses.entities.toAlbumArtistCredits
+import us.huseli.thoucylinder.dataclasses.entities.toAlbumArtists
+import us.huseli.thoucylinder.dataclasses.entities.toTrackArtistCredits
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID
 import javax.inject.Inject
 
@@ -46,15 +54,16 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         MutableStateFlow<Set<AlbumArt>>(emptySet()).also { flow ->
             _isLoadingAlbumArt.value = true
 
-            viewModelScope.launch(Dispatchers.IO) {
+            launchOnIOThread {
                 repos.album.getAlbumWithTracks(albumId)?.also { combo ->
                     combo.album.albumArt?.also { addAlbumArt(it, context, flow, true) }
 
                     val jobs = listOf(
                         launch {
-                            repos.spotify.searchAlbumArt(combo.album).forEach {
-                                addAlbumArt(it, context, flow)
-                            }
+                            repos.spotify.searchAlbumArt(
+                                combo = combo,
+                                getArtist = { repos.artist.artistCache.get(it) }
+                            ).forEach { addAlbumArt(it, context, flow) }
                         },
                         launch {
                             combo.album.youtubePlaylist?.fullImage?.url?.also { addAlbumArt(it, context, flow) }
@@ -67,7 +76,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
                         launch {
                             val response = repos.discogs.searchMasters(
                                 query = combo.album.title,
-                                artist = combo.album.artist,
+                                artist = combo.artists.joined(),
                             )
 
                             response?.data?.results?.forEach { item ->
@@ -98,44 +107,68 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
     fun flowAlbumWithTracks(albumId: UUID) = repos.album.flowAlbumWithTracks(albumId)
 
     fun saveAlbumArtFromUri(albumId: UUID, uri: Uri, context: Context, onSuccess: () -> Unit, onFail: () -> Unit) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.album.getAlbum(albumId)?.also { album ->
-                MediaStoreImage.fromUri(uri, context).saveInternal(album, context)?.also { mediaStoreImage ->
-                    repos.localMedia.deleteAlbumDirectoryAlbumArt(album)
-                    repos.localMedia.createAlbumDirectory(album)?.also {
-                        mediaStoreImage.saveToDirectory(context, it)
-                    }
-                    repos.album.updateAlbumArt(albumId, mediaStoreImage)
-                    onSuccess()
-                } ?: run(onFail)
-            } ?: run(onFail)
+        launchOnIOThread {
+            saveMediaStoreImage(albumId, MediaStoreImage.fromUri(uri, context), context, onSuccess, onFail)
         }
 
-    fun saveAlbumArt(albumId: UUID, albumArt: AlbumArt?, context: Context) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repos.album.getAlbum(albumId)?.also { album ->
-                val mediaStoreImage = albumArt?.mediaStoreImage?.saveInternal(album, context)
+    fun saveAlbumArt(albumId: UUID, albumArt: AlbumArt?, context: Context) = launchOnIOThread {
+        saveMediaStoreImage(albumId, albumArt?.mediaStoreImage, context)
+    }
 
-                repos.localMedia.deleteAlbumDirectoryAlbumArt(album)
-                if (album.isLocal && mediaStoreImage != null) {
-                    repos.localMedia.createAlbumDirectory(album)?.also {
-                        mediaStoreImage.saveToDirectory(context, it)
-                    }
-                }
-                repos.album.updateAlbumArt(albumId, mediaStoreImage)
-            }
+    fun updateAlbumCombo(
+        combo: AlbumWithTracksCombo,
+        title: String,
+        year: Int?,
+        artistNames: Collection<String>,
+        tags: Collection<Tag>,
+        updateMatchingTrackArtists: Boolean,
+    ) = launchOnIOThread {
+        val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.get(it) }
+        val album = combo.album.copy(title = title, year = year)
+        val albumArtists = artists.toAlbumArtistCredits(album.albumId)
+        val updatedTrackArtists = mutableListOf<TrackArtist>()
+        val trackCombos = combo.trackCombos.map { trackCombo ->
+            trackCombo.copy(
+                track = ensureTrackMetadata(trackCombo.track),
+                album = album,
+                artists = if (updateMatchingTrackArtists && trackCombo.artists.toArtists() == combo.artists.toArtists())
+                    artists.toTrackArtistCredits(trackCombo.track.trackId)
+                        .also { updatedTrackArtists.addAll(it.toTrackArtists()) }
+                else trackCombo.artists,
+            )
         }
 
-    fun tagAlbumTrack(combo: AlbumWithTracksCombo, track: Track) = viewModelScope.launch(Dispatchers.IO) {
-        repos.localMedia.tagTrack(ensureTrackMetadata(track), combo)
+        repos.settings.getAlbumDirectory(combo)
+        if (updatedTrackArtists.isNotEmpty()) repos.artist.setTrackArtists(updatedTrackArtists)
+        repos.artist.setAlbumArtists(artists.toAlbumArtists(album.albumId))
+        repos.album.updateAlbum(album)
+        repos.album.setAlbumTags(combo.album.albumId, tags)
+        trackCombos.forEach { trackCombo ->
+            repos.localMedia.tagTrack(trackCombo = trackCombo, albumArtists = albumArtists)
+        }
     }
 
-    fun tagAlbumTracks(combo: AlbumWithTracksCombo) = viewModelScope.launch(Dispatchers.IO) {
-        repos.localMedia.tagAlbumTracks(combo.copy(tracks = combo.tracks.map { track -> ensureTrackMetadata(track) }))
-    }
+    fun updateTrackCombo(
+        combo: TrackCombo,
+        title: String,
+        year: Int?,
+        artistNames: Collection<String>,
+        albumCombo: AbstractAlbumCombo,
+    ) = launchOnIOThread {
+        var trackArtists = combo.artists
+        val updatedTrack = ensureTrackMetadata(combo.track.copy(title = title, year = year))
 
-    fun updateAlbumCombo(combo: AbstractAlbumCombo) = viewModelScope.launch(Dispatchers.IO) {
-        repos.album.updateAlbumCombo(combo)
+        if (artistNames.filter { it.isNotEmpty() } != combo.artists.map { it.name }) {
+            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.get(it) }
+
+            trackArtists = artists.map { TrackArtistCredit(artist = it, trackId = combo.track.trackId) }
+            repos.artist.setTrackArtists(trackArtists.toTrackArtists())
+        }
+        repos.track.updateTrack(updatedTrack)
+        repos.localMedia.tagTrack(
+            trackCombo = combo.copy(track = updatedTrack, artists = trackArtists),
+            albumArtists = albumCombo.artists,
+        )
     }
 
     private suspend fun addAlbumArt(
@@ -163,5 +196,32 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
                 flow.value += AlbumArt(mediaStoreImage, it, isCurrent)
             }
         }
+    }
+
+    private suspend fun saveMediaStoreImage(
+        albumId: UUID,
+        albumArt: MediaStoreImage?,
+        context: Context,
+        onSuccess: () -> Unit = {},
+        onFail: () -> Unit = {},
+    ) {
+        val combo = repos.album.getAlbumCombo(albumId)
+
+        if (combo != null) {
+            if (albumArt != null) {
+                albumArt.saveInternal(combo.album, context)?.also { mediaStoreImage ->
+                    if (combo.album.isLocal) {
+                        repos.settings.createAlbumDirectory(combo)?.also {
+                            mediaStoreImage.saveToDirectory(context, it)
+                        }
+                    }
+                    repos.album.updateAlbumArt(albumId, mediaStoreImage)
+                    onSuccess()
+                } ?: run(onFail)
+            } else {
+                repos.album.updateAlbumArt(albumId, null)
+                onSuccess()
+            }
+        } else onFail()
     }
 }

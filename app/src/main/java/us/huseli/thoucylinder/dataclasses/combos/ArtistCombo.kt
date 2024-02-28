@@ -2,11 +2,13 @@ package us.huseli.thoucylinder.dataclasses.combos
 
 import android.net.Uri
 import androidx.core.net.toUri
+import androidx.room.Embedded
+import us.huseli.thoucylinder.dataclasses.entities.Artist
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-data class ArtistPojo(
-    val name: String,
+data class ArtistCombo(
+    @Embedded val artist: Artist,
     val albumCount: Int,
     val trackCount: Int,
     val totalDurationMs: Long,
@@ -14,9 +16,6 @@ data class ArtistPojo(
     val youtubeFullImageUrls: String,
     val spotifyFullImageUrls: String,
 ) {
-    private val splitRegex: Regex
-        get() = Regex("(?<!')','(?!')")
-
     val totalDuration: Duration
         get() = totalDurationMs.milliseconds
 
@@ -34,5 +33,9 @@ data class ArtistPojo(
         urls.addAll(youtubeFullImageUrls.trim('\'').split(splitRegex))
         urls.addAll(spotifyFullImageUrls.trim('\'').split(splitRegex))
         return urls.filter { it != "NULL" }
+    }
+
+    companion object {
+        val splitRegex = Regex("(?<!')','(?!')")
     }
 }

@@ -73,6 +73,7 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.distance
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.track.TrackContextMenu
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.getAverageColor
@@ -263,6 +264,7 @@ fun BoxWithConstraintsScope.ModalCover(
                         callbacks = trackCallbacks,
                         isShown = isContextMenuShown,
                         onDismissRequest = { isContextMenuShown = false },
+                        trackArtists = trackCombo.artists,
                     )
                 }
             }
@@ -310,7 +312,7 @@ fun BoxWithConstraintsScope.ModalCover(
                                 modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
                                 imageBitmap = previousImageBitmap.value,
                                 title = combo.track.title,
-                                artist = combo.artist,
+                                artist = combo.artists.joined(),
                                 animationSpec = dpAnimationSpec,
                                 offsetX = 0,
                                 contentAlpha = expandedContentAlpha,
@@ -324,7 +326,7 @@ fun BoxWithConstraintsScope.ModalCover(
                         modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
                         imageBitmap = imageBitmap.value,
                         title = trackCombo.track.title,
-                        artist = trackCombo.artist,
+                        artist = trackCombo.artists.joined(),
                         animationSpec = dpAnimationSpec,
                         offsetX = if (previousTrackCombo != null && !isLandscape && isExpanded && !isExpanding)
                             maxWidthPx.toInt() else 0,
@@ -340,7 +342,7 @@ fun BoxWithConstraintsScope.ModalCover(
                                 modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
                                 imageBitmap = nextImageBitmap.value,
                                 title = combo.track.title,
-                                artist = combo.artist,
+                                artist = combo.artists.joined(),
                                 animationSpec = dpAnimationSpec,
                                 offsetX = maxWidthPx.toInt() * if (previousTrackCombo != null) 2 else 1,
                                 contentAlpha = expandedContentAlpha,
@@ -366,7 +368,7 @@ fun BoxWithConstraintsScope.ModalCover(
                                 modifier = Modifier.weight(1f),
                                 isExpanded = false,
                                 title = trackCombo.track.title,
-                                artist = trackCombo.artist,
+                                artist = trackCombo.artists.joined(),
                                 alpha = collapsedContentAlpha,
                             )
                             // Buttons:
@@ -424,7 +426,7 @@ fun BoxWithConstraintsScope.ModalCover(
                                 TitlesColumn(
                                     isExpanded = true,
                                     title = trackCombo.track.title,
-                                    artist = trackCombo.artist,
+                                    artist = trackCombo.artists.joined(),
                                     alpha = expandedContentAlpha,
                                 )
                             }

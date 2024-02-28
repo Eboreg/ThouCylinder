@@ -6,16 +6,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
 
 @Composable
-fun DeleteAlbumDialog(
-    album: Album,
+fun DeleteAlbumsDialog(
+    count: Int,
     onCancel: () -> Unit,
-    onDeleteAlbumClick: () -> Unit,
-    onDeleteAlbumAndFilesClick: () -> Unit,
+    onDeleteAlbumsClick: () -> Unit,
+    onDeleteAlbumsAndFilesClick: () -> Unit,
     onDeleteFilesClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -24,12 +24,15 @@ fun DeleteAlbumDialog(
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
-        title = { Text(text = stringResource(R.string.delete_x, album)) },
+        title = { Text(text = pluralStringResource(R.plurals.delete_x_albums, count, count)) },
         confirmButton = {
-            TextButton(onClick = onDeleteAlbumAndFilesClick) { Text(stringResource(R.string.remove_album_and_delete_files)) }
-            TextButton(onClick = onDeleteAlbumClick) { Text(stringResource(R.string.only_remove_album)) }
-            if (album.isOnYoutube)
-                TextButton(onClick = onDeleteFilesClick) { Text(stringResource(R.string.only_delete_files)) }
+            TextButton(onClick = onDeleteAlbumsAndFilesClick) {
+                Text(pluralStringResource(R.plurals.remove_album_and_delete_files, count, count))
+            }
+            TextButton(onClick = onDeleteAlbumsClick) {
+                Text(pluralStringResource(R.plurals.only_remove_album, count, count))
+            }
+            TextButton(onClick = onDeleteFilesClick) { Text(stringResource(R.string.only_delete_files)) }
         },
         text = { Text(text = stringResource(R.string.what_do_you_want_to_do)) },
     )

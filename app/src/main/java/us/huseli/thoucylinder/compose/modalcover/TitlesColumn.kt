@@ -32,7 +32,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = if (isExpanded) Alignment.CenterHorizontally else Alignment.Start,
-        modifier = modifier.padding(top = 10.dp).fillMaxWidth(),
+        modifier = modifier.padding(top = if (isExpanded) 10.dp else 0.dp).fillMaxWidth(),
     ) {
         Text(
             text = title.umlautify(),
@@ -50,7 +50,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
                 overflow = TextOverflow.Ellipsis,
                 style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
                 fontSize = artistTextSize.sp,
-                modifier = Modifier.basicMarquee(Int.MAX_VALUE),
+                modifier = Modifier.padding(top = 5.dp).basicMarquee(Int.MAX_VALUE),
                 color = textColor,
             )
         }

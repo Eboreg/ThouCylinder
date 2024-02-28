@@ -23,14 +23,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 
 @Composable
 fun AlbumContextMenu(
+    albumArtists: Collection<AlbumArtistCredit>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isPartiallyDownloaded: Boolean,
@@ -62,23 +65,27 @@ fun AlbumContextMenu(
             },
         )
 
-        DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.play)) },
-            leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
-            onClick = {
-                callbacks.onPlayClick()
-                onDismissRequest()
-            }
-        )
+        callbacks.onPlayClick?.also { onPlayClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.play)) },
+                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
+                onClick = {
+                    onPlayClick()
+                    onDismissRequest()
+                }
+            )
+        }
 
-        DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.enqueue)) },
-            leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
-            onClick = {
-                callbacks.onEnqueueClick()
-                onDismissRequest()
-            }
-        )
+        callbacks.onEnqueueClick?.also { onEnqueueClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.enqueue)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+                onClick = {
+                    onEnqueueClick()
+                    onDismissRequest()
+                }
+            )
+        }
 
         if (isInLibrary) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.edit)) },
@@ -98,12 +105,18 @@ fun AlbumContextMenu(
             }
         )
 
-        callbacks.onArtistClick?.also { onArtistClick ->
+        albumArtists.forEach { albumArtist ->
             DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.go_to_artist)) },
+                text = {
+                    Text(
+                        text = stringResource(R.string.go_to_x, albumArtist.name),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
                 onClick = {
-                    onArtistClick()
+                    callbacks.onArtistClick(albumArtist.artistId)
                     onDismissRequest()
                 },
             )
@@ -144,6 +157,7 @@ fun AlbumContextMenu(
 
 @Composable
 fun AlbumContextMenuWithButton(
+    albumArtists: Collection<AlbumArtistCredit>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isPartiallyDownloaded: Boolean,
@@ -158,6 +172,7 @@ fun AlbumContextMenuWithButton(
         onClick = { isMenuShown = !isMenuShown },
         content = {
             AlbumContextMenu(
+                albumArtists = albumArtists,
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,
                 expanded = isMenuShown,

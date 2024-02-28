@@ -15,14 +15,17 @@ import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.launchOnMainThread
 import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 import javax.inject.Inject
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.time.DurationUnit
 
 @HiltViewModel
-class QueueViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
+class QueueViewModel @Inject constructor(
+    private val repos: Repositories,
+) : AbstractTrackListViewModel("QueueViewModel", repos) {
     private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
     private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
 
@@ -39,22 +42,12 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
     val isRepeatEnabled = repos.player.isRepeatEnabled
     val isShuffleEnabled = repos.player.isShuffleEnabled
     val queue = _queue.asStateFlow()
-    val selectedQueueTracks: Flow<List<QueueTrackCombo>> = combine(_queue, _selectedQueueTracks) { queue, selected ->
-        selected.filter { queue.contains(it) }
-    }
-    val trackDownloadTasks = repos.download.tasks
+    override val trackDownloadTasks = repos.download.tasks
 
     init {
         viewModelScope.launch {
             repos.player.queue.collect { queue -> _queue.value = queue }
         }
-    }
-
-    fun enqueueQueueTracks(combos: List<QueueTrackCombo>, context: Context) {
-        repos.player.moveNext(combos)
-        SnackbarEngine.addInfo(
-            context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size).umlautify()
-        )
     }
 
     fun getNextCombo(): QueueTrackCombo? = repos.player.getNextTrack()
@@ -73,28 +66,17 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
-    fun playQueueTracks(combos: List<QueueTrackCombo>) = repos.player.moveNextAndPlay(combos)
+    fun removeFromQueue(queueTrackId: UUID) {
+        repos.player.removeFromQueue(listOf(queueTrackId))
+        unselectTracks(listOf(queueTrackId))
+    }
 
-    fun removeFromQueue(combo: QueueTrackCombo) = removeFromQueue(listOf(combo))
-
-    fun removeFromQueue(combos: List<QueueTrackCombo>) {
-        repos.player.removeFromQueue(combos)
-        _selectedQueueTracks.value -= combos
+    fun removeSelectedTracksFromQueue() {
+        repos.player.removeFromQueue(selectedTrackIds.value)
+        unselectAllTracks()
     }
 
     fun seekToProgress(progress: Float) = repos.player.seekToProgress(progress)
-
-    fun selectQueueTracksFromLastSelected(to: QueueTrackCombo) {
-        val lastSelectedIdx = queue.value.indexOf(_selectedQueueTracks.value.lastOrNull())
-        val thisIdx = queue.value.indexOf(to)
-
-        if (lastSelectedIdx > -1 && thisIdx > -1) {
-            _selectedQueueTracks.value +=
-                queue.value.subList(min(thisIdx, lastSelectedIdx), max(thisIdx, lastSelectedIdx) + 1)
-        } else {
-            _selectedQueueTracks.value += to
-        }
-    }
 
     fun skipTo(index: Int) = repos.player.skipTo(index)
 
@@ -115,7 +97,25 @@ class QueueViewModel @Inject constructor(private val repos: Repositories) : Abst
 
     fun toggleShuffle() = repos.player.toggleShuffle()
 
-    fun unselectAllQueueTracks() {
-        _selectedQueueTracks.value = emptyList()
+    override suspend fun listSelectedTrackCombos(): List<QueueTrackCombo> =
+        repos.player.listQueueTrackCombosById(selectedTrackIds.value)
+
+    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
+
+    override fun enqueueSelectedTracks(context: Context) {
+        launchOnMainThread {
+            repos.player.moveNext(selectedTrackIds.value)
+            SnackbarEngine.addInfo(
+                context.resources.getQuantityString(
+                    R.plurals.x_tracks_enqueued_next,
+                    selectedTrackIds.value.size,
+                    selectedTrackIds.value.size,
+                ).umlautify()
+            )
+        }
+    }
+
+    override fun playSelectedTracks() {
+        launchOnMainThread { repos.player.moveNextAndPlay(selectedTrackIds.value) }
     }
 }

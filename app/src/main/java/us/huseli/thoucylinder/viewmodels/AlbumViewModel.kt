@@ -3,21 +3,22 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,6 +31,7 @@ class AlbumViewModel @Inject constructor(
     private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
     private val _albumCombo = MutableStateFlow<AlbumWithTracksCombo?>(null)
     private val _albumNotFound = MutableStateFlow(false)
+    private val _importProgress = MutableStateFlow<ProgressData?>(null)
 
     val albumArt: Flow<ImageBitmap?> =
         _albumCombo.map { it?.album?.albumArt?.getFullImageBitmap(context) }.distinctUntilChanged()
@@ -38,15 +40,15 @@ class AlbumViewModel @Inject constructor(
         .distinctUntilChanged()
     val albumCombo = _albumCombo.asStateFlow()
     override val trackDownloadTasks = repos.download.tasks
-        .map { tasks -> tasks.filter { it.track.albumId == _albumId } }
+        .map { tasks -> tasks.filter { it.trackCombo.track.albumId == _albumId } }
         .distinctUntilChanged()
     val albumNotFound = _albumNotFound.asStateFlow()
-    val trackCombos = repos.track.flowTrackCombosByAlbumId(_albumId)
+    val importProgress = _importProgress.asStateFlow()
 
     init {
-        unselectAllTrackCombos()
+        unselectAllTracks()
 
-        viewModelScope.launch(Dispatchers.IO) {
+        launchOnIOThread {
             repos.album.flowAlbumWithTracks(_albumId).distinctUntilChanged().collect { combo ->
                 if (combo != null) {
                     _albumNotFound.value = false
@@ -58,13 +60,39 @@ class AlbumViewModel @Inject constructor(
         }
     }
 
-    fun loadTrackMetadata(track: Track) {
-        /**
-         * On-demand fetch (and save, if necessary) of track metadata, because
-         * we only want to load it when it is actually going to be used.
-         */
-        viewModelScope.launch(Dispatchers.IO) {
-            ensureTrackMetadata(track)
+    fun matchUnplayableTracks(context: Context) = launchOnIOThread {
+        _albumCombo.value?.also { combo ->
+            val unplayableTrackIds = combo.trackCombos.filter { !it.track.isPlayable }.map { it.track.trackId }
+            val progressData = ProgressData(text = context.getString(R.string.matching))
+
+            _importProgress.value = progressData
+
+            val match = repos.youtube.getBestAlbumMatch(combo) { progress ->
+                _importProgress.value = progressData.copy(progress = progress * 0.5)
+            }
+            val matchedCombo = match?.albumCombo
+            val updatedTracks =
+                matchedCombo?.trackCombos?.map { it.track }?.filter { unplayableTrackIds.contains(it.trackId) }
+                    ?: emptyList()
+
+            if (updatedTracks.isNotEmpty()) {
+                _importProgress.value = progressData.copy(progress = 0.5, text = context.getString(R.string.importing))
+                repos.track.updateTracks(updatedTracks.map { ensureTrackMetadata(it, commit = false) })
+                _importProgress.value = progressData.copy(progress = 0.9, text = context.getString(R.string.importing))
+                // So youtubePlaylist gets saved:
+                matchedCombo?.album?.also { repos.album.updateAlbum(it) }
+                SnackbarEngine.addInfo(
+                    context.resources.getQuantityString(
+                        R.plurals.x_tracks_matched_and_updated,
+                        updatedTracks.size,
+                        updatedTracks.size,
+                    ).umlautify()
+                )
+            } else {
+                SnackbarEngine.addError(context.getString(R.string.no_tracks_could_be_matched).umlautify())
+            }
+
+            _importProgress.value = null
         }
     }
 }

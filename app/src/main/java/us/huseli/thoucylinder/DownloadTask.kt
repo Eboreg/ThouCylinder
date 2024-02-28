@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
@@ -60,7 +62,7 @@ fun getDownloadProgress(downloadTaskState: State<AbstractDownloadTask?>): Pair<D
 
 class TrackDownloadTask(
     private val scope: CoroutineScope,
-    val track: Track,
+    val trackCombo: AbstractTrackCombo,
     private val directory: DocumentFile,
     private val repos: Repositories,
     val albumCombo: AbstractAlbumCombo? = null,
@@ -112,11 +114,14 @@ class TrackDownloadTask(
     }
 
     private suspend fun run(context: Context): Track {
-        val youtubeMetadata = repos.youtube.getBestMetadata(track)
-            ?: throw Exception("Could not get Youtube metadata for $track")
-        val basename = track.generateBasename(includeArtist = albumCombo == null)
+        val youtubeMetadata = repos.youtube.getBestMetadata(trackCombo.track)
+            ?: throw Exception("Could not get Youtube metadata for $trackCombo")
+        val basename = trackCombo.track.generateBasename(
+            includeArtist = albumCombo == null,
+            artist = trackCombo.artists.joined(),
+        )
         val filename = "$basename.${youtubeMetadata.fileExtension}"
-        val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
+        val tempFile = File(context.cacheDir, "${trackCombo.track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
 
         setProgress(0.0)
         setStatus(DownloadStatus.DOWNLOADING)
@@ -128,9 +133,9 @@ class TrackDownloadTask(
 
         setStatus(DownloadStatus.TAGGING)
         repos.localMedia.tagTrack(
-            track = track,
+            trackCombo = trackCombo,
             documentFile = DocumentFile.fromFile(tempFile),
-            albumCombo = albumCombo,
+            albumArtists = albumCombo?.artists,
         )
         setProgress(0.8)
 
@@ -152,9 +157,9 @@ class TrackDownloadTask(
         }
 
         setStatus(DownloadStatus.SAVING)
-        val downloadedTrack = track.copy(
+        val downloadedTrack = trackCombo.track.copy(
             isInLibrary = true,
-            albumId = albumCombo?.album?.albumId ?: track.albumId,
+            albumId = albumCombo?.album?.albumId ?: trackCombo.track.albumId,
             metadata = tempFile.extractTrackMetadata(),
             localUri = documentFile.uri,
         )
@@ -180,9 +185,9 @@ class TrackDownloadTask(
     }
 
     override fun equals(other: Any?) =
-        other is TrackDownloadTask && other.track == track && other.state.value == state.value
+        other is TrackDownloadTask && other.trackCombo == trackCombo && other.state.value == state.value
 
-    override fun hashCode() = 31 * track.hashCode() + state.value.hashCode()
+    override fun hashCode() = 31 * trackCombo.hashCode() + state.value.hashCode()
 }
 
 class AlbumDownloadTask(

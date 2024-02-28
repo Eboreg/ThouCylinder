@@ -5,9 +5,9 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 
 data class Selection(
-    val tracks: List<Track> = emptyList(),
-    val albums: List<Album> = emptyList(),
-    val albumsWithTracks: List<AlbumWithTracksCombo> = emptyList(),
+    val tracks: Collection<Track> = emptyList(),
+    val albums: Collection<Album> = emptyList(),
+    val albumsWithTracks: Collection<AlbumWithTracksCombo> = emptyList(),
 ) {
     constructor(track: Track) : this(tracks = listOf(track))
 

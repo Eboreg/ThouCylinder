@@ -19,22 +19,27 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.ImportProgressSection
 import us.huseli.thoucylinder.compose.album.AlbumBadges
 import us.huseli.thoucylinder.compose.album.AlbumButtons
 import us.huseli.thoucylinder.compose.album.AlbumTrackRow
@@ -43,12 +48,13 @@ import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.tracks
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AlbumViewModel
 
@@ -63,33 +69,31 @@ fun AlbumScreen(
         viewModel.albumDownloadTask.collectAsStateWithLifecycle(null)
     )
     val albumCombo by viewModel.albumCombo.collectAsStateWithLifecycle(null)
-    val selectedTrackCombos by viewModel.selectedTrackCombos.collectAsStateWithLifecycle()
+    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val trackCombos by viewModel.trackCombos.collectAsStateWithLifecycle(emptyList())
     val albumNotFound by viewModel.albumNotFound.collectAsStateWithLifecycle()
+    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    var isPlayable by rememberSaveable { mutableStateOf(true) }
 
     if (albumNotFound) {
         appCallbacks.onBackClick()
     }
 
     albumCombo?.let { combo ->
-        if (combo.album.isDeleted) {
-            appCallbacks.onBackClick()
+        val artistString = combo.artists.joined()
+
+        if (combo.album.isDeleted) appCallbacks.onBackClick()
+
+        LaunchedEffect(combo) {
+            isPlayable = combo.unplayableTrackCount == 0
         }
 
         Column {
             SelectedTracksButtons(
-                trackCount = selectedTrackCombos.size,
-                callbacks = TrackSelectionCallbacks(
-                    onAddToPlaylistClick = {
-                        appCallbacks.onAddToPlaylistClick(Selection(tracks = selectedTrackCombos.tracks()))
-                    },
-                    onPlayClick = { viewModel.playTrackCombos(selectedTrackCombos) },
-                    onEnqueueClick = { viewModel.enqueueTrackCombos(selectedTrackCombos, context) },
-                    onUnselectAllClick = { viewModel.unselectAllTrackCombos() },
-                )
+                trackCount = selectedTrackIds.size,
+                callbacks = viewModel.getTrackSelectionCallbacks(appCallbacks, context),
             )
 
             LazyColumn {
@@ -150,14 +154,12 @@ fun AlbumScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                combo.album.artist?.also { artist ->
-                                    Text(
-                                        text = artist.umlautify(),
-                                        style = if (artist.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                                if (artistString != null) Text(
+                                    text = artistString.umlautify(),
+                                    style = if (artistString.length > 35) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
 
                             AlbumBadges(
@@ -171,6 +173,7 @@ fun AlbumScreen(
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 AlbumButtons(
+                                    albumArtists = combo.artists,
                                     isLocal = combo.album.isLocal,
                                     isInLibrary = combo.album.isInLibrary,
                                     modifier = Modifier.align(Alignment.Bottom),
@@ -180,8 +183,12 @@ fun AlbumScreen(
                                         combo = combo,
                                         appCallbacks = appCallbacks,
                                         context = context,
-                                        onPlayClick = { viewModel.playTrackCombos(trackCombos) },
-                                        onEnqueueClick = { viewModel.enqueueTrackCombos(trackCombos, context) },
+                                        onPlayClick = if (!combo.isUnplayable) {
+                                            { viewModel.playTrackCombos(combo.trackCombos) }
+                                        } else null,
+                                        onEnqueueClick = if (!combo.isUnplayable) {
+                                            { viewModel.enqueueTrackCombos(combo.trackCombos, context) }
+                                        } else null,
                                         onAddToPlaylistClick = {
                                             appCallbacks.onAddToPlaylistClick(Selection(albumWithTracks = combo))
                                         },
@@ -199,9 +206,7 @@ fun AlbumScreen(
                             progress = { downloadProgress?.toFloat() ?: 0f },
                         )
                     }
-                }
-
-                if (combo.isPartiallyDownloaded && !downloadIsActive) {
+                } else if (combo.isPartiallyDownloaded) {
                     item {
                         Text(
                             text = stringResource(R.string.this_album_is_only_partially_downloaded),
@@ -211,23 +216,56 @@ fun AlbumScreen(
                     }
                 }
 
-                val rowDataObjects = trackCombos.map { trackCombo ->
+                if (!isPlayable) {
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        ) {
+                            Text(
+                                text = pluralStringResource(
+                                    R.plurals.x_album_tracks_unplayable,
+                                    combo.unplayableTrackCount,
+                                    combo.unplayableTrackCount,
+                                ),
+                                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedButton(
+                                onClick = { viewModel.matchUnplayableTracks(context) },
+                                content = { Text(stringResource(R.string.match)) },
+                                shape = MaterialTheme.shapes.small,
+                                enabled = importProgress == null,
+                            )
+                        }
+                    }
+                }
+
+                importProgress?.also { progress ->
+                    item {
+                        ImportProgressSection(progress = progress, modifier = Modifier.padding(horizontal = 10.dp))
+                    }
+                }
+
+                val rowDataObjects = combo.trackCombos.map { trackCombo ->
                     AlbumTrackRowData(
                         title = trackCombo.track.title,
                         isDownloadable = trackCombo.track.isDownloadable,
-                        artist = trackCombo.artist,
                         duration = trackCombo.track.duration,
-                        showArtist = trackCombo.artist != combo.album.artist,
-                        isSelected = selectedTrackCombos.contains(trackCombo),
-                        downloadTask = trackDownloadTasks.find { it.track.trackId == trackCombo.track.trackId },
+                        showArtist = trackCombo.artists.joined() != artistString,
+                        isSelected = selectedTrackIds.contains(trackCombo.track.trackId),
+                        downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == trackCombo.track.trackId },
                         position = trackCombo.track.getPositionString(combo.discCount),
                         isInLibrary = trackCombo.track.isInLibrary,
+                        artists = trackCombo.artists,
+                        isPlayable = trackCombo.track.isPlayable,
                     )
                 }
                 val positionColumnWidth = rowDataObjects.maxOfOrNull { it.position.length * 10 }?.dp
 
-                itemsIndexed(trackCombos) { index, trackCombo ->
-                    viewModel.loadTrackMetadata(trackCombo.track)
+                itemsIndexed(combo.trackCombos) { index, trackCombo ->
+                    viewModel.ensureTrackMetadataAsync(trackCombo.track)
 
                     AlbumTrackRow(
                         data = rowDataObjects[index],
@@ -237,12 +275,18 @@ fun AlbumScreen(
                             appCallbacks = appCallbacks,
                             context = context,
                             onTrackClick = {
-                                if (selectedTrackCombos.isNotEmpty()) viewModel.toggleSelected(trackCombo)
-                                else viewModel.playTrackCombos(trackCombos, combo.indexOfTrack(trackCombo.track))
+                                if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(trackCombo.track.trackId)
+                                else if (trackCombo.track.isPlayable)
+                                    viewModel.playTrackCombos(combo.trackCombos, combo.indexOfTrack(trackCombo.track))
                             },
-                            onEnqueueClick = { viewModel.enqueueTrackCombo(trackCombo, context) },
+                            onEnqueueClick = if (trackCombo.track.isPlayable) {
+                                { viewModel.enqueueTrackCombo(trackCombo, context) }
+                            } else null,
                             onLongClick = {
-                                viewModel.selectTrackCombosFromLastSelected(to = trackCombo, allCombos = trackCombos)
+                                viewModel.selectTracksFromLastSelected(
+                                    to = trackCombo.track.trackId,
+                                    allTrackIds = combo.trackCombos.map { it.track.trackId },
+                                )
                             },
                         ),
                     )

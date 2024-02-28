@@ -29,10 +29,10 @@ import us.huseli.thoucylinder.DebugDestination
 import us.huseli.thoucylinder.DownloadsDestination
 import us.huseli.thoucylinder.ImportDestination
 import us.huseli.thoucylinder.LibraryDestination
-import us.huseli.thoucylinder.MenuItemId
 import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.RecommendationsDestination
 import us.huseli.thoucylinder.SettingsDestination
 import us.huseli.thoucylinder.compose.modalcover.ModalCover
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
@@ -43,6 +43,7 @@ import us.huseli.thoucylinder.compose.screens.ImportScreen
 import us.huseli.thoucylinder.compose.screens.LibraryScreen
 import us.huseli.thoucylinder.compose.screens.PlaylistScreen
 import us.huseli.thoucylinder.compose.screens.QueueScreen
+import us.huseli.thoucylinder.compose.screens.RecommendationsScreen
 import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.dataclasses.Selection
@@ -51,7 +52,6 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
@@ -77,14 +77,14 @@ fun App(
 
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
-    var editTrack by rememberSaveable { mutableStateOf<Track?>(null) }
+    var editTrackCombo by rememberSaveable { mutableStateOf<AbstractTrackCombo?>(null) }
     var infoTrackCombo by rememberSaveable { mutableStateOf<AbstractTrackCombo?>(null) }
     var addToPlaylist by rememberSaveable { mutableStateOf(false) }
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
     var createPlaylist by rememberSaveable { mutableStateOf(false) }
     var addDownloadedAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
     var editAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
-    var deleteAlbumCombo by rememberSaveable { mutableStateOf<AbstractAlbumCombo?>(null) }
+    var deleteAlbumCombos by rememberSaveable { mutableStateOf<Collection<AbstractAlbumCombo>?>(null) }
 
     // This is just to forcefully recompose stuff when the value changes:
     LaunchedEffect(umlautify) {}
@@ -131,8 +131,8 @@ fun App(
             addToPlaylist = true
         },
         onAlbumClick = onAlbumClick,
-        onArtistClick = { artist ->
-            navController.navigate(ArtistDestination.route(artist))
+        onArtistClick = { artistId ->
+            navController.navigate(ArtistDestination.route(artistId))
             isCoverExpanded = false
         },
         onBackClick = { if (!navController.popBackStack()) navController.navigate(LibraryDestination.route) },
@@ -156,20 +156,20 @@ fun App(
             }
         },
         onDownloadAlbumClick = { album -> addDownloadedAlbum = album },
-        onDownloadTrackClick = { track -> viewModel.downloadTrack(track) },
+        onDownloadTrackClick = { trackCombo -> viewModel.downloadTrack(trackCombo) },
         onEditAlbumClick = { combo -> editAlbum = combo.album },
         onPlaylistClick = onPlaylistClick,
         onShowTrackInfoClick = { combo -> infoTrackCombo = combo },
-        onDeleteAlbumComboClick = { combo -> deleteAlbumCombo = combo },
-        onEditTrackClick = { editTrack = it },
+        onDeleteAlbumCombosClick = { combos -> deleteAlbumCombos = combos },
+        onEditTrackClick = { editTrackCombo = it },
     )
 
     AppCallbacksComposables(
         viewModel = viewModel,
         onCancel = {
             editAlbum = null
-            editTrack = null
-            deleteAlbumCombo = null
+            editTrackCombo = null
+            deleteAlbumCombos = null
             addDownloadedAlbum = null
             createPlaylist = false
             addToPlaylist = false
@@ -183,8 +183,8 @@ fun App(
             createPlaylist = true
         },
         editAlbum = editAlbum,
-        editTrack = editTrack,
-        deleteAlbumCombo = deleteAlbumCombo,
+        editTrackCombo = editTrackCombo,
+        deleteAlbumCombos = deleteAlbumCombos,
         addDownloadedAlbum = addDownloadedAlbum,
         createPlaylist = createPlaylist,
         addToPlaylist = addToPlaylist,
@@ -269,6 +269,11 @@ fun App(
             composable(route = SettingsDestination.route) {
                 activeMenuItemId = SettingsDestination.menuItemId
                 SettingsScreen(appCallbacks = appCallbacks)
+            }
+
+            composable(route = RecommendationsDestination.route) {
+                activeMenuItemId = RecommendationsDestination.menuItemId
+                RecommendationsScreen()
             }
         }
 

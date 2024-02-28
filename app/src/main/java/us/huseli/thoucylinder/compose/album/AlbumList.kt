@@ -30,30 +30,32 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.pluralStringResource
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 
 @Composable
 fun <T : AbstractAlbumCombo> AlbumList(
     combos: List<T>,
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
-    selectedAlbums: List<Album>,
+    selectedAlbumIds: List<UUID>,
     albumDownloadTasks: List<AlbumDownloadTask>,
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
-    progressIndicatorText: String? = null,
+    progressIndicatorStringRes: Int? = null,
     onEmpty: @Composable (() -> Unit)? = null,
-    getThumbnail: suspend (Album) -> ImageBitmap?,
+    getThumbnail: suspend (T) -> ImageBitmap?,
 ) {
-    val isSelected = { combo: T -> selectedAlbums.contains(combo.album) }
+    val isSelected = { combo: T -> selectedAlbumIds.contains(combo.album.albumId) }
 
     Column {
-        SelectedAlbumsButtons(albumCount = selectedAlbums.size, callbacks = albumSelectionCallbacks)
+        SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = albumSelectionCallbacks)
 
         ItemList(
             things = combos,
@@ -63,7 +65,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
             onEmpty = onEmpty,
             listState = listState,
             cardHeight = 70.dp,
-            progressIndicatorText = progressIndicatorText,
+            progressIndicatorText = progressIndicatorStringRes?.let { stringResource(it) },
         ) { _, combo ->
             val (downloadProgress, downloadIsActive) =
                 getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
@@ -74,10 +76,10 @@ fun <T : AbstractAlbumCombo> AlbumList(
                 combo.duration?.sensibleFormat(),
             ).joinToString(" • ").nullIfBlank()
             val callbacks = albumCallbacks(combo)
+            val artistString = combo.artists.joined()
 
             LaunchedEffect(combo.album.albumArt) {
-                // imageBitmap.value = combo.album.albumArt?.getThumbnailImageBitmap(context)
-                imageBitmap.value = getThumbnail(combo.album)
+                imageBitmap.value = getThumbnail(combo)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -100,20 +102,16 @@ fun <T : AbstractAlbumCombo> AlbumList(
                         ) {
                             Text(
                                 text = combo.album.title.umlautify(),
-                                maxLines = if (combo.album.artist != null && showArtist) 1 else 2,
+                                maxLines = if (artistString != null && showArtist) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                             )
-                            if (showArtist) {
-                                combo.album.artist?.also { artist ->
-                                    Text(
-                                        text = artist.umlautify(),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-                                    )
-                                }
-                            }
+                            if (showArtist && artistString != null) Text(
+                                text = artistString.umlautify(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                            )
                             if (thirdRow != null) {
                                 Text(
                                     text = thirdRow,
@@ -134,6 +132,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
                             isInLibrary = combo.album.isInLibrary,
                             isPartiallyDownloaded = combo.isPartiallyDownloaded,
                             callbacks = callbacks,
+                            albumArtists = combo.artists,
                         )
                     }
 

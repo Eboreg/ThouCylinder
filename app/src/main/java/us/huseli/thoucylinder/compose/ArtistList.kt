@@ -22,25 +22,26 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.combos.ArtistPojo
+import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.umlautify
+import java.util.UUID
 
 @Composable
 fun ArtistList(
-    artistPojos: List<ArtistPojo>,
+    artistCombos: List<ArtistCombo>,
     progressIndicatorText: String? = null,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
-    imageFlow: (ArtistPojo) -> Flow<ImageBitmap?>,
+    imageFlow: (ArtistCombo) -> Flow<ImageBitmap?>,
 ) {
     ItemList(
-        things = artistPojos,
+        things = artistCombos,
         progressIndicatorText = progressIndicatorText,
-        onClick = { _, artistPojo -> onArtistClick(artistPojo.name) },
+        onClick = { _, combo -> onArtistClick(combo.artist.id) },
         onEmpty = onEmpty,
-    ) { _, artist ->
-        val imageBitmap by imageFlow(artist).collectAsStateWithLifecycle(null)
+    ) { _, combo ->
+        val imageBitmap by imageFlow(combo).collectAsStateWithLifecycle(null)
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
@@ -50,16 +51,16 @@ fun ArtistList(
             )
             Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = artist.name.umlautify(),
+                    text = combo.artist.name.umlautify(),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 )
                 Text(
                     style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
-                    text = pluralStringResource(R.plurals.x_albums, artist.albumCount, artist.albumCount) + " • " +
-                        pluralStringResource(R.plurals.x_tracks, artist.trackCount, artist.trackCount) + " • " +
-                        artist.totalDuration.sensibleFormat(),
+                    text = pluralStringResource(R.plurals.x_albums, combo.albumCount, combo.albumCount) + " • " +
+                        pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount) + " • " +
+                        combo.totalDuration.sensibleFormat(),
                 )
             }
         }

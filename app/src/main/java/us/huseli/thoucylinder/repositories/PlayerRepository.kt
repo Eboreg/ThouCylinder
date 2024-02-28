@@ -40,6 +40,7 @@ import us.huseli.thoucylinder.dataclasses.combos.containsWithPosition
 import us.huseli.thoucylinder.dataclasses.combos.reindexed
 import us.huseli.thoucylinder.dataclasses.combos.toMediaItems
 import us.huseli.thoucylinder.widget.AppWidget
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -246,13 +247,16 @@ class PlayerRepository @Inject constructor(
         play()
     }
 
-    fun moveNext(combos: List<QueueTrackCombo>) {
-        removeFromQueue(combos)
-        player?.addMediaItems(nextItemIndex, combos.map { it.toMediaItem() })
+    fun listQueueTrackCombosById(queueTrackIds: Collection<UUID>): List<QueueTrackCombo> =
+        _queue.value.filter { queueTrackIds.contains(it.queueTrackId) }
+
+    fun moveNext(queueTrackIds: Collection<UUID>) {
+        removeFromQueue(queueTrackIds)
+        player?.addMediaItems(nextItemIndex, listQueueTrackCombosById(queueTrackIds).map { it.toMediaItem() })
     }
 
-    fun moveNextAndPlay(combos: List<QueueTrackCombo>) {
-        moveNext(combos)
+    fun moveNextAndPlay(queueTrackIds: Collection<UUID>) {
+        moveNext(queueTrackIds)
         player?.seekTo(nextItemIndex, 0L)
         play()
     }
@@ -279,11 +283,11 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun removeFromQueue(combos: List<QueueTrackCombo>) = scope.launch {
+    fun removeFromQueue(queueTrackIds: Collection<UUID>) = scope.launch {
         queueMutex.withLock {
-            val ids = combos.map { it.queueTrackId }
-            val indices =
-                _queue.value.mapIndexedNotNull { index, combo -> if (ids.contains(combo.queueTrackId)) index else null }
+            val indices = _queue.value.mapIndexedNotNull { index, combo ->
+                if (queueTrackIds.contains(combo.queueTrackId)) index else null
+            }
 
             indices.sortedDescending().forEach { index ->
                 player?.removeMediaItem(index)
@@ -465,8 +469,7 @@ class PlayerRepository @Inject constructor(
                 val removed = _queue.value.filter { !queueTrackIds.contains(it.queueTrackId.toString()) }
                 Log.i("PlayerRepository", "onTimelineChanged: queueReindexed=$queueReindexed")
 
-                if (newAndChanged.isNotEmpty())
-                    queueDao.upsertQueueTracks(*newAndChanged.map { it.queueTrack }.toTypedArray())
+                queueDao.upsertQueueTracks(*newAndChanged.map { it.queueTrack }.toTypedArray())
                 if (removed.isNotEmpty())
                     queueDao.deleteQueueTracks(*removed.map { it.queueTrack }.toTypedArray())
                 _queue.value = queueReindexed

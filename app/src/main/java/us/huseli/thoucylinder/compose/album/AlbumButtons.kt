@@ -22,9 +22,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 
 @Composable
 fun AlbumButtons(
+    albumArtists: Collection<AlbumArtistCredit>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isDownloading: Boolean,
@@ -95,17 +97,19 @@ fun AlbumButtons(
                 )
             }
 
-            IconButton(
-                onClick = callbacks.onPlayClick,
-                content = {
-                    Icon(
-                        imageVector = Icons.Sharp.PlayArrow,
-                        contentDescription = stringResource(R.string.play),
-                        modifier = Modifier.size(iconSize),
-                    )
-                },
-                modifier = modifier.padding(horizontal = 5.dp),
-            )
+            callbacks.onPlayClick?.also { onPlayClick ->
+                IconButton(
+                    onClick = onPlayClick,
+                    content = {
+                        Icon(
+                            imageVector = Icons.Sharp.PlayArrow,
+                            contentDescription = stringResource(R.string.play),
+                            modifier = Modifier.size(iconSize),
+                        )
+                    },
+                    modifier = modifier.padding(horizontal = 5.dp),
+                )
+            }
         }
 
         Row {
@@ -114,6 +118,7 @@ fun AlbumButtons(
                 isInLibrary = isInLibrary,
                 callbacks = callbacks,
                 isPartiallyDownloaded = isPartiallyDownloaded,
+                albumArtists = albumArtists,
             )
         }
     }

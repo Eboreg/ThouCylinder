@@ -39,6 +39,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.DownloadsViewModel
 
@@ -53,12 +54,14 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         gap = 5.dp,
         onEmpty = { Text(stringResource(R.string.no_downloads_found), modifier = Modifier.padding(10.dp)) },
     ) { _, task ->
-        val thumbnail = remember(task.track) { mutableStateOf<ImageBitmap?>(null) }
+        val thumbnail = remember(task.trackCombo) { mutableStateOf<ImageBitmap?>(null) }
         val progress by task.downloadProgress.collectAsStateWithLifecycle()
         val state by task.state.collectAsStateWithLifecycle()
 
-        LaunchedEffect(task.track) {
-            thumbnail.value = viewModel.getTrackThumbnail(track = task.track, album = task.albumCombo?.album)
+        LaunchedEffect(task.trackCombo.track.image, task.albumCombo?.album?.albumArt) {
+            thumbnail.value =
+                viewModel.getTrackThumbnail(task.trackCombo, context)
+                    ?: task.albumCombo?.let { viewModel.getAlbumThumbnail(it, context) }
         }
 
         Row(
@@ -78,7 +81,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                 )
                 Text(
-                    text = task.track.title.umlautify(),
+                    text = task.trackCombo.track.title.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -90,7 +93,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                         color = LocalBasicColors.current.Red,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else (task.track.artist ?: task.albumCombo?.album?.artist)?.also {
+                } else (task.trackCombo.artists.joined() ?: task.albumCombo?.artists?.joined())?.also {
                     Text(
                         text = it.umlautify(),
                         maxLines = 1,

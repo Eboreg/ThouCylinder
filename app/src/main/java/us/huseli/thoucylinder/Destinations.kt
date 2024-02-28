@@ -7,6 +7,7 @@ import us.huseli.retaintheme.navigation.AbstractSimpleDestination
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
+import us.huseli.thoucylinder.compose.MenuItemId
 import java.util.UUID
 
 abstract class Destination(override val menuItemId: MenuItemId) :
@@ -26,6 +27,8 @@ object DownloadsDestination : Destination(MenuItemId.DOWNLOADS)
 
 object SettingsDestination : Destination(MenuItemId.SETTINGS)
 
+object RecommendationsDestination : Destination(MenuItemId.RECOMMENDATIONS)
+
 object AlbumDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "album/{$NAV_ARG_ALBUM}"
     override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
@@ -39,7 +42,7 @@ object ArtistDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "artist/{$NAV_ARG_ARTIST}"
     override val menuItemId: MenuItemId? = null
 
-    fun route(artist: String) = "artist/$artist"
+    fun route(artistId: UUID) = "artist/$artistId"
 }
 
 object PlaylistDestination : AbstractDestination<MenuItemId>() {

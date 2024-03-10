@@ -1,9 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.combos
 
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
@@ -24,13 +22,7 @@ data class YoutubePlaylistCombo(
         AlbumMatch(distance = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
 
     suspend fun toAlbumCombo(isInLibrary: Boolean, getArtist: suspend (String) -> Artist): AlbumWithTracksCombo {
-        val album = Album(
-            title = playlist.title,
-            isInLibrary = isInLibrary,
-            isLocal = false,
-            youtubePlaylist = playlist,
-            albumArt = playlist.getMediaStoreImage(),
-        )
+        val album = playlist.toAlbum(isInLibrary = isInLibrary)
         val albumArtist = playlist.artist?.let { getArtist(it) }
             ?.let { AlbumArtistCredit(artist = it, albumId = album.albumId) }
         val albumArtists = albumArtist?.let { listOf(it) } ?: emptyList()
@@ -39,18 +31,11 @@ data class YoutubePlaylistCombo(
             album = album,
             artists = albumArtists,
             trackCombos = videos.mapIndexed { index, video ->
-                TrackCombo(
-                    track = Track(
-                        title = playlist.artist?.let {
-                            video.title.replace(Regex("^$it (- )?", RegexOption.IGNORE_CASE), "")
-                        } ?: video.title,
-                        isInLibrary = isInLibrary,
-                        albumId = album.albumId,
-                        albumPosition = index + 1,
-                        youtubeVideo = video,
-                    ),
+                video.toTrackCombo(
+                    isInLibrary = isInLibrary,
+                    artist = playlist.artist,
                     album = album,
-                    artists = emptyList(),
+                    albumPosition = index + 1,
                 )
             }.stripTitleCommons(),
         )

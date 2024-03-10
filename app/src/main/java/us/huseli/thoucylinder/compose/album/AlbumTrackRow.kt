@@ -103,7 +103,7 @@ fun AlbumTrackRow(
                     data.duration?.also {
                         Text(
                             text = it.sensibleFormat(),
-                            style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                            style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                             color = textColor,
                         )
                     }

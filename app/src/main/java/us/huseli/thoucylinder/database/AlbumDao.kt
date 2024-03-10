@@ -19,16 +19,15 @@ import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
 import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.toAlbumTags
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import java.util.UUID
 
 @Dao
@@ -38,7 +37,7 @@ abstract class AlbumDao {
     protected abstract suspend fun _deleteAlbumTags(vararg albumIds: UUID)
 
     @Transaction
-    @RawQuery(observedEntities = [Album::class, Tag::class, AlbumTag::class, AlbumArtistCredit::class])
+    @RawQuery(observedEntities = [Album::class, Tag::class, AlbumTag::class, AlbumArtist::class])
     protected abstract fun _flowAlbumCombos(query: SupportSQLiteQuery): Flow<List<AlbumCombo>>
 
     @RawQuery(observedEntities = [Tag::class, AlbumTag::class, Album::class])
@@ -115,10 +114,10 @@ abstract class AlbumDao {
         return _flowAlbumCombos(
             SimpleSQLiteQuery(
                 """
-                SELECT * FROM AlbumCombo LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId $tagJoin
+                SELECT AlbumCombo.* FROM AlbumCombo LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId $tagJoin
                 WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0 AND Album_isHidden = 0 $searchQuery $availabilityQuery
                 GROUP BY Album_albumId
-                ORDER BY ${sortParameter.sqlColumn} ${sortOrder.sql}
+                ORDER BY ${sortParameter.sql(sortOrder)}
                 """.trimIndent()
             )
         )
@@ -227,7 +226,7 @@ abstract class AlbumDao {
     abstract suspend fun upsertAlbums(vararg albums: Album)
 
     @Transaction
-    open suspend fun upsertAlbumsAndTags(combos: Collection<AbstractAlbumCombo>) {
+    open suspend fun upsertAlbumsAndTags(combos: Collection<AlbumWithTracksCombo>) {
         if (combos.isNotEmpty()) {
             val tags = combos.flatMap { it.tags }
 

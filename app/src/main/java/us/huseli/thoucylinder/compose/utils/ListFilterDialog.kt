@@ -36,13 +36,13 @@ import us.huseli.thoucylinder.umlautify
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ListFilterDialog(
-    tagPojos: List<TagPojo>,
-    selectedTagPojos: List<TagPojo>,
-    availabilityFilter: AvailabilityFilter,
     modifier: Modifier = Modifier,
+    selectedTagPojos: List<TagPojo>? = null,
+    tagPojos: List<TagPojo>? = null,
+    availabilityFilter: AvailabilityFilter? = null,
     onCancelClick: () -> Unit,
-    onAvailabilityFilterChange: (AvailabilityFilter) -> Unit,
-    onTagsChange: (List<TagPojo>) -> Unit,
+    onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},
+    onTagsChange: (List<TagPojo>) -> Unit = {},
 ) {
     var localSelectedTagPojos by rememberSaveable { mutableStateOf(selectedTagPojos) }
     var isTagSectionExpanded by rememberSaveable { mutableStateOf(true) }
@@ -60,40 +60,41 @@ fun ListFilterDialog(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                item { Text(stringResource(R.string.availability)) }
-                item {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        FilterChip(
-                            selected = localAvailabilityFilter == AvailabilityFilter.ALL,
-                            onClick = {
-                                localAvailabilityFilter = AvailabilityFilter.ALL
-                                onAvailabilityFilterChange(localAvailabilityFilter)
-                            },
-                            label = { Text(stringResource(AvailabilityFilter.ALL.stringRes)) },
-                        )
-                        FilterChip(
-                            selected = localAvailabilityFilter == AvailabilityFilter.ONLY_PLAYABLE,
-                            onClick = {
-                                localAvailabilityFilter = AvailabilityFilter.ONLY_PLAYABLE
-                                onAvailabilityFilterChange(localAvailabilityFilter)
-                            },
-                            label = { Text(stringResource(AvailabilityFilter.ONLY_PLAYABLE.stringRes)) },
-                        )
-                        FilterChip(
-                            selected = localAvailabilityFilter == AvailabilityFilter.ONLY_LOCAL,
-                            onClick = {
-                                localAvailabilityFilter = AvailabilityFilter.ONLY_LOCAL
-                                onAvailabilityFilterChange(localAvailabilityFilter)
-                            },
-                            label = { Text(stringResource(AvailabilityFilter.ONLY_LOCAL.stringRes)) },
-                        )
+                if (availabilityFilter != null) {
+                    item { Text(stringResource(R.string.availability)) }
+                    item {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            FilterChip(
+                                selected = localAvailabilityFilter == AvailabilityFilter.ALL,
+                                onClick = {
+                                    localAvailabilityFilter = AvailabilityFilter.ALL.also(onAvailabilityFilterChange)
+                                },
+                                label = { Text(stringResource(AvailabilityFilter.ALL.stringRes)) },
+                            )
+                            FilterChip(
+                                selected = localAvailabilityFilter == AvailabilityFilter.ONLY_PLAYABLE,
+                                onClick = {
+                                    localAvailabilityFilter =
+                                        AvailabilityFilter.ONLY_PLAYABLE.also(onAvailabilityFilterChange)
+                                },
+                                label = { Text(stringResource(AvailabilityFilter.ONLY_PLAYABLE.stringRes)) },
+                            )
+                            FilterChip(
+                                selected = localAvailabilityFilter == AvailabilityFilter.ONLY_LOCAL,
+                                onClick = {
+                                    localAvailabilityFilter =
+                                        AvailabilityFilter.ONLY_LOCAL.also(onAvailabilityFilterChange)
+                                },
+                                label = { Text(stringResource(AvailabilityFilter.ONLY_LOCAL.stringRes)) },
+                            )
+                        }
                     }
                 }
 
-                if (tagPojos.isNotEmpty()) {
+                if (tagPojos?.isNotEmpty() == true) {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.tags), modifier = Modifier.weight(1f))
@@ -106,8 +107,7 @@ fun ListFilterDialog(
                         item {
                             SmallOutlinedButton(
                                 onClick = {
-                                    localSelectedTagPojos = emptyList()
-                                    onTagsChange(localSelectedTagPojos)
+                                    localSelectedTagPojos = emptyList<TagPojo>().also(onTagsChange)
                                 },
                                 text = stringResource(R.string.reset),
                             )
@@ -120,13 +120,12 @@ fun ListFilterDialog(
                                 ) {
                                     chunk.forEach { pojo ->
                                         FilterChip(
-                                            selected = localSelectedTagPojos.contains(pojo),
+                                            selected = localSelectedTagPojos?.contains(pojo) == true,
                                             onClick = {
-                                                localSelectedTagPojos = localSelectedTagPojos.toMutableList().apply {
+                                                localSelectedTagPojos = localSelectedTagPojos?.toMutableList()?.apply {
                                                     if (contains(pojo)) remove(pojo)
                                                     else add(pojo)
-                                                }
-                                                onTagsChange(localSelectedTagPojos)
+                                                }?.also(onTagsChange)
                                             },
                                             label = {
                                                 Text(pojo.name.umlautify())

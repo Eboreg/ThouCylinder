@@ -87,7 +87,7 @@ fun AlbumScreen(
         if (combo.album.isDeleted) appCallbacks.onBackClick()
 
         LaunchedEffect(combo) {
-            isPlayable = combo.unplayableTrackCount == 0
+            isPlayable = combo.album.isLocal || combo.album.youtubePlaylist != null
         }
 
         Column {
@@ -183,10 +183,10 @@ fun AlbumScreen(
                                         combo = combo,
                                         appCallbacks = appCallbacks,
                                         context = context,
-                                        onPlayClick = if (!combo.isUnplayable) {
+                                        onPlayClick = if (isPlayable) {
                                             { viewModel.playTrackCombos(combo.trackCombos) }
                                         } else null,
-                                        onEnqueueClick = if (!combo.isUnplayable) {
+                                        onEnqueueClick = if (isPlayable) {
                                             { viewModel.enqueueTrackCombos(combo.trackCombos, context) }
                                         } else null,
                                         onAddToPlaylistClick = {
@@ -216,7 +216,7 @@ fun AlbumScreen(
                     }
                 }
 
-                if (!isPlayable) {
+                if (!combo.album.isLocal && combo.album.youtubePlaylist == null) {
                     item {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

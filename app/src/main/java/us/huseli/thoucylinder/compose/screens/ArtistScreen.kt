@@ -1,11 +1,14 @@
 package us.huseli.thoucylinder.compose.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
+import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.ArtistContextMenu
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
@@ -34,6 +39,7 @@ import us.huseli.thoucylinder.compose.album.AlbumGrid
 import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.track.TrackGrid
 import us.huseli.thoucylinder.compose.track.TrackList
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
@@ -49,10 +55,12 @@ fun ArtistScreen(
     viewModel: ArtistViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
 ) {
+    val uriHandler = LocalUriHandler.current
     val artist by viewModel.artist.collectAsStateWithLifecycle(null)
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
@@ -60,17 +68,45 @@ fun ArtistScreen(
             tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(horizontal = 10.dp),
+            ) {
                 IconButton(
                     onClick = appCallbacks.onBackClick,
                     content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) }
                 )
-                artist?.name?.also {
-                    Text(
-                        text = it.umlautify(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Column(modifier = Modifier.weight(1f)) {
+                    artist?.name?.also {
+                        Text(
+                            text = it.umlautify(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                artist?.also { artist ->
+                    IconButton(
+                        onClick = { isContextMenuShown = !isContextMenuShown },
+                        modifier = Modifier.size(32.dp, 40.dp),
+                        content = {
+                            ArtistContextMenu(
+                                expanded = isContextMenuShown,
+                                onDismissRequest = { isContextMenuShown = false },
+                                onPlayClick = { viewModel.playArtist() },
+                                onStartRadioClick = { appCallbacks.onStartArtistRadioClick(artist.id) },
+                                onEnqueueClick = { viewModel.enqueueArtist(context) },
+                                onAddToPlaylistClick = {
+                                    viewModel.onAllArtistTracks {
+                                        appCallbacks.onAddToPlaylistClick(Selection(tracks = it))
+                                    }
+                                },
+                                onSpotifyClick = artist.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
+                            )
+                            Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(30.dp))
+                        }
                     )
                 }
             }
@@ -96,8 +132,12 @@ fun ArtistScreen(
                             combo = combo,
                             appCallbacks = appCallbacks,
                             context = context,
-                            onPlayClick = { viewModel.playAlbum(combo.album.albumId) },
-                            onEnqueueClick = { viewModel.enqueueAlbum(combo.album.albumId, context) },
+                            onPlayClick = if (combo.album.isPlayable) {
+                                { viewModel.playAlbum(combo.album.albumId) }
+                            } else null,
+                            onEnqueueClick = if (combo.album.isPlayable) {
+                                { viewModel.enqueueAlbum(combo.album.albumId, context) }
+                            } else null,
                             onAlbumLongClick = {
                                 viewModel.selectAlbumsFromLastSelected(
                                     combo.album.albumId,
@@ -175,6 +215,7 @@ fun ArtistScreen(
                     when (displayType) {
                         DisplayType.LIST -> TrackList(
                             trackCombos = trackCombos,
+                            showAlbum = true,
                             viewModel = viewModel,
                             showArtist = false,
                             selectedTrackIds = selectedTrackIds,
@@ -189,6 +230,7 @@ fun ArtistScreen(
                             trackCombos = trackCombos,
                             viewModel = viewModel,
                             showArtist = false,
+                            showAlbum = true,
                             trackCallbacks = trackCallbacks,
                             trackSelectionCallbacks = trackSelectionCallbacks,
                             selectedTrackIds = selectedTrackIds,

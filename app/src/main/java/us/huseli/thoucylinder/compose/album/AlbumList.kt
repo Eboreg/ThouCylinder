@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.extensions.nullIfBlank
-import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
@@ -73,7 +72,6 @@ fun <T : AbstractAlbumCombo> AlbumList(
             val thirdRow = listOfNotNull(
                 pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
                 combo.yearString,
-                combo.duration?.sensibleFormat(),
             ).joinToString(" • ").nullIfBlank()
             val callbacks = albumCallbacks(combo)
             val artistString = combo.artists.joined()
@@ -110,12 +108,12 @@ fun <T : AbstractAlbumCombo> AlbumList(
                                 text = artistString.umlautify(),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                                style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                             )
                             if (thirdRow != null) {
                                 Text(
                                     text = thirdRow,
-                                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                                     maxLines = 1,
                                 )
                             }

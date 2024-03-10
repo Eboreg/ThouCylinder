@@ -63,6 +63,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
     viewModel: AbstractBaseViewModel,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
+    showAlbum: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     trackCallbacks: (Int, T) -> TrackCallbacks<T>,
     trackSelectionCallbacks: TrackSelectionCallbacks,
@@ -147,8 +148,9 @@ fun <T : AbstractTrackCombo> TrackGrid(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                val albumString = if (showAlbum) combo.album?.title else null
                                 val artistString = if (showArtist) combo.artists.joined() else null
-                                val titleLines = if (artistString != null) 1 else 2
+                                val titleLines = 1 + listOfNotNull(albumString, artistString).size
 
                                 Text(
                                     text = track.title.umlautify(),
@@ -158,6 +160,12 @@ fun <T : AbstractTrackCombo> TrackGrid(
                                 )
                                 if (artistString != null) Text(
                                     text = artistString.umlautify(),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                                )
+                                if (albumString != null) Text(
+                                    text = albumString.umlautify(),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,

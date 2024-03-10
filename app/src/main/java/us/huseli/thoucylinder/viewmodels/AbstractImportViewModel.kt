@@ -13,7 +13,8 @@ import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.launchOnIOThread
@@ -53,6 +54,8 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
     abstract suspend fun fetchExternalAlbums(): Boolean
 
     abstract suspend fun getThumbnail(externalAlbum: A): ImageBitmap?
+
+    abstract suspend fun updateArtists(artists: Iterable<Artist>)
 
     fun importSelectedAlbums(
         matchYoutube: Boolean,
@@ -176,7 +179,7 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
         repos.track.upsertTracks(combo.trackCombos.map { it.track })
         repos.artist.insertAlbumArtists(combo.artists.toAlbumArtists())
         repos.artist.insertTrackArtists(combo.trackCombos.flatMap { it.artists.toTrackArtists() })
-        repos.artist.updateArtists(
+        updateArtists(
             combo.artists.toArtists()
                 .plus(combo.trackCombos.flatMap { it.artists.toArtists() })
                 .toSet()

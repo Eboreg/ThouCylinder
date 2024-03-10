@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
+import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
 import androidx.compose.material.icons.sharp.Close
+import androidx.compose.material.icons.sharp.PlayArrow
+import androidx.compose.material.icons.sharp.SelectAll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,6 +28,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.AnimatedSection
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
+import us.huseli.thoucylinder.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -50,26 +53,35 @@ fun SelectedTracksButtons(
                 callbacks.onPlayClick?.also { onPlayClick ->
                     SmallOutlinedButton(
                         onClick = onPlayClick,
-                        text = stringResource(R.string.play),
+                        content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },
                     )
                 }
                 callbacks.onEnqueueClick?.also { onEnqueueClick ->
                     SmallOutlinedButton(
                         onClick = onEnqueueClick,
-                        text = stringResource(R.string.enqueue),
+                        content = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, stringResource(R.string.enqueue)) },
                     )
                 }
                 SmallOutlinedButton(
                     onClick = callbacks.onAddToPlaylistClick,
-                    text = stringResource(R.string.add_to_playlist),
+                    content = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, stringResource(R.string.add_to_playlist)) },
                 )
                 extraButtons?.invoke()
             }
-            IconButton(
-                onClick = callbacks.onUnselectAllClick,
-                content = { Icon(Icons.Sharp.Close, stringResource(R.string.unselect_all)) },
-                modifier = Modifier.padding(start = 5.dp).size(32.dp),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                callbacks.onSelectAllClick?.also { onSelectAllClick ->
+                    IconButton(
+                        onClick = onSelectAllClick,
+                        content = { Icon(Icons.Sharp.SelectAll, stringResource(R.string.select_all)) },
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+                IconButton(
+                    onClick = callbacks.onUnselectAllClick,
+                    content = { Icon(Icons.Sharp.Close, stringResource(R.string.unselect_all)) },
+                    modifier = Modifier.size(32.dp),
+                )
+            }
         }
     }
 }

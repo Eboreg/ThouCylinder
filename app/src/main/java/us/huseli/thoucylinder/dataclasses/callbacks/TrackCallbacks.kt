@@ -24,4 +24,5 @@ data class TrackCallbacks<out T : AbstractTrackCombo>(
     val onPlayOnSpotifyClick: (() -> Unit)? = combo.track.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
     val onEach: (() -> Unit)? = null,
     val onEditTrackClick: () -> Unit = { appCallbacks.onEditTrackClick(combo) },
+    val onStartTrackRadioClick: () -> Unit = { appCallbacks.onStartTrackRadioClick(combo.track.trackId) },
 )

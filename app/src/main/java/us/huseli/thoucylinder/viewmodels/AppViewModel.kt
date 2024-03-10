@@ -7,33 +7,54 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.DpSize
 import androidx.media3.common.PlaybackException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.PlayerRepositoryListener
+import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.RadioType
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.Selection
+import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
+import us.huseli.thoucylinder.dataclasses.abstr.toArtists
+import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
+import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.repositories.PlayerRepository
+import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.random.Random
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
     private val repos: Repositories,
+    @ApplicationContext context: Context,
 ) : DownloadsViewModel(repos), PlayerRepositoryListener {
-    private val allArtists = MutableStateFlow<List<Artist>>(emptyList())
     private var deletedPlaylist: Playlist? = null
     private var deletedPlaylistTracks: List<PlaylistTrack> = emptyList()
+    private var enqueueRadioTracksJob: Job? = null
+    private var radioHasMoreTracks = true
+    private val radioUsedLocalTrackIds = mutableListOf<UUID>()
+    private val radioUsedSpotifyTrackIds = mutableListOf<String>()
 
     val playlists = repos.playlist.playlistsPojos
     val isWelcomeDialogShown = repos.settings.isWelcomeDialogShown
@@ -41,8 +62,18 @@ class AppViewModel @Inject constructor(
 
     init {
         repos.player.addListener(this)
+        repos.musicBrainz.startMatchingArtists(repos.artist.artistsWithTracksOrAlbums) { artistId, musicBrainzId ->
+            repos.artist.setArtistMusicBrainzId(artistId, musicBrainzId)
+        }
+        repos.spotify.startMatchingArtists(repos.artist.artistsWithTracksOrAlbums) { artistId, spotifyId, image ->
+            repos.artist.setArtistSpotifyData(artistId, spotifyId, image)
+        }
+
         launchOnIOThread {
-            repos.artist.flowArtists().collect { artists -> allArtists.value = artists }
+            repos.radio.activeRadio.filterNotNull().collect {
+                if (it.isInitialized) restartRadio(it)
+                else initializeRadio(it, context)
+            }
         }
     }
 
@@ -73,7 +104,6 @@ class AppViewModel @Inject constructor(
     }
 
     fun deleteLocalAlbumFiles(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
-
         repos.album.setAlbumsIsLocal(albumIds, false)
         repos.album.listAlbumsWithTracks(albumIds).forEach { combo ->
             deleteLocalAlbumFiles(combo)
@@ -89,13 +119,14 @@ class AppViewModel @Inject constructor(
         repos.track.deleteTempTracks()
         repos.album.deleteTempAlbums()
         deleteMarkedAlbums()
-        repos.artist.deleteOrphans()
     }
 
-    suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) =
+    suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) = withContext(Dispatchers.IO) {
         repos.playlist.getDuplicatePlaylistTrackCount(playlistId, selection)
+    }
 
-    suspend fun getAlbumCombo(albumId: UUID): AlbumCombo? = repos.album.getAlbumCombo(albumId)
+    suspend fun getAlbumCombo(albumId: UUID): AlbumCombo? =
+        withContext(Dispatchers.IO) { repos.album.getAlbumCombo(albumId) }
 
     fun hideAlbums(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
         repos.album.setAlbumsIsHidden(albumIds, true)
@@ -110,7 +141,8 @@ class AppViewModel @Inject constructor(
         onFinish()
     }
 
-    suspend fun listSelectionTracks(selection: Selection) = repos.playlist.listSelectionTracks(selection)
+    suspend fun listSelectionTracks(selection: Selection) =
+        withContext(Dispatchers.IO) { repos.playlist.listSelectionTracks(selection) }
 
     fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
 
@@ -119,6 +151,18 @@ class AppViewModel @Inject constructor(
     fun setContentAreaSize(value: DpSize) = repos.settings.setContentAreaSize(value)
 
     fun setWelcomeDialogShown(value: Boolean) = repos.settings.setWelcomeDialogShown(value)
+
+    fun startAlbumRadio(albumId: UUID) = launchOnIOThread {
+        repos.radio.setActiveRadio(Radio(albumId = albumId, type = RadioType.ALBUM))
+    }
+
+    fun startArtistRadio(artistId: UUID) = launchOnIOThread {
+        repos.radio.setActiveRadio(Radio(artistId = artistId, type = RadioType.ARTIST))
+    }
+
+    fun startTrackRadio(trackId: UUID) = launchOnIOThread {
+        repos.radio.setActiveRadio(Radio(trackId = trackId, type = RadioType.TRACK))
+    }
 
     fun undoDeletePlaylist(onFinish: (UUID) -> Unit) = launchOnIOThread {
         deletedPlaylist?.also { playlist ->
@@ -162,6 +206,76 @@ class AppViewModel @Inject constructor(
         }
     }
 
+    private suspend fun enqueueRadioTracks(
+        radioId: UUID,
+        radioType: RadioType,
+        recommendations: SpotifyTrackRecommendations,
+        channel: Channel<QueueTrackCombo?>,
+        localTrackLimit: Int,
+    ) {
+        val localTrackRatio =
+            if (recommendations.foundTracks > 0) localTrackLimit.toDouble() / recommendations.foundTracks else 1.0
+        val localTracksRandomBound = (localTrackRatio * 2).roundToInt()
+        var enqueuedLocalTracks = 0
+
+        if (!recommendations.hasMore) radioHasMoreTracks = false
+
+        recommendations.tracks.forEach { spotifyTrack ->
+            val queueTrackCombo = repos.youtube.getBestTrackMatch(
+                trackCombo = spotifyTrack.toTrackCombo(
+                    getArtist = { repos.artist.artistCache.get(it) },
+                    isInLibrary = false,
+                ),
+                albumArtists = spotifyTrack.album.artists.map {
+                    repos.artist.artistCache.get(BaseArtist(name = it.name, spotifyId = it.id))
+                },
+                withMetadata = true,
+            )?.also {
+                repos.track.upsertTrack(it.track)
+                repos.artist.insertTrackArtists(it.artists.toTrackArtists())
+            }?.toQueueTrackCombo()
+
+            if (queueTrackCombo != null) channel.trySend(queueTrackCombo)
+
+            // Send a random amount of local tracks if applicable. Limits for the randomness is determined by the
+            // desired ratio of local tracks to Spotify recommended tracks.
+            if (radioType == RadioType.LIBRARY && localTracksRandomBound > 0 && enqueuedLocalTracks < localTrackLimit) {
+                for (i in 0..Random.nextInt(localTracksRandomBound)) {
+                    getRandomLibraryQueueTrackCombo(
+                        exceptSpotifyTrackIds = radioUsedSpotifyTrackIds,
+                        exceptTrackIds = radioUsedLocalTrackIds,
+                    )?.also {
+                        radioUsedLocalTrackIds.add(it.track.trackId)
+                        enqueuedLocalTracks++
+                        channel.trySend(it)
+                    }
+                }
+            }
+        }
+
+        if (radioType == RadioType.LIBRARY) {
+            while (enqueuedLocalTracks < localTrackLimit) {
+                val queueTrackCombo = getRandomLibraryQueueTrackCombo(
+                    exceptSpotifyTrackIds = radioUsedSpotifyTrackIds,
+                    exceptTrackIds = radioUsedLocalTrackIds,
+                )
+
+                if (queueTrackCombo != null) {
+                    radioUsedLocalTrackIds.add(queueTrackCombo.track.trackId)
+                    enqueuedLocalTracks++
+                    channel.trySend(queueTrackCombo)
+                } else break
+            }
+        }
+        // Null signals to PlayerRepository that this batch is finished.
+        channel.trySend(null)
+        repos.radio.updateRadio(
+            radioId = radioId,
+            spotifyTrackIds = radioUsedSpotifyTrackIds,
+            localTrackIds = radioUsedLocalTrackIds,
+        )
+    }
+
     private suspend fun findOrphansAndDuplicates() {
         val allTracks = repos.track.listTracks()
         val allAlbumCombos = repos.album.listAlbumCombos()
@@ -186,6 +300,166 @@ class AppViewModel @Inject constructor(
         repos.track.clearLocalUris(brokenUriTracks.map { it.trackId })
         // Update albums that should have isLocal=true, but don't:
         repos.album.setAlbumsIsLocal(noLongerLocalAlbums.keys.map { it.album.albumId }, false)
+    }
+
+    private suspend fun getInitialRadioRecommendations(radio: RadioView): SpotifyTrackRecommendations? =
+        when (radio.type) {
+            RadioType.LIBRARY -> repos.spotify.getTrackRecommendations(
+                spotifyTrackIds = listRandomLibrarySpotifyTrackIds(5),
+                limit = 10,
+            )
+            RadioType.ARTIST -> radio.artist?.let { artist ->
+                repos.spotify.getTrackRecommendationsByArtist(artist, 20)
+            }
+            RadioType.ALBUM -> radio.album?.let { album ->
+                repos.album.getAlbumWithTracks(album.albumId)
+                    ?.let { repos.spotify.getTrackRecommendationsByAlbumCombo(it, 20) }
+            }
+            RadioType.TRACK -> radio.track?.let { track ->
+                val albumCombo = track.albumId?.let { repos.album.getAlbumCombo(it) }
+                val artists = repos.artist.listTrackArtistCredits(track.trackId).toArtists()
+                    .plus(albumCombo?.artists?.toArtists() ?: emptyList())
+
+                repos.spotify.getTrackRecommendationsByTrack(
+                    track = track,
+                    album = albumCombo?.album,
+                    artists = artists,
+                    limit = 20,
+                )
+            }
+        }?.also { radioUsedSpotifyTrackIds.addAll(it.tracks.map { track -> track.id }) }
+
+    private fun getRadioCallbacks(
+        radioId: UUID,
+        radioType: RadioType,
+        channel: Channel<QueueTrackCombo?>,
+    ) = RadioCallbacks(
+        deactivate = {
+            repos.radio.deactivateRadio()
+            channel.close()
+            enqueueRadioTracksJob?.cancel()
+            enqueueRadioTracksJob = null
+        },
+        requestMoreTracks = {
+            if (radioHasMoreTracks) enqueueRadioTracksJob = repos.globalScope.launch {
+                val recommendations =
+                    repos.spotify.getTrackRecommendations(spotifyTrackIds = radioUsedSpotifyTrackIds, limit = 5)
+                        .also { radioUsedSpotifyTrackIds.addAll(it.tracks.map { track -> track.id }) }
+
+                enqueueRadioTracks(
+                    radioId = radioId,
+                    radioType = radioType,
+                    recommendations = recommendations,
+                    channel = channel,
+                    localTrackLimit = 5,
+                )
+            }
+        },
+    )
+
+    private suspend fun getRandomLibraryQueueTrackCombo(
+        exceptTrackIds: Collection<UUID>? = null,
+        exceptSpotifyTrackIds: Collection<String>? = null,
+    ): QueueTrackCombo? {
+        // Does a Youtube match if necessary.
+        val trackCount = repos.track.getLibraryTrackCount()
+        var triedTracks = 0
+
+        while (triedTracks < trackCount) {
+            val combos = repos.track.listRandomLibraryTrackCombos(
+                limit = 10,
+                exceptTrackIds = exceptTrackIds,
+                exceptSpotifyTrackIds = exceptSpotifyTrackIds,
+            )
+
+            for (combo in combos) {
+                getQueueTrackCombo(trackCombo = combo, matchIfNeeded = true)?.also { return it }
+                triedTracks++
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun initializeRadio(radio: RadioView, context: Context) {
+        /** Run the first time a radio is started (i.e. not every time it's REstarted). */
+        val channel = Channel<QueueTrackCombo?>(capacity = Channel.BUFFERED)
+        val recommendations = getInitialRadioRecommendations(radio)
+
+        if (recommendations == null) {
+            SnackbarEngine.addError(
+                if (radio.title != null)
+                    context.getString(R.string.could_not_start_radio_for_x, radio.title).umlautify()
+                else context.getString(R.string.could_not_start_radio).umlautify()
+            )
+        } else {
+            withContext(Dispatchers.Main) {
+                repos.player.activateRadio(
+                    radio = radio,
+                    channel = channel,
+                    callbacks = getRadioCallbacks(radioId = radio.id, radioType = radio.type, channel = channel),
+                    clearAndPlay = true,
+                )
+            }
+
+            enqueueRadioTracksJob = launchOnIOThread {
+                enqueueRadioTracks(
+                    radioId = radio.id,
+                    radioType = radio.type,
+                    recommendations = recommendations,
+                    channel = channel,
+                    localTrackLimit = 10,
+                )
+            }
+        }
+    }
+
+    private suspend fun listRandomLibrarySpotifyTrackIds(limit: Int): List<String> {
+        /**
+         * Returns the Spotify ID's of up to `limit` random tracks from the library. To be used as seed for Spotify's
+         * track recommendation API when "library radio" is activated.
+         */
+        val trackCount = repos.track.getLibraryTrackCount()
+        val spotifyTrackIds = mutableListOf<String>()
+        var triedTrackCount = 0
+        val trueLimit = min(limit, trackCount)
+
+        while (spotifyTrackIds.size < trueLimit && triedTrackCount < trackCount) {
+            for (trackCombo in repos.track.listRandomLibraryTrackCombos(min(limit * 4, trackCount))) {
+                if (trackCombo.track.spotifyId != null) spotifyTrackIds.add(trackCombo.track.spotifyId)
+                else {
+                    val spotifyTrack = repos.spotify.matchTrack(
+                        track = trackCombo.track,
+                        album = trackCombo.album,
+                        artists = trackCombo.artists.toArtists()
+                            .let { artists -> trackCombo.albumArtist?.let { artists.plus(Artist(it)) } ?: artists },
+                    )
+                    if (spotifyTrack != null) {
+                        spotifyTrackIds.add(spotifyTrack.id)
+                        launchOnIOThread { repos.track.setTrackSpotifyId(trackCombo.track.trackId, spotifyTrack.id) }
+                    }
+                }
+
+                triedTrackCount++
+                if (spotifyTrackIds.size == trueLimit) return spotifyTrackIds.toList()
+            }
+        }
+
+        return spotifyTrackIds.toList()
+    }
+
+    private suspend fun restartRadio(radio: RadioView) {
+        val channel = Channel<QueueTrackCombo?>(capacity = Channel.BUFFERED)
+
+        withContext(Dispatchers.Main) {
+            repos.player.activateRadio(
+                radio = radio,
+                channel = channel,
+                callbacks = getRadioCallbacks(radioId = radio.id, radioType = radio.type, channel = channel),
+                clearAndPlay = false,
+            )
+        }
+        channel.trySend(null)
     }
 
     private suspend fun updateGenreList() {

@@ -54,7 +54,14 @@ abstract class AbstractAlbumListViewModel(
         }
     }
 
-    fun enqueueAlbum(albumId: UUID, context: Context) = enqueueAlbums(listOf(albumId), context)
+    fun enqueueAlbum(albumId: UUID, context: Context) = launchOnIOThread {
+        val queueTrackCombos = getQueueTrackCombos(repos.track.listTrackCombosByAlbumId(albumId))
+
+        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
+            repos.player.insertNext(queueTrackCombos)
+            SnackbarEngine.addInfo(context.getString(R.string.the_album_was_enqueued_next).umlautify())
+        }
+    }
 
     fun getAlbumSelectionCallbacks(appCallbacks: AppCallbacks, context: Context) = AlbumSelectionCallbacks(
         onAddToPlaylistClick = { onSelectedAlbumTracks { appCallbacks.onAddToPlaylistClick(Selection(tracks = it)) } },
@@ -65,7 +72,13 @@ abstract class AbstractAlbumListViewModel(
         onDeleteClick = { onSelectedAlbumsWithTracks { appCallbacks.onDeleteAlbumCombosClick(it) } },
     )
 
-    fun playAlbum(albumId: UUID) = playAlbums(listOf(albumId))
+    fun playAlbum(albumId: UUID) = launchOnIOThread {
+        val queueTrackCombos = getQueueTrackCombos(repos.track.listTrackCombosByAlbumId(albumId))
+
+        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
+            repos.player.replaceAndPlay(queueTrackCombos)
+        }
+    }
 
     fun selectAlbumsFromLastSelected(to: UUID, allAlbumIds: List<UUID>) = launchOnIOThread {
         val albumIds = filteredSelectedAlbumIds.first().lastOrNull()
@@ -80,10 +93,7 @@ abstract class AbstractAlbumListViewModel(
 
     /** PRIVATE METHODS *******************************************************/
     private fun enqueueAlbums(albumCombos: Collection<AlbumWithTracksCombo>, context: Context) = launchOnIOThread {
-        val queueTrackCombos = getQueueTrackCombos(
-            trackCombos = albumCombos.flatMap { it.trackCombos },
-            startIndex = repos.player.nextItemIndex,
-        )
+        val queueTrackCombos = getQueueTrackCombos(albumCombos.flatMap { it.trackCombos })
 
         if (queueTrackCombos.isNotEmpty()) {
             withContext(Dispatchers.Main) { repos.player.insertNext(queueTrackCombos) }
@@ -100,23 +110,11 @@ abstract class AbstractAlbumListViewModel(
         }
     }
 
-    private fun enqueueAlbums(albumIds: List<UUID>, context: Context) = launchOnIOThread {
-        val albumCombos = repos.album.listAlbumsWithTracks(albumIds)
-
-        if (albumCombos.isNotEmpty()) enqueueAlbums(albumCombos, context)
-    }
-
     private fun playAlbums(albumCombos: Collection<AlbumWithTracksCombo>) = launchOnIOThread {
         val queueTrackCombos = getQueueTrackCombos(albumCombos.flatMap { it.trackCombos })
 
-        if (queueTrackCombos.isNotEmpty()) {
-            withContext(Dispatchers.Main) { repos.player.replaceAndPlay(queueTrackCombos) }
+        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
+            repos.player.replaceAndPlay(queueTrackCombos)
         }
-    }
-
-    private fun playAlbums(albumIds: List<UUID>) = launchOnIOThread {
-        val albumCombos = repos.album.listAlbumsWithTracks(albumIds)
-
-        if (albumCombos.isNotEmpty()) playAlbums(albumCombos)
     }
 }

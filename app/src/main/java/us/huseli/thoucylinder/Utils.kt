@@ -87,6 +87,20 @@ inline fun <S, T : S, K> Iterable<T>.distinctWith(operation: (acc: S, T) -> S, s
     return result.values.toList()
 }
 
+fun <K, V> Map<out K, V>.mergeWith(other: Map<out K, V>): Map<K, *> {
+    val result: MutableMap<K, Any?> = this.toMutableMap()
+
+    other.forEach { (key, value) ->
+        val ownValue = this[key]
+
+        if (ownValue is Map<*, *> && value is Map<*, *>) {
+            result[key] = ownValue.mergeWith(value)
+        } else result[key] = value
+    }
+
+    return result.toMap()
+}
+
 
 /** STRING ********************************************************************/
 fun String.escapeQuotes() = replace("\"", "\\\"")
@@ -140,8 +154,6 @@ fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString
 
 fun JSONObject.getIntOrNull(name: String): Int? =
     if (has(name)) getStringOrNull(name)?.takeWhile { it.isDigit() }?.toIntOrNull() else null
-
-fun JSONObject.getDoubleOrNull(name: String): Double? = if (has(name)) getDouble(name) else null
 
 
 /** BITMAP/IMAGEBITMAP ********************************************************/
@@ -204,18 +216,6 @@ suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.I
 
 
 /** DOCUMENTFILE **************************************************************/
-@WorkerThread
-fun DocumentFile.toBitmap(context: Context): Bitmap? = try {
-    context.contentResolver.openFileDescriptor(uri, "r")
-        ?.use { BitmapFactory.decodeFileDescriptor(it.fileDescriptor) }
-} catch (e: FileNotFoundException) {
-    Log.e("DocumentFile", "toBitmap: $e", e)
-    null
-} catch (e: IllegalArgumentException) {
-    Log.e("DocumentFile", "toBitmap: $e", e)
-    null
-}
-
 @WorkerThread
 fun DocumentFile.toByteArray(context: Context): ByteArray? = try {
     openInputStream(context)?.use { it.readBytes() }

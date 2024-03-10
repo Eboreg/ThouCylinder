@@ -55,8 +55,8 @@ data class QueueTrackCombo(
     override fun hashCode(): Int = 31 * (31 * track.trackId.hashCode() + uri.hashCode()) + queueTrackId.hashCode()
 }
 
-fun List<QueueTrackCombo>.reindexed(): List<QueueTrackCombo> =
-    mapIndexed { index, combo -> combo.copy(position = index) }
+fun List<QueueTrackCombo>.reindexed(offset: Int = 0): List<QueueTrackCombo> =
+    mapIndexed { index, combo -> combo.copy(position = index + offset) }
 
 fun List<QueueTrackCombo>.plus(item: QueueTrackCombo, index: Int): List<QueueTrackCombo> =
     toMutableList().apply { add(index, item) }.toList()

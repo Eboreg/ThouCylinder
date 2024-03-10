@@ -10,6 +10,7 @@ object Constants {
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
     const val NAV_ARG_PLAYLIST = "playlist"
+    const val PREF_ACTIVE_RADIO_ID = "activeRadioId"
     const val PREF_AUTO_IMPORT_LOCAL_MUSIC = "autoImportLocalMusic"
     const val PREF_CURRENT_TRACK_POSITION = "currentTrackPosition"
     const val PREF_LASTFM_SCROBBLE = "lastFmScrobble"

@@ -16,6 +16,8 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.ProgressData
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.umlautify
@@ -94,5 +96,16 @@ class AlbumViewModel @Inject constructor(
 
             _importProgress.value = null
         }
+    }
+
+    override fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): TrackSelectionCallbacks {
+        return super.getTrackSelectionCallbacks(appCallbacks, context).copy(
+            onSelectAllClick = {
+                repos.track.selectTrackIds(
+                    selectionKey = "AlbumViewModel",
+                    trackIds = _albumCombo.value?.trackCombos?.map { it.track.trackId } ?: emptyList(),
+                )
+            }
+        )
     }
 }

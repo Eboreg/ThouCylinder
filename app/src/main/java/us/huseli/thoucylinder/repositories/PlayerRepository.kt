@@ -18,27 +18,35 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.thoucylinder.Constants.PREF_CURRENT_TRACK_POSITION
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.PlaybackService
-import us.huseli.thoucylinder.PlayerRepositoryListener
+import us.huseli.thoucylinder.PlaybackState
+import us.huseli.thoucylinder.RadioState
+import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.database.QueueDao
+import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.combos.containsWithPosition
 import us.huseli.thoucylinder.dataclasses.combos.reindexed
 import us.huseli.thoucylinder.dataclasses.combos.toMediaItems
+import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
+import us.huseli.thoucylinder.dataclasses.views.RadioView
 import us.huseli.thoucylinder.widget.AppWidget
 import java.util.UUID
 import javax.inject.Inject
@@ -53,7 +61,6 @@ class PlayerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueDao: QueueDao,
 ) : Player.Listener {
-    enum class PlaybackState { STOPPED, PLAYING, PAUSED }
     enum class LastAction { PLAY, STOP, PAUSE }
 
     private val listeners = mutableListOf<PlayerRepositoryListener>()
@@ -62,36 +69,53 @@ class PlayerRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private var currentTrackPlayTimeJob: Job? = null
+    private var lastAction = LastAction.STOP
     private var onPlayerReady: (MediaController) -> Unit = {}
     private var player: MediaController? = null
     private var positionSaveJob: Job? = null
     private var positionUpdateJob: Job? = null
+    private var radioCallbacks: RadioCallbacks? = null
+    private var radioJob: Job? = null
+
+    private val currentTrackPlayStartTimestamp = MutableStateFlow<Long?>(null)
+    private val currentTrackPlayTime = MutableStateFlow(0) // seconds
+    private val isCurrentTrackHalfPlayedReported = MutableStateFlow(false)
+    private val playbackState = MutableStateFlow(PlaybackState.STOPPED)
+    private val playedQueueTrackIds = MutableStateFlow<Set<UUID>>(emptySet())
 
     private val _canGotoNext = MutableStateFlow(player?.hasNextMediaItem() ?: false)
     private val _canPlay = MutableStateFlow(player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) ?: false)
     private val _currentCombo = MutableStateFlow<QueueTrackCombo?>(null)
     private val _currentPositionMs = MutableStateFlow(0L)
-    private val _currentTrackPlayStartTimestamp = MutableStateFlow<Long?>(null)
-    private val _currentTrackPlayTime = MutableStateFlow(0) // seconds
-    private val _isCurrentTrackHalfPlayedReported = MutableStateFlow(false)
     private val _isLoading = MutableStateFlow(false)
     private val _isRepeatEnabled = MutableStateFlow(false)
     private val _isShuffleEnabled = MutableStateFlow(false)
-    private val _playbackState = MutableStateFlow(PlaybackState.STOPPED)
     private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
-    private var _lastAction = LastAction.STOP
+    private val _radioPojo = MutableStateFlow<RadioPojo?>(null)
+    private val _radioState = MutableStateFlow(RadioState.INACTIVE)
 
     val canGotoNext: StateFlow<Boolean> = _canGotoNext.asStateFlow()
     val canPlay = combine(_canPlay, _isLoading) { canPlay, isLoading -> canPlay && !isLoading }.distinctUntilChanged()
     val currentCombo: StateFlow<QueueTrackCombo?> = _currentCombo.asStateFlow()
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-    val isPlaying: Flow<Boolean> = _playbackState.map { it == PlaybackState.PLAYING }.distinctUntilChanged()
+    val isPlaying: Flow<Boolean> = playbackState.map { it == PlaybackState.PLAYING }.distinctUntilChanged()
     val isRepeatEnabled: StateFlow<Boolean> = _isRepeatEnabled.asStateFlow()
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
     val queue: StateFlow<List<QueueTrackCombo>> = _queue.asStateFlow()
+    val radioPojo = combine(_radioState, _radioPojo) { state, pojo ->
+        if (state != RadioState.INACTIVE) pojo else null
+    }
+    val radioState: StateFlow<RadioState> = _radioState.asStateFlow()
 
-    val nextItemIndex: Int
+    private val tracksLeft = combine(playedQueueTrackIds, _queue) { playedIds, queue ->
+        playedIds.filter { id -> queue.map { it.queueTrackId }.contains(id) }.toSet().sorted()
+    }.map { playedIds ->
+        if (_isShuffleEnabled.value) _queue.value.size - playedIds.size
+        else _queue.value.size - (player?.currentMediaItemIndex?.plus(1) ?: 0)
+    }.distinctUntilChanged()
+
+    private val nextItemIndex: Int
         get() = player?.let { if (it.mediaItemCount == 0) 0 else it.currentMediaItemIndex + 1 } ?: 0
 
     init {
@@ -116,7 +140,7 @@ class PlayerRepository @Inject constructor(
              * single source of truth for queue contents and playback status etc, with some stateflows acting as cache.
              */
             queueMutex.withLock {
-                val combos = queueDao.getQueue()
+                val combos = withContext(Dispatchers.IO) { queueDao.getQueue() }
                 val currentIndex =
                     preferences.getInt(PREF_QUEUE_INDEX, 0).takeIf { it < combos.size && it > -1 } ?: 0
                 val currentTrackPosition = preferences.getLong(PREF_CURRENT_TRACK_POSITION, 0)
@@ -153,7 +177,7 @@ class PlayerRepository @Inject constructor(
         }
 
         scope.launch {
-            _playbackState.collect { state ->
+            playbackState.collect { state ->
                 if (state == PlaybackState.PLAYING) {
                     positionUpdateJob = launch {
                         while (true) {
@@ -169,7 +193,7 @@ class PlayerRepository @Inject constructor(
                     }
                     currentTrackPlayTimeJob = launch {
                         while (true) {
-                            if (!_isCurrentTrackHalfPlayedReported.value) {
+                            if (!isCurrentTrackHalfPlayedReported.value) {
                                 val combo = _currentCombo.value
                                 val duration = combo?.track?.duration
 
@@ -179,20 +203,20 @@ class PlayerRepository @Inject constructor(
                                     // https://www.last.fm/api/scrobbling#when-is-a-scrobble-a-scrobble
                                     val threshold = min(duration.inWholeSeconds / 2, 240L)
 
-                                    if (_currentTrackPlayTime.value >= threshold) {
-                                        _currentTrackPlayStartTimestamp.value?.also { startTimestamp ->
+                                    if (currentTrackPlayTime.value >= threshold) {
+                                        currentTrackPlayStartTimestamp.value?.also { startTimestamp ->
                                             listeners.forEach { it.onHalfTrackPlayed(combo, startTimestamp) }
                                         }
-                                        _isCurrentTrackHalfPlayedReported.value = true
+                                        isCurrentTrackHalfPlayedReported.value = true
                                     }
                                 }
                             }
                             delay(5000)
-                            _currentTrackPlayTime.value += 5
+                            currentTrackPlayTime.value += 5
                         }
                     }
-                    if (_currentTrackPlayStartTimestamp.value == null) {
-                        _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                    if (currentTrackPlayStartTimestamp.value == null) {
+                        currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
                     }
                 } else {
                     positionUpdateJob?.cancel()
@@ -210,15 +234,60 @@ class PlayerRepository @Inject constructor(
 
         scope.launch {
             _currentCombo.collect { combo ->
-                _currentTrackPlayTime.value = 0
-                _isCurrentTrackHalfPlayedReported.value = false
-                listeners.forEach { it.onPlaybackChange(combo, _playbackState.value) }
+                currentTrackPlayTime.value = 0
+                isCurrentTrackHalfPlayedReported.value = false
+                listeners.forEach { it.onPlaybackChange(combo, playbackState.value) }
                 updateWidget()
             }
         }
     }
 
+    fun activateRadio(
+        radio: RadioView,
+        channel: Channel<QueueTrackCombo?>,
+        callbacks: RadioCallbacks,
+        clearAndPlay: Boolean,
+    ) {
+        _radioState.value = RadioState.LOADING
+        _radioPojo.value = RadioPojo(type = radio.type, title = radio.title)
+        radioCallbacks = callbacks
+        if (clearAndPlay) player?.clearMediaItems()
+        radioJob?.cancel()
+
+        radioJob = scope.launch {
+            launch {
+                if (clearAndPlay) channel.receive()?.also {
+                    insertLastAndPlay(it)
+                    _radioState.value = RadioState.LOADED_FIRST
+                }
+                for (combo in channel) {
+                    if (combo != null) {
+                        insertLast(combo)
+                        _radioState.value = RadioState.LOADED_FIRST
+                    } else _radioState.value = RadioState.LOADED
+                }
+            }
+
+            combineTransform(_radioState, tracksLeft) { state, tracksLeft ->
+                if (state == RadioState.LOADED) emit(tracksLeft)
+            }.collect { tracksLeft ->
+                if (tracksLeft < 5) {
+                    _radioState.value = RadioState.LOADING
+                    callbacks.requestMoreTracks()
+                }
+            }
+        }
+    }
+
     fun addListener(listener: PlayerRepositoryListener) = listeners.add(listener)
+
+    fun deactivateRadio() {
+        radioJob?.cancel()
+        radioJob = null
+        _radioState.value = RadioState.INACTIVE
+        radioCallbacks?.deactivate?.invoke()
+        radioCallbacks = null
+    }
 
     fun getNextTrack(): QueueTrackCombo? = player?.let {
         val nextMediaItem =
@@ -237,14 +306,36 @@ class PlayerRepository @Inject constructor(
         findQueueTrackByMediaItem(previousMediaItem)
     }
 
+    @Suppress("MemberVisibilityCanBePrivate")
+    fun insertLast(combo: QueueTrackCombo) {
+        player?.also {
+            it.addMediaItem(it.mediaItemCount, combo.copy(position = it.mediaItemCount).toMediaItem())
+        }
+    }
+
+    @Suppress("MemberVisibilityCanBePrivate")
+    fun insertLastAndPlay(combo: QueueTrackCombo) {
+        player?.also {
+            val index = it.mediaItemCount
+
+            it.addMediaItem(index, combo.copy(position = index).toMediaItem())
+            play(index)
+        }
+    }
+
     fun insertNext(combos: List<QueueTrackCombo>) {
-        if (combos.isNotEmpty()) player?.addMediaItems(nextItemIndex, combos.toMediaItems())
+        if (combos.isNotEmpty()) {
+            val offset = nextItemIndex
+
+            player?.addMediaItems(offset, combos.reindexed(offset).toMediaItems())
+        }
     }
 
     fun insertNextAndPlay(combo: QueueTrackCombo) {
-        player?.addMediaItem(nextItemIndex, combo.toMediaItem())
-        player?.seekTo(nextItemIndex, 0L)
-        play()
+        val index = nextItemIndex
+
+        player?.addMediaItem(index, combo.copy(position = index).toMediaItem())
+        play(index)
     }
 
     fun listQueueTrackCombosById(queueTrackIds: Collection<UUID>): List<QueueTrackCombo> =
@@ -257,14 +348,13 @@ class PlayerRepository @Inject constructor(
 
     fun moveNextAndPlay(queueTrackIds: Collection<UUID>) {
         moveNext(queueTrackIds)
-        player?.seekTo(nextItemIndex, 0L)
-        play()
+        play(nextItemIndex)
     }
 
     fun onMoveTrackFinished(from: Int, to: Int) = player?.moveMediaItem(from, to)
 
     fun play(index: Int? = null) {
-        _lastAction = LastAction.PLAY
+        lastAction = LastAction.PLAY
         player?.also {
             _isLoading.value = true
             if (it.playbackState == Player.STATE_IDLE) it.prepare()
@@ -277,7 +367,7 @@ class PlayerRepository @Inject constructor(
         /** Plays/pauses the current item, if any. */
         player?.also {
             if (it.isPlaying) {
-                _lastAction = LastAction.PAUSE
+                lastAction = LastAction.PAUSE
                 it.pause()
             } else play()
         }
@@ -298,10 +388,10 @@ class PlayerRepository @Inject constructor(
     fun replaceAndPlay(combos: List<QueueTrackCombo>, startIndex: Int? = 0) {
         /** Clear queue, add tracks, play. */
         player?.clearMediaItems()
+        deactivateRadio()
         if (combos.isNotEmpty()) {
-            player?.addMediaItems(combos.map { it.toMediaItem() })
-            player?.seekTo(max(startIndex ?: 0, 0), 0L)
-            play()
+            player?.addMediaItems(combos.reindexed().map { it.toMediaItem() })
+            play(max(startIndex ?: 0, 0))
         }
     }
 
@@ -314,8 +404,7 @@ class PlayerRepository @Inject constructor(
         player?.also {
             if (it.mediaItemCount > index) {
                 _isLoading.value = true
-                it.seekTo(index, 0L)
-                play()
+                play(index)
             }
         }
     }
@@ -346,7 +435,7 @@ class PlayerRepository @Inject constructor(
     }
 
     fun stop() {
-        _lastAction = LastAction.STOP
+        lastAction = LastAction.STOP
         player?.stop()
     }
 
@@ -365,7 +454,7 @@ class PlayerRepository @Inject constructor(
         player?.also {
             it.removeMediaItem(combo.position)
             it.addMediaItem(combo.position, combo.toMediaItem())
-            if (combo.position <= it.currentMediaItemIndex && _playbackState.value != PlaybackState.PLAYING)
+            if (combo.position <= it.currentMediaItemIndex && playbackState.value != PlaybackState.PLAYING)
                 it.seekTo(it.currentMediaItemIndex - 1, 0L)
         }
     }
@@ -396,10 +485,10 @@ class PlayerRepository @Inject constructor(
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         if (isPlaying) Log.i(javaClass.simpleName, "Playing: ${player?.currentMediaItem?.localConfiguration?.uri}")
-        _playbackState.value = when {
+        playbackState.value = when {
             isPlaying -> {
-                if (_currentTrackPlayStartTimestamp.value == null)
-                    _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                if (currentTrackPlayStartTimestamp.value == null)
+                    currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
                 _isLoading.value = false
                 PlaybackState.PLAYING
             }
@@ -419,17 +508,18 @@ class PlayerRepository @Inject constructor(
                 if (combo != _currentCombo.value) {
                     Log.i("PlayerRepository", "current track URI: ${combo?.uri}")
                     _currentCombo.value = combo
+                    combo?.also { playedQueueTrackIds.value += it.queueTrackId }
                     player?.currentPosition?.also { _currentPositionMs.value = it }
-                    if (_playbackState.value == PlaybackState.PLAYING)
-                        _currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
-                    else _currentTrackPlayStartTimestamp.value = null
+                    if (playbackState.value == PlaybackState.PLAYING)
+                        currentTrackPlayStartTimestamp.value = System.currentTimeMillis() / 1000
+                    else currentTrackPlayStartTimestamp.value = null
                 }
             }
         }
     }
 
     override fun onPlayerError(error: PlaybackException) {
-        listeners.forEach { it.onPlayerError(error, _currentCombo.value, _lastAction) }
+        listeners.forEach { it.onPlayerError(error, _currentCombo.value, lastAction) }
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) {
@@ -469,9 +559,11 @@ class PlayerRepository @Inject constructor(
                 val removed = _queue.value.filter { !queueTrackIds.contains(it.queueTrackId.toString()) }
                 Log.i("PlayerRepository", "onTimelineChanged: queueReindexed=$queueReindexed")
 
-                queueDao.upsertQueueTracks(*newAndChanged.map { it.queueTrack }.toTypedArray())
-                if (removed.isNotEmpty())
-                    queueDao.deleteQueueTracks(*removed.map { it.queueTrack }.toTypedArray())
+                withContext(Dispatchers.IO) {
+                    queueDao.upsertQueueTracks(*newAndChanged.map { it.queueTrack }.toTypedArray())
+                    if (removed.isNotEmpty())
+                        queueDao.deleteQueueTracks(*removed.map { it.queueTrack }.toTypedArray())
+                }
                 _queue.value = queueReindexed
                 saveCurrentPosition()
                 saveQueueIndex()

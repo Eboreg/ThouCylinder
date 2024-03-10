@@ -4,14 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.filterBySearchTerm
 import us.huseli.thoucylinder.dataclasses.lastFm.toMediaStoreImage
@@ -81,6 +84,12 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) :
 
     override suspend fun fetchExternalAlbums(): Boolean = repos.lastFm.fetchNextTopAlbums()
 
+    override suspend fun updateArtists(artists: Iterable<Artist>) {
+        artists.forEach { artist ->
+            artist.musicBrainzId?.also { repos.artist.setArtistMusicBrainzId(artist.id, it) }
+        }
+    }
+
     override suspend fun getThumbnail(externalAlbum: LastFmTopAlbumsResponse.Album) =
-        repos.lastFm.getThumbnail(externalAlbum)
+        withContext(Dispatchers.IO) { repos.lastFm.getThumbnail(externalAlbum) }
 }

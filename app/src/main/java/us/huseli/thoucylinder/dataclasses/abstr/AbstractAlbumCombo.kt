@@ -9,28 +9,15 @@ import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.entities.toAlbumTags
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 abstract class AbstractAlbumCombo {
     abstract val album: Album
-    abstract val tags: List<Tag>
     abstract val artists: List<AlbumArtistCredit>
     abstract val trackCount: Int
-    abstract val durationMs: Long?
     abstract val minYear: Int?
     abstract val maxYear: Int?
     abstract val isPartiallyDownloaded: Boolean
-
-    val albumTags: List<AlbumTag>
-        get() = tags.toAlbumTags(album.albumId)
-
-    val duration: Duration?
-        get() = durationMs?.milliseconds
 
     private val years: Pair<Int, Int>?
         get() {

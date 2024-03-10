@@ -2,12 +2,13 @@ package us.huseli.thoucylinder.dataclasses.musicBrainz
 
 import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 
 @Suppress("unused")
 enum class MusicBrainzReleaseStatus {
@@ -95,7 +96,7 @@ data class MusicBrainzRelease(
     suspend fun toAlbumWithTracks(
         isLocal: Boolean = false,
         albumArt: MediaStoreImage? = null,
-        getArtist: suspend (String) -> Artist,
+        getArtist: suspend (BaseArtist) -> Artist,
     ): AlbumWithTracksCombo {
         val album = Album(
             title = title,
@@ -108,7 +109,7 @@ data class MusicBrainzRelease(
         )
         val albumArtists = artistCredit.mapIndexed { index, albumArtist ->
             albumArtist.toNativeAlbumArtist(
-                artist = getArtist(albumArtist.name).copy(musicBrainzId = albumArtist.artist.id),
+                artist = getArtist(BaseArtist(name = albumArtist.name, musicBrainzId = albumArtist.artist.id)),
                 albumId = album.albumId,
                 position = index,
             )
@@ -124,7 +125,7 @@ data class MusicBrainzRelease(
 
     private suspend fun Iterable<Media>.toTrackCombos(
         album: Album? = null,
-        getArtist: suspend (String) -> Artist,
+        getArtist: suspend (BaseArtist) -> Artist,
     ): List<TrackCombo> = flatMap { medium ->
         medium.tracks.map {
             val track = Track(
@@ -135,10 +136,11 @@ data class MusicBrainzRelease(
                 year = it.year,
                 musicBrainzId = it.id,
                 albumId = album?.albumId,
+                durationMs = it.length.toLong(),
             )
             val artists = it.artistCredit.mapIndexed { index, trackArtist ->
                 trackArtist.toNativeTrackArtist(
-                    artist = getArtist(trackArtist.name).copy(musicBrainzId = trackArtist.artist.id),
+                    artist = getArtist(BaseArtist(name = trackArtist.name, musicBrainzId = trackArtist.artist.id)),
                     trackId = track.trackId,
                     position = index,
                 )

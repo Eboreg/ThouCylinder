@@ -162,6 +162,9 @@ fun App(
         onShowTrackInfoClick = { combo -> infoTrackCombo = combo },
         onDeleteAlbumCombosClick = { combos -> deleteAlbumCombos = combos },
         onEditTrackClick = { editTrackCombo = it },
+        onStartAlbumRadioClick = { viewModel.startAlbumRadio(it) },
+        onStartArtistRadioClick = { viewModel.startArtistRadio(it) },
+        onStartTrackRadioClick = { viewModel.startTrackRadio(it) },
     )
 
     AppCallbacksComposables(

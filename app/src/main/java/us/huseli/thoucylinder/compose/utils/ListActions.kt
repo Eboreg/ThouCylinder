@@ -36,29 +36,31 @@ import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun <SortParameter : Enum<SortParameter>> ListActions(
-    modifier: Modifier = Modifier,
-    tonalElevation: Dp = 2.dp,
     initialSearchTerm: String,
     sortParameter: SortParameter,
     sortOrder: SortOrder,
     sortParameters: Map<SortParameter, String>,
     sortDialogTitle: String,
-    tagPojos: List<TagPojo>,
-    selectedTagPojos: List<TagPojo>,
-    availabilityFilter: AvailabilityFilter,
     onSort: (parameter: SortParameter, order: SortOrder) -> Unit,
     onSearch: (String) -> Unit,
-    onTagsChange: (List<TagPojo>) -> Unit,
-    onAvailabilityFilterChange: (AvailabilityFilter) -> Unit,
+    modifier: Modifier = Modifier,
+    showFilterButton: Boolean = true,
+    filterButtonSelected: Boolean = false,
+    tonalElevation: Dp = 2.dp,
+    tagPojos: List<TagPojo>? = null,
+    selectedTagPojos: List<TagPojo>? = null,
+    availabilityFilter: AvailabilityFilter? = null,
+    onTagsChange: (List<TagPojo>) -> Unit = {},
+    onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},
+    extraButtons: @Composable () -> Unit = {},
 ) {
     var isSortDialogOpen by rememberSaveable { mutableStateOf(false) }
-
     var isFilterDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     if (isFilterDialogOpen) {
         ListFilterDialog(
             tagPojos = tagPojos,
-            selectedTagPojos = selectedTagPojos,
+            selectedTagPojos = selectedTagPojos ?: emptyList(),
             onCancelClick = { isFilterDialogOpen = false },
             availabilityFilter = availabilityFilter,
             onAvailabilityFilterChange = onAvailabilityFilterChange,
@@ -113,17 +115,21 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
                 }
             }
 
-            InputChip(
-                selected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
-                onClick = { isFilterDialogOpen = true },
-                label = {
-                    Icon(
-                        imageVector = Icons.Sharp.FilterList,
-                        contentDescription = stringResource(R.string.tags),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            )
+            if (showFilterButton) {
+                InputChip(
+                    selected = filterButtonSelected,
+                    onClick = { isFilterDialogOpen = true },
+                    label = {
+                        Icon(
+                            imageVector = Icons.Sharp.FilterList,
+                            contentDescription = stringResource(R.string.filters),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                )
+            }
+
+            extraButtons()
 
             CompactSearchTextField(
                 value = initialSearchTerm,

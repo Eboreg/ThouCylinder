@@ -118,7 +118,7 @@ fun ImportSpotify(
             Text(
                 text = pluralStringResource(R.plurals.x_tracks, count, count) +
                     " • ${album.year} • ${album.duration.sensibleFormat()}",
-                style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
             )
         },
         listState = listState,

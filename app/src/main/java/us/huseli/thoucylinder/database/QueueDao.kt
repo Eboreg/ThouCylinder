@@ -2,6 +2,7 @@
 
 package us.huseli.thoucylinder.database
 
+import android.util.Log
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -15,44 +16,52 @@ import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import java.util.UUID
 
 @Dao
-interface QueueDao {
+abstract class QueueDao {
     @Insert
-    suspend fun _insertQueueTracks(vararg queueTracks: QueueTrack)
+    protected abstract suspend fun _insertQueueTracks(vararg queueTracks: QueueTrack)
 
     @Query("SELECT QueueTrack_queueTrackId FROM QueueTrack")
-    suspend fun _listQueueTrackIds(): List<UUID>
+    protected abstract suspend fun _listQueueTrackIds(): List<UUID>
 
     @Update
-    suspend fun _updateQueueTracks(vararg queueTracks: QueueTrack)
+    protected abstract suspend fun _updateQueueTracks(vararg queueTracks: QueueTrack)
 
     @Delete
-    suspend fun deleteQueueTracks(vararg queueTracks: QueueTrack)
+    abstract suspend fun deleteQueueTracks(vararg queueTracks: QueueTrack)
 
     @Query("SELECT Track.* FROM QueueTrack JOIN Track ON Track_trackId = QueueTrack_trackId")
-    fun flowTracksInQueue(): Flow<List<Track>>
+    abstract fun flowTracksInQueue(): Flow<List<Track>>
 
     @Transaction
     @Query(
         """
-        SELECT Track.*, Album.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position,
-            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
-        FROM QueueTrack  
-            JOIN Track ON Track_trackId = QueueTrack_trackId
-            LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
+        SELECT TrackCombo.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position
+        FROM QueueTrack JOIN TrackCombo ON Track_trackId = QueueTrack_trackId
         GROUP BY QueueTrack_queueTrackId
         ORDER BY QueueTrack_position, QueueTrack_queueTrackId
         """
     )
-    suspend fun getQueue(): List<QueueTrackCombo>
+    abstract suspend fun getQueue(): List<QueueTrackCombo>
 
     @Transaction
-    suspend fun upsertQueueTracks(vararg queueTracks: QueueTrack) {
+    open suspend fun upsertQueueTracks(vararg queueTracks: QueueTrack) {
         if (queueTracks.isNotEmpty()) {
             val ids = _listQueueTrackIds()
             queueTracks.partition { ids.contains(it.queueTrackId) }.also { (toUpdate, toInsert) ->
-                _updateQueueTracks(*toUpdate.toTypedArray())
-                _insertQueueTracks(*toInsert.toTypedArray())
+                toUpdate.forEach {
+                    try {
+                        _updateQueueTracks(it)
+                    } catch (e: Exception) {
+                        Log.e("QueueDao", "_updateQueueTracks($it): $e")
+                    }
+                }
+                toInsert.forEach {
+                    try {
+                        _insertQueueTracks(it)
+                    } catch (e: Exception) {
+                        Log.e("QueueDao", "_insertQueueTracks($it): $e")
+                    }
+                }
             }
         }
     }

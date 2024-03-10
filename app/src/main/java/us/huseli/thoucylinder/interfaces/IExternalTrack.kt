@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.interfaces
+package us.huseli.thoucylinder.interfaces
 
 interface IExternalTrack {
     val id: String

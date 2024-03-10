@@ -11,6 +11,7 @@ import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material.icons.sharp.PlayArrow
+import androidx.compose.material.icons.sharp.Radio
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -47,6 +48,37 @@ fun AlbumContextMenu(
         onDismissRequest = onDismissRequest,
         expanded = expanded,
     ) {
+        callbacks.onPlayClick?.also { onPlayClick ->
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.play)) },
+                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
+                onClick = {
+                    onPlayClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
+        callbacks.onEnqueueClick?.also { onEnqueueClick ->
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.enqueue)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+                onClick = {
+                    onEnqueueClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.start_radio)) },
+            leadingIcon = { Icon(Icons.Sharp.Radio, null) },
+            onClick = {
+                callbacks.onStartAlbumRadioClick()
+                onDismissRequest()
+            }
+        )
+
         if (!isInLibrary) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.add_to_library)) },
             leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
@@ -64,28 +96,6 @@ fun AlbumContextMenu(
                 onDismissRequest()
             },
         )
-
-        callbacks.onPlayClick?.also { onPlayClick ->
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.play)) },
-                leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
-                onClick = {
-                    onPlayClick()
-                    onDismissRequest()
-                }
-            )
-        }
-
-        callbacks.onEnqueueClick?.also { onEnqueueClick ->
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.enqueue)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
-                onClick = {
-                    onEnqueueClick()
-                    onDismissRequest()
-                }
-            )
-        }
 
         if (isInLibrary) DropdownMenuItem(
             text = { Text(text = stringResource(R.string.edit)) },
@@ -168,7 +178,7 @@ fun AlbumContextMenuWithButton(
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
     IconButton(
-        modifier = modifier,
+        modifier = modifier.size(32.dp, 40.dp),
         onClick = { isMenuShown = !isMenuShown },
         content = {
             AlbumContextMenu(

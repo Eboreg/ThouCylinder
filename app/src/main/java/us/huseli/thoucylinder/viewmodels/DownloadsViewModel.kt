@@ -35,7 +35,7 @@ open class DownloadsViewModel @Inject constructor(private val repos: Repositorie
             repos.settings.createAlbumDirectory(albumCombo)?.also { directory ->
                 val trackCombos = albumCombo.trackCombos
                     .filter { !it.track.isDownloaded }
-                    .map { it.copy(track = repos.youtube.ensureTrackMetadata(it.track)) }
+                    .map { it.copy(track = repos.youtube.ensureTrackMetadata(track = it.track)) }
                 val trackTasks = trackCombos.map { trackCombo ->
                     repos.download.downloadTrack(
                         trackCombo = trackCombo,

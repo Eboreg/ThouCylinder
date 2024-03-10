@@ -61,7 +61,7 @@ class ThouCylinderMenuItem<MI : Enum<MI>>(
 @Composable
 fun getMenuItems(): List<ThouCylinderMenuItem<MenuItemId>> {
     return listOf(
-        ThouCylinderMenuItem(MenuItemId.MENU, Icons.Sharp.Menu, stringResource(R.string.menu)),
+        ThouCylinderMenuItem(MenuItemId.MENU, Icons.Sharp.Menu, stringResource(R.string.menu), showInDrawer = false),
         ThouCylinderMenuItem(MenuItemId.LIBRARY, Icons.Sharp.LibraryMusic, stringResource(R.string.library)),
         ThouCylinderMenuItem(MenuItemId.QUEUE, Icons.AutoMirrored.Sharp.QueueMusic, stringResource(R.string.queue)),
         ThouCylinderMenuItem(

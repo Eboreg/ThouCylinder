@@ -7,6 +7,8 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,6 +35,8 @@ data class Request(
 
     suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
         Log.i("Request", "${method.value} $url")
+        if (body != null) Log.i("Request", "Request body: $body")
+
         (URL(url).openConnection() as HttpURLConnection).apply {
             if (BuildConfig.DEBUG) {
                 connectTimeout = 0
@@ -49,7 +53,9 @@ data class Request(
                 setFixedLengthStreamingMode(binaryBody.size)
                 outputStream.write(binaryBody, 0, binaryBody.size)
             }
-            if (responseCode >= 400) throw HTTPResponseError(responseCode, responseMessage)
+            responseCode.also {
+                if (it >= 400) throw HTTPResponseError(it, responseMessage)
+            }
         }
     }
 
@@ -78,11 +84,18 @@ data class Request(
         val jsonResponseType = object : TypeToken<Map<String, *>>() {}
 
         fun getUrl(url: String, params: Map<String, String> = emptyMap()) =
-            if (params.isNotEmpty()) encodeQuery(params).let { if (url.contains("?")) "$url&$it" else "$url?$it" } else url
+            if (params.isNotEmpty()) encodeQuery(params).let { if (url.contains("?")) "$url&$it" else "$url?$it" }
+            else url
 
-        fun postJson(url: String, headers: Map<String, String> = emptyMap(), json: Map<String, *>) =
+        fun postJson(
+            url: String,
+            params: Map<String, String> = emptyMap(),
+            headers: Map<String, String> = emptyMap(),
+            json: Map<String, *>,
+        ) =
             Request(
                 url = url,
+                params = params,
                 headers = headers.plus("Content-Type" to "application/json"),
                 body = gson.toJson(json),
                 method = Method.POST,
@@ -100,3 +113,29 @@ data class Request(
             params.map { (key, value) -> "$key=${URLEncoder.encode(value, "UTF-8")}" }.joinToString("&")
     }
 }
+
+abstract class SuspendingRequestJob(val url: String, val lowPrio: Boolean = false) {
+    /** Stalls until it gets unlocked. */
+    val created = System.currentTimeMillis()
+    val lock = Mutex(true)
+    var isStarted = false
+        private set
+
+    suspend fun run(): String? {
+        return lock.withLock {
+            isStarted = true
+            before()
+            request().also { after(it) }
+        }
+    }
+
+    open fun after(result: String?) {}
+    open fun before() {}
+    abstract suspend fun request(): String?
+    override fun equals(other: Any?) = other is SuspendingRequestJob && other.url == url
+    override fun hashCode() = url.hashCode()
+}
+
+fun Collection<SuspendingRequestJob>.getNext(): SuspendingRequestJob? =
+    filter { !it.isStarted && !it.lowPrio }.minByOrNull { it.created }
+        ?: filter { !it.isStarted }.minByOrNull { it.created }

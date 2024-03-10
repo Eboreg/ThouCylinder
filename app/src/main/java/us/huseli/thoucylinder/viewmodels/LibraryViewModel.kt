@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,15 +17,19 @@ import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flattenMerge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
+import us.huseli.thoucylinder.RadioType
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID
 import javax.inject.Inject
 
@@ -76,6 +81,12 @@ class LibraryViewModel @Inject constructor(
             ).flow.cachedIn(viewModelScope)
         }.flattenMerge().onEach { _isLoadingTracks.value = false }.distinctUntilChanged()
 
+    val albumSearchTerm = _albumSearchTerm.asStateFlow()
+    val albumSortOrder = _albumSortOrder.asStateFlow()
+    val albumSortParameter = _albumSortParameter.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val albumTagPojos = _availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }
+    val availabilityFilter = _availabilityFilter.asStateFlow()
     val displayType = _displayType.asStateFlow()
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
     val isLoadingAlbums = _isLoadingAlbums.asStateFlow()
@@ -85,24 +96,20 @@ class LibraryViewModel @Inject constructor(
     val playlists = repos.playlist.playlistsPojos
         .onStart { _isLoadingPlaylists.value = true }
         .onEach { _isLoadingPlaylists.value = false }
-    val albumSortParameter = _albumSortParameter.asStateFlow()
-    val albumSortOrder = _albumSortOrder.asStateFlow()
-    val trackSortParameter = _trackSortParameter.asStateFlow()
-    val trackSortOrder = _trackSortOrder.asStateFlow()
-    val albumSearchTerm = _albumSearchTerm.asStateFlow()
-    val trackSearchTerm = _trackSearchTerm.asStateFlow()
+    val radioState = repos.player.radioState
     val selectedAlbumTagPojos = _selectedAlbumTagPojos.asStateFlow()
     val selectedTrackTagPojos = _selectedTrackTagPojos.asStateFlow()
-    val availabilityFilter = _availabilityFilter.asStateFlow()
+    val trackSearchTerm = _trackSearchTerm.asStateFlow()
+    val trackSortOrder = _trackSortOrder.asStateFlow()
+    val trackSortParameter = _trackSortParameter.asStateFlow()
     @OptIn(ExperimentalCoroutinesApi::class)
-    val albumTagPojos = availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val trackTagPojos = availabilityFilter.flatMapMerge { repos.track.flowTagPojos(it) }
+    val trackTagPojos = _availabilityFilter.flatMapMerge { repos.track.flowTagPojos(it) }
 
-    suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? =
+    suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? = withContext(Dispatchers.IO) {
         repos.playlist.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
             album.albumArt?.getThumbnailImageBitmap(context)
         }
+    }
 
     fun setAlbumSearchTerm(value: String) {
         _albumSearchTerm.value = value
@@ -140,5 +147,9 @@ class LibraryViewModel @Inject constructor(
     fun setTrackSorting(sortParameter: TrackSortParameter, sortOrder: SortOrder) {
         _trackSortParameter.value = sortParameter
         _trackSortOrder.value = sortOrder
+    }
+
+    fun startLibraryRadio() = launchOnIOThread {
+        repos.radio.setActiveRadio(Radio(type = RadioType.LIBRARY))
     }
 }

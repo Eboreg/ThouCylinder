@@ -11,19 +11,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.slice
 import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
 import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.enumerate
 import us.huseli.thoucylinder.dataclasses.pojos.TopLocalSpotifyArtistPojo
-import us.huseli.thoucylinder.getMutexCache
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.matchDirectoriesRecursive
 import us.huseli.thoucylinder.matchFiles
 import java.util.UUID
@@ -35,19 +39,28 @@ class ArtistRepository @Inject constructor(
     database: Database,
     @ApplicationContext private val context: Context,
 ) : SharedPreferences.OnSharedPreferenceChangeListener {
+    inner class ArtistCache : MutexCache<BaseArtist, String, Artist>(
+        fetchMethod = { artistDao.createOrUpdateArtist(it) },
+        itemToKey = { it.name },
+        debugLabel = "artistCache",
+    ) {
+        suspend fun getByName(name: String): Artist = get(BaseArtist(name = name))
+    }
+
     private val artistDao = database.artistDao()
     private val levenshtein = LevenshteinDistance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val _allArtists = MutableStateFlow<List<Artist>>(emptyList())
+    private val allArtists = MutableStateFlow<List<Artist>>(emptyList())
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val localMusicUri = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri())
 
+    val artistsWithTracksOrAlbums = artistDao.flowArtistsWithTracksOrAlbums().distinctUntilChanged()
     val trackArtistCombos = artistDao.flowTrackArtistCombos()
     val albumArtistCombos = artistDao.flowAlbumArtistCombos()
-    val artistCache: MutexCache<String, String, Artist> =
-        getMutexCache("artistCache") { name -> artistDao.getOrCreateArtistByName(name) }
+    val artistCache = ArtistCache()
     val artistImageUriCache = MutexCache<ArtistCombo, UUID, Uri?>(
         itemToKey = { it.artist.id },
+        debugLabel = "ArtistRepository.artistImageUriCache",
         fetchMethod = { combo ->
             combo.artist.image?.uri
                 ?: localMusicUri.value?.let { DocumentFile.fromTreeUri(context, it) }
@@ -65,19 +78,17 @@ class ArtistRepository @Inject constructor(
     init {
         preferences.registerOnSharedPreferenceChangeListener(this)
         scope.launch {
-            artistDao.flowArtists().collect { _allArtists.value = it }
+            artistDao.flowArtists().collect { allArtists.value = it }
         }
     }
 
     suspend fun clearArtists() = artistDao.clearArtists()
 
-    suspend fun deleteOrphans() = artistDao.deleteOrphans()
-
     fun flowArtistById(id: UUID) = artistDao.flowArtistById(id)
 
-    fun flowArtists() = artistDao.flowArtists()
+    suspend fun getArtist(id: UUID) = artistDao.getArtist(id)
 
-    fun getArtistNameSuggestions(name: String, limit: Int = 10) = _allArtists.value
+    fun getArtistNameSuggestions(name: String, limit: Int = 10) = allArtists.value
         .filter { it.name.contains(name, true) }
         .map { it.name }
         .sortedBy { levenshtein.apply(name.lowercase(), it.lowercase()) }
@@ -91,10 +102,11 @@ class ArtistRepository @Inject constructor(
         if (trackArtists.isNotEmpty()) artistDao.insertTrackArtists(*trackArtists.toTypedArray())
     }
 
-    suspend fun listArtists(): List<Artist> = artistDao.listArtists()
-
     suspend fun listTopSpotifyArtists(limit: Int = 10): List<TopLocalSpotifyArtistPojo> =
         artistDao.listTopSpotifyArtists(limit)
+
+    suspend fun listTrackArtistCredits(trackId: UUID): List<TrackArtistCredit> =
+        artistDao.listTrackArtistCredits(trackId)
 
     suspend fun setAlbumArtists(albumArtists: Collection<AlbumArtist>) {
         if (albumArtists.isNotEmpty()) {
@@ -103,6 +115,20 @@ class ArtistRepository @Inject constructor(
         }
     }
 
+    suspend fun setArtistMusicBrainzId(artistId: UUID, musicBrainzId: String) =
+        artistDao.setMusicBrainzId(artistId, musicBrainzId)
+
+    suspend fun setArtistSpotifyData(artistId: UUID, spotifyId: String, image: MediaStoreImage?) =
+        artistDao.setSpotifyData(
+            artistId = artistId,
+            spotifyId = spotifyId,
+            imageUri = image?.uri,
+            imageThumbnailUri = image?.thumbnailUri,
+            imageHash = image?.hash
+        )
+
+    suspend fun setArtistSpotifyId(artistId: UUID, spotifyId: String) = artistDao.setSpotifyId(artistId, spotifyId)
+
     suspend fun setTrackArtists(trackArtists: Collection<TrackArtist>) {
         if (trackArtists.isNotEmpty()) {
             artistDao.clearTrackArtists(*trackArtists.map { it.trackId }.toSet().toTypedArray())
@@ -110,11 +136,7 @@ class ArtistRepository @Inject constructor(
         }
     }
 
-    suspend fun updateArtist(artist: Artist) = updateArtists(listOf(artist))
-
-    suspend fun updateArtists(artists: Collection<Artist>) {
-        if (artists.isNotEmpty()) artistDao.updateArtists(*artists.toTypedArray())
-    }
+    suspend fun upsertSpotifyArtist(artist: SpotifyArtist) = artistDao.upsertSpotifyArtist(artist)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (key == PREF_LOCAL_MUSIC_URI) localMusicUri.value = preferences.getString(key, null)?.toUri()

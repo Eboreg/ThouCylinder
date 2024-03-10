@@ -48,7 +48,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
                 text = artist.umlautify(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                 fontSize = artistTextSize.sp,
                 modifier = Modifier.padding(top = 5.dp).basicMarquee(Int.MAX_VALUE),
                 color = textColor,

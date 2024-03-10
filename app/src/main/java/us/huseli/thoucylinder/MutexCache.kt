@@ -11,10 +11,11 @@ import kotlinx.coroutines.sync.withLock
 
 data class CachedValue<V>(val value: V?, val timestamp: Long = System.currentTimeMillis())
 
-class MutexCache<I, K, V>(
+open class MutexCache<I, K, V>(
     private val itemToKey: (I) -> K,
     private val fetchMethod: suspend MutexCache<I, K, V>.(I) -> V?,
     private val debugLabel: String? = null,
+    private val retentionMs: Long = 20_000L,
 ) {
     private val cache = mutableMapOf<K, CachedValue<V>>()
     private val mutexes = mutableMapOf<K, Mutex>()
@@ -23,13 +24,13 @@ class MutexCache<I, K, V>(
     init {
         scope.launch {
             while (true) {
-                val oldKeys = cache.filterValues { it.timestamp < System.currentTimeMillis() - 20_000 }.keys
+                val oldKeys = cache.filterValues { it.timestamp < System.currentTimeMillis() - retentionMs }.keys
                 if (oldKeys.isNotEmpty()) {
                     val prefix = debugLabel?.let { "[$it] " } ?: ""
                     Log.i("MutexCache", "${prefix}Throwing ${oldKeys.size} items")
                     cache.minusAssign(oldKeys)
                 }
-                delay(20_000L)
+                delay(retentionMs)
             }
         }
     }

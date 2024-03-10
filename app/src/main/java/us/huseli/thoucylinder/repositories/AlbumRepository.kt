@@ -1,7 +1,5 @@
 package us.huseli.thoucylinder.repositories
 
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +10,6 @@ import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -22,7 +19,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AlbumRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
+class AlbumRepository @Inject constructor(database: Database) {
     private val albumDao = database.albumDao()
     private val selectedAlbumIds = mutableMapOf<String, MutableStateFlow<List<UUID>>>()
 
@@ -68,8 +65,6 @@ class AlbumRepository @Inject constructor(database: Database, @ApplicationContex
     suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksCombo? = albumDao.getAlbumWithTracks(albumId)
 
     suspend fun getAlbumWithTracksByPlaylistId(playlistId: String) = albumDao.getAlbumWithTracksByPlaylistId(playlistId)
-
-    suspend fun getThumbnail(album: Album) = album.albumArt?.getThumbnailImageBitmap(context)
 
     suspend fun insertTags(tags: Collection<Tag>) {
         if (tags.isNotEmpty()) albumDao.insertTags(*tags.toTypedArray())
@@ -120,9 +115,9 @@ class AlbumRepository @Inject constructor(database: Database, @ApplicationContex
         else albumDao.clearAlbumArt(albumId)
     }
 
-    suspend fun upsertAlbumAndTags(combo: AbstractAlbumCombo) = albumDao.upsertAlbumsAndTags(listOf(combo))
+    suspend fun upsertAlbumAndTags(combo: AlbumWithTracksCombo) = albumDao.upsertAlbumsAndTags(listOf(combo))
 
-    suspend fun upsertAlbumsAndTags(combos: Collection<AbstractAlbumCombo>) = albumDao.upsertAlbumsAndTags(combos)
+    suspend fun upsertAlbumsAndTags(combos: Collection<AlbumWithTracksCombo>) = albumDao.upsertAlbumsAndTags(combos)
 
     private fun mutableFlowSelectedAlbumIds(viewModelClass: String): MutableStateFlow<List<UUID>> =
         selectedAlbumIds[viewModelClass] ?: MutableStateFlow<List<UUID>>(emptyList()).also {

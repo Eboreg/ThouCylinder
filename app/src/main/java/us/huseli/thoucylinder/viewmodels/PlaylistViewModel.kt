@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.launchOnIOThread
@@ -53,4 +56,15 @@ class PlaylistViewModel @Inject constructor(
         repos.playlist.listPlaylistTrackCombosById(selectedTrackIds.value)
 
     override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
+
+    override fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): TrackSelectionCallbacks {
+        return super.getTrackSelectionCallbacks(appCallbacks, context).copy(
+            onSelectAllClick = {
+                repos.track.selectTrackIds(
+                    selectionKey = "PlaylistViewModel",
+                    trackIds = _trackCombos.value.map { it.track.trackId },
+                )
+            }
+        )
+    }
 }

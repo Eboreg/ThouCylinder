@@ -4,7 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import us.huseli.retaintheme.extensions.combineEquals
 import java.util.UUID
 
 @Entity(
@@ -35,6 +34,3 @@ data class TrackArtist(
 ) : Comparable<TrackArtist> {
     override fun compareTo(other: TrackArtist): Int = position - other.position
 }
-
-fun Iterable<TrackArtist>.enumerate() = combineEquals { a, b -> a.trackId == b.trackId }
-    .flatMap { trackArtists -> trackArtists.mapIndexed { index, trackArtist -> trackArtist.copy(position = index) } }

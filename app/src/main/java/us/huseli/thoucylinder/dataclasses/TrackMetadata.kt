@@ -54,7 +54,6 @@ fun MediaExtractor.extractTrackMetadata(ff: MediaInformation?): TrackMetadata {
                     MediaFormat.KEY_CHANNEL_COUNT,
                     ffStream?.getNumberProperty("channels")?.toInt()
                 ),
-                // durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000,
                 durationMs = format.getLongOrNull(MediaFormat.KEY_DURATION)?.div(1000)
                     ?: ff?.duration?.toFloat()?.times(1000)?.toLong() ?: 0L,
                 extension = when {

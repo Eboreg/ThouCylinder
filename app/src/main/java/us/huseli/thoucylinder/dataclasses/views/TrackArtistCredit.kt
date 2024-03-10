@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses.views
 import androidx.room.ColumnInfo
 import androidx.room.DatabaseView
 import androidx.room.Embedded
-import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.entities.Artist
@@ -51,7 +50,4 @@ data class TrackArtistCredit(
         TrackArtist(trackId = trackId, artistId = artistId, joinPhrase = joinPhrase, position = position)
 }
 
-fun Iterable<TrackArtistCredit>.toTrackArtists(): List<TrackArtist> = map { it.toTrackArtist() }
-
-fun Iterable<TrackArtistCredit>.enumerate() = combineEquals { a, b -> a.trackId == b.trackId }
-    .flatMap { trackArtists -> trackArtists.mapIndexed { index, trackArtist -> trackArtist.copy(position = index) } }
+fun Iterable<TrackArtistCredit>.toTrackArtists(): Collection<TrackArtist> = map { it.toTrackArtist() }.toSet()

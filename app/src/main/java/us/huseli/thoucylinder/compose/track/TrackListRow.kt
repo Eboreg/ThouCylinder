@@ -43,9 +43,10 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
     combo: T,
     thumbnail: ImageBitmap?,
     showArtist: Boolean,
-    isSelected: Boolean,
+    showAlbum: Boolean,
     callbacks: TrackCallbacks<*>,
     modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
     downloadTask: TrackDownloadTask? = null,
@@ -81,7 +82,11 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
+                        val albumString = if (showAlbum) combo.album?.title else null
                         val artistString = if (showArtist) combo.artists.joined() else null
+                        val secondRow = listOfNotNull(artistString, albumString, combo.year?.toString())
+                            .takeIf { it.isNotEmpty() }
+                            ?.joinToString(" • ")
 
                         Text(
                             text = combo.track.title.umlautify(),
@@ -89,12 +94,14 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
-                        if (artistString != null) Text(
-                            text = artistString.umlautify(),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
-                        )
+                        secondRow?.also {
+                            Text(
+                                text = it,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
+                            )
+                        }
                     }
 
                     combo.track.duration?.also { duration ->

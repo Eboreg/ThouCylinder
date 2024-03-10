@@ -69,7 +69,7 @@ fun ImportableAlbumRow(
                     text = artist.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                     color = textColor,
                 )
             }

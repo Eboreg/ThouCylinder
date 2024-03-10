@@ -23,11 +23,11 @@ data class TypographyExtended(
     val listNormalHeader: TextStyle = TextStyle.Default,
     val listNormalTitle: TextStyle = TextStyle.Default,
     val listNormalTitleSecondary: TextStyle = TextStyle.Default,
-    val listNormalSubtitle: TextStyle = TextStyle.Default,
-    val listNormalSubtitleSecondary: TextStyle = TextStyle.Default,
     val listSmallHeader: TextStyle = TextStyle.Default,
     val listSmallTitle: TextStyle = TextStyle.Default,
     val listSmallTitleSecondary: TextStyle = TextStyle.Default,
+    val listExtraSmallTitle: TextStyle = TextStyle.Default,
+    val listExtraSmallTitleSecondary: TextStyle = TextStyle.Default,
 )
 
 val LocalTypographyExtended = staticCompositionLocalOf { TypographyExtended() }
@@ -84,19 +84,6 @@ fun ThouCylinderTheme(
             letterSpacing = 0.2.sp,
             color = colorScheme.onSurfaceVariant,
         ),
-        listNormalSubtitle = TextStyle.Default.copy(
-            fontSize = 14.sp,
-            lineHeight = 18.sp,
-            fontWeight = FontWeight.Normal,
-            letterSpacing = 0.4.sp,
-        ),
-        listNormalSubtitleSecondary = TextStyle.Default.copy(
-            fontSize = 14.sp,
-            lineHeight = 18.sp,
-            fontWeight = FontWeight.Normal,
-            letterSpacing = 0.4.sp,
-            color = colorScheme.onSurfaceVariant,
-        ),
         listSmallHeader = TextStyle.Default.copy(
             fontSize = 14.sp,
             lineHeight = 18.sp,
@@ -114,6 +101,19 @@ fun ThouCylinderTheme(
             lineHeight = 18.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
+            color = colorScheme.onSurfaceVariant,
+        ),
+        listExtraSmallTitle = TextStyle.Default.copy(
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.4.sp,
+        ),
+        listExtraSmallTitleSecondary = TextStyle.Default.copy(
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.3.sp,
             color = colorScheme.onSurfaceVariant,
         ),
     )

@@ -41,6 +41,7 @@ import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel
@@ -58,7 +59,7 @@ fun PlaylistScreen(
     val playlistOrNull by viewModel.playlist.collectAsStateWithLifecycle(null)
     val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val trackCombos by viewModel.trackCombos.collectAsStateWithLifecycle()
+    val trackCombos: List<PlaylistTrackCombo> by viewModel.trackCombos.collectAsStateWithLifecycle()
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -120,7 +121,7 @@ fun PlaylistScreen(
                 extraTrackSelectionButtons = {
                     SmallOutlinedButton(
                         onClick = { viewModel.removeTrackCombos(selectedTrackIds) },
-                        text = stringResource(R.string.remove),
+                        content = { Icon(Icons.Sharp.Delete, stringResource(R.string.remove)) },
                     )
                 },
             ) {
@@ -141,6 +142,7 @@ fun PlaylistScreen(
                         TrackListRow(
                             combo = combo,
                             showArtist = true,
+                            showAlbum = false,
                             thumbnail = thumbnail.value,
                             isSelected = isSelected,
                             containerColor = containerColor,

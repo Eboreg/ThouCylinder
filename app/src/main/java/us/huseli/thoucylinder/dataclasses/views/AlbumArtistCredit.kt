@@ -50,4 +50,4 @@ data class AlbumArtistCredit(
         AlbumArtist(albumId = albumId, artistId = artistId, joinPhrase = joinPhrase, position = position)
 }
 
-fun Iterable<AlbumArtistCredit>.toAlbumArtists(): List<AlbumArtist> = map { it.toAlbumArtist() }
+fun Iterable<AlbumArtistCredit>.toAlbumArtists(): Collection<AlbumArtist> = map { it.toAlbumArtist() }.toSet()

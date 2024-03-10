@@ -5,4 +5,5 @@ data class TrackSelectionCallbacks(
     val onPlayClick: (() -> Unit)? = null,
     val onEnqueueClick: (() -> Unit)? = null,
     val onUnselectAllClick: () -> Unit,
+    val onSelectAllClick: (() -> Unit)? = null,
 )

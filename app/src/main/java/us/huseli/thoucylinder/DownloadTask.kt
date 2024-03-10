@@ -157,11 +157,13 @@ class TrackDownloadTask(
         }
 
         setStatus(DownloadStatus.SAVING)
+        val metadata = tempFile.extractTrackMetadata()
         val downloadedTrack = trackCombo.track.copy(
             isInLibrary = true,
             albumId = albumCombo?.album?.albumId ?: trackCombo.track.albumId,
-            metadata = tempFile.extractTrackMetadata(),
+            metadata = metadata,
             localUri = documentFile.uri,
+            durationMs = metadata?.durationMs,
         )
         repos.track.updateTrack(downloadedTrack)
         tempFile.delete()

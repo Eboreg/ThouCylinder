@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.compose.screens.library
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.AlbumSortParameter
+import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.album.AlbumGrid
@@ -45,8 +48,12 @@ fun LibraryScreenAlbumTab(
             combo = combo,
             appCallbacks = appCallbacks,
             context = context,
-            onPlayClick = { viewModel.playAlbum(combo.album.albumId) },
-            onEnqueueClick = { viewModel.enqueueAlbum(combo.album.albumId, context) },
+            onPlayClick = if (combo.album.isPlayable) {
+                { viewModel.playAlbum(combo.album.albumId) }
+            } else null,
+            onEnqueueClick = if (combo.album.isPlayable) {
+                { viewModel.enqueueAlbum(combo.album.albumId, context) }
+            } else null,
             onAlbumLongClick = {
                 viewModel.selectAlbumsFromLastSelected(combo.album.albumId, albumCombos.map { it.album.albumId })
             },
@@ -71,40 +78,43 @@ fun LibraryScreenAlbumTab(
         }
     }
 
-    ListActions(
-        initialSearchTerm = searchTerm,
-        sortParameter = sortParameter,
-        sortOrder = sortOrder,
-        sortParameters = AlbumSortParameter.withLabels(context),
-        sortDialogTitle = stringResource(R.string.album_order),
-        onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
-        onSearch = { viewModel.setAlbumSearchTerm(it) },
-        tagPojos = tagPojos,
-        selectedTagPojos = selectedTagPojos,
-        onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
-        availabilityFilter = availabilityFilter,
-        onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
-    )
+    Column(modifier = Modifier.fillMaxSize()) {
+        ListActions(
+            initialSearchTerm = searchTerm,
+            sortParameter = sortParameter,
+            sortOrder = sortOrder,
+            sortParameters = AlbumSortParameter.withLabels(context),
+            sortDialogTitle = stringResource(R.string.album_order),
+            onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
+            onSearch = { viewModel.setAlbumSearchTerm(it) },
+            tagPojos = tagPojos,
+            selectedTagPojos = selectedTagPojos,
+            onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
+            availabilityFilter = availabilityFilter,
+            onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
+            filterButtonSelected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
+        )
 
-    when (displayType) {
-        DisplayType.LIST -> AlbumList(
-            combos = albumCombos,
-            albumCallbacks = albumCallbacks,
-            albumSelectionCallbacks = albumSelectionCallbacks,
-            selectedAlbumIds = selectedAlbumIds,
-            onEmpty = onEmpty,
-            albumDownloadTasks = albumDownloadTasks,
-            progressIndicatorStringRes = progressIndicatorStringRes,
-            getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
-        )
-        DisplayType.GRID -> AlbumGrid(
-            combos = albumCombos,
-            albumCallbacks = albumCallbacks,
-            selectedAlbumIds = selectedAlbumIds,
-            albumSelectionCallbacks = albumSelectionCallbacks,
-            onEmpty = onEmpty,
-            albumDownloadTasks = albumDownloadTasks,
-            progressIndicatorStringRes = progressIndicatorStringRes,
-        )
+        when (displayType) {
+            DisplayType.LIST -> AlbumList(
+                combos = albumCombos,
+                albumCallbacks = albumCallbacks,
+                albumSelectionCallbacks = albumSelectionCallbacks,
+                selectedAlbumIds = selectedAlbumIds,
+                onEmpty = onEmpty,
+                albumDownloadTasks = albumDownloadTasks,
+                progressIndicatorStringRes = progressIndicatorStringRes,
+                getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
+            )
+            DisplayType.GRID -> AlbumGrid(
+                combos = albumCombos,
+                albumCallbacks = albumCallbacks,
+                selectedAlbumIds = selectedAlbumIds,
+                albumSelectionCallbacks = albumSelectionCallbacks,
+                onEmpty = onEmpty,
+                albumDownloadTasks = albumDownloadTasks,
+                progressIndicatorStringRes = progressIndicatorStringRes,
+            )
+        }
     }
 }

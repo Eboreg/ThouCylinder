@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
-import us.huseli.thoucylinder.dataclasses.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.viewmodels.AbstractImportViewModel
 import java.util.UUID
 

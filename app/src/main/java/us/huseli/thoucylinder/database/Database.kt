@@ -15,12 +15,15 @@ import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
+import us.huseli.thoucylinder.dataclasses.entities.Radio
+import us.huseli.thoucylinder.dataclasses.entities.RadioTrack
 import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.RadioView
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import java.util.concurrent.Executors
 
@@ -38,10 +41,18 @@ import java.util.concurrent.Executors
         Artist::class,
         AlbumArtist::class,
         TrackArtist::class,
+        Radio::class,
+        RadioTrack::class,
     ],
-    views = [AlbumArtistCredit::class, TrackArtistCredit::class, TrackCombo::class, AlbumCombo::class],
+    views = [
+        AlbumArtistCredit::class,
+        TrackArtistCredit::class,
+        TrackCombo::class,
+        AlbumCombo::class,
+        RadioView::class,
+    ],
     exportSchema = false,
-    version = 88,
+    version = 95,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -51,6 +62,7 @@ abstract class Database : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
+    abstract fun radioDao(): RadioDao
 
     companion object {
         fun build(context: Context): Database {
@@ -67,7 +79,11 @@ abstract class Database : RoomDatabase() {
                             && !sqlQuery.startsWith("END TRANSACTION")
                             && !sqlQuery.contains("room_table_modification_log")
                             && !sqlQuery.startsWith("DROP TRIGGER IF EXISTS")
-                        ) Log.i("Database", "$sqlQuery\nbindArgs=$bindArgs")
+                        ) {
+                            var index = 0
+
+                            Log.i("Database", sqlQuery.replace(Regex("\\?")) { "'${bindArgs.getOrNull(index++)}'" })
+                        }
                     }
                 }
 

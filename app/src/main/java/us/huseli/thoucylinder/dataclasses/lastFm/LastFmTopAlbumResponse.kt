@@ -1,6 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.lastFm
 
-import us.huseli.thoucylinder.dataclasses.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 
 data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
     data class TopAlbums(val album: List<Album>)

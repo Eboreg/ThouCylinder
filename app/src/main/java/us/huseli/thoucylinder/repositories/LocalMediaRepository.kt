@@ -218,6 +218,7 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
                             metadata = metadata,
                             localUri = documentFile.uri,
                             musicBrainzId = id3.musicBrainzTrackId,
+                            durationMs = metadata.durationMs,
                         )
                         val artist = (id3.artist ?: pathArtist)?.let { getArtist(it) }
                         val trackArtist = artist?.let { TrackArtistCredit(artist = it, trackId = track.trackId) }
@@ -275,7 +276,7 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
     ) {
         val tmpInFile = File(context.cacheDir, "${documentFile.baseName}.in.tmp.${documentFile.extension}")
         val tmpOutFile = File(context.cacheDir, "${documentFile.baseName}.out.tmp.${documentFile.extension}")
-        val tagCommands = getTagMap(trackCombo, albumArtists).map { (key, value) ->
+        val tagCommands = ID3Data.fromTrackCombo(trackCombo, albumArtists).toTagMap().map { (key, value) ->
             "-metadata \"$key=${value.escapeQuotes()}\" -metadata:s \"$key=${value.escapeQuotes()}\""
         }.joinToString(" ")
         val ffmpegCommand =
@@ -298,26 +299,5 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
 
         tmpInFile.delete()
         tmpOutFile.delete()
-    }
-
-
-    /** PRIVATE METHODS *******************************************************/
-    private fun getTagMap(
-        trackCombo: AbstractTrackCombo,
-        albumArtists: List<AlbumArtistCredit>? = null,
-    ): Map<String, String> {
-        val tags = mutableMapOf("title" to trackCombo.track.title)
-
-        (trackCombo.artists.joined() ?: albumArtists?.joined())?.also { tags["artist"] = it }
-        albumArtists?.joined()?.also { tags["album_artist"] = it }
-        trackCombo.album?.title?.also { tags["album"] = it }
-        trackCombo.track.albumPosition?.also { tags["track"] = it.toString() }
-        (trackCombo.track.year ?: trackCombo.album?.year)?.also { tags["date"] = it.toString() }
-        trackCombo.track.musicBrainzId?.also { tags["mb_track_id"] = it }
-        trackCombo.album?.musicBrainzReleaseId?.also { tags["mb_release_id"] = it }
-        trackCombo.album?.musicBrainzReleaseGroupId?.also { tags["mb_release_group_id"] = it }
-        albumArtists?.firstNotNullOfOrNull { it.musicBrainzId }?.also { tags["mb_artist_id"] = it }
-
-        return tags
     }
 }

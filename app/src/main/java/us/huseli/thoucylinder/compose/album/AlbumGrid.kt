@@ -127,7 +127,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
                     text = artistString.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AlbumSmallIcons(combo = combo)

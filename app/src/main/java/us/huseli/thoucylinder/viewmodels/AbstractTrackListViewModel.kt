@@ -13,7 +13,6 @@ import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.launchOnMainThread
@@ -45,14 +44,16 @@ abstract class AbstractTrackListViewModel(
 
     fun enqueueTrackCombo(combo: AbstractTrackCombo, context: Context) = enqueueTrackCombos(listOf(combo), context)
 
-    fun enqueueTrackCombos(combos: Collection<AbstractTrackCombo>, context: Context) = launchOnMainThread {
-        repos.player.insertNext(getQueueTrackCombos(combos, repos.player.nextItemIndex))
+    fun enqueueTrackCombos(combos: Collection<AbstractTrackCombo>, context: Context) = launchOnIOThread {
+        val queueTrackCombos = getQueueTrackCombos(combos)
+
+        withContext(Dispatchers.Main) { repos.player.insertNext(queueTrackCombos) }
         SnackbarEngine.addInfo(
             context.resources.getQuantityString(R.plurals.x_tracks_enqueued_next, combos.size, combos.size).umlautify()
         )
     }
 
-    fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context) = TrackSelectionCallbacks(
+    open fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context) = TrackSelectionCallbacks(
         onAddToPlaylistClick = {
             launchOnIOThread { appCallbacks.onAddToPlaylistClick(Selection(tracks = listSelectedTracks())) }
         },
@@ -61,19 +62,17 @@ abstract class AbstractTrackListViewModel(
         onUnselectAllClick = { unselectAllTracks() },
     )
 
-    fun playPlaylist(playlistId: UUID, startTrackId: UUID? = null) = launchOnMainThread {
+    fun playPlaylist(playlistId: UUID, startTrackId: UUID? = null) = launchOnIOThread {
         val combos = getQueueTrackCombos(repos.playlist.listPlaylistTrackCombos(playlistId))
         val startIndex =
             startTrackId?.let { trackId -> combos.indexOfFirst { it.track.trackId == trackId }.takeIf { it > -1 } } ?: 0
 
-        repos.player.replaceAndPlay(combos, startIndex = startIndex)
+        withContext(Dispatchers.Main) { repos.player.replaceAndPlay(combos, startIndex = startIndex) }
     }
 
     fun playTrackCombo(combo: AbstractTrackCombo) = launchOnIOThread {
-        getQueueTrackCombo(combo, repos.player.nextItemIndex)?.also {
-            withContext(Dispatchers.Main) {
-                repos.player.insertNextAndPlay(it)
-            }
+        getQueueTrackCombo(combo)?.also {
+            withContext(Dispatchers.Main) { repos.player.insertNextAndPlay(it) }
         }
     }
 
@@ -104,30 +103,4 @@ abstract class AbstractTrackListViewModel(
     fun unselectAllTracks() = repos.track.unselectAllTrackIds(selectionKey)
 
     fun unselectTracks(trackIds: Collection<UUID>) = repos.track.unselectTrackIds(selectionKey, trackIds)
-
-    private suspend fun getQueueTrackCombo(trackCombo: AbstractTrackCombo, index: Int): QueueTrackCombo? {
-        val track = ensureTrackMetadata(trackCombo.track)
-
-        return track.playUri?.let { uri ->
-            QueueTrackCombo(
-                track = track,
-                uri = uri,
-                position = index,
-                album = trackCombo.album,
-                albumArtist = trackCombo.albumArtist,
-                artists = trackCombo.artists,
-            )
-        }
-    }
-
-    protected suspend fun getQueueTrackCombos(
-        trackCombos: Collection<AbstractTrackCombo>,
-        startIndex: Int = 0,
-    ): List<QueueTrackCombo> {
-        var offset = 0
-
-        return trackCombos.mapNotNull { combo ->
-            getQueueTrackCombo(combo, startIndex + offset)?.also { offset++ }
-        }
-    }
 }

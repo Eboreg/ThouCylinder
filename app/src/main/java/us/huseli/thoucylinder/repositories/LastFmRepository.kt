@@ -21,12 +21,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import us.huseli.retaintheme.extensions.join
 import us.huseli.retaintheme.extensions.md5
+import us.huseli.retaintheme.extensions.slice
 import us.huseli.retaintheme.extensions.toHex
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
-import us.huseli.thoucylinder.PlayerRepositoryListener
+import us.huseli.thoucylinder.PlaybackState
+import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database
@@ -35,6 +37,7 @@ import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
+import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopArtistsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getBitmapByUrl
@@ -47,7 +50,6 @@ import kotlin.time.Duration.Companion.seconds
 class LastFmRepository @Inject constructor(
     database: Database,
     @ApplicationContext private val context: Context,
-    playerRepo: PlayerRepository,
 ) : PlayerRepositoryListener {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val albumDao = database.albumDao()
@@ -77,8 +79,6 @@ class LastFmRepository @Inject constructor(
     )
 
     init {
-        playerRepo.addListener(this)
-
         scope.launch {
             combine(_sessionKey, _scrobble) { sessionKey, scrobble -> Pair(sessionKey, scrobble) }
                 .collect { (sessionKey, scrobble) ->
@@ -166,6 +166,26 @@ class LastFmRepository @Inject constructor(
     suspend fun getThumbnail(album: LastFmTopAlbumsResponse.Album): ImageBitmap? =
         album.image.getThumbnail()?.let { image -> image.url.getBitmapByUrl()?.asFullImageBitmap(context) }
 
+    suspend fun getTopArtists(limit: Int = 10): List<LastFmTopArtistsResponse.Artist> {
+        return _username.value?.let { username ->
+            val url = getApiUrl(
+                mapOf(
+                    "method" to "user.gettopartists",
+                    "period" to "12month",
+                    "format" to "json",
+                    "user" to username,
+                )
+            )
+
+            apiResponseCache.getOrNull(url)
+                ?.fromJson<LastFmTopArtistsResponse>()
+                ?.topartists
+                ?.artist
+                ?.filter { it.mbid.isNotEmpty() }
+                ?.slice(0, limit)
+        } ?: emptyList()
+    }
+
     suspend fun listImportedAlbumIds(): List<String> = albumDao.listMusicBrainzReleaseIds()
 
     fun setScrobble(value: Boolean) {
@@ -216,7 +236,7 @@ class LastFmRepository @Inject constructor(
 
 
     /** OVERRIDDEN METHODS ****************************************************/
-    override suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlayerRepository.PlaybackState) {
+    override suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {
         _sessionKey.value?.also { sessionKey ->
             if (_scrobble.value) {
                 val nowPlaying = combo?.let {

@@ -9,33 +9,38 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.AndroidUriHandler
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import us.huseli.thoucylinder.compose.App
+import us.huseli.thoucylinder.interfaces.SpotifyOAuth2Listener
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.LastFmViewModel
 import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), SpotifyOAuth2Listener {
     private val spotifyImportViewModel by viewModels<SpotifyImportViewModel>()
     private val lastFmViewModel by viewModels<LastFmViewModel>()
     private val appViewModel by viewModels<AppViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (BuildConfig.DEBUG) {
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
+                    .detectLeakedClosableObjects()
+                    .detectLeakedSqlLiteObjects()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
         val startDestination: String = intent?.let { handleIntent(it) } ?: LibraryDestination.route
 
-        if (BuildConfig.DEBUG) {
-            StrictMode.setVmPolicy(
-                StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
-                    .detectLeakedClosableObjects()
-                    .build()
-            )
-        }
-
+        spotifyImportViewModel.registerOAuth2Listener(this)
         appViewModel.doStartupTasks(this)
 
         /**
@@ -68,5 +73,9 @@ class MainActivity : ComponentActivity() {
             }
         }
         return null
+    }
+
+    override fun onSpotifyReauthNeeded(authUrl: String) {
+        AndroidUriHandler(this).openUri(authUrl)
     }
 }

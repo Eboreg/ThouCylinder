@@ -20,15 +20,15 @@ import java.time.Instant
 import java.util.UUID
 
 @Dao
-interface PlaylistDao {
+abstract class PlaylistDao {
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId ORDER BY PlaylistTrack_position")
-    suspend fun _listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
+    protected abstract suspend fun _listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
 
     @Update
-    suspend fun _updateTracks(vararg tracks: PlaylistTrack)
+    protected abstract suspend fun _updateTracks(vararg tracks: PlaylistTrack)
 
     @Delete
-    suspend fun deletePlaylist(playlist: Playlist)
+    abstract suspend fun deletePlaylist(playlist: Playlist)
 
     @Query(
         """
@@ -37,10 +37,10 @@ interface PlaylistDao {
             OR PlaylistTrack_playlistId NOT IN (SELECT Playlist_playlistId FROM Playlist)
         """
     )
-    suspend fun deleteOrphanPlaylistTracks()
+    abstract suspend fun deleteOrphanPlaylistTracks()
 
     @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_id IN (:ids)")
-    suspend fun deletePlaylistTracks(vararg ids: UUID)
+    abstract suspend fun deletePlaylistTracks(vararg ids: UUID)
 
     @Query(
         """
@@ -52,35 +52,32 @@ interface PlaylistDao {
         HAVING Playlist_playlistId IS NOT NULL
         """
     )
-    fun flowPojos(): Flow<List<PlaylistPojo>>
+    abstract fun flowPojos(): Flow<List<PlaylistPojo>>
 
     @Query("SELECT * FROM Playlist WHERE Playlist_playlistId = :playlistId")
-    fun flowPlaylist(playlistId: UUID): Flow<Playlist?>
+    abstract fun flowPlaylist(playlistId: UUID): Flow<Playlist?>
 
     @Query("SELECT * FROM Playlist")
-    fun flowPlaylists(): Flow<List<Playlist>>
+    abstract fun flowPlaylists(): Flow<List<Playlist>>
 
     @Transaction
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
-            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
-        FROM Track 
+        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
+        FROM TrackCombo 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-            LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
         WHERE Playlist_playlistId = :playlistId
         ORDER BY PlaylistTrack_position
         """
     )
-    fun flowTrackCombos(playlistId: UUID): Flow<List<PlaylistTrackCombo>>
+    abstract fun flowTrackCombos(playlistId: UUID): Flow<List<PlaylistTrackCombo>>
 
     @Insert
-    suspend fun insertPlaylists(vararg playlists: Playlist)
+    abstract suspend fun insertPlaylists(vararg playlists: Playlist)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertPlaylistTracks(vararg playlistTracks: PlaylistTrack)
+    abstract suspend fun insertPlaylistTracks(vararg playlistTracks: PlaylistTrack)
 
     @Query(
         """
@@ -91,50 +88,44 @@ interface PlaylistDao {
         WHERE PlaylistTrack_playlistId = :playlistId
         """
     )
-    suspend fun listAlbums(playlistId: UUID): List<Album>
+    abstract suspend fun listAlbums(playlistId: UUID): List<Album>
 
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
-    suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
+    abstract suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
 
     @Transaction
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
-            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
-        FROM Track 
+        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
+        FROM TrackCombo 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-            LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
         WHERE Playlist_playlistId = :playlistId
         GROUP BY PlaylistTrack_id
         ORDER BY PlaylistTrack_position
         """
     )
-    suspend fun listTrackCombos(playlistId: UUID): List<PlaylistTrackCombo>
+    abstract suspend fun listTrackCombos(playlistId: UUID): List<PlaylistTrackCombo>
 
     @Transaction
     @Query(
         """
-        SELECT DISTINCT Track.*, Album.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id,
-            GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist            
-        FROM Track 
+        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
+        FROM TrackCombo 
             JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
             JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-            LEFT JOIN Album ON Track_albumId = Album_albumId
-            LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
         WHERE PlaylistTrack_id IN (:ids)
         GROUP BY PlaylistTrack_id
         ORDER BY PlaylistTrack_position
         """
     )
-    suspend fun listTrackCombosById(vararg ids: UUID): List<PlaylistTrackCombo>
+    abstract suspend fun listTrackCombosById(vararg ids: UUID): List<PlaylistTrackCombo>
 
     @Query("SELECT Track.* FROM PlaylistTrack JOIN Track ON Track_trackId = PlaylistTrack_trackId WHERE PlaylistTrack_playlistId = :playlistId")
-    suspend fun listTracks(playlistId: UUID): List<Track>
+    abstract suspend fun listTracks(playlistId: UUID): List<Track>
 
     @Transaction
-    suspend fun moveTrack(playlistId: UUID, from: Int, to: Int) {
+    open suspend fun moveTrack(playlistId: UUID, from: Int, to: Int) {
         val tracks = _listPlaylistTracks(playlistId)
         val updatedTracks = tracks
             .toMutableList()
@@ -145,5 +136,5 @@ interface PlaylistDao {
     }
 
     @Query("UPDATE Playlist SET Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")
-    suspend fun touchPlaylist(playlistId: UUID, updated: Instant = Instant.now())
+    abstract suspend fun touchPlaylist(playlistId: UUID, updated: Instant = Instant.now())
 }

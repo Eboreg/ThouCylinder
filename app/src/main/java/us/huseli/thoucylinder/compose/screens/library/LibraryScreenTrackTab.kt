@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.compose.screens.library
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -14,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
+import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
@@ -89,43 +92,46 @@ fun LibraryScreenTrackTab(
         }
     }
 
-    ListActions(
-        initialSearchTerm = searchTerm,
-        sortParameter = sortParameter,
-        sortOrder = sortOrder,
-        sortParameters = TrackSortParameter.withLabels(context),
-        sortDialogTitle = stringResource(R.string.track_order),
-        onSort = { param, order -> viewModel.setTrackSorting(param, order) },
-        onSearch = { viewModel.setTrackSearchTerm(it) },
-        tagPojos = tagPojos,
-        selectedTagPojos = selectedTagPojos,
-        onTagsChange = { viewModel.setSelectedTrackTagPojos(it) },
-        availabilityFilter = availabilityFilter,
-        onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
-    )
+    Column(modifier = Modifier.fillMaxSize()) {
+        ListActions(
+            initialSearchTerm = searchTerm,
+            sortParameter = sortParameter,
+            sortOrder = sortOrder,
+            sortParameters = TrackSortParameter.withLabels(context),
+            sortDialogTitle = stringResource(R.string.track_order),
+            onSort = { param, order -> viewModel.setTrackSorting(param, order) },
+            onSearch = { viewModel.setTrackSearchTerm(it) },
+            tagPojos = tagPojos,
+            selectedTagPojos = selectedTagPojos,
+            onTagsChange = { viewModel.setSelectedTrackTagPojos(it) },
+            availabilityFilter = availabilityFilter,
+            onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
+            filterButtonSelected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
+        )
 
-    when (displayType) {
-        DisplayType.LIST -> TrackList(
-            trackCombos = trackCombos,
-            selectedTrackIds = selectedTrackIds,
-            viewModel = viewModel,
-            listState = listState,
-            trackCallbacks = trackCallbacks,
-            trackSelectionCallbacks = trackSelectionCallbacks,
-            trackDownloadTasks = trackDownloadTasks,
-            onEmpty = onEmpty,
-            progressIndicatorText = progressIndicatorText,
-        )
-        DisplayType.GRID -> TrackGrid(
-            trackCombos = trackCombos,
-            viewModel = viewModel,
-            gridState = gridState,
-            trackCallbacks = trackCallbacks,
-            trackSelectionCallbacks = trackSelectionCallbacks,
-            selectedTrackIds = selectedTrackIds,
-            trackDownloadTasks = trackDownloadTasks,
-            onEmpty = onEmpty,
-            progressIndicatorText = progressIndicatorText,
-        )
+        when (displayType) {
+            DisplayType.LIST -> TrackList(
+                trackCombos = trackCombos,
+                selectedTrackIds = selectedTrackIds,
+                viewModel = viewModel,
+                listState = listState,
+                trackCallbacks = trackCallbacks,
+                trackSelectionCallbacks = trackSelectionCallbacks,
+                trackDownloadTasks = trackDownloadTasks,
+                onEmpty = onEmpty,
+                progressIndicatorText = progressIndicatorText,
+            )
+            DisplayType.GRID -> TrackGrid(
+                trackCombos = trackCombos,
+                viewModel = viewModel,
+                gridState = gridState,
+                trackCallbacks = trackCallbacks,
+                trackSelectionCallbacks = trackSelectionCallbacks,
+                selectedTrackIds = selectedTrackIds,
+                trackDownloadTasks = trackDownloadTasks,
+                onEmpty = onEmpty,
+                progressIndicatorText = progressIndicatorText,
+            )
+        }
     }
 }

@@ -21,7 +21,7 @@ abstract class AbstractArtistCredit : Comparable<AbstractArtistCredit> {
 
 fun List<AbstractArtistCredit>.joined(): String? = takeIf { it.isNotEmpty() }
     ?.sorted()
-    ?.mapIndexed { index, pojo -> pojo.name + if (index < lastIndex) pojo.joinPhrase else "" }
+    ?.mapIndexed { index, artist -> artist.name + if (index < lastIndex) artist.joinPhrase else "" }
     ?.joinToString("")
 
-fun Iterable<AbstractArtistCredit>.toArtists(): List<Artist> = map { it.toArtist() }
+fun Iterable<AbstractArtistCredit>.toArtists(): Collection<Artist> = map { it.toArtist() }.toSet()

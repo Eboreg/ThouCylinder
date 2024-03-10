@@ -25,6 +25,7 @@ import us.huseli.thoucylinder.getParentDirectory
 import us.huseli.thoucylinder.matchFiles
 import java.util.UUID
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @Entity(
     foreignKeys = [
@@ -49,6 +50,7 @@ data class Track(
     @ColumnInfo("Track_localUri") val localUri: Uri? = null,
     @ColumnInfo("Track_musicBrainzId") val musicBrainzId: String? = null,
     @ColumnInfo("Track_spotifyId") val spotifyId: String? = null,
+    @ColumnInfo("Track_durationMs") val durationMs: Long? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
@@ -60,7 +62,7 @@ data class Track(
         get() = discNumber ?: 1
 
     val duration: Duration?
-        get() = metadata?.duration ?: youtubeVideo?.duration
+        get() = durationMs?.milliseconds ?: metadata?.duration ?: youtubeVideo?.duration
 
     val isDownloadable: Boolean
         get() = !isDownloaded && isOnYoutube
@@ -97,38 +99,6 @@ data class Track(
 
     @WorkerThread
     fun getDocumentFile(context: Context): DocumentFile? = localUri?.let { DocumentFileCompat.fromUri(context, it) }
-
-    /*
-    fun getLevenshteinDistance(other: Track, albumArtist: String? = null): Int {
-        val levenshtein = LevenshteinDistance()
-        val distances = mutableListOf<Int>()
-
-        distances.add(levenshtein.apply(title.lowercase(), other.title.lowercase()))
-
-        if (albumArtist != null) {
-            distances.add(levenshtein.apply("$albumArtist - $title".lowercase(), other.title.lowercase()))
-            if (other.artist != null) distances.add(
-                levenshtein.apply(
-                    "$albumArtist - $title".lowercase(),
-                    "${other.artist} ${other.title}".lowercase(),
-                )
-            )
-        }
-        if (artist != null) {
-            distances.add(levenshtein.apply("$artist - $title".lowercase(), other.title.lowercase()))
-            if (other.artist != null) distances.add(
-                levenshtein.apply(
-                    "$artist - $title".lowercase(),
-                    "${other.artist} - ${other.title}".lowercase(),
-                )
-            )
-        }
-        if (other.artist != null)
-            distances.add(levenshtein.apply(title.lowercase(), "${other.artist} - ${other.title}".lowercase()))
-
-        return distances.min()
-    }
-     */
 
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()

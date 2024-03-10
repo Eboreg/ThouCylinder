@@ -45,7 +45,7 @@ class YoutubeSearchViewModel @Inject constructor(
                         .map { playlistCombo ->
                             playlistCombo.toAlbumCombo(
                                 isInLibrary = false,
-                                getArtist = { repos.artist.artistCache.get(it) },
+                                getArtist = { repos.artist.artistCache.getByName(it) },
                             )
                         }
 

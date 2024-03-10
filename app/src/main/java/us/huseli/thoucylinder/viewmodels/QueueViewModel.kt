@@ -14,8 +14,12 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.dataclasses.Selection
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.launchOnMainThread
 import us.huseli.thoucylinder.umlautify
 import java.util.UUID
@@ -26,7 +30,6 @@ import kotlin.time.DurationUnit
 class QueueViewModel @Inject constructor(
     private val repos: Repositories,
 ) : AbstractTrackListViewModel("QueueViewModel", repos) {
-    private val _selectedQueueTracks = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
     private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
 
     val canGotoNext = repos.player.canGotoNext
@@ -34,7 +37,7 @@ class QueueViewModel @Inject constructor(
     val currentCombo = repos.player.currentCombo.filterNotNull().distinctUntilChanged()
     val currentPositionSeconds = repos.player.currentPositionMs.map { it / 1000 }.distinctUntilChanged()
     val currentProgress: Flow<Float> = combine(repos.player.currentPositionMs, currentCombo) { position, combo ->
-        val endPosition = combo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
+        val endPosition = combo.track.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
         endPosition?.let { position / it.toFloat() } ?: 0f
     }.distinctUntilChanged()
     val isLoading = repos.player.isLoading
@@ -42,6 +45,8 @@ class QueueViewModel @Inject constructor(
     val isRepeatEnabled = repos.player.isRepeatEnabled
     val isShuffleEnabled = repos.player.isShuffleEnabled
     val queue = _queue.asStateFlow()
+    val radioPojo = repos.player.radioPojo
+
     override val trackDownloadTasks = repos.download.tasks
 
     init {
@@ -88,19 +93,7 @@ class QueueViewModel @Inject constructor(
 
     fun toggleRepeat() = repos.player.toggleRepeat()
 
-    fun toggleSelected(queueTrack: QueueTrackCombo) {
-        if (_selectedQueueTracks.value.contains(queueTrack))
-            _selectedQueueTracks.value -= queueTrack
-        else
-            _selectedQueueTracks.value += queueTrack
-    }
-
     fun toggleShuffle() = repos.player.toggleShuffle()
-
-    override suspend fun listSelectedTrackCombos(): List<QueueTrackCombo> =
-        repos.player.listQueueTrackCombosById(selectedTrackIds.value)
-
-    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
 
     override fun enqueueSelectedTracks(context: Context) {
         launchOnMainThread {
@@ -114,6 +107,22 @@ class QueueViewModel @Inject constructor(
             )
         }
     }
+
+    override fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): TrackSelectionCallbacks {
+        /** It makes little sense to define onPlayClick and onEnqueueClick here. */
+        return TrackSelectionCallbacks(
+            onAddToPlaylistClick = {
+                launchOnIOThread { appCallbacks.onAddToPlaylistClick(Selection(tracks = listSelectedTracks())) }
+            },
+            onUnselectAllClick = { unselectAllTracks() },
+            onSelectAllClick = { repos.track.selectTrackIds("QueueViewModel", _queue.value.map { it.queueTrackId }) },
+        )
+    }
+
+    override suspend fun listSelectedTrackCombos(): List<QueueTrackCombo> =
+        repos.player.listQueueTrackCombosById(selectedTrackIds.value)
+
+    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
 
     override fun playSelectedTracks() {
         launchOnMainThread { repos.player.moveNextAndPlay(selectedTrackIds.value) }

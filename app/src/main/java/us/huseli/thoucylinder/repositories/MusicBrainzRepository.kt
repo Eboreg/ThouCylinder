@@ -4,12 +4,24 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
+import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
+import us.huseli.thoucylinder.SuspendingRequestJob
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy
@@ -19,22 +31,27 @@ import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzRelease
 import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseGroup
 import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseSearch
 import us.huseli.thoucylinder.getMutexCache
+import us.huseli.thoucylinder.getNext
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class MusicBrainzRepository @Inject constructor(@ApplicationContext private val context: Context) {
-    private val gson: Gson = GsonBuilder().create()
-    private var lastRequest: Long? = null
-    private val apiResponseCache = getMutexCache("MusicBrainzRepository.apiResponseCache") { url ->
-        lastRequest?.let { System.currentTimeMillis() - it }?.also { millisSinceLast ->
-            if (millisSinceLast < MIN_REQUEST_INTERVAL_MS) {
-                kotlinx.coroutines.delay(MIN_REQUEST_INTERVAL_MS - millisSinceLast)
-            }
-        }
-        Request(url = url, headers = mapOf("User-Agent" to CUSTOM_USER_AGENT)).getString()
-            .also { lastRequest = System.currentTimeMillis() }
+    class RequestJob(url: String, lowPrio: Boolean = false) : SuspendingRequestJob(url, lowPrio) {
+        override suspend fun request(): String =
+            Request(url = url, headers = mapOf("User-Agent" to CUSTOM_USER_AGENT)).getString()
     }
+
+    private val gson: Gson = GsonBuilder().create()
+    private val apiResponseCache = MutexCache<RequestJob, String, String>(
+        itemToKey = { it.url },
+        fetchMethod = { job ->
+            requestQueue.value += job
+            job.run().also { requestQueue.value -= job }
+        },
+        debugLabel = "MusicBrainzRepository.apiResponseCache2",
+    )
     private val coverArtArchiveCache =
         getMutexCache<String, CoverArtArchiveResponse>("MusicBrainzRepository.coverArtArchiveCache") { releaseId ->
             Request(
@@ -42,6 +59,20 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
                 headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
             ).getObject<CoverArtArchiveResponse>()
         }
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val requestQueue = MutableStateFlow<List<RequestJob>>(emptyList())
+    private var matchArtistsJob: Job? = null
+
+    init {
+        scope.launch {
+            requestQueue.collect { jobs ->
+                jobs.getNext()?.also { job ->
+                    job.lock.unlock()
+                    delay(MIN_REQUEST_INTERVAL_MS)
+                }
+            }
+        }
+    }
 
     suspend fun getAllCoverArtArchiveImages(releaseId: String): List<CoverArtArchiveImage> =
         coverArtArchiveCache.getOrNull(releaseId)?.images?.filter { it.front } ?: emptyList()
@@ -76,7 +107,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         combo: AlbumWithTracksCombo,
         maxDistance: Double = MAX_ALBUM_MATCH_DISTANCE,
         strategy: TrackMergeStrategy = TrackMergeStrategy.KEEP_LEAST,
-        getArtist: suspend (String) -> Artist,
+        getArtist: suspend (BaseArtist) -> Artist,
     ): AlbumWithTracksCombo? {
         val params = mutableMapOf(
             "release" to combo.album.title,
@@ -95,15 +126,25 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
             ?.let { combo.updateWith(it, strategy) }
     }
 
-    suspend fun matchArtist(artist: Artist): Artist? = try {
-        if (artist.musicBrainzId == null) {
-            gson.fromJson(search("artist", artist.name), MusicBrainzArtistSearch::class.java)
-                ?.artists
-                ?.firstOrNull { it.matches(artist.name) }
-                ?.let { artist.copy(musicBrainzId = it.id) }
-        } else null
-    } catch (e: Exception) {
-        null
+    fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (UUID, String) -> Unit) {
+        if (matchArtistsJob == null) matchArtistsJob = scope.launch {
+            val previousIds = mutableSetOf<UUID>()
+
+            flow
+                .map { artists -> artists.filter { it.musicBrainzId == null && !previousIds.contains(it.id) } }
+                .collect { artists ->
+                    for (artist in artists) {
+                        val matchedId = search("artist", artist.name, true)
+                            ?.let { gson.fromJson(it, MusicBrainzArtistSearch::class.java) }
+                            ?.artists
+                            ?.firstOrNull { it.matches(artist.name) }
+                            ?.id
+
+                        save(artist.id, matchedId ?: "")
+                        previousIds.add(artist.id)
+                    }
+                }
+        }
     }
 
 
@@ -134,22 +175,31 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         return response?.releases?.firstOrNull { release -> release.matches(artist, album) }?.id
     }
 
-    private suspend fun request(path: String, params: Map<String, String> = emptyMap()): String? {
+    private suspend fun request(
+        path: String,
+        params: Map<String, String> = emptyMap(),
+        lowPrio: Boolean = false,
+    ): String? {
         val url = Request.getUrl("$MUSICBRAINZ_API_ROOT/${path.trimStart('/')}", params.plus("fmt" to "json"))
 
-        return apiResponseCache.getOrNull(url)
+        return apiResponseCache.getOrNull(RequestJob(url, lowPrio))
     }
 
-    private suspend fun search(resource: String, params: Map<String, String> = emptyMap(), limit: Int = 10): String? {
-        val query = params
+    private suspend fun search(
+        resource: String,
+        queryParams: Map<String, String> = emptyMap(),
+        lowPrio: Boolean = false,
+        limit: Int = 10,
+    ): String? {
+        val query = queryParams
             .map { (key, value) -> "$key:${escapeString(value)}" }
             .joinToString(" AND ")
 
-        return request(resource, mapOf("query" to query, "limit" to limit.toString()))
+        return request(resource, mapOf("query" to query, "limit" to limit.toString()), lowPrio)
     }
 
-    private suspend fun search(resource: String, query: String, limit: Int = 10): String? {
-        return request(resource, mapOf("query" to escapeString(query), "limit" to limit.toString()))
+    private suspend fun search(resource: String, query: String, lowPrio: Boolean = false, limit: Int = 10): String? {
+        return request(resource, mapOf("query" to escapeString(query), "limit" to limit.toString()), lowPrio)
     }
 
     companion object {

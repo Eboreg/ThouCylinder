@@ -105,7 +105,7 @@ fun BoxWithConstraintsScope.ModalCover(
 
     var backgroundColor by remember { mutableStateOf(baseBackgroundColor) }
     val currentTrackEndPosition by remember(trackCombo.track.trackId) {
-        mutableStateOf(trackCombo.track.metadata?.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 })
+        mutableStateOf(trackCombo.track.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 })
     }
     val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
     var isCollapsing by remember { mutableStateOf(false) }

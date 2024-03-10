@@ -9,15 +9,16 @@ import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.Flow
-import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
@@ -33,7 +34,7 @@ fun ArtistList(
     progressIndicatorText: String? = null,
     onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
-    imageFlow: (ArtistCombo) -> Flow<ImageBitmap?>,
+    getImage: suspend (ArtistCombo) -> ImageBitmap?,
 ) {
     ItemList(
         things = artistCombos,
@@ -41,7 +42,11 @@ fun ArtistList(
         onClick = { _, combo -> onArtistClick(combo.artist.id) },
         onEmpty = onEmpty,
     ) { _, combo ->
-        val imageBitmap by imageFlow(combo).collectAsStateWithLifecycle(null)
+        var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+        LaunchedEffect(combo.artist) {
+            imageBitmap = getImage(combo)
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
@@ -57,10 +62,9 @@ fun ArtistList(
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                 )
                 Text(
-                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                     text = pluralStringResource(R.plurals.x_albums, combo.albumCount, combo.albumCount) + " • " +
-                        pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount) + " • " +
-                        combo.totalDuration.sensibleFormat(),
+                        pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
                 )
             }
         }

@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.dataclasses.abstr
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
@@ -13,11 +14,24 @@ abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
     abstract val artists: List<TrackArtistCredit>
     abstract val albumArtist: String?
 
+    val year: Int?
+        get() = track.year ?: album?.year
+
     suspend fun getFullBitmap(context: Context) =
         track.image?.getFullBitmap(context) ?: album?.albumArt?.getFullBitmap(context)
 
     suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
         track.image?.getFullImageBitmap(context) ?: album?.albumArt?.getFullImageBitmap(context)
+
+    fun toQueueTrackCombo(): QueueTrackCombo? = track.playUri?.let { uri ->
+        QueueTrackCombo(
+            track = track,
+            uri = uri,
+            album = album,
+            albumArtist = albumArtist,
+            artists = artists,
+        )
+    }
 
     fun toString(
         showAlbumPosition: Boolean = true,

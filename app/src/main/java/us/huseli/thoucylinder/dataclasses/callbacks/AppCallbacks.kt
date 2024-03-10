@@ -23,4 +23,7 @@ data class AppCallbacks(
     val onEditTrackClick: (AbstractTrackCombo) -> Unit,
     val onPlaylistClick: (UUID) -> Unit,
     val onShowTrackInfoClick: (AbstractTrackCombo) -> Unit,
+    val onStartAlbumRadioClick: (UUID) -> Unit,
+    val onStartArtistRadioClick: (UUID) -> Unit,
+    val onStartTrackRadioClick: (UUID) -> Unit,
 )

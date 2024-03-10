@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.musicBrainz
 
 import com.google.gson.annotations.SerializedName
-import us.huseli.thoucylinder.dataclasses.interfaces.IExternalTrack
+import us.huseli.thoucylinder.interfaces.IExternalTrack
 
 data class MusicBrainzTrack(
     @SerializedName("artist-credit")

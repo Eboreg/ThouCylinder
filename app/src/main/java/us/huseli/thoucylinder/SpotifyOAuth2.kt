@@ -2,6 +2,7 @@ package us.huseli.thoucylinder
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,7 +10,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_CODE_VERIFIER
 import us.huseli.thoucylinder.dataclasses.OAuth2Token
+import us.huseli.thoucylinder.interfaces.SpotifyOAuth2Listener
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -21,10 +24,15 @@ class SpotifyOAuth2(context: Context) {
     private val token = MutableStateFlow(
         preferences.getString(Constants.PREF_SPOTIFY_OAUTH2_TOKEN, null)?.let { OAuth2Token.fromJson(it) }
     )
+    private var listener: SpotifyOAuth2Listener? = null
 
     val authorizationStatus = token.map { token ->
         if (token == null) AuthorizationStatus.UNAUTHORIZED
         else AuthorizationStatus.AUTHORIZED
+    }
+
+    fun registerListener(listener: SpotifyOAuth2Listener) {
+        this.listener = listener
     }
 
     fun getAuthUrl(): String {
@@ -33,13 +41,13 @@ class SpotifyOAuth2(context: Context) {
         val params = mapOf(
             "client_id" to BuildConfig.spotifyClientId,
             "response_type" to "code",
-            "redirect_uri" to REDIRECT_URL,
+            "redirect_uri" to IMPORT_ALBUMS_REDIRECT_URL,
             "scope" to "user-library-read",
             "code_challenge_method" to "S256",
             "code_challenge" to challenge,
         )
 
-        preferences.edit().putString(Constants.PREF_SPOTIFY_CODE_VERIFIER, codeVerifier).apply()
+        preferences.edit().putString(PREF_SPOTIFY_CODE_VERIFIER, codeVerifier).apply()
         return Request.getUrl(AUTH_URL, params)
     }
 
@@ -80,32 +88,46 @@ class SpotifyOAuth2(context: Context) {
         return List(128) { charPool.random() }.joinToString("")
     }
 
-    private suspend fun fetchToken(code: String): OAuth2Token {
-        val codeVerifier = preferences.getString(Constants.PREF_SPOTIFY_CODE_VERIFIER, null)
-            ?: throw Exception("No codeVerifier found in preferences")
-        val response = Request.postFormData(
-            url = TOKEN_URL,
-            formData = mapOf(
-                "grant_type" to "authorization_code",
-                "code" to code,
-                "redirect_uri" to REDIRECT_URL,
-                "client_id" to BuildConfig.spotifyClientId,
-                "code_verifier" to codeVerifier,
-            ),
-        )
-        return saveToken(response.getString())
+    private suspend fun fetchToken(code: String): OAuth2Token? {
+        return try {
+            val codeVerifier = preferences.getString(PREF_SPOTIFY_CODE_VERIFIER, null)
+                ?: throw Exception("No codeVerifier found in preferences")
+            val response = Request.postFormData(
+                url = TOKEN_URL,
+                formData = mapOf(
+                    "grant_type" to "authorization_code",
+                    "code" to code,
+                    "redirect_uri" to IMPORT_ALBUMS_REDIRECT_URL,
+                    "client_id" to BuildConfig.spotifyClientId,
+                    "code_verifier" to codeVerifier,
+                ),
+            )
+            saveToken(response.getString())
+        } catch (e: HTTPResponseError) {
+            Log.e(javaClass.simpleName, e.toString())
+            token.value = null
+            null
+        }
     }
 
-    private suspend fun refreshToken(token: OAuth2Token): OAuth2Token {
-        val response = Request.postFormData(
-            url = TOKEN_URL,
-            formData = mapOf(
-                "grant_type" to "refresh_token",
-                "refresh_token" to token.refreshToken,
-                "client_id" to BuildConfig.spotifyClientId,
-            )
-        )
-        return saveToken(response.getString())
+    private suspend fun refreshToken(token: OAuth2Token): OAuth2Token? {
+        return try {
+            val response =
+                Request.postFormData(
+                    url = TOKEN_URL,
+                    formData = mapOf(
+                        "grant_type" to "refresh_token",
+                        "refresh_token" to token.refreshToken,
+                        "client_id" to BuildConfig.spotifyClientId,
+                    )
+                )
+            saveToken(response.getString())
+        } catch (e: HTTPResponseError) {
+            Log.e(javaClass.simpleName, e.toString())
+            this.token.value = null
+            listener?.onSpotifyReauthNeeded(getAuthUrl())
+            null
+        }
     }
 
     private fun saveToken(json: String): OAuth2Token {
@@ -118,6 +140,6 @@ class SpotifyOAuth2(context: Context) {
     companion object {
         const val AUTH_URL = "https://accounts.spotify.com/authorize"
         const val TOKEN_URL = "https://accounts.spotify.com/api/token"
-        const val REDIRECT_URL = "klaatu://${BuildConfig.hostName}/spotify/import-albums"
+        const val IMPORT_ALBUMS_REDIRECT_URL = "klaatu://${BuildConfig.hostName}/spotify/import-albums"
     }
 }

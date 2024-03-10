@@ -245,15 +245,12 @@ fun AppCallbacksComposables(
         }
 
         TrackInfoDialog(
-            isDownloaded = combo.track.isDownloaded,
-            isOnYoutube = combo.track.isOnYoutube,
-            metadata = combo.track.metadata,
+            track = combo.track,
             albumTitle = albumCombo?.album?.title,
             albumArtist = albumCombo?.artists?.joined(),
             year = combo.track.year ?: albumCombo?.album?.year,
             localPath = localPath,
             onClose = onCancel,
-            isOnSpotify = combo.track.isOnSpotify,
         )
     }
 }

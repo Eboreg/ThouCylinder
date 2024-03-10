@@ -31,7 +31,7 @@ class YoutubeTrackSearchMediator(
                     token.nextKey
                 }
             }
-            val result = repo.getTrackSearchResult(query, key)
+            val result = repo.getVideoSearchResult(query, key)
 
             database.withTransaction {
                 database.youtubeSearchDao().insertOrReplaceToken(

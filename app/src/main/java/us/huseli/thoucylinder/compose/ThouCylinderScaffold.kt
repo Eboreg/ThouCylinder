@@ -22,8 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.DpSize
@@ -51,22 +49,22 @@ fun ThouCylinderScaffold(
     onContentAreaSizeChange: (DpSize) -> Unit,
     content: @Composable BoxWithConstraintsScope.() -> Unit,
 ) {
-    var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val onMenuItemClick = { menuItem: MenuItemId ->
-        when (menuItem) {
-            MenuItemId.SEARCH_YOUTUBE -> onNavigate(AddDestination.route)
-            MenuItemId.LIBRARY -> onNavigate(LibraryDestination.route)
-            MenuItemId.QUEUE -> onNavigate(QueueDestination.route)
-            MenuItemId.IMPORT -> onNavigate(ImportDestination.route)
-            MenuItemId.DEBUG -> onNavigate(DebugDestination.route)
-            MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
-            MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
-            MenuItemId.MENU -> scope.launch { drawerState.open() }
-            MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
+        if (menuItem != activeMenuItemId) {
+            when (menuItem) {
+                MenuItemId.SEARCH_YOUTUBE -> onNavigate(AddDestination.route)
+                MenuItemId.LIBRARY -> onNavigate(LibraryDestination.route)
+                MenuItemId.QUEUE -> onNavigate(QueueDestination.route)
+                MenuItemId.IMPORT -> onNavigate(ImportDestination.route)
+                MenuItemId.DEBUG -> onNavigate(DebugDestination.route)
+                MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
+                MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
+                MenuItemId.MENU -> scope.launch { drawerState.open() }
+                MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
+            }
         }
-        isCoverExpanded = false
     }
     val menuItems = getMenuItems().filter { !it.debugOnly || BuildConfig.DEBUG }
 

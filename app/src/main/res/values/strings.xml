@@ -8,6 +8,7 @@
     <string name="after_enabling_this_authorize_app_with_last_fm">After enabling this, you will get to authorize this app with Last.fm.</string>
     <string name="album">Album</string>
     <string name="album_artist">Album artist</string>
+    <string name="album_count"># albums</string>
     <string name="album_order">Album order</string>
     <string name="album_title">Album title</string>
     <string name="album_was_downloaded">%1$s was downloaded.</string>
@@ -18,6 +19,7 @@
     <string name="app_name">ThouCylinder</string>
     <string name="apply">Apply</string>
     <string name="artist">Artist</string>
+    <string name="artist_order">Artist order</string>
     <string name="artists">Artists</string>
     <string name="ascending">Ascending</string>
     <string name="authorize">Authorize</string>
@@ -87,6 +89,7 @@
     <string name="importing_tracks">Importing tracks</string>
     <string name="importing_x">Importing %1$s</string>
     <string name="is_downloaded">Is downloaded</string>
+    <string name="is_in_library">Is in library</string>
     <string name="is_on_spotify">Is on Spotify</string>
     <string name="is_on_youtube">Is on Youtube</string>
     <string name="last_fm">Last.fm</string>
@@ -132,6 +135,7 @@
     <string name="play_count">Play count: %1$s</string>
     <string name="play_local_music_files">Play local music files</string>
     <string name="play_on_spotify">Play on Spotify</string>
+    <string name="browse_on_spotify">Browse on Spotify</string>
     <string name="play_on_youtube">Play on Youtube</string>
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
@@ -170,6 +174,7 @@
     <string name="this_is_where_downloaded_music_will_be_placed">This is where downloaded music will be placed.</string>
     <string name="this_playlist_is_empty">This playlist is empty. :(</string>
     <string name="title">Title</string>
+    <string name="track_count"># tracks</string>
     <string name="track_information">Track information</string>
     <string name="track_number">Track number</string>
     <string name="track_order">Track order</string>
@@ -192,6 +197,20 @@
     <string name="you_need_to_select_your_local_music_root_folder">You need to select your local music root folder.</string>
     <string name="youtube">Youtube</string>
     <string name="import_method_description_2_lastfm">Importing from Last.fm is already somewhat slow since we need to fetch data from Musicbrainz, which caps requests to one per second. Matching with Youtube will obviously be even slower.</string>
+    <string name="related_to_x">Related to: %1$s</string>
+    <string name="start_radio">Start radio</string>
+    <string name="stop_radio">Stop radio</string>
+    <string name="radio_x">Radio: %1$s</string>
+    <string name="could_not_start_radio_for_x">Could not start radio: Failed to get recommendations for %1$s.</string>
+    <string name="could_not_start_radio">Could not start radio: Failed to get recommendations.</string>
+    <string name="the_album_was_enqueued_next">The album was enqueued next.</string>
+    <string name="library_radio">Library radio</string>
+    <string name="deactivate">Deactivate</string>
+    <string name="only_show_artists_with_albums">Only show artists with albums</string>
+    <plurals name="x_tracks_were_enqueued_next">
+        <item quantity="one">One track was enqueued next.</item>
+        <item quantity="other">%1$s tracks were enqueued next.</item>
+    </plurals>
     <plurals name="deleted_local_album_files">
         <item quantity="one">Deleted the local files of one album.</item>
         <item quantity="other">Deleted the local files of %1$d albums.</item>

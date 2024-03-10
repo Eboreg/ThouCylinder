@@ -114,7 +114,7 @@ fun ImportLastFm(
             album.playcount?.also { playCount ->
                 Text(
                     text = stringResource(R.string.play_count, playCount),
-                    style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
+                    style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                     maxLines = 1,
                 )
             }

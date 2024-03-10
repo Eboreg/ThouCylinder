@@ -154,14 +154,6 @@ fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppVi
                 style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,
             )
             Text(
-                "ThouCylinderTheme...listNormalSubtitle",
-                style = ThouCylinderTheme.typographyExtended.listNormalSubtitle,
-            )
-            Text(
-                "ThouCylinderTheme...listNormalSubtitleSecondary",
-                style = ThouCylinderTheme.typographyExtended.listNormalSubtitleSecondary,
-            )
-            Text(
                 "ThouCylinderTheme...listSmallHeader",
                 style = ThouCylinderTheme.typographyExtended.listSmallHeader,
             )

@@ -63,12 +63,30 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
         trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm, tagNames, availabilityFilter)
     }
 
+    suspend fun getLibraryTrackCount(): Int = trackDao.getLibraryTrackCount()
+
+    suspend fun listRandomLibraryTrackCombos(
+        limit: Int,
+        exceptTrackIds: Collection<UUID>? = null,
+        exceptSpotifyTrackIds: Collection<String>? = null,
+    ): List<TrackCombo> = trackDao.listRandomLibraryTrackCombos(
+        limit = limit,
+        exceptTrackIds = exceptTrackIds ?: emptyList(),
+        exceptSpotifyTrackIds = exceptSpotifyTrackIds ?: emptyList(),
+    )
+
+    suspend fun listTrackCombosByAlbumId(albumId: UUID) = trackDao.listTrackCombosByAlbumId(albumId)
+
+    suspend fun listTrackCombosByArtistId(artistId: UUID) = trackDao.listTrackCombosByArtistId(artistId)
+
     suspend fun listTrackCombosById(trackIds: Collection<UUID>) =
         if (trackIds.isNotEmpty()) trackDao.listTrackCombosById(*trackIds.toTypedArray()) else emptyList()
 
     suspend fun listTrackLocalUris(): List<Uri> = trackDao.listLocalUris()
 
     suspend fun listTracks(): List<Track> = trackDao.listLibraryTracks()
+
+    suspend fun listTracksByArtistId(artistId: UUID): List<Track> = trackDao.listTracksByArtistId(artistId)
 
     suspend fun listTracksById(trackIds: Collection<UUID>) =
         if (trackIds.isNotEmpty()) trackDao.listTracksById(*trackIds.toTypedArray()) else emptyList()
@@ -84,6 +102,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     }
 
     suspend fun setAlbumTracks(albumId: UUID, tracks: Collection<Track>) = trackDao.setAlbumTracks(albumId, tracks)
+
+    suspend fun setTrackSpotifyId(trackId: UUID, spotifyId: String) = trackDao.setTrackSpotifyId(trackId, spotifyId)
 
     fun toggleTrackIdSelected(selectionKey: String, trackId: UUID): Boolean {
         return mutableFlowSelectedTrackIds(selectionKey).let {
@@ -108,6 +128,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     suspend fun updateTrack(track: Track) = trackDao.updateTracks(track)
 
     suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
+
+    suspend fun upsertTrack(track: Track) = trackDao.upsertTracks(track)
 
     suspend fun upsertTracks(tracks: Collection<Track>) {
         if (tracks.isNotEmpty()) trackDao.upsertTracks(*tracks.toTypedArray())

@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose.track
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.PlaylistAdd
 import androidx.compose.material.icons.automirrored.sharp.PlaylistPlay
@@ -9,6 +10,7 @@ import androidx.compose.material.icons.sharp.Edit
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material.icons.sharp.MoreVert
+import androidx.compose.material.icons.sharp.Radio
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 
@@ -35,7 +38,7 @@ inline fun TrackContextMenu(
     isShown: Boolean,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
-    callbacks: TrackCallbacks<*>,
+    callbacks: TrackCallbacks<AbstractTrackCombo>,
     crossinline onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
@@ -48,6 +51,26 @@ inline fun TrackContextMenu(
         onDismissRequest = { onDismissRequest() },
         offset = offset,
     ) {
+        callbacks.onEnqueueClick?.also { onEnqueueClick ->
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.enqueue)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
+                onClick = {
+                    onEnqueueClick()
+                    onDismissRequest()
+                }
+            )
+        }
+
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.start_radio)) },
+            leadingIcon = { Icon(Icons.Sharp.Radio, null) },
+            onClick = {
+                callbacks.onStartTrackRadioClick()
+                onDismissRequest()
+            },
+        )
+
         if (isDownloadable) {
             DropdownMenuItem(
                 text = { Text(text = stringResource(id = R.string.download)) },
@@ -67,17 +90,6 @@ inline fun TrackContextMenu(
                 onDismissRequest()
             }
         )
-
-        callbacks.onEnqueueClick?.also { onEnqueueClick ->
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.enqueue)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
-                onClick = {
-                    onEnqueueClick()
-                    onDismissRequest()
-                }
-            )
-        }
 
         trackArtists.forEach { trackArtist ->
             DropdownMenuItem(
@@ -161,7 +173,7 @@ inline fun TrackContextButtonWithMenu(
     trackArtists: Collection<TrackArtistCredit>,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
-    callbacks: TrackCallbacks<*>,
+    callbacks: TrackCallbacks<AbstractTrackCombo>,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
@@ -170,7 +182,7 @@ inline fun TrackContextButtonWithMenu(
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
     IconButton(
-        modifier = modifier,
+        modifier = modifier.size(32.dp, 40.dp),
         onClick = { isMenuShown = !isMenuShown },
         content = {
             Icon(Icons.Sharp.MoreVert, null)

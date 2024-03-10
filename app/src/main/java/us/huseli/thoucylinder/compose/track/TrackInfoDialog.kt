@@ -19,7 +19,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -28,21 +27,19 @@ import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TrackInfoDialog(
-    isDownloaded: Boolean,
-    isOnYoutube: Boolean,
-    metadata: TrackMetadata?,
+    track: Track,
     modifier: Modifier = Modifier,
     albumTitle: String? = null,
     albumArtist: String? = null,
     year: Int? = null,
     localPath: String? = null,
-    isOnSpotify: Boolean? = null,
     onClose: () -> Unit,
 ) {
     AlertDialog(
@@ -77,12 +74,14 @@ fun TrackInfoDialog(
                     value = year?.toString() ?: "-",
                     modifier = rowModifier,
                 )
-                metadata?.also { metadata ->
+                track.duration?.also { duration ->
                     TrackInfoTextRow(
                         label = stringResource(R.string.duration),
-                        value = metadata.duration.sensibleFormat(),
+                        value = duration.sensibleFormat(),
                         modifier = rowModifier,
                     )
+                }
+                track.metadata?.also { metadata ->
                     TrackInfoTextRow(
                         label = stringResource(R.string.mime_type),
                         value = metadata.mimeType,
@@ -110,18 +109,23 @@ fun TrackInfoDialog(
                     )
                 }
                 TrackInfoBooleanRow(
+                    label = stringResource(R.string.is_in_library),
+                    value = track.isInLibrary,
+                    modifier = rowModifier,
+                )
+                TrackInfoBooleanRow(
                     label = stringResource(R.string.is_downloaded),
-                    value = isDownloaded,
+                    value = track.isDownloaded,
                     modifier = rowModifier,
                 )
                 TrackInfoBooleanRow(
                     label = stringResource(R.string.is_on_youtube),
-                    value = isOnYoutube,
+                    value = track.isOnYoutube,
                     modifier = rowModifier,
                 )
                 TrackInfoBooleanRow(
                     label = stringResource(R.string.is_on_spotify),
-                    value = isOnSpotify,
+                    value = track.isOnSpotify,
                     modifier = rowModifier,
                 )
                 localPath?.also {

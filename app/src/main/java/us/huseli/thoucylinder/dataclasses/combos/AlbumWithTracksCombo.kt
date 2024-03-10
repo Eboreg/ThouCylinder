@@ -3,13 +3,13 @@ package us.huseli.thoucylinder.dataclasses.combos
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
-import us.huseli.retaintheme.extensions.sumOfOrNull
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
 import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.entities.toAlbumTags
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import kotlin.math.abs
 import kotlin.math.max
@@ -28,7 +28,7 @@ data class AlbumWithTracksCombo(
             entityColumn = "AlbumTag_tagName",
         )
     )
-    override val tags: List<Tag> = emptyList(),
+    val tags: List<Tag> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "AlbumArtist_albumId")
     override val artists: List<AlbumArtistCredit> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
@@ -41,18 +41,14 @@ data class AlbumWithTracksCombo(
         val albumCombo: AlbumWithTracksCombo,
     )
 
+    val albumTags: List<AlbumTag>
+        get() = tags.toAlbumTags(album.albumId)
+
     val discCount: Int
         get() = trackCombos.mapNotNull { it.track.discNumber }.maxOrNull() ?: 1
 
     override val trackCount: Int
         get() = trackCombos.size
-
-    override val durationMs: Long?
-        get() = trackCombos.sumOfOrNull {
-            it.track.metadata?.durationMs
-                ?: it.track.youtubeVideo?.durationMs
-                ?: it.track.youtubeVideo?.metadata?.durationMs
-        }
 
     override val minYear: Int?
         get() = trackCombos.mapNotNull { it.track.year }.minOrNull()
@@ -62,9 +58,6 @@ data class AlbumWithTracksCombo(
 
     override val isPartiallyDownloaded: Boolean
         get() = trackCombos.any { it.track.isDownloaded } && trackCombos.any { !it.track.isDownloaded }
-
-    val isUnplayable: Boolean
-        get() = trackCombos.all { !it.track.isPlayable }
 
     val unplayableTrackCount: Int
         get() = trackCombos.count { !it.track.isPlayable }
@@ -116,6 +109,7 @@ data class AlbumWithTracksCombo(
                             youtubeVideo = otherTrackCombo.track.youtubeVideo ?: thisTrackCombo.track.youtubeVideo,
                             metadata = otherTrackCombo.track.metadata ?: thisTrackCombo.track.metadata,
                             image = otherTrackCombo.track.image ?: thisTrackCombo.track.image,
+                            durationMs = otherTrackCombo.track.durationMs ?: thisTrackCombo.track.durationMs,
                         ),
                         album = mergedAlbum,
                         artists = otherTrackCombo.artists.map { it.copy(trackId = thisTrackCombo.track.trackId) },

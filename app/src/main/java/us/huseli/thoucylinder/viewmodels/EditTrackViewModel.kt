@@ -23,7 +23,7 @@ class EditTrackViewModel @Inject constructor(private val repos: Repositories) : 
         val albumCombo = combo.track.albumId?.let { repos.album.getAlbumCombo(it) }
 
         if (artistNames.filter { it.isNotEmpty() } != combo.artists.map { it.name }) {
-            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.get(it) }
+            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.getByName(it) }
 
             trackArtists = artists.map { TrackArtistCredit(artist = it, trackId = combo.track.trackId) }
             repos.artist.setTrackArtists(trackArtists.toTrackArtists())

@@ -9,14 +9,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.InterpreterMode
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
@@ -33,7 +35,7 @@ fun ArtistGrid(
     onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    imageFlow: (ArtistCombo) -> Flow<ImageBitmap?>,
+    getImage: suspend (ArtistCombo) -> ImageBitmap?,
 ) {
     ItemGrid(
         things = artistCombos,
@@ -42,7 +44,11 @@ fun ArtistGrid(
         progressIndicatorText = progressIndicatorText,
         onEmpty = onEmpty,
     ) { _, combo ->
-        val imageBitmap by imageFlow(combo).collectAsStateWithLifecycle(null)
+        var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+        LaunchedEffect(combo.artist.image) {
+            imageBitmap = getImage(combo)
+        }
 
         Thumbnail(
             image = imageBitmap,

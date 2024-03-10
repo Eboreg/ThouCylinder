@@ -31,27 +31,30 @@ import java.util.UUID
 @Composable
 fun TrackList(
     itemCount: Int,
-    selectedTrackIds: List<UUID>,
-    trackSelectionCallbacks: TrackSelectionCallbacks,
     modifier: Modifier = Modifier,
+    padding: PaddingValues = PaddingValues(horizontal = 10.dp),
+    trackSelectionCallbacks: TrackSelectionCallbacks? = null,
+    selectedTrackIds: List<UUID> = emptyList(),
     listState: LazyListState = rememberLazyListState(),
     extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
     onEmpty: (@Composable () -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
     Column {
-        SelectedTracksButtons(
-            trackCount = selectedTrackIds.size,
-            callbacks = trackSelectionCallbacks,
-            extraButtons = extraTrackSelectionButtons,
-        )
+        trackSelectionCallbacks?.also { callbacks ->
+            SelectedTracksButtons(
+                trackCount = selectedTrackIds.size,
+                callbacks = callbacks,
+                extraButtons = extraTrackSelectionButtons,
+            )
+        }
 
         if (itemCount == 0 && onEmpty != null) onEmpty()
 
         ListWithNumericBar(
             listState = listState,
             listSize = itemCount,
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(padding),
             itemHeight = 55.dp,
             minItems = 50,
         ) {
@@ -78,6 +81,7 @@ fun <T : AbstractTrackCombo> TrackList(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     showArtist: Boolean = true,
+    showAlbum: Boolean = false,
     progressIndicatorText: String? = null,
     extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
     onEmpty: (@Composable () -> Unit)? = null,
@@ -113,6 +117,7 @@ fun <T : AbstractTrackCombo> TrackList(
                         callbacks = trackCallbacks(index, combo),
                         downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == combo.track.trackId },
                         thumbnail = thumbnail.value,
+                        showAlbum = showAlbum,
                     )
                 }
             }

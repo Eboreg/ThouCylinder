@@ -13,18 +13,15 @@ import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
 import java.util.UUID
 
 @Dao
-interface YoutubeSearchDao {
-    @Query("DELETE FROM Track WHERE Track_isInLibrary = 0")
-    suspend fun _deleteAllTracks()
-
+abstract class YoutubeSearchDao {
     @Query("DELETE FROM YoutubeSearchToken")
-    suspend fun _deleteAllTokens()
+    protected abstract suspend fun _deleteAllTokens()
 
     @Query("DELETE FROM YoutubeQueryTrack")
-    suspend fun _deleteAllQueryTracks()
+    protected abstract suspend fun _deleteAllQueryTracks()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun _insertTracks(vararg tracks: Track)
+    protected abstract suspend fun _insertTracks(vararg tracks: Track)
 
     @Query(
         """
@@ -32,23 +29,22 @@ interface YoutubeSearchDao {
         VALUES (:query, :trackId, (SELECT COALESCE(MAX(qt2.YoutubeQueryTrack_position), 0) + 1 FROM YoutubeQueryTrack qt2))
         """
     )
-    suspend fun _insertQueryTrack(query: String, trackId: UUID)
+    protected abstract suspend fun _insertQueryTrack(query: String, trackId: UUID)
 
     @Transaction
-    suspend fun clearCache() {
+    open suspend fun clearCache() {
         _deleteAllTokens()
         _deleteAllQueryTracks()
-        _deleteAllTracks()
     }
 
     @Query("SELECT * FROM YoutubeSearchToken WHERE YoutubeSearchToken_query = :query")
-    suspend fun getToken(query: String): YoutubeSearchToken?
+    abstract suspend fun getToken(query: String): YoutubeSearchToken?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrReplaceToken(token: YoutubeSearchToken)
+    abstract suspend fun insertOrReplaceToken(token: YoutubeSearchToken)
 
     @Transaction
-    suspend fun insertTracksForQuery(query: String, tracks: List<Track>) {
+    open suspend fun insertTracksForQuery(query: String, tracks: List<Track>) {
         if (tracks.isNotEmpty()) {
             _insertTracks(*tracks.map { it.copy(isInLibrary = false) }.toTypedArray())
             tracks.forEach { track -> _insertQueryTrack(query, track.trackId) }
@@ -62,5 +58,5 @@ interface YoutubeSearchDao {
         ORDER BY YoutubeQueryTrack_position
         """
     )
-    fun pageTracksByQuery(query: String): PagingSource<Int, Track>
+    abstract fun pageTracksByQuery(query: String): PagingSource<Int, Track>
 }

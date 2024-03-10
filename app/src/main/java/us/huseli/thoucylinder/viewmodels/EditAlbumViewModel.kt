@@ -123,7 +123,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         tags: Collection<Tag>,
         updateMatchingTrackArtists: Boolean,
     ) = launchOnIOThread {
-        val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.get(it) }
+        val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.getByName(it) }
         val album = combo.album.copy(title = title, year = year)
         val albumArtists = artists.toAlbumArtistCredits(album.albumId)
         val updatedTrackArtists = mutableListOf<TrackArtist>()
@@ -159,7 +159,7 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         val updatedTrack = ensureTrackMetadata(combo.track.copy(title = title, year = year))
 
         if (artistNames.filter { it.isNotEmpty() } != combo.artists.map { it.name }) {
-            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.get(it) }
+            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.getByName(it) }
 
             trackArtists = artists.map { TrackArtistCredit(artist = it, trackId = combo.track.trackId) }
             repos.artist.setTrackArtists(trackArtists.toTrackArtists())

@@ -31,6 +31,9 @@ data class Album(
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
 
+    val isPlayable: Boolean
+        get() = isLocal || youtubePlaylist != null
+
     val spotifyWebUrl: String?
         get() = spotifyId?.let { "https://open.spotify.com/album/${it}" }
 

@@ -109,17 +109,17 @@ val lifecycleVersion = "2.7.0"
 val roomVersion = "2.6.1"
 val daggerVersion = "2.50"
 val media3Version = "1.3.0"
-val pagingVersion = "3.3.0-alpha04"
+val pagingVersion = "3.3.0-alpha05"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Compose:
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.03.00"))
 
     // Material:
-    implementation("androidx.compose.material:material:1.6.3") // for swipeable
+    implementation("androidx.compose.material:material:1.6.4") // for swipeable
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 

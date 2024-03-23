@@ -11,6 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,6 +33,8 @@ import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
 import us.huseli.thoucylinder.dataclasses.views.RadioView
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
@@ -41,7 +45,6 @@ import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.random.Random
 
 @HiltViewModel
@@ -56,9 +59,11 @@ class AppViewModel @Inject constructor(
     private val radioUsedLocalTrackIds = mutableListOf<UUID>()
     private val radioUsedSpotifyTrackIds = mutableListOf<String>()
 
-    val playlists = repos.playlist.playlistsPojos
-    val isWelcomeDialogShown = repos.settings.isWelcomeDialogShown
-    val umlautify = repos.settings.umlautify
+    val activeRadio: StateFlow<RadioView?> = repos.radio.activeRadio
+    val isWelcomeDialogShown: StateFlow<Boolean> = repos.settings.isWelcomeDialogShown
+    val libraryRadioNovelty: StateFlow<Float> = repos.settings.libraryRadioNovelty
+    val playlists: Flow<List<PlaylistPojo>> = repos.playlist.playlistsPojos
+    val umlautify: StateFlow<Boolean> = repos.settings.umlautify
 
     init {
         repos.player.addListener(this)
@@ -119,6 +124,7 @@ class AppViewModel @Inject constructor(
         repos.track.deleteTempTracks()
         repos.album.deleteTempAlbums()
         deleteMarkedAlbums()
+        // repos.spotify.fetchTrackAudioFeatures(repos.track.listTrackSpotifyIds())
     }
 
     suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) = withContext(Dispatchers.IO) {
@@ -146,6 +152,8 @@ class AppViewModel @Inject constructor(
 
     fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
 
+    fun setLibraryRadioNovelty(value: Float) = repos.settings.setLibraryRadioNovelty(value)
+
     fun setLocalMusicUri(value: Uri) = repos.settings.setLocalMusicUri(value)
 
     fun setContentAreaSize(value: DpSize) = repos.settings.setContentAreaSize(value)
@@ -158,6 +166,10 @@ class AppViewModel @Inject constructor(
 
     fun startArtistRadio(artistId: UUID) = launchOnIOThread {
         repos.radio.setActiveRadio(Radio(artistId = artistId, type = RadioType.ARTIST))
+    }
+
+    fun startLibraryRadio() = launchOnIOThread {
+        repos.radio.setActiveRadio(Radio(type = RadioType.LIBRARY))
     }
 
     fun startTrackRadio(trackId: UUID) = launchOnIOThread {
@@ -206,67 +218,67 @@ class AppViewModel @Inject constructor(
         }
     }
 
+    private suspend fun enqueueLibraryRadioTracks(
+        recommendations: SpotifyTrackRecommendations,
+        channel: Channel<QueueTrackCombo?>,
+        limit: Int,
+    ) {
+        /**
+         * For every iteration, there is a probability of `libraryRadioNovelty` that the next track to add should be a
+         * recommendation track (rather than a library track). This works because `libraryRadioNovelty` is a float
+         * ranging between 0f and 1f, where 1f represents 100% recommendation tracks.
+         */
+        var recommendationTrackIdx = 0
+
+        for (i in 0 until limit) {
+            val nextIsLibraryTrack = Random.nextFloat() >= libraryRadioNovelty.value
+            var queueTrackCombo: QueueTrackCombo? = null
+
+            if (nextIsLibraryTrack) {
+                queueTrackCombo = getRandomLibraryQueueTrackCombo(
+                    exceptSpotifyTrackIds = radioUsedSpotifyTrackIds,
+                    exceptTrackIds = radioUsedLocalTrackIds,
+                )?.also { radioUsedLocalTrackIds.add(it.track.trackId) }
+            } else {
+                while (queueTrackCombo == null && recommendationTrackIdx < recommendations.tracks.size) {
+                    queueTrackCombo = spotifyTrackToQueueTrackCombo(
+                        spotifyTrack = recommendations.tracks[recommendationTrackIdx++]
+                    )
+                }
+            }
+
+            if (queueTrackCombo != null) channel.trySend(queueTrackCombo)
+            else break
+        }
+    }
+
     private suspend fun enqueueRadioTracks(
         radioId: UUID,
         radioType: RadioType,
         recommendations: SpotifyTrackRecommendations,
         channel: Channel<QueueTrackCombo?>,
-        localTrackLimit: Int,
+        limit: Int,
     ) {
-        val localTrackRatio =
-            if (recommendations.foundTracks > 0) localTrackLimit.toDouble() / recommendations.foundTracks else 1.0
-        val localTracksRandomBound = (localTrackRatio * 2).roundToInt()
-        var enqueuedLocalTracks = 0
-
         if (!recommendations.hasMore) radioHasMoreTracks = false
 
-        recommendations.tracks.forEach { spotifyTrack ->
-            val queueTrackCombo = repos.youtube.getBestTrackMatch(
-                trackCombo = spotifyTrack.toTrackCombo(
-                    getArtist = { repos.artist.artistCache.get(it) },
-                    isInLibrary = false,
-                ),
-                albumArtists = spotifyTrack.album.artists.map {
-                    repos.artist.artistCache.get(BaseArtist(name = it.name, spotifyId = it.id))
-                },
-                withMetadata = true,
-            )?.also {
-                repos.track.upsertTrack(it.track)
-                repos.artist.insertTrackArtists(it.artists.toTrackArtists())
-            }?.toQueueTrackCombo()
-
-            if (queueTrackCombo != null) channel.trySend(queueTrackCombo)
-
-            // Send a random amount of local tracks if applicable. Limits for the randomness is determined by the
-            // desired ratio of local tracks to Spotify recommended tracks.
-            if (radioType == RadioType.LIBRARY && localTracksRandomBound > 0 && enqueuedLocalTracks < localTrackLimit) {
-                for (i in 0..Random.nextInt(localTracksRandomBound)) {
-                    getRandomLibraryQueueTrackCombo(
-                        exceptSpotifyTrackIds = radioUsedSpotifyTrackIds,
-                        exceptTrackIds = radioUsedLocalTrackIds,
-                    )?.also {
-                        radioUsedLocalTrackIds.add(it.track.trackId)
-                        enqueuedLocalTracks++
-                        channel.trySend(it)
-                    }
-                }
-            }
-        }
-
         if (radioType == RadioType.LIBRARY) {
-            while (enqueuedLocalTracks < localTrackLimit) {
-                val queueTrackCombo = getRandomLibraryQueueTrackCombo(
-                    exceptSpotifyTrackIds = radioUsedSpotifyTrackIds,
-                    exceptTrackIds = radioUsedLocalTrackIds,
-                )
+            enqueueLibraryRadioTracks(
+                recommendations = recommendations,
+                channel = channel,
+                limit = limit,
+            )
+        } else {
+            var addedTracks = 0
 
-                if (queueTrackCombo != null) {
-                    radioUsedLocalTrackIds.add(queueTrackCombo.track.trackId)
-                    enqueuedLocalTracks++
-                    channel.trySend(queueTrackCombo)
-                } else break
+            for (spotifyTrack in recommendations.tracks) {
+                spotifyTrackToQueueTrackCombo(spotifyTrack)?.also {
+                    channel.trySend(it)
+                    addedTracks++
+                }
+                if (addedTracks >= limit) break
             }
         }
+
         // Null signals to PlayerRepository that this batch is finished.
         channel.trySend(null)
         repos.radio.updateRadio(
@@ -278,9 +290,9 @@ class AppViewModel @Inject constructor(
 
     private suspend fun findOrphansAndDuplicates() {
         val allTracks = repos.track.listTracks()
-        val allAlbumCombos = repos.album.listAlbumCombos()
+        val allAlbums = repos.album.listAlbums()
         val allAlbumMultimap =
-            allAlbumCombos.associateWith { combo -> allTracks.filter { it.albumId == combo.album.albumId } }
+            allAlbums.associateWith { album -> allTracks.filter { it.albumId == album.albumId } }
         val nonAlbumDuplicateTracks = allTracks
             .combineEquals { a, b -> a.localUri == b.localUri && a.youtubeVideo?.id == b.youtubeVideo?.id }
             .filter { tracks -> tracks.size > 1 }
@@ -291,7 +303,7 @@ class AppViewModel @Inject constructor(
         val nonLocalTracks = brokenUriTracks + allTracks.filter { it.localUri == null }
         // Collect albums that have isLocal=true but should have false:
         val noLongerLocalAlbums = allAlbumMultimap
-            .filterKeys { it.album.isLocal }
+            .filterKeys { it.isLocal }
             .filterValues { nonLocalTracks.containsAll(it) }
 
         // Delete non-album tracks that have duplicates on albums:
@@ -299,21 +311,21 @@ class AppViewModel @Inject constructor(
         // Update tracks with broken localUris:
         repos.track.clearLocalUris(brokenUriTracks.map { it.trackId })
         // Update albums that should have isLocal=true, but don't:
-        repos.album.setAlbumsIsLocal(noLongerLocalAlbums.keys.map { it.album.albumId }, false)
+        repos.album.setAlbumsIsLocal(noLongerLocalAlbums.keys.map { it.albumId }, false)
     }
 
     private suspend fun getInitialRadioRecommendations(radio: RadioView): SpotifyTrackRecommendations? =
         when (radio.type) {
             RadioType.LIBRARY -> repos.spotify.getTrackRecommendations(
                 spotifyTrackIds = listRandomLibrarySpotifyTrackIds(5),
-                limit = 10,
+                limit = 40,
             )
             RadioType.ARTIST -> radio.artist?.let { artist ->
-                repos.spotify.getTrackRecommendationsByArtist(artist, 20)
+                repos.spotify.getTrackRecommendationsByArtist(artist, 40)
             }
             RadioType.ALBUM -> radio.album?.let { album ->
                 repos.album.getAlbumWithTracks(album.albumId)
-                    ?.let { repos.spotify.getTrackRecommendationsByAlbumCombo(it, 20) }
+                    ?.let { repos.spotify.getTrackRecommendationsByAlbumCombo(it, 40) }
             }
             RadioType.TRACK -> radio.track?.let { track ->
                 val albumCombo = track.albumId?.let { repos.album.getAlbumCombo(it) }
@@ -324,7 +336,7 @@ class AppViewModel @Inject constructor(
                     track = track,
                     album = albumCombo?.album,
                     artists = artists,
-                    limit = 20,
+                    limit = 40,
                 )
             }
         }?.also { radioUsedSpotifyTrackIds.addAll(it.tracks.map { track -> track.id }) }
@@ -343,7 +355,7 @@ class AppViewModel @Inject constructor(
         requestMoreTracks = {
             if (radioHasMoreTracks) enqueueRadioTracksJob = repos.globalScope.launch {
                 val recommendations =
-                    repos.spotify.getTrackRecommendations(spotifyTrackIds = radioUsedSpotifyTrackIds, limit = 5)
+                    repos.spotify.getTrackRecommendations(spotifyTrackIds = radioUsedSpotifyTrackIds, limit = 20)
                         .also { radioUsedSpotifyTrackIds.addAll(it.tracks.map { track -> track.id }) }
 
                 enqueueRadioTracks(
@@ -351,7 +363,7 @@ class AppViewModel @Inject constructor(
                     radioType = radioType,
                     recommendations = recommendations,
                     channel = channel,
-                    localTrackLimit = 5,
+                    limit = 10,
                 )
             }
         },
@@ -408,7 +420,7 @@ class AppViewModel @Inject constructor(
                     radioType = radio.type,
                     recommendations = recommendations,
                     channel = channel,
-                    localTrackLimit = 10,
+                    limit = 20,
                 )
             }
         }
@@ -460,6 +472,22 @@ class AppViewModel @Inject constructor(
             )
         }
         channel.trySend(null)
+    }
+
+    private suspend fun spotifyTrackToQueueTrackCombo(spotifyTrack: SpotifyTrack): QueueTrackCombo? {
+        return repos.youtube.getBestTrackMatch(
+            trackCombo = spotifyTrack.toTrackCombo(
+                getArtist = { repos.artist.artistCache.get(it) },
+                isInLibrary = false,
+            ),
+            albumArtists = spotifyTrack.album.artists.map {
+                repos.artist.artistCache.get(BaseArtist(name = it.name, spotifyId = it.id))
+            },
+            withMetadata = true,
+        )?.also {
+            repos.track.upsertTrack(it.track)
+            repos.artist.insertTrackArtists(it.artists.toTrackArtists())
+        }?.toQueueTrackCombo()
     }
 
     private suspend fun updateGenreList() {

@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.ArtistContextMenu
 import us.huseli.thoucylinder.compose.DisplayType
@@ -45,6 +47,7 @@ import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
@@ -54,6 +57,7 @@ fun ArtistScreen(
     modifier: Modifier = Modifier,
     viewModel: ArtistViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
+    onArtistFetched: (Artist) -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     val artist by viewModel.artist.collectAsStateWithLifecycle(null)
@@ -61,6 +65,10 @@ fun ArtistScreen(
     val listType by viewModel.listType.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(artist) {
+        artist?.also(onArtistFetched)
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
@@ -154,17 +162,16 @@ fun ArtistScreen(
 
                     when (displayType) {
                         DisplayType.LIST -> AlbumList(
-                            combos = albumCombos,
+                            combos = albumCombos.toImmutableList(),
                             albumCallbacks = albumCallbacks,
                             albumSelectionCallbacks = albumSelectionCallbacks,
-                            selectedAlbumIds = selectedAlbumIds,
+                            selectedAlbumIds = selectedAlbumIds.toImmutableList(),
                             showArtist = false,
                             onEmpty = {
                                 Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                             },
-                            albumDownloadTasks = albumDownloadTasks,
-                            getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
-                        )
+                            albumDownloadTasks = albumDownloadTasks.toImmutableList(),
+                        ) { viewModel.getAlbumThumbnail(it, context) }
                         DisplayType.GRID -> AlbumGrid(
                             combos = albumCombos,
                             albumCallbacks = albumCallbacks,

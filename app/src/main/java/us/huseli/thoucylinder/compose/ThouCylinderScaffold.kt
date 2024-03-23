@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,7 +35,6 @@ import us.huseli.thoucylinder.LibraryDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.RecommendationsDestination
 import us.huseli.thoucylinder.SettingsDestination
-import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun ThouCylinderScaffold(
@@ -47,6 +43,7 @@ fun ThouCylinderScaffold(
     onNavigate: (route: String) -> Unit,
     onInnerPaddingChange: (PaddingValues) -> Unit,
     onContentAreaSizeChange: (DpSize) -> Unit,
+    onRadioClick: () -> Unit,
     content: @Composable BoxWithConstraintsScope.() -> Unit,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -63,6 +60,7 @@ fun ThouCylinderScaffold(
                 MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
                 MenuItemId.MENU -> scope.launch { drawerState.open() }
                 MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
+                MenuItemId.RADIO -> onRadioClick()
             }
         }
     }
@@ -75,16 +73,13 @@ fun ThouCylinderScaffold(
                 drawerShape = RectangleShape,
                 modifier = Modifier.width(IntrinsicSize.Min),
             ) {
-                menuItems.filter { it.showInDrawer }.forEach { item ->
-                    NavigationDrawerItem(
-                        shape = RectangleShape,
-                        label = { item.description?.also { Text(it.umlautify()) } },
-                        selected = activeMenuItemId == item.id,
+                for (item in menuItems.filter { it.showInDrawer }) {
+                    item.DrawerItem(
+                        activeItemId = activeMenuItemId,
                         onClick = {
                             scope.launch { drawerState.close() }
                             onMenuItemClick(item.id)
                         },
-                        icon = item.icon,
                     )
                 }
             }
@@ -97,12 +92,8 @@ fun ThouCylinderScaffold(
             onMenuItemClick = onMenuItemClick,
             landscapeMenu = { innerPadding ->
                 NavigationRail(modifier = Modifier.padding(innerPadding)) {
-                    menuItems.filter { it.showInMainMenu }.forEach { item ->
-                        NavigationRailItem(
-                            selected = activeMenuItemId == item.id,
-                            onClick = { onMenuItemClick(item.id) },
-                            icon = item.icon,
-                        )
+                    for (item in menuItems.filter { it.showInMainMenu }) {
+                        item.RailItem(activeItemId = activeMenuItemId, onClick = { onMenuItemClick(item.id) })
                     }
                 }
             },

@@ -48,7 +48,7 @@ class ArtistViewModel @Inject constructor(
             withContext(Dispatchers.Main) { repos.player.insertNext(queueTrackCombos) }
             SnackbarEngine.addInfo(
                 context.resources.getQuantityString(
-                    R.plurals.x_tracks_were_enqueued_next,
+                    R.plurals.x_tracks_enqueued_next,
                     queueTrackCombos.size,
                     queueTrackCombos.size,
                 )

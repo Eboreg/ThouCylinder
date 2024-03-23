@@ -14,8 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.isInLandscapeMode
+import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.ImportProgressSection
 import us.huseli.thoucylinder.compose.utils.CompactSearchTextField
@@ -28,7 +28,7 @@ import us.huseli.thoucylinder.stringResource
 @Composable
 fun ImportSpotifyHeader(
     modifier: Modifier = Modifier,
-    authorizationStatus: SpotifyOAuth2.AuthorizationStatus,
+    authorizationStatus: AuthorizationStatus,
     hasPrevious: Boolean,
     hasNext: Boolean,
     importButtonEnabled: Boolean,
@@ -67,7 +67,7 @@ fun ImportSpotifyHeader(
                 ) {
                     backendSelection()
 
-                    if (authorizationStatus == SpotifyOAuth2.AuthorizationStatus.AUTHORIZED) {
+                    if (authorizationStatus == AuthorizationStatus.AUTHORIZED) {
                         if (!isLandscape) {
                             SmallButton(
                                 onClick = onImportClick,
@@ -119,7 +119,7 @@ fun ImportSpotifyHeader(
                                 modifier = Modifier.align(Alignment.CenterVertically).padding(start = 10.dp),
                             )
                         }
-                    } else if (authorizationStatus != SpotifyOAuth2.AuthorizationStatus.UNKNOWN) {
+                    } else if (authorizationStatus != AuthorizationStatus.UNKNOWN) {
                         SmallButton(onClick = onAuthorizeClick, text = stringResource(R.string.authorize))
                     }
                 }

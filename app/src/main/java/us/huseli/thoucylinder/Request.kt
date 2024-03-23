@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlin.math.roundToInt
 import kotlin.text.Charsets.UTF_8
 
 class HTTPResponseError(val code: Int, message: String?) : Exception("HTTP $code: ${message ?: "No message"}")
@@ -33,9 +34,12 @@ data class Request(
 
     enum class Method(val value: String) { GET("GET"), POST("POST") }
 
+    private var requestStart: Long? = null
+
     suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
-        Log.i("Request", "${method.value} $url")
-        if (body != null) Log.i("Request", "Request body: $body")
+        requestStart = System.currentTimeMillis()
+        Log.i("Request", "START ${method.value} $url")
+        if (body != null) Log.d("Request", "BODY $body")
 
         (URL(url).openConnection() as HttpURLConnection).apply {
             if (BuildConfig.DEBUG) {
@@ -59,21 +63,35 @@ data class Request(
         }
     }
 
-    suspend fun getBitmap(): Bitmap? =
-        withContext(Dispatchers.IO) { connect().inputStream.use { BitmapFactory.decodeStream(it) } }
+    fun finish(receivedBytes: Int? = null) {
+        requestStart?.also { start ->
+            val elapsed = (System.currentTimeMillis() - start).toDouble() / 1000
+            var message = "FINISH ${method.value} $url: ${elapsed}s"
+            if (receivedBytes != null) {
+                val kbps = ((receivedBytes / elapsed) / 1024).roundToInt()
+                message += ", ${receivedBytes}B ($kbps KB/s)"
+            }
 
-    suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
-        getString().let { gson.fromJson(it, jsonResponseType) ?: emptyMap<String, Any>() }
+            Log.i("Request", message)
+        }
     }
 
-    suspend inline fun <reified T> getObject(): T? =
-        withContext(Dispatchers.IO) { gson.fromJson(getString(), T::class.java) }
+    suspend fun getBitmap(): Bitmap? = withContext(Dispatchers.IO) {
+        connect().inputStream.use { BitmapFactory.decodeStream(it) }.also { finish() }
+    }
 
-    suspend fun getString(): String = try {
-        withContext(Dispatchers.IO) { connect().inputStream.use { it.bufferedReader().readText() } }
-    } catch (e: Exception) {
-        Log.e(javaClass.simpleName, "getString [url=$url]: $e", e)
-        throw e
+    suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
+        connect().inputStream.use {
+            gson.fromJson(it.bufferedReader(), jsonResponseType) ?: emptyMap<String, Any>()
+        }.also { finish() }
+    }
+
+    suspend inline fun <reified T> getObject(): T? = withContext(Dispatchers.IO) {
+        connect().inputStream.use { gson.fromJson(it.bufferedReader(), T::class.java) }.also { finish() }
+    }
+
+    suspend fun getString(): String = withContext(Dispatchers.IO) {
+        connect().inputStream.use { it.bufferedReader().readText() }.also { finish(it.length) }
     }
 
     companion object {
@@ -114,7 +132,7 @@ data class Request(
     }
 }
 
-abstract class SuspendingRequestJob(val url: String, val lowPrio: Boolean = false) {
+abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false) {
     /** Stalls until it gets unlocked. */
     val created = System.currentTimeMillis()
     val lock = Mutex(true)
@@ -132,10 +150,10 @@ abstract class SuspendingRequestJob(val url: String, val lowPrio: Boolean = fals
     open fun after(result: String?) {}
     open fun before() {}
     abstract suspend fun request(): String?
-    override fun equals(other: Any?) = other is SuspendingRequestJob && other.url == url
+    override fun equals(other: Any?) = other is DeferredRequestJob && other.url == url
     override fun hashCode() = url.hashCode()
 }
 
-fun Collection<SuspendingRequestJob>.getNext(): SuspendingRequestJob? =
+fun Collection<DeferredRequestJob>.getNext(): DeferredRequestJob? =
     filter { !it.isStarted && !it.lowPrio }.minByOrNull { it.created }
         ?: filter { !it.isStarted }.minByOrNull { it.created }

@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose
 
-import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.QueueMusic
 import androidx.compose.material.icons.sharp.BugReport
@@ -9,14 +8,21 @@ import androidx.compose.material.icons.sharp.FileUpload
 import androidx.compose.material.icons.sharp.LibraryMusic
 import androidx.compose.material.icons.sharp.Lightbulb
 import androidx.compose.material.icons.sharp.Menu
+import androidx.compose.material.icons.sharp.Radio
 import androidx.compose.material.icons.sharp.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import us.huseli.retaintheme.compose.MenuItem
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 
 enum class MenuItemId(val route: String) {
     SEARCH_YOUTUBE("search-youtube"),
@@ -28,9 +34,10 @@ enum class MenuItemId(val route: String) {
     SETTINGS("settings"),
     MENU("menu"),
     RECOMMENDATIONS("recommendations"),
+    RADIO("radio"),
 }
 
-class ThouCylinderMenuItem<MI : Enum<MI>>(
+open class ThouCylinderMenuItem<MI : Enum<MI>>(
     id: MI,
     icon: @Composable () -> Unit,
     description: String? = null,
@@ -55,6 +62,26 @@ class ThouCylinderMenuItem<MI : Enum<MI>>(
         showInDrawer: Boolean = true,
         debugOnly: Boolean = false,
     ) : this(id, { Icon(painter, null) }, description, showInMainMenu, showInDrawer, debugOnly)
+
+    @Composable
+    open fun DrawerItem(activeItemId: MenuItemId?, onClick: () -> Unit) {
+        NavigationDrawerItem(
+            shape = RectangleShape,
+            label = { description?.also { Text(it.umlautify()) } },
+            selected = activeItemId == id,
+            onClick = onClick,
+            icon = icon,
+        )
+    }
+
+    @Composable
+    open fun RailItem(activeItemId: MenuItemId?, onClick: () -> Unit) {
+        NavigationRailItem(
+            selected = activeItemId == id,
+            onClick = onClick,
+            icon = icon,
+        )
+    }
 }
 
 
@@ -81,6 +108,7 @@ fun getMenuItems(): List<ThouCylinderMenuItem<MenuItemId>> {
             imageVector = Icons.Sharp.Lightbulb,
             description = stringResource(R.string.recommendations),
             showInMainMenu = false,
+            debugOnly = true,
         ),
         ThouCylinderMenuItem(
             id = MenuItemId.SETTINGS,
@@ -89,11 +117,17 @@ fun getMenuItems(): List<ThouCylinderMenuItem<MenuItemId>> {
             showInMainMenu = false,
         ),
         ThouCylinderMenuItem(
-            MenuItemId.DEBUG,
-            Icons.Sharp.BugReport,
-            stringResource(R.string.debug),
+            id = MenuItemId.DEBUG,
+            imageVector = Icons.Sharp.BugReport,
+            description = stringResource(R.string.debug),
             debugOnly = true,
             showInMainMenu = false,
         ),
+        ThouCylinderMenuItem(
+            id = MenuItemId.RADIO,
+            imageVector = Icons.Sharp.Radio,
+            description = stringResource(R.string.radio),
+            showInMainMenu = false,
+        )
     )
 }

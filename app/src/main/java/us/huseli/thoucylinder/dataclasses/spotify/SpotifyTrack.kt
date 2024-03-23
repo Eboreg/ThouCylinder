@@ -75,6 +75,7 @@ abstract class AbstractSpotifyTrack<AT : AbstractSpotifyArtist> : AbstractSpotif
     )
 }
 
+
 data class SpotifySimplifiedTrack(
     override val artists: List<SpotifySimplifiedArtist>,
     @SerializedName("disc_number")
@@ -88,6 +89,7 @@ data class SpotifySimplifiedTrack(
     override val trackNumber: Int,
     override val uri: String?,
 ) : AbstractSpotifyTrack<SpotifySimplifiedArtist>()
+
 
 data class SpotifyTrack(
     override val artists: List<SpotifyArtist>,
@@ -138,3 +140,6 @@ data class SpotifyTrack(
     ) = super.toTrackCombo(getArtist = getArtist, album = album, isLocal = isLocal, isInLibrary = isInLibrary)
         .copy(album = album ?: this.album.toAlbum(isLocal = isLocal, isInLibrary = isInLibrary))
 }
+
+
+data class SpotifyTrackIdPair(val spotifyTrackId: String, val trackId: UUID)

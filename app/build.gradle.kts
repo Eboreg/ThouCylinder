@@ -39,6 +39,7 @@ android {
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
         val spotifyClientId = secretsProperties["spotifyClientId"] as String
+        val spotifyClientSecret = secretsProperties["spotifyClientSecret"] as String
         val lastFmApiKey = secretsProperties["lastFmApiKey"] as String
         val lastFmApiSecret = secretsProperties["lastFmApiSecret"] as String
 
@@ -59,6 +60,7 @@ android {
         buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
         buildConfigField("String", "spotifyClientId", "\"$spotifyClientId\"")
+        buildConfigField("String", "spotifyClientSecret", "\"$spotifyClientSecret\"")
         buildConfigField("String", "lastFmApiKey", "\"$lastFmApiKey\"")
         buildConfigField("String", "lastFmApiSecret", "\"$lastFmApiSecret\"")
         signingConfig = signingConfigs.getByName("release")
@@ -106,8 +108,8 @@ android {
 val lifecycleVersion = "2.7.0"
 val roomVersion = "2.6.1"
 val daggerVersion = "2.50"
-val media3Version = "1.2.1"
-val pagingVersion = "3.3.0-alpha03"
+val media3Version = "1.3.0"
+val pagingVersion = "3.3.0-alpha04"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
@@ -117,7 +119,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
 
     // Material:
-    implementation("androidx.compose.material:material:1.6.2") // for swipeable
+    implementation("androidx.compose.material:material:1.6.3") // for swipeable
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
@@ -179,4 +181,7 @@ dependencies {
     // Glance for widget:
     implementation("androidx.glance:glance-appwidget:1.0.0")
     implementation("androidx.glance:glance-material3:1.0.0")
+
+    // Trying out "immutable collection":
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.7")
 }

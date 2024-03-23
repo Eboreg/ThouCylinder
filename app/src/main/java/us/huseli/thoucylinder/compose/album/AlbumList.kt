@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.retaintheme.extensions.nullIfBlank
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
@@ -40,11 +41,11 @@ import java.util.UUID
 
 @Composable
 fun <T : AbstractAlbumCombo> AlbumList(
-    combos: List<T>,
+    combos: ImmutableList<T>,
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
-    selectedAlbumIds: List<UUID>,
-    albumDownloadTasks: List<AlbumDownloadTask>,
+    selectedAlbumIds: ImmutableList<UUID>,
+    albumDownloadTasks: ImmutableList<AlbumDownloadTask>,
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
     progressIndicatorStringRes: Int? = null,
@@ -73,8 +74,8 @@ fun <T : AbstractAlbumCombo> AlbumList(
                 pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
                 combo.yearString,
             ).joinToString(" • ").nullIfBlank()
-            val callbacks = albumCallbacks(combo)
-            val artistString = combo.artists.joined()
+            val callbacks = remember(combo) { albumCallbacks(combo) }
+            val artistString = remember(combo) { combo.artists.joined() }
 
             LaunchedEffect(combo.album.albumArt) {
                 imageBitmap.value = getThumbnail(combo)

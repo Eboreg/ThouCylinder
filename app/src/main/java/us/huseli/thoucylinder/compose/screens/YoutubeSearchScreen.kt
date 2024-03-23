@@ -21,6 +21,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.TrackDownloadTask
@@ -55,7 +58,7 @@ fun YoutubeSearchScreen(
     val context = LocalContext.current
 
     val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
-    val albumCombos by viewModel.albumCombos.collectAsStateWithLifecycle(emptyList())
+    val albumCombos by viewModel.albumCombos.collectAsStateWithLifecycle(persistentListOf())
     val isSearchingAlbums by viewModel.isSearchingAlbums.collectAsStateWithLifecycle()
     val isSearchingTracks by viewModel.isSearchingTracks.collectAsStateWithLifecycle()
     val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle(null)
@@ -110,9 +113,9 @@ fun YoutubeSearchScreen(
             ListType.ALBUMS -> AlbumSearchResults(
                 albumCombos = albumCombos,
                 displayType = displayType,
-                selectedAlbumIds = selectedAlbumIds,
+                selectedAlbumIds = selectedAlbumIds.toImmutableList(),
                 isSearching = isSearchingAlbums,
-                albumDownloadTasks = albumDownloadTasks,
+                albumDownloadTasks = albumDownloadTasks.toImmutableList(),
                 getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
                 albumCallbacks = { combo: AlbumWithTracksCombo ->
                     AlbumCallbacks(
@@ -184,11 +187,11 @@ fun YoutubeSearchScreen(
 fun AlbumSearchResults(
     albumCallbacks: (AlbumWithTracksCombo) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
-    albumCombos: List<AlbumWithTracksCombo>,
+    albumCombos: ImmutableList<AlbumWithTracksCombo>,
     displayType: DisplayType,
     isSearching: Boolean,
-    selectedAlbumIds: List<UUID>,
-    albumDownloadTasks: List<AlbumDownloadTask>,
+    selectedAlbumIds: ImmutableList<UUID>,
+    albumDownloadTasks: ImmutableList<AlbumDownloadTask>,
     getThumbnail: suspend (AlbumWithTracksCombo) -> ImageBitmap?,
 ) {
     when (displayType) {

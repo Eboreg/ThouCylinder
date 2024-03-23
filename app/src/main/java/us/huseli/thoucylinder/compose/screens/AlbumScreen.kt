@@ -48,6 +48,7 @@ import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.Selection
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
@@ -63,6 +64,7 @@ fun AlbumScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
+    onAlbumComboFetched: (AbstractAlbumCombo) -> Unit = {},
 ) {
     val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
     val (downloadProgress, downloadIsActive) = getDownloadProgress(
@@ -79,6 +81,10 @@ fun AlbumScreen(
 
     if (albumNotFound) {
         appCallbacks.onBackClick()
+    }
+
+    LaunchedEffect(albumCombo) {
+        albumCombo?.also(onAlbumComboFetched)
     }
 
     albumCombo?.let { combo ->

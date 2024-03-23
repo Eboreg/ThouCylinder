@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,15 +12,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.slice
+import us.huseli.thoucylinder.AbstractSpotifyOAuth2
+import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
-import us.huseli.thoucylinder.SpotifyOAuth2
-import us.huseli.thoucylinder.SuspendingRequestJob
+import us.huseli.thoucylinder.SpotifyOAuth2ClientCredentials
+import us.huseli.thoucylinder.SpotifyOAuth2PKCE
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
@@ -34,15 +39,16 @@ import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtistsResponse
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyResponse
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifySavedAlbumObject
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifySearchResponse
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrack
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackAudioFeaturesResponse
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendationResponse
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
 import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
-import us.huseli.thoucylinder.dataclasses.spotify.toSpotifySavedAlbumResponse
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getNext
-import us.huseli.thoucylinder.interfaces.SpotifyOAuth2Listener
 import java.net.URLEncoder
 import java.util.UUID
 import javax.inject.Inject
@@ -51,9 +57,13 @@ import kotlin.math.min
 
 @Singleton
 class SpotifyRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
-    inner class RequestJob(url: String, lowPrio: Boolean = false) : SuspendingRequestJob(url, lowPrio) {
-        override suspend fun request(): String? = oauth2.getToken()?.accessToken?.let { accessToken ->
-            Request(url = url, headers = mapOf("Authorization" to "Bearer $accessToken")).getString()
+    inner class RequestJob(
+        url: String,
+        private val oauth2: AbstractSpotifyOAuth2<*>,
+        lowPrio: Boolean = false,
+    ) : DeferredRequestJob(url, lowPrio) {
+        override suspend fun request(): String? = oauth2.getAccessToken()?.let { accessToken ->
+            return Request(url = url, headers = mapOf("Authorization" to "Bearer $accessToken")).getString()
         }
 
         override fun after(result: String?) {
@@ -70,17 +80,19 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         },
         debugLabel = "SpotifyRepository.apiResponseCache",
     )
+    private var matchArtistsJob: Job? = null
+    private val oauth2CC = SpotifyOAuth2ClientCredentials(context)
     private val requestTimes = MutableStateFlow<List<Long>>(emptyList())
     private val requestQueue = MutableStateFlow<List<RequestJob>>(emptyList())
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var matchArtistsJob: Job? = null
+    private val spotifyDao = database.spotifyDao()
 
     private val _allUserAlbumsFetched = MutableStateFlow(false)
     private val _nextUserAlbumIdx = MutableStateFlow(0)
     private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
     private val _userAlbums = MutableStateFlow<List<SpotifyAlbum>>(emptyList())
 
-    val oauth2 = SpotifyOAuth2(context)
+    val oauth2PKCE = SpotifyOAuth2PKCE(context)
     val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
     val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
     val userAlbums: StateFlow<List<SpotifyAlbum>> = _userAlbums.asStateFlow()
@@ -106,24 +118,50 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
                 }
             }
         }
+
+        scope.launch {
+            spotifyDao.flowSpotifyTrackIdsWithoutAudioFeatures()
+                .takeWhile { it.isNotEmpty() }
+                .distinctUntilChanged()
+                .collect { spotifyTrackIds ->
+                    for (chunk in spotifyTrackIds.chunked(100)) {
+                        val job = RequestJob(
+                            url = "${API_ROOT}/audio-features?ids=${chunk.joinToString(",")}",
+                            oauth2 = oauth2CC,
+                            lowPrio = true,
+                        )
+
+                        apiResponseCache.getOrNull(job)
+                            ?.fromJson<SpotifyTrackAudioFeaturesResponse>()
+                            ?.audioFeatures
+                            ?.filterNotNull()
+                            ?.also { spotifyDao.insertAudioFeatures(it) }
+                    }
+                }
+        }
     }
 
     suspend fun fetchNextUserAlbums(): Boolean {
         if (!_allUserAlbumsFetched.value) {
-            val job = RequestJob(url = "${API_ROOT}/me/albums?limit=50&offset=${_nextUserAlbumIdx.value}")
+            val job = RequestJob(
+                url = "${API_ROOT}/me/albums?limit=50&offset=${_nextUserAlbumIdx.value}",
+                oauth2 = oauth2PKCE,
+            )
 
-            apiResponseCache.getOrNull(job, retryOnNull = true)?.toSpotifySavedAlbumResponse()?.also { response ->
-                _userAlbums.value += response.items.map { it.album }
-                _nextUserAlbumIdx.value += response.items.size
-                _allUserAlbumsFetched.value = response.next == null
-                _totalUserAlbumCount.value = response.total
-                return true
-            }
+            apiResponseCache.getOrNull(job, retryOnNull = true)
+                ?.fromJson(object : TypeToken<SpotifyResponse<SpotifySavedAlbumObject>>() {})
+                ?.also { response ->
+                    _userAlbums.value += response.items.map { it.album }
+                    _nextUserAlbumIdx.value += response.items.size
+                    _allUserAlbumsFetched.value = response.next == null
+                    _totalUserAlbumCount.value = response.total
+                    return true
+                }
         }
         return false
     }
 
-    suspend fun getTrackRecommendations(spotifyTrackIds: List<String>, limit: Int): SpotifyTrackRecommendations {
+    suspend fun getTrackRecommendations(spotifyTrackIds: Collection<String>, limit: Int): SpotifyTrackRecommendations {
         val newTracks = mutableListOf<SpotifyTrack>()
         val innerLimit = min(limit * 2, 100)
 
@@ -149,7 +187,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
     }
 
     suspend fun getRelatedArtists(artistId: String, limit: Int = 10): List<SpotifyArtist>? =
-        apiResponseCache.getOrNull(RequestJob("$API_ROOT/artists/$artistId/related-artists"))
+        apiResponseCache.getOrNull(RequestJob(url = "$API_ROOT/artists/$artistId/related-artists", oauth2 = oauth2CC))
             ?.fromJson<SpotifyArtistsResponse>()
             ?.artists
             ?.sortedByDescending { it.popularity }
@@ -161,6 +199,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
                 url = "$API_ROOT/albums",
                 params = mapOf("ids" to albumIds.joinToString(",")),
             ),
+            oauth2 = oauth2CC,
         )
         return apiResponseCache.getOrNull(job)?.fromJson<SpotifyAlbumsResponse>()?.albums
     }
@@ -214,8 +253,6 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             ?.items
             ?.firstOrNull { it.name.lowercase() == name.lowercase() }
 
-    fun registerOAuth2Listener(listener: SpotifyOAuth2Listener) = oauth2.registerListener(listener)
-
     suspend fun searchAlbumArt(
         combo: AbstractAlbumCombo,
         getArtist: suspend (BaseArtist) -> Artist,
@@ -263,7 +300,8 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             url = Request.getUrl(
                 url = "$API_ROOT/recommendations",
                 params = params.plus("limit" to limit.toString())
-            )
+            ),
+            oauth2 = oauth2CC,
         )
         val response = apiResponseCache.getOrNull(job)?.fromJson<SpotifyTrackRecommendationResponse>()
 
@@ -318,7 +356,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         val query = withContext(Dispatchers.IO) {
             URLEncoder.encode(getSearchQuery(params), "UTF-8")
         }
-        val job = RequestJob("$API_ROOT/search?q=$query&type=$type", lowPrio)
+        val job = RequestJob(url = "$API_ROOT/search?q=$query&type=$type", oauth2 = oauth2CC, lowPrio = lowPrio)
 
         return apiResponseCache.getOrNull(job)?.fromJson<SpotifySearchResponse>()
     }

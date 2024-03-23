@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -14,11 +15,13 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.launchOnMainThread
 import us.huseli.thoucylinder.umlautify
@@ -32,22 +35,22 @@ class QueueViewModel @Inject constructor(
 ) : AbstractTrackListViewModel("QueueViewModel", repos) {
     private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
 
-    val canGotoNext = repos.player.canGotoNext
-    val canPlay = repos.player.canPlay
-    val currentCombo = repos.player.currentCombo.filterNotNull().distinctUntilChanged()
-    val currentPositionSeconds = repos.player.currentPositionMs.map { it / 1000 }.distinctUntilChanged()
+    val canGotoNext: StateFlow<Boolean> = repos.player.canGotoNext
+    val canPlay: Flow<Boolean> = repos.player.canPlay
+    val currentCombo: Flow<QueueTrackCombo> = repos.player.currentCombo.filterNotNull().distinctUntilChanged()
+    val currentPositionSeconds: Flow<Long> = repos.player.currentPositionMs.map { it / 1000 }.distinctUntilChanged()
     val currentProgress: Flow<Float> = combine(repos.player.currentPositionMs, currentCombo) { position, combo ->
         val endPosition = combo.track.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 }
         endPosition?.let { position / it.toFloat() } ?: 0f
     }.distinctUntilChanged()
-    val isLoading = repos.player.isLoading
-    val isPlaying = repos.player.isPlaying
-    val isRepeatEnabled = repos.player.isRepeatEnabled
-    val isShuffleEnabled = repos.player.isShuffleEnabled
-    val queue = _queue.asStateFlow()
-    val radioPojo = repos.player.radioPojo
+    val isLoading: StateFlow<Boolean> = repos.player.isLoading
+    val isPlaying: Flow<Boolean> = repos.player.isPlaying
+    val isRepeatEnabled: StateFlow<Boolean> = repos.player.isRepeatEnabled
+    val isShuffleEnabled: StateFlow<Boolean> = repos.player.isShuffleEnabled
+    val queue: StateFlow<List<QueueTrackCombo>> = _queue.asStateFlow()
+    val radioPojo: Flow<RadioPojo?> = repos.player.radioPojo
 
-    override val trackDownloadTasks = repos.download.tasks
+    override val trackDownloadTasks: Flow<List<TrackDownloadTask>> = repos.download.tasks
 
     init {
         viewModelScope.launch {

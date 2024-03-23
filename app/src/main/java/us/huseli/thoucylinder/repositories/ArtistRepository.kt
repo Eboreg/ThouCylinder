@@ -78,7 +78,7 @@ class ArtistRepository @Inject constructor(
     init {
         preferences.registerOnSharedPreferenceChangeListener(this)
         scope.launch {
-            artistDao.flowArtists().collect { allArtists.value = it }
+            artistDao.flowArtists().distinctUntilChanged().collect { allArtists.value = it }
         }
     }
 

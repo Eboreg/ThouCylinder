@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.thoucylinder.Constants.PREF_AUTO_IMPORT_LOCAL_MUSIC
+import us.huseli.thoucylinder.Constants.PREF_LIBRARY_RADIO_NOVELTY
 import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.Constants.PREF_UMLAUTIFY
 import us.huseli.thoucylinder.Constants.PREF_WELCOME_DIALOG_SHOWN
@@ -28,18 +29,20 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             preferences.getBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, false)
         else null
     )
-    private val _localMusicUri = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri())
-    private val _isWelcomeDialogShown = MutableStateFlow(preferences.getBoolean(PREF_WELCOME_DIALOG_SHOWN, false))
-    private val _innerPadding = MutableStateFlow(PaddingValues())
     private val _contentAreaSize = MutableStateFlow(DpSize.Zero)
+    private val _innerPadding = MutableStateFlow(PaddingValues())
+    private val _isWelcomeDialogShown = MutableStateFlow(preferences.getBoolean(PREF_WELCOME_DIALOG_SHOWN, false))
+    private val _libraryRadioNovelty = MutableStateFlow(preferences.getFloat(PREF_LIBRARY_RADIO_NOVELTY, 0.5f))
+    private val _localMusicUri = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri())
     private val _umlautify = MutableStateFlow(preferences.getBoolean(PREF_UMLAUTIFY, false))
 
     val autoImportLocalMusic: StateFlow<Boolean?> = _autoImportLocalMusic.asStateFlow()
-    val localMusicUri: StateFlow<Uri?> = _localMusicUri.asStateFlow()
+    val contentAreaSize: StateFlow<DpSize> = _contentAreaSize.asStateFlow()
+    val innerPadding: StateFlow<PaddingValues> = _innerPadding.asStateFlow()
     val isWelcomeDialogShown: StateFlow<Boolean> = _isWelcomeDialogShown.asStateFlow()
-    val innerPadding = _innerPadding.asStateFlow()
-    val contentAreaSize = _contentAreaSize.asStateFlow()
-    val umlautify = _umlautify.asStateFlow()
+    val libraryRadioNovelty: StateFlow<Float> = _libraryRadioNovelty.asStateFlow()
+    val localMusicUri: StateFlow<Uri?> = _localMusicUri.asStateFlow()
+    val umlautify: StateFlow<Boolean> = _umlautify.asStateFlow()
 
     init {
         if (_umlautify.value) Umlautify.enabled = true
@@ -64,6 +67,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     fun setInnerPadding(value: PaddingValues) {
         _innerPadding.value = value
+    }
+
+    fun setLibraryRadioNovelty(value: Float) {
+        _libraryRadioNovelty.value = value
+        preferences.edit().putFloat(PREF_LIBRARY_RADIO_NOVELTY, value).apply()
     }
 
     fun setLocalMusicUri(value: Uri?) {

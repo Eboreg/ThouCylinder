@@ -11,14 +11,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
+import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Repositories
-import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.spotify.filterBySearchTerm
-import us.huseli.thoucylinder.interfaces.SpotifyOAuth2Listener
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.umlautify
 import javax.inject.Inject
@@ -41,7 +40,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         }
     override val totalAlbumCount: StateFlow<Int?> = repos.spotify.totalUserAlbumCount
 
-    val authorizationStatus: Flow<SpotifyOAuth2.AuthorizationStatus> = repos.spotify.oauth2.authorizationStatus
+    val authorizationStatus: Flow<AuthorizationStatus> = repos.spotify.oauth2PKCE.authorizationStatus
     val filteredAlbumCount: Flow<Int?> = combine(
         searchTerm,
         externalAlbums,
@@ -63,18 +62,16 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         }
     }
 
-    fun getAuthUrl() = repos.spotify.oauth2.getAuthUrl()
+    fun getAuthUrl() = repos.spotify.oauth2PKCE.getAuthUrl()
 
     fun handleIntent(intent: Intent, context: Context) = launchOnIOThread {
         try {
-            repos.spotify.oauth2.handleIntent(intent)
+            repos.spotify.oauth2PKCE.handleIntent(intent)
         } catch (e: Exception) {
             Log.e(javaClass.simpleName, "handleIntent: $e", e)
             SnackbarEngine.addError(context.getString(R.string.spotify_authorization_failed, e).umlautify())
         }
     }
-
-    fun registerOAuth2Listener(listener: SpotifyOAuth2Listener) = repos.spotify.registerOAuth2Listener(listener)
 
     override suspend fun convertExternalAlbum(
         externalAlbum: SpotifyAlbum,

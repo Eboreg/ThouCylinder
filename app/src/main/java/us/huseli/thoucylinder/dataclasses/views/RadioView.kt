@@ -1,10 +1,12 @@
 package us.huseli.thoucylinder.dataclasses.views
 
+import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.DatabaseView
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.RadioType
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
@@ -43,6 +45,9 @@ data class RadioView(
     )
     val usedLocalTracks: List<Track>,
 ) {
+    fun getFullTitle(context: Context) =
+        if (type == RadioType.LIBRARY) context.getString(R.string.library_radio)
+        else context.getString(R.string.x_x_radio, title, context.getString(type.stringRes).lowercase())
     /*
     override fun equals(other: Any?) = other is RadioView && other.id == id
     override fun hashCode() = id.hashCode()

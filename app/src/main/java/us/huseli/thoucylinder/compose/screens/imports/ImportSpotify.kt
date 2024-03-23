@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.extensions.sensibleFormat
+import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.SpotifyOAuth2
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
@@ -39,7 +39,7 @@ fun ImportSpotify(
 ) {
     val uriHandler = LocalUriHandler.current
     val authorizationStatus by viewModel.authorizationStatus.collectAsStateWithLifecycle(
-        SpotifyOAuth2.AuthorizationStatus.UNKNOWN
+        AuthorizationStatus.UNKNOWN
     )
     val filteredAlbumCount by viewModel.filteredAlbumCount.collectAsStateWithLifecycle(null)
     val isAlbumCountExact by viewModel.isAlbumCountExact.collectAsStateWithLifecycle(false)
@@ -97,7 +97,7 @@ fun ImportSpotify(
     )
 
     if (externalAlbums.isEmpty()) {
-        if (authorizationStatus == SpotifyOAuth2.AuthorizationStatus.UNAUTHORIZED) {
+        if (authorizationStatus == AuthorizationStatus.UNAUTHORIZED) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(horizontal = 30.dp, vertical = 10.dp)

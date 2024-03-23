@@ -176,28 +176,6 @@ class YoutubeRepository @Inject constructor(
     @Suppress("UNCHECKED_CAST")
     private val metadataCache =
         getMutexCache<String, YoutubeMetadataList>("YoutubeRepository.metadataCache") { videoId ->
-            /*
-            val data: Map<String, *> = mapOf(
-                "context" to mapOf(
-                    "client" to mapOf(
-                        "clientName" to "ANDROID",
-                        "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION_ANDROID,
-                        "androidSdkVersion" to HEADER_ANDROID_SDK_VERSION,
-                    ),
-                ),
-                "videoId" to videoId,
-            )
-            val response = Request.postJson(
-                url = PLAYER_URL,
-                headers = mapOf(
-                    "User-Agent" to USER_AGENT_ANDROID,
-                    "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME_ANDROID,
-                    "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION_ANDROID,
-                    "Origin" to "https://www.youtube.com",
-                ),
-                json = data,
-            ).getJson()
-            */
             val response = YoutubeClient.android(url = PLAYER_URL, json = mapOf("videoId" to videoId)).postJson()
             val formats =
                 (response["streamingData"] as? Map<*, *>)?.get("formats") as? Collection<Map<*, *>> ?: emptyList()
@@ -307,7 +285,7 @@ class YoutubeRepository @Inject constructor(
         onChanged: suspend (Track) -> Unit = {},
     ): Track? {
         if (track.localUri != null) return track
-        if (track.youtubeVideo != null) return ensureTrackMetadataOrNull(track)?.also { onChanged(it) }
+        if (track.youtubeVideo != null) return ensureTrackMetadataOrNull(track, onChanged = onChanged)
         return if (matchIfNeeded)
             getBestTrackMatch(
                 track = track,
@@ -359,38 +337,10 @@ class YoutubeRepository @Inject constructor(
     )?.let { track -> trackCombo.copy(track = track) }
 
     suspend fun getVideoSearchResult(query: String, continuationToken: String? = null): VideoSearchResult {
-        /*
-        val requestData: MutableMap<String, Any> = mutableMapOf(
-            "context" to mapOf(
-                "client" to mapOf(
-                    "userAgent" to USER_AGENT_ANDROID,
-                    "hl" to "en",
-                    "clientName" to HEADER_X_YOUTUBE_CLIENT_NAME_WEB,
-                    "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION_WEB,
-                )
-            ),
-            "params" to "EgIQAQ==",
-        )
-
-        if (continuationToken != null) requestData["continuation"] = continuationToken
-        else requestData["query"] = query
-         */
         val json =
             if (continuationToken != null) mapOf("continuation" to continuationToken)
             else mapOf("query" to query)
         val response = YoutubeClient.web(url = SEARCH_URL, json = json).postJson()
-        /*
-        val response = Request.postJson(
-            url = SEARCH_URL,
-            headers = mapOf(
-                "User-Agent" to USER_AGENT_ANDROID,
-                "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME_WEB,
-                "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION_WEB,
-                "Origin" to "https://www.youtube.com",
-            ),
-            json = requestData,
-        ).getString().fromJson<Map<String, *>>()
-         */
         val videos = mutableListOf<YoutubeVideo>()
         var nextContinuationToken: String? = null
 
@@ -441,14 +391,6 @@ class YoutubeRepository @Inject constructor(
         query: String,
         progressCallback: (Double) -> Unit = {},
     ): List<YoutubePlaylistCombo> {
-        // val body = Request(
-        //     url = "https://www.youtube.com/results",
-        //     params = mapOf("search_query" to query),
-        //     headers = mapOf(
-        //         "User-Agent" to CUSTOM_USER_AGENT,
-        //         "Accept" to "*/*",
-        //     )
-        // ).getString()
         val body = YoutubeClient.custom(
             url = "https://www.youtube.com/results",
             params = mapOf("search_query" to query),
@@ -535,9 +477,12 @@ class YoutubeRepository @Inject constructor(
 
 
     /** PRIVATE METHODS ******************************************************/
-    private suspend fun ensureTrackMetadataOrNull(track: Track, forceReload: Boolean = false): Track? =
-        ensureTrackMetadata(track = track, forceReload = forceReload)
-            .takeIf { it.metadata != null && it.youtubeVideo?.metadata != null }
+    private suspend fun ensureTrackMetadataOrNull(
+        track: Track,
+        forceReload: Boolean = false,
+        onChanged: suspend (Track) -> Unit = {},
+    ): Track? = ensureTrackMetadata(track = track, forceReload = forceReload, onChanged = onChanged)
+        .takeIf { it.metadata != null && it.youtubeVideo?.metadata != null }
 
     private suspend fun getBestTrackMatch(
         track: Track,
@@ -600,27 +545,6 @@ class YoutubeRepository @Inject constructor(
         playlistId: String,
         artist: String? = null,
     ): YoutubePlaylistCombo? {
-        /*
-        val response = Request.postJson(
-            url = BROWSE_URL,
-            headers = mapOf(
-                "X-YouTube-Client-Name" to HEADER_X_YOUTUBE_CLIENT_NAME_ANDROID,
-                "X-YouTube-Client-Version" to HEADER_X_YOUTUBE_CLIENT_VERSION_ANDROID,
-                "Origin" to "https://www.youtube.com",
-            ),
-            json = mutableMapOf(
-                "context" to mapOf(
-                    "client" to mapOf(
-                        "userAgent" to USER_AGENT_ANDROID,
-                        "hl" to "en",
-                        "clientName" to HEADER_X_YOUTUBE_CLIENT_NAME_WEB,
-                        "clientVersion" to HEADER_X_YOUTUBE_CLIENT_VERSION_WEB,
-                    )
-                ),
-                "browseId" to "VL$playlistId",
-            ),
-        ).getString().fromJson<Map<String, *>>()
-         */
         val response = YoutubeClient.web(
             url = BROWSE_URL,
             json = mapOf("browseId" to "VL$playlistId"),

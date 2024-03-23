@@ -22,6 +22,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackAudioFeatures
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.RadioView
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
@@ -43,6 +44,7 @@ import java.util.concurrent.Executors
         TrackArtist::class,
         Radio::class,
         RadioTrack::class,
+        SpotifyTrackAudioFeatures::class,
     ],
     views = [
         AlbumArtistCredit::class,
@@ -52,7 +54,7 @@ import java.util.concurrent.Executors
         RadioView::class,
     ],
     exportSchema = false,
-    version = 95,
+    version = 96,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
@@ -63,6 +65,7 @@ abstract class Database : RoomDatabase() {
     abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
     abstract fun radioDao(): RadioDao
+    abstract fun spotifyDao(): SpotifyDao
 
     companion object {
         fun build(context: Context): Database {

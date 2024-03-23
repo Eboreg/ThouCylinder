@@ -1,5 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.spotify
 
+import com.google.gson.annotations.SerializedName
+
 data class SpotifyResponse<T>(
     val href: String,
     val limit: Int,
@@ -33,3 +35,8 @@ data class SpotifyTrackRecommendationResponse(
 data class SpotifyAlbumsResponse(val albums: List<SpotifyAlbum>)
 
 data class SpotifyArtistsResponse(val artists: List<SpotifyArtist>)
+
+data class SpotifyTrackAudioFeaturesResponse(
+    @SerializedName("audio_features")
+    val audioFeatures: List<SpotifyTrackAudioFeatures?>,
+)

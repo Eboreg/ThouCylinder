@@ -114,7 +114,7 @@ fun <T : AbstractTrackCombo> TrackList(
                         combo = combo,
                         showArtist = showArtist,
                         isSelected = selectedTrackIds.contains(combo.track.trackId),
-                        callbacks = trackCallbacks(index, combo),
+                        callbacks = remember { trackCallbacks(index, combo) },
                         downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == combo.track.trackId },
                         thumbnail = thumbnail.value,
                         showAlbum = showAlbum,

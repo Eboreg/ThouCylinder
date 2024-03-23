@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
@@ -28,7 +30,7 @@ import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 fun LibraryScreenAlbumTab(
     viewModel: LibraryViewModel,
     appCallbacks: AppCallbacks,
-    albumCombos: List<AlbumCombo>,
+    albumCombos: ImmutableList<AlbumCombo>,
     isImporting: Boolean,
     displayType: DisplayType,
 ) {
@@ -43,25 +45,27 @@ fun LibraryScreenAlbumTab(
     val selectedTagPojos by viewModel.selectedAlbumTagPojos.collectAsStateWithLifecycle()
     val availabilityFilter by viewModel.availabilityFilter.collectAsStateWithLifecycle()
 
-    val albumCallbacks = { combo: AlbumCombo ->
-        AlbumCallbacks(
-            combo = combo,
-            appCallbacks = appCallbacks,
-            context = context,
-            onPlayClick = if (combo.album.isPlayable) {
-                { viewModel.playAlbum(combo.album.albumId) }
-            } else null,
-            onEnqueueClick = if (combo.album.isPlayable) {
-                { viewModel.enqueueAlbum(combo.album.albumId, context) }
-            } else null,
-            onAlbumLongClick = {
-                viewModel.selectAlbumsFromLastSelected(combo.album.albumId, albumCombos.map { it.album.albumId })
-            },
-            onAlbumClick = {
-                if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(combo.album.albumId)
-                else appCallbacks.onAlbumClick(combo.album.albumId)
-            },
-        )
+    val albumCallbacks = remember {
+        { combo: AlbumCombo ->
+            AlbumCallbacks(
+                combo = combo,
+                appCallbacks = appCallbacks,
+                context = context,
+                onPlayClick = if (combo.album.isPlayable) {
+                    { viewModel.playAlbum(combo.album.albumId) }
+                } else null,
+                onEnqueueClick = if (combo.album.isPlayable) {
+                    { viewModel.enqueueAlbum(combo.album.albumId, context) }
+                } else null,
+                onAlbumLongClick = {
+                    viewModel.selectAlbumsFromLastSelected(combo.album.albumId, albumCombos.map { it.album.albumId })
+                },
+                onAlbumClick = {
+                    if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(combo.album.albumId)
+                    else appCallbacks.onAlbumClick(combo.album.albumId)
+                },
+            )
+        }
     }
     val albumSelectionCallbacks = remember { viewModel.getAlbumSelectionCallbacks(appCallbacks, context) }
     val progressIndicatorStringRes = remember(isImporting, isLoadingAlbums) {
@@ -87,8 +91,8 @@ fun LibraryScreenAlbumTab(
             sortDialogTitle = stringResource(R.string.album_order),
             onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
             onSearch = { viewModel.setAlbumSearchTerm(it) },
-            tagPojos = tagPojos,
-            selectedTagPojos = selectedTagPojos,
+            tagPojos = tagPojos.toImmutableList(),
+            selectedTagPojos = selectedTagPojos.toImmutableList(),
             onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
             availabilityFilter = availabilityFilter,
             onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
@@ -100,19 +104,18 @@ fun LibraryScreenAlbumTab(
                 combos = albumCombos,
                 albumCallbacks = albumCallbacks,
                 albumSelectionCallbacks = albumSelectionCallbacks,
-                selectedAlbumIds = selectedAlbumIds,
+                selectedAlbumIds = selectedAlbumIds.toImmutableList(),
                 onEmpty = onEmpty,
-                albumDownloadTasks = albumDownloadTasks,
+                albumDownloadTasks = albumDownloadTasks.toImmutableList(),
                 progressIndicatorStringRes = progressIndicatorStringRes,
-                getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
-            )
+            ) { viewModel.getAlbumThumbnail(it, context) }
             DisplayType.GRID -> AlbumGrid(
                 combos = albumCombos,
                 albumCallbacks = albumCallbacks,
-                selectedAlbumIds = selectedAlbumIds,
+                selectedAlbumIds = selectedAlbumIds.toImmutableList(),
                 albumSelectionCallbacks = albumSelectionCallbacks,
                 onEmpty = onEmpty,
-                albumDownloadTasks = albumDownloadTasks,
+                albumDownloadTasks = albumDownloadTasks.toImmutableList(),
                 progressIndicatorStringRes = progressIndicatorStringRes,
             )
         }

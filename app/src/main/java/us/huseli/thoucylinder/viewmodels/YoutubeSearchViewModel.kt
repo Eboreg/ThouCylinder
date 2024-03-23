@@ -5,7 +5,11 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import us.huseli.thoucylinder.Repositories
@@ -24,14 +28,14 @@ class YoutubeSearchViewModel @Inject constructor(
 ) : AbstractAlbumListViewModel("YoutubeSearchViewModel", repos) {
     private val _isSearchingAlbums = MutableStateFlow(false)
     private val _query = MutableStateFlow("")
-    private val _albumCombos = MutableStateFlow<List<AlbumWithTracksCombo>>(emptyList())
+    private val _albumCombos = MutableStateFlow<ImmutableList<AlbumWithTracksCombo>>(persistentListOf())
     private val _trackCombos = MutableStateFlow<PagingData<TrackCombo>>(PagingData.empty())
 
-    override val albumCombos = _albumCombos.asStateFlow()
-    val trackCombos = _trackCombos.asStateFlow()
-    val isSearchingTracks = repos.youtube.isSearchingTracks
-    val isSearchingAlbums = _isSearchingAlbums.asStateFlow()
-    val query = _query.asStateFlow()
+    override val albumCombos: StateFlow<ImmutableList<AlbumWithTracksCombo>> = _albumCombos.asStateFlow()
+    val trackCombos: StateFlow<PagingData<TrackCombo>> = _trackCombos.asStateFlow()
+    val isSearchingTracks: StateFlow<Boolean> = repos.youtube.isSearchingTracks
+    val isSearchingAlbums: StateFlow<Boolean> = _isSearchingAlbums.asStateFlow()
+    val query: StateFlow<String> = _query.asStateFlow()
 
     fun search(query: String) {
         if (query != _query.value) {
@@ -58,7 +62,7 @@ class YoutubeSearchViewModel @Inject constructor(
                             combos.flatMap { combo -> combo.trackCombos.flatMap { it.artists.toTrackArtists() } }
                         )
                     }
-                    _albumCombos.value = combos
+                    _albumCombos.value = combos.toImmutableList()
                     _isSearchingAlbums.value = false
                 }
 

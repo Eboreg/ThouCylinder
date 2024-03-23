@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.spotify
 
 import com.google.gson.annotations.SerializedName
-import com.google.gson.reflect.TypeToken
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
@@ -14,9 +13,8 @@ import us.huseli.thoucylinder.dataclasses.combos.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.fromJson
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -87,6 +85,7 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem(), IExternalAlbum {
     }
 }
 
+
 data class SpotifySimplifiedAlbum(
     @SerializedName("album_type")
     override val albumType: String?,
@@ -103,6 +102,7 @@ data class SpotifySimplifiedAlbum(
     override val totalTracks: Int?,
     override val uri: String?,
 ) : AbstractSpotifyAlbum()
+
 
 data class SpotifyAlbum(
     @SerializedName("album_type")
@@ -163,6 +163,7 @@ data class SpotifyAlbum(
     ).copy(trackCount = tracks.total)
 }
 
+
 fun List<SpotifyAlbum>.filterBySearchTerm(term: String): List<SpotifyAlbum> {
     val words = term.lowercase().split(Regex(" +"))
 
@@ -175,11 +176,9 @@ fun List<SpotifyAlbum>.filterBySearchTerm(term: String): List<SpotifyAlbum> {
     }
 }
 
+
 data class SpotifySavedAlbumObject(
     @SerializedName("added_at")
     val addedAt: String,
     val album: SpotifyAlbum,
 )
-
-fun String.toSpotifySavedAlbumResponse(): SpotifyResponse<SpotifySavedAlbumObject> =
-    fromJson(object : TypeToken<SpotifyResponse<SpotifySavedAlbumObject>>() {})

@@ -1,3 +1,4 @@
+<!--suppress IncorrectFormatting -->
 <resources>
     <string name="add_anyway">Add anyway</string>
     <string name="add_new">Add new</string>
@@ -26,6 +27,7 @@
     <string name="auto_import_local_music">Auto import local music</string>
     <string name="availability">Availability</string>
     <string name="bit_rate">Bit rate</string>
+    <string name="browse_on_spotify">Browse on Spotify</string>
     <string name="cancel">Cancel</string>
     <string name="cancel_download">Cancel download</string>
     <string name="channels">Channels</string>
@@ -34,8 +36,12 @@
     <string name="converting">Converting</string>
     <string name="cost_money">Cost money</string>
     <string name="could_not_open_the_selected_image">Could not open the selected image.</string>
+    <string name="could_not_start_radio">Could not start radio: Failed to get recommendations.</string>
+    <string name="could_not_start_radio_for_x">Could not start radio: Failed to get recommendations for %1$s.</string>
     <string name="create_new_playlist">Create new playlist</string>
     <string name="current_value">Current value: %1$s</string>
+    <string name="deactivate">Deactivate</string>
+    <string name="deactivate_radio">Deactivate radio</string>
     <string name="debug">Debug</string>
     <string name="delete">Delete</string>
     <string name="delete_album">Delete album</string>
@@ -74,6 +80,7 @@
     <string name="import_from_lastfm">Import from Last.fm</string>
     <string name="import_from_spotify">Import from Spotify</string>
     <string name="import_method_description_1">We can either import the selected albums and try to match them to Youtube playlists, or just import them without matching, and do the matching on demand later on.</string>
+    <string name="import_method_description_2_lastfm">Importing from Last.fm is already somewhat slow since we need to fetch data from Musicbrainz, which caps requests to one per second. Matching with Youtube will obviously be even slower.</string>
     <string name="import_method_description_2_spotify">Matching all of them now will be significantly slower.</string>
     <string name="import_str">Import</string>
     <string name="import_without_matching">Import without matching</string>
@@ -96,6 +103,7 @@
     <string name="last_fm_authorization_failed">Last.fm authorization failed: %1$s</string>
     <string name="last_fm_username">Last.fm username</string>
     <string name="library">Library</string>
+    <string name="library_radio">Library radio</string>
     <string name="loading">Loading ...</string>
     <string name="loading_albums">Loading albums ...</string>
     <string name="loading_artists">Loading artists ...</string>
@@ -126,22 +134,26 @@
     <string name="no_tracks_could_be_matched">No tracks could be matched.</string>
     <string name="no_tracks_found">No tracks found.</string>
     <string name="none">None</string>
+    <string name="now_active_x">Now active: %1$s</string>
     <string name="ok">OK</string>
     <string name="only_delete_files">Only delete files</string>
     <string name="only_local">Only local</string>
     <string name="only_playable">Only playable</string>
+    <string name="only_show_artists_with_albums">Only show artists with albums</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
     <string name="play_count">Play count: %1$s</string>
     <string name="play_local_music_files">Play local music files</string>
     <string name="play_on_spotify">Play on Spotify</string>
-    <string name="browse_on_spotify">Browse on Spotify</string>
     <string name="play_on_youtube">Play on Youtube</string>
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
     <string name="puts_metal_umlauts_above_random_letters_because_it_s_cool">Puts metal umlauts above random letters, because it\'s cool.</string>
     <string name="queue">Queue</string>
+    <string name="radio">Radio</string>
+    <string name="radio_x">Radio: %1$s</string>
     <string name="recommendations">Recommendations</string>
+    <string name="related_to_x">Related to: %1$s</string>
     <string name="remove">Remove</string>
     <string name="remove_from_queue">Remove from queue</string>
     <string name="remove_playlist">Remove playlist</string>
@@ -163,9 +175,14 @@
     <string name="spotify_authorization_failed">Spotify authorization failed: %1$s</string>
     <string name="spotify_import_help_1">Press the \"Authorize\" button above to authorize this application with Spotify and fetch your saved albums from there. After this, you will get to select which albums to import.</string>
     <string name="spotify_import_help_2">For each selected album, attempts will be made to match it with a Youtube playlist. If a sufficiently good match is found, it will be added to your library as an album. However, it will not be automatically downloaded.</string>
+    <string name="start_library_radio">Start library radio</string>
+    <string name="start_radio">Start radio</string>
+    <string name="start_x_x_radio">Start <b>%1$s</b> %2$s radio</string>
     <string name="starting">Starting</string>
+    <string name="stop_radio">Stop radio</string>
     <string name="tagging">Tagging</string>
     <string name="tags">Tags</string>
+    <string name="the_album_was_enqueued_next">The album was enqueued next.</string>
     <string name="the_playlist_was_removed">The playlist was removed.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
     <string name="the_queue_is_empty">The queue is empty.</string>
@@ -174,6 +191,7 @@
     <string name="this_is_where_downloaded_music_will_be_placed">This is where downloaded music will be placed.</string>
     <string name="this_playlist_is_empty">This playlist is empty. :(</string>
     <string name="title">Title</string>
+    <string name="track">Track</string>
     <string name="track_count"># tracks</string>
     <string name="track_information">Track information</string>
     <string name="track_number">Track number</string>
@@ -191,26 +209,16 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="what_it_can_do">What it can do:</string>
     <string name="what_it_will_not_do">What it will NOT do:</string>
+    <string name="x_x_radio"><b>%1$s</b> %2$s radio</string>
     <string name="year">Year</string>
     <string name="you_can_always_change_this_later_in_the_settings">You can always change this later in the settings.</string>
     <string name="you_need_to_configure_your_last_fm_username_in_the_settings">You need to configure your Last.fm username in the settings.</string>
     <string name="you_need_to_select_your_local_music_root_folder">You need to select your local music root folder.</string>
     <string name="youtube">Youtube</string>
-    <string name="import_method_description_2_lastfm">Importing from Last.fm is already somewhat slow since we need to fetch data from Musicbrainz, which caps requests to one per second. Matching with Youtube will obviously be even slower.</string>
-    <string name="related_to_x">Related to: %1$s</string>
-    <string name="start_radio">Start radio</string>
-    <string name="stop_radio">Stop radio</string>
-    <string name="radio_x">Radio: %1$s</string>
-    <string name="could_not_start_radio_for_x">Could not start radio: Failed to get recommendations for %1$s.</string>
-    <string name="could_not_start_radio">Could not start radio: Failed to get recommendations.</string>
-    <string name="the_album_was_enqueued_next">The album was enqueued next.</string>
-    <string name="library_radio">Library radio</string>
-    <string name="deactivate">Deactivate</string>
-    <string name="only_show_artists_with_albums">Only show artists with albums</string>
-    <plurals name="x_tracks_were_enqueued_next">
-        <item quantity="one">One track was enqueued next.</item>
-        <item quantity="other">%1$s tracks were enqueued next.</item>
-    </plurals>
+    <string name="radio_dialog_help_1">Artist, album, and track radios are generated using Spotify\'s track recommendation API (but does not require you to have a Spotify account).</string>
+    <string name="radio_dialog_help_2">The library radio will contain a mix of random tracks from your library, and Spotify recommendations based on your library. The ratio between them can be set using the \'library radio novelty\' slider.</string>
+    <string name="library_radio_novelty">Library radio novelty</string>
+    <string name="radio_dialog_help_3">0% = only library tracks, 100% = only Spotify recommendations</string>
     <plurals name="deleted_local_album_files">
         <item quantity="one">Deleted the local files of one album.</item>
         <item quantity="other">Deleted the local files of %1$d albums.</item>
@@ -244,7 +252,7 @@
         <item quantity="other">%1$d albums</item>
     </plurals>
     <plurals name="x_albums_enqueued_next">
-        <item quantity="one">The album was enqueued next.</item>
+        <item quantity="one">One album was enqueued next.</item>
         <item quantity="other">%1$d albums were enqueued next.</item>
     </plurals>
     <plurals name="x_albums_imported">
@@ -269,7 +277,7 @@
         <item quantity="other">%1$d tracks were added to the playlist.</item>
     </plurals>
     <plurals name="x_tracks_enqueued_next">
-        <item quantity="one">The track was enqueued next.</item>
+        <item quantity="one">One track was enqueued next.</item>
         <item quantity="other">%1$d tracks were enqueued next.</item>
     </plurals>
     <plurals name="x_tracks_matched_and_updated">

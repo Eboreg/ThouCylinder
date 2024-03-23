@@ -20,16 +20,13 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
-import us.huseli.thoucylinder.RadioType
 import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID
 import javax.inject.Inject
 
@@ -96,7 +93,6 @@ class LibraryViewModel @Inject constructor(
     val playlists = repos.playlist.playlistsPojos
         .onStart { _isLoadingPlaylists.value = true }
         .onEach { _isLoadingPlaylists.value = false }
-    val radioState = repos.player.radioState
     val selectedAlbumTagPojos = _selectedAlbumTagPojos.asStateFlow()
     val selectedTrackTagPojos = _selectedTrackTagPojos.asStateFlow()
     val trackSearchTerm = _trackSearchTerm.asStateFlow()
@@ -147,9 +143,5 @@ class LibraryViewModel @Inject constructor(
     fun setTrackSorting(sortParameter: TrackSortParameter, sortOrder: SortOrder) {
         _trackSortParameter.value = sortParameter
         _trackSortOrder.value = sortOrder
-    }
-
-    fun startLibraryRadio() = launchOnIOThread {
-        repos.radio.setActiveRadio(Radio(type = RadioType.LIBRARY))
     }
 }

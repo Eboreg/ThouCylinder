@@ -17,7 +17,7 @@ import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
-import us.huseli.thoucylinder.SuspendingRequestJob
+import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
@@ -38,7 +38,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MusicBrainzRepository @Inject constructor(@ApplicationContext private val context: Context) {
-    class RequestJob(url: String, lowPrio: Boolean = false) : SuspendingRequestJob(url, lowPrio) {
+    class RequestJob(url: String, lowPrio: Boolean = false) : DeferredRequestJob(url, lowPrio) {
         override suspend fun request(): String =
             Request(url = url, headers = mapOf("User-Agent" to CUSTOM_USER_AGENT)).getString()
     }

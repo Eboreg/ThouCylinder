@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
 import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.SortOrder
@@ -39,7 +41,7 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
     initialSearchTerm: String,
     sortParameter: SortParameter,
     sortOrder: SortOrder,
-    sortParameters: Map<SortParameter, String>,
+    sortParameters: ImmutableMap<SortParameter, String>,
     sortDialogTitle: String,
     onSort: (parameter: SortParameter, order: SortOrder) -> Unit,
     onSearch: (String) -> Unit,
@@ -47,8 +49,8 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
     showFilterButton: Boolean = true,
     filterButtonSelected: Boolean = false,
     tonalElevation: Dp = 2.dp,
-    tagPojos: List<TagPojo>? = null,
-    selectedTagPojos: List<TagPojo>? = null,
+    tagPojos: ImmutableList<TagPojo>? = null,
+    selectedTagPojos: ImmutableList<TagPojo>? = null,
     availabilityFilter: AvailabilityFilter? = null,
     onTagsChange: (List<TagPojo>) -> Unit = {},
     onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},

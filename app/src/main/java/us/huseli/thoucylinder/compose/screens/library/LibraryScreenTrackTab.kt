@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.TrackSortParameter
@@ -53,32 +55,34 @@ fun LibraryScreenTrackTab(
 
     var latestSelectedIndex by rememberSaveable(selectedTrackIds) { mutableStateOf<Int?>(null) }
 
-    val trackCallbacks = { index: Int, combo: TrackCombo ->
-        TrackCallbacks(
-            combo = combo,
-            appCallbacks = appCallbacks,
-            context = context,
-            onTrackClick = {
-                if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.track.trackId)
-                else if (combo.track.isPlayable) viewModel.playTrackCombo(combo)
-            },
-            onEnqueueClick = if (combo.track.isPlayable) {
-                { viewModel.enqueueTrackCombo(combo, context) }
-            } else null,
-            onLongClick = {
-                viewModel.selectTracksBetweenIndices(
-                    fromIndex = latestSelectedIndex,
-                    toIndex = index,
-                    getTrackIdAtIndex = { trackCombos[it]?.track?.trackId },
-                )
-            },
-            onEach = {
-                if (combo.track.trackId == latestSelectedTrackId)
-                    latestSelectedIndex = index
-            },
-        )
+    val trackCallbacks = remember {
+        { index: Int, combo: TrackCombo ->
+            TrackCallbacks(
+                combo = combo,
+                appCallbacks = appCallbacks,
+                context = context,
+                onTrackClick = {
+                    if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.track.trackId)
+                    else if (combo.track.isPlayable) viewModel.playTrackCombo(combo)
+                },
+                onEnqueueClick = if (combo.track.isPlayable) {
+                    { viewModel.enqueueTrackCombo(combo, context) }
+                } else null,
+                onLongClick = {
+                    viewModel.selectTracksBetweenIndices(
+                        fromIndex = latestSelectedIndex,
+                        toIndex = index,
+                        getTrackIdAtIndex = { trackCombos[it]?.track?.trackId },
+                    )
+                },
+                onEach = {
+                    if (combo.track.trackId == latestSelectedTrackId)
+                        latestSelectedIndex = index
+                },
+            )
+        }
     }
-    val trackSelectionCallbacks = viewModel.getTrackSelectionCallbacks(appCallbacks, context)
+    val trackSelectionCallbacks = remember { viewModel.getTrackSelectionCallbacks(appCallbacks, context) }
     val progressIndicatorText =
         if (isImporting) stringResource(R.string.importing_local_tracks)
         else if (isLoadingTracks) stringResource(R.string.loading_tracks)
@@ -101,8 +105,8 @@ fun LibraryScreenTrackTab(
             sortDialogTitle = stringResource(R.string.track_order),
             onSort = { param, order -> viewModel.setTrackSorting(param, order) },
             onSearch = { viewModel.setTrackSearchTerm(it) },
-            tagPojos = tagPojos,
-            selectedTagPojos = selectedTagPojos,
+            tagPojos = tagPojos.toImmutableList(),
+            selectedTagPojos = selectedTagPojos.toImmutableList(),
             onTagsChange = { viewModel.setSelectedTrackTagPojos(it) },
             availabilityFilter = availabilityFilter,
             onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
@@ -112,12 +116,12 @@ fun LibraryScreenTrackTab(
         when (displayType) {
             DisplayType.LIST -> TrackList(
                 trackCombos = trackCombos,
-                selectedTrackIds = selectedTrackIds,
+                selectedTrackIds = selectedTrackIds.toImmutableList(),
                 viewModel = viewModel,
                 listState = listState,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
-                trackDownloadTasks = trackDownloadTasks,
+                trackDownloadTasks = trackDownloadTasks.toImmutableList(),
                 onEmpty = onEmpty,
                 progressIndicatorText = progressIndicatorText,
             )
@@ -127,8 +131,8 @@ fun LibraryScreenTrackTab(
                 gridState = gridState,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
-                selectedTrackIds = selectedTrackIds,
-                trackDownloadTasks = trackDownloadTasks,
+                selectedTrackIds = selectedTrackIds.toImmutableList(),
+                trackDownloadTasks = trackDownloadTasks.toImmutableList(),
                 onEmpty = onEmpty,
                 progressIndicatorText = progressIndicatorText,
             )

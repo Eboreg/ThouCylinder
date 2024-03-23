@@ -3,23 +3,21 @@ package us.huseli.thoucylinder
 import android.content.Intent
 import android.os.Bundle
 import android.os.StrictMode
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.AndroidUriHandler
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import us.huseli.thoucylinder.compose.App
-import us.huseli.thoucylinder.interfaces.SpotifyOAuth2Listener
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.LastFmViewModel
 import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity(), SpotifyOAuth2Listener {
+class MainActivity : ComponentActivity() {
     private val spotifyImportViewModel by viewModels<SpotifyImportViewModel>()
     private val lastFmViewModel by viewModels<LastFmViewModel>()
     private val appViewModel by viewModels<AppViewModel>()
@@ -40,7 +38,6 @@ class MainActivity : ComponentActivity(), SpotifyOAuth2Listener {
 
         val startDestination: String = intent?.let { handleIntent(it) } ?: LibraryDestination.route
 
-        spotifyImportViewModel.registerOAuth2Listener(this)
         appViewModel.doStartupTasks(this)
 
         /**
@@ -49,9 +46,8 @@ class MainActivity : ComponentActivity(), SpotifyOAuth2Listener {
          * Some hints: https://stackoverflow.com/questions/72301445/why-is-setcontent-being-called-twice
          */
         setContent {
-            Log.i(javaClass.simpleName, "setContent recomposed")
             ThouCylinderTheme {
-                App(startDestination = startDestination, modifier = Modifier.safeDrawingPadding())
+                App(startDestination = remember { startDestination }, modifier = Modifier.safeDrawingPadding())
             }
         }
     }
@@ -73,9 +69,5 @@ class MainActivity : ComponentActivity(), SpotifyOAuth2Listener {
             }
         }
         return null
-    }
-
-    override fun onSpotifyReauthNeeded(authUrl: String) {
-        AndroidUriHandler(this).openUri(authUrl)
     }
 }

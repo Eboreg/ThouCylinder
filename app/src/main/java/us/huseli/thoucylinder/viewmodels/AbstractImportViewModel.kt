@@ -14,9 +14,9 @@ import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID
 

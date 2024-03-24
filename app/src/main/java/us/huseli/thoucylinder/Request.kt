@@ -152,6 +152,7 @@ abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false)
     abstract suspend fun request(): String?
     override fun equals(other: Any?) = other is DeferredRequestJob && other.url == url
     override fun hashCode() = url.hashCode()
+    override fun toString() = "<${javaClass.simpleName} $url>"
 }
 
 fun Collection<DeferredRequestJob>.getNext(): DeferredRequestJob? =

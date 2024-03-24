@@ -57,13 +57,13 @@ open class MutexCache<I, K, V>(
         retryOnNull: Boolean = false,
     ): V? {
         val key = itemToKey(item)
+        val mutex = mutexes.getOrPut(key) { Mutex() }
 
-        return mutexes.getOrPut(key) { Mutex() }.withLock {
-            if (cache.containsKey(key)) {
-                if (forceReload || (cache[key] == null && retryOnNull))
-                    fetchMethod(item).also { cache[key] = CachedValue(it) }
-                else cache[key]?.value
-            } else fetchMethod(item).also { cache[key] = CachedValue(it) }
+        return mutex.withLock {
+            val shouldRun = !cache.containsKey(key) || forceReload || (cache[key]?.value == null && retryOnNull)
+
+            if (shouldRun) fetchMethod(item).also { cache[key] = CachedValue(it) }
+            else cache[key]?.value
         }
     }
 }

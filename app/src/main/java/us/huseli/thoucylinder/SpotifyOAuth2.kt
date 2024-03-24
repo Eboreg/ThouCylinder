@@ -28,15 +28,19 @@ abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: 
         preferences.getString(tokenPrefKey, null)?.let { jsonToToken(it) }
     )
 
-    val authorizationStatus: Flow<AuthorizationStatus>
-        get() = token.map { token ->
-            if (token == null) AuthorizationStatus.UNAUTHORIZED
-            else AuthorizationStatus.AUTHORIZED
-        }
+    val authorizationStatus: Flow<AuthorizationStatus> = token.map { token ->
+        if (token == null) AuthorizationStatus.UNAUTHORIZED
+        else AuthorizationStatus.AUTHORIZED
+    }
 
     abstract fun baseJsonToToken(json: String): T
     abstract suspend fun getAccessToken(): String?
     abstract fun jsonToToken(json: String): T?
+
+    fun clearToken() {
+        token.value = null
+        preferences.edit().remove(tokenPrefKey).apply()
+    }
 
     protected fun saveToken(json: String): T = baseJsonToToken(json).also {
         token.value = it

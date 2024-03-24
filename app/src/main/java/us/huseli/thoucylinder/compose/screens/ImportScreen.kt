@@ -13,8 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.screens.imports.ImportLastFm
-import us.huseli.thoucylinder.compose.screens.imports.ImportSpotify
+import us.huseli.thoucylinder.compose.screens.imports.LastFmImport
+import us.huseli.thoucylinder.compose.screens.imports.SpotifyImport
 import us.huseli.thoucylinder.stringResource
 import java.util.UUID
 
@@ -48,12 +48,12 @@ fun ImportScreen(
 
     Column(modifier = modifier) {
         when (backend) {
-            ImportBackend.SPOTIFY -> ImportSpotify(
+            ImportBackend.SPOTIFY -> SpotifyImport(
                 onGotoLibraryClick = onGotoLibraryClick,
                 onGotoAlbumClick = onGotoAlbumClick,
                 backendSelection = backendSelection,
             )
-            ImportBackend.LAST_FM -> ImportLastFm(
+            ImportBackend.LAST_FM -> LastFmImport(
                 onGotoSettingsClick = onGotoSettingsClick,
                 onGotoLibraryClick = onGotoLibraryClick,
                 onGotoAlbumClick = onGotoAlbumClick,

@@ -151,8 +151,11 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             apiResponseCache.getOrNull(job, retryOnNull = true)
                 ?.fromJson(object : TypeToken<SpotifyResponse<SpotifySavedAlbumObject>>() {})
                 ?.also { response ->
-                    _userAlbums.value += response.items.map { it.album }
-                    _nextUserAlbumIdx.value += response.items.size
+                    val userAlbums = _userAlbums.value.toMutableList().apply {
+                        this.addAll(response.offset, response.items.map { it.album })
+                    }
+                    _nextUserAlbumIdx.value = userAlbums.size
+                    _userAlbums.value = userAlbums
                     _allUserAlbumsFetched.value = response.next == null
                     _totalUserAlbumCount.value = response.total
                     return true
@@ -280,6 +283,12 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
                     }
                 }
         }
+    }
+
+    fun unauthorize() {
+        oauth2PKCE.clearToken()
+        _userAlbums.value = emptyList()
+        _nextUserAlbumIdx.value = 0
     }
 
 

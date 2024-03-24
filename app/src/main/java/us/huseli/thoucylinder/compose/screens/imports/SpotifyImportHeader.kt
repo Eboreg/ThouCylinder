@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BottomAppBarDefaults
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.thoucylinder.AuthorizationStatus
+import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.ImportProgressSection
@@ -26,7 +28,7 @@ import us.huseli.thoucylinder.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ImportSpotifyHeader(
+fun SpotifyImportHeader(
     modifier: Modifier = Modifier,
     authorizationStatus: AuthorizationStatus,
     hasPrevious: Boolean,
@@ -46,6 +48,7 @@ fun ImportSpotifyHeader(
     onSelectAllClick: (Boolean) -> Unit,
     onSearch: (String) -> Unit,
     onAuthorizeClick: () -> Unit,
+    onUnauthorizeClick: () -> Unit,
     backendSelection: @Composable () -> Unit,
 ) {
     val isLandscape = isInLandscapeMode()
@@ -69,11 +72,17 @@ fun ImportSpotifyHeader(
 
                     if (authorizationStatus == AuthorizationStatus.AUTHORIZED) {
                         if (!isLandscape) {
-                            SmallButton(
-                                onClick = onImportClick,
-                                text = stringResource(R.string.import_str),
-                                enabled = importButtonEnabled,
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                if (BuildConfig.DEBUG) SmallButton(
+                                    onClick = onUnauthorizeClick,
+                                    text = "Unauth",
+                                )
+                                SmallButton(
+                                    onClick = onImportClick,
+                                    text = stringResource(R.string.import_str),
+                                    enabled = importButtonEnabled,
+                                )
+                            }
                         }
 
                         PaginationSection(

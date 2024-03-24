@@ -29,7 +29,7 @@ import us.huseli.thoucylinder.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ImportLastFmHeader(
+fun LastFmImportHeader(
     modifier: Modifier = Modifier,
     hasPrevious: Boolean,
     hasNext: Boolean,
@@ -102,14 +102,6 @@ fun ImportLastFmHeader(
                             onClick = { onSelectAllClick(!isAllSelected) },
                             modifier = Modifier.align(Alignment.CenterVertically),
                         )
-                        /*
-                        SelectAllCheckbox(
-                            checked = isAllSelected,
-                            enabled = selectAllEnabled,
-                            onCheckedChange = onSelectAllClick,
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                        )
-                         */
                     }
 
                     CompactSearchTextField(
@@ -127,14 +119,6 @@ fun ImportLastFmHeader(
                             onClick = { onSelectAllClick(!isAllSelected) },
                             modifier = Modifier.align(Alignment.CenterVertically).padding(start = 10.dp),
                         )
-                        /*
-                        SelectAllCheckbox(
-                            checked = isAllSelected,
-                            enabled = selectAllEnabled,
-                            onCheckedChange = onSelectAllClick,
-                            modifier = Modifier.align(Alignment.CenterVertically).padding(start = 10.dp),
-                        )
-                         */
                     }
                 }
 

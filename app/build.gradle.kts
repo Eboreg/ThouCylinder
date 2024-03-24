@@ -46,8 +46,8 @@ android {
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.2.0"
+        versionCode = 2
+        versionName = "0.3.0"
 
         manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -80,6 +80,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            isDebuggable = false
             manifestPlaceholders["hostName"] = "thoucylinder"
             manifestPlaceholders["redirectHostName"] = "thoucylinder"
             buildConfigField("String", "hostName", "\"thoucylinder\"")

@@ -73,6 +73,8 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         }
     }
 
+    fun unauthorize() = repos.spotify.unauthorize()
+
     override suspend fun convertExternalAlbum(
         externalAlbum: SpotifyAlbum,
         progressCallback: (Double) -> Unit,

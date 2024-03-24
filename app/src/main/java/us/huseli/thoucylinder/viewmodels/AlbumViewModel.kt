@@ -14,7 +14,7 @@ import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks

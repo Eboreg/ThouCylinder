@@ -2,8 +2,8 @@ package us.huseli.thoucylinder.dataclasses.spotify
 
 import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track

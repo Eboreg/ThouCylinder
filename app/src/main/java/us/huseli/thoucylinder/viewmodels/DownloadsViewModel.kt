@@ -6,10 +6,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import us.huseli.thoucylinder.AlbumDownloadTask
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.launchOnIOThread
 import java.util.UUID

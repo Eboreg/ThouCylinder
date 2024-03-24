@@ -20,12 +20,12 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
 import java.util.UUID
 import javax.inject.Inject

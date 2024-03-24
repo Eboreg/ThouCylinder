@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.combos
+package us.huseli.thoucylinder.dataclasses.views
 
 import androidx.room.DatabaseView
 import androidx.room.Embedded
@@ -7,7 +7,6 @@ import us.huseli.retaintheme.extensions.stripCommonFixes
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 
 @DatabaseView(
     """

@@ -5,7 +5,7 @@ import androidx.annotation.StringRes
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 
 interface SortParameter<T> {

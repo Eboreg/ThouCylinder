@@ -33,7 +33,7 @@ import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse

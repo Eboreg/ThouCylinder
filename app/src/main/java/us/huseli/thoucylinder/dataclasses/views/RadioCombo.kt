@@ -24,7 +24,7 @@ import java.util.UUID
         LEFT JOIN Track ON Radio_trackId = Track_trackId
     """
 )
-data class RadioView(
+data class RadioCombo(
     @ColumnInfo("Radio_id") val id: UUID = UUID.randomUUID(),
     @ColumnInfo("Radio_type") val type: RadioType,
     @ColumnInfo("Radio_title") val title: String?,
@@ -48,8 +48,4 @@ data class RadioView(
     fun getFullTitle(context: Context) =
         if (type == RadioType.LIBRARY) context.getString(R.string.library_radio)
         else context.getString(R.string.x_x_radio, title, context.getString(type.stringRes).lowercase())
-    /*
-    override fun equals(other: Any?) = other is RadioView && other.id == id
-    override fun hashCode() = id.hashCode()
-     */
 }

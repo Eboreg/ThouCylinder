@@ -21,7 +21,7 @@ import us.huseli.thoucylinder.compose.screens.library.LibraryScreenArtistTab
 import us.huseli.thoucylinder.compose.screens.library.LibraryScreenPlaylistTab
 import us.huseli.thoucylinder.compose.screens.library.LibraryScreenTrackTab
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable

@@ -75,7 +75,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.track.TrackContextMenu
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.getAverageColor
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.QueueViewModel

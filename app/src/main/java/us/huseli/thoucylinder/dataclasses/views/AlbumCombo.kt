@@ -1,11 +1,10 @@
-package us.huseli.thoucylinder.dataclasses.combos
+package us.huseli.thoucylinder.dataclasses.views
 
 import androidx.room.DatabaseView
 import androidx.room.Embedded
 import androidx.room.Relation
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 
 @DatabaseView(
     """

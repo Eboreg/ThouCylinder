@@ -21,7 +21,7 @@ import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
+import us.huseli.thoucylinder.dataclasses.BaseArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy

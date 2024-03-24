@@ -10,7 +10,7 @@ import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Tag

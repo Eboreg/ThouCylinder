@@ -1,9 +1,10 @@
-package us.huseli.thoucylinder.dataclasses.combos
+package us.huseli.thoucylinder.dataclasses.views
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.room.ColumnInfo
+import androidx.room.DatabaseView
 import androidx.room.Embedded
 import androidx.room.Relation
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
@@ -11,10 +12,17 @@ import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 
+@DatabaseView(
+    """
+    SELECT TrackCombo.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position
+    FROM QueueTrack JOIN TrackCombo ON Track_trackId = QueueTrack_trackId
+    GROUP BY QueueTrack_queueTrackId
+    ORDER BY QueueTrack_position, QueueTrack_queueTrackId
+    """
+)
 data class QueueTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,

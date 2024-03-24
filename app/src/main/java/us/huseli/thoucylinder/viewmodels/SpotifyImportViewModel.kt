@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum

@@ -41,7 +41,7 @@ import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.PlaylistViewModel

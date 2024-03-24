@@ -31,14 +31,14 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.stringResource
 import java.util.UUID
 import kotlin.math.roundToInt
 
 @Composable
 fun RadioDialog(
-    activeRadio: RadioView?,
+    activeRadio: RadioCombo?,
     activeTrackCombo: AbstractTrackCombo?,
     activeAlbumCombo: AbstractAlbumCombo?,
     activeArtist: Artist?,

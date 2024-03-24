@@ -12,7 +12,7 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import java.util.UUID
 
 @Dao
@@ -33,14 +33,7 @@ abstract class QueueDao {
     abstract fun flowTracksInQueue(): Flow<List<Track>>
 
     @Transaction
-    @Query(
-        """
-        SELECT TrackCombo.*, QueueTrack_uri, QueueTrack_queueTrackId, QueueTrack_position
-        FROM QueueTrack JOIN TrackCombo ON Track_trackId = QueueTrack_trackId
-        GROUP BY QueueTrack_queueTrackId
-        ORDER BY QueueTrack_position, QueueTrack_queueTrackId
-        """
-    )
+    @Query("SELECT * FROM QueueTrackCombo")
     abstract suspend fun getQueue(): List<QueueTrackCombo>
 
     @Transaction

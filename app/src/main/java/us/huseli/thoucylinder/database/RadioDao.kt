@@ -9,7 +9,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.entities.RadioTrack
-import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import java.util.UUID
 
 @Dao
@@ -24,8 +24,8 @@ abstract class RadioDao {
     abstract suspend fun clearRadios()
 
     @Transaction
-    @Query("SELECT * FROM RadioView WHERE Radio_id = :radioId")
-    abstract suspend fun getRadioView(radioId: UUID): RadioView?
+    @Query("SELECT * FROM RadioCombo WHERE Radio_id = :radioId")
+    abstract suspend fun getRadioCombo(radioId: UUID): RadioCombo?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertRadio(radio: Radio)

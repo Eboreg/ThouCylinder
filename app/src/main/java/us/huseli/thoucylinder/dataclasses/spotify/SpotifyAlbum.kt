@@ -5,11 +5,11 @@ import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
+import us.huseli.thoucylinder.dataclasses.BaseArtist
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.stripTitleCommons
+import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Tag

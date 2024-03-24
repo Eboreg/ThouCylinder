@@ -1,4 +1,4 @@
-package us.huseli.thoucylinder
+package us.huseli.thoucylinder.repositories
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

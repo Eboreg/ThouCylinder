@@ -1,9 +1,9 @@
 package us.huseli.thoucylinder.viewmodels
 
 import dagger.hilt.android.lifecycle.HiltViewModel
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.launchOnIOThread

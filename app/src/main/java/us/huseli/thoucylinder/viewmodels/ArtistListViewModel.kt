@@ -4,18 +4,17 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.ArtistSortParameter
-import us.huseli.thoucylinder.Repositories
 import us.huseli.thoucylinder.SortOrder
 import us.huseli.thoucylinder.asThumbnailImageBitmap
-import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.getBitmap
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
@@ -26,13 +25,8 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
     private val _sortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _sortParameter = MutableStateFlow(ArtistSortParameter.NAME)
 
-    private val unfilteredArtistCombos: Flow<List<ArtistCombo>> = combine(
-        repos.artist.albumArtistCombos,
-        repos.artist.trackArtistCombos,
-    ) { a1, a2 -> (a1 + a2) }
-
     val artistCombos = combine(
-        unfilteredArtistCombos,
+        repos.artist.artistCombos,
         _searchTerm,
         _sortParameter,
         _sortOrder,

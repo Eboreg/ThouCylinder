@@ -11,7 +11,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -61,17 +61,8 @@ abstract class PlaylistDao {
     abstract fun flowPlaylists(): Flow<List<Playlist>>
 
     @Transaction
-    @Query(
-        """
-        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
-        FROM TrackCombo 
-            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
-            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-        WHERE Playlist_playlistId = :playlistId
-        ORDER BY PlaylistTrack_position
-        """
-    )
-    abstract fun flowTrackCombos(playlistId: UUID): Flow<List<PlaylistTrackCombo>>
+    @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
+    abstract fun flowTrackCombosByPlaylistId(playlistId: UUID): Flow<List<PlaylistTrackCombo>>
 
     @Insert
     abstract suspend fun insertPlaylists(vararg playlists: Playlist)
@@ -94,32 +85,12 @@ abstract class PlaylistDao {
     abstract suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
 
     @Transaction
-    @Query(
-        """
-        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
-        FROM TrackCombo 
-            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
-            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-        WHERE Playlist_playlistId = :playlistId
-        GROUP BY PlaylistTrack_id
-        ORDER BY PlaylistTrack_position
-        """
-    )
-    abstract suspend fun listTrackCombos(playlistId: UUID): List<PlaylistTrackCombo>
+    @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
+    abstract suspend fun listTrackCombosByPlaylistId(playlistId: UUID): List<PlaylistTrackCombo>
 
     @Transaction
-    @Query(
-        """
-        SELECT DISTINCT TrackCombo.*, Playlist.*, PlaylistTrack_position, PlaylistTrack_id
-        FROM TrackCombo 
-            JOIN PlaylistTrack ON Track_trackId = PlaylistTrack_trackId 
-            JOIN Playlist ON PlaylistTrack_playlistId = Playlist_playlistId 
-        WHERE PlaylistTrack_id IN (:ids)
-        GROUP BY PlaylistTrack_id
-        ORDER BY PlaylistTrack_position
-        """
-    )
-    abstract suspend fun listTrackCombosById(vararg ids: UUID): List<PlaylistTrackCombo>
+    @Query("SELECT * FROM PlaylistTrackCombo WHERE PlaylistTrack_id IN (:ids)")
+    abstract suspend fun listTrackCombosByPlaylistTrackId(vararg ids: UUID): List<PlaylistTrackCombo>
 
     @Query("SELECT Track.* FROM PlaylistTrack JOIN Track ON Track_trackId = PlaylistTrack_trackId WHERE PlaylistTrack_playlistId = :playlistId")
     abstract suspend fun listTracks(playlistId: UUID): List<Track>

@@ -10,8 +10,8 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
-import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
@@ -41,27 +41,11 @@ abstract class ArtistDao {
     @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId IN(:trackIds)")
     abstract suspend fun clearTrackArtists(vararg trackIds: UUID)
 
-    @Query(
-        """
-        SELECT
-            Artist.*,
-            COUNT(DISTINCT Track_trackId) AS trackCount,
-            COUNT(DISTINCT Album_albumId) AS albumCount,
-            group_concat(DISTINCT quote(Album_albumArt_uri)) AS albumArtUris,
-            group_concat(DISTINCT quote(Album_youtubePlaylist_thumbnail_url)) AS youtubeFullImageUrls,
-            group_concat(DISTINCT quote(Album_spotifyImage_uri)) AS spotifyFullImageUrls
-        FROM Artist
-            JOIN AlbumArtist ON Artist_id = AlbumArtist_artistId        
-            JOIN Album ON Album_albumId = AlbumArtist_albumId AND Album_isInLibrary = 1
-            LEFT JOIN Track ON Track_albumId = Album_albumId AND Track_isInLibrary = 1
-        GROUP BY Artist_id        
-        ORDER BY LOWER(Artist_name)
-        """
-    )
-    abstract fun flowAlbumArtistCombos(): Flow<List<ArtistCombo>>
-
     @Query("SELECT * FROM Artist WHERE Artist_id = :id")
     abstract fun flowArtistById(id: UUID): Flow<Artist?>
+
+    @Query("SELECT * FROM ArtistCombo")
+    abstract fun flowArtistCombos(): Flow<List<ArtistCombo>>
 
     @Query("SELECT * FROM Artist ORDER BY Artist_name")
     abstract fun flowArtists(): Flow<List<Artist>>
@@ -76,29 +60,6 @@ abstract class ArtistDao {
         """
     )
     abstract fun flowArtistsWithTracksOrAlbums(): Flow<List<Artist>>
-
-    @Query(
-        """
-        SELECT
-            Artist.*,
-            COUNT(DISTINCT Track_trackId) AS trackCount,
-            0 AS albumCount,
-            group_concat(DISTINCT quote(Album_albumArt_uri)) AS albumArtUris,
-            group_concat(DISTINCT quote(Album_youtubePlaylist_thumbnail_url)) AS youtubeFullImageUrls,
-            group_concat(DISTINCT quote(Album_spotifyImage_uri)) AS spotifyFullImageUrls
-        FROM Artist
-            JOIN TrackArtist ON Artist_id = TrackArtist_artistId        
-            JOIN Track ON Track_trackId = TrackArtist_trackId AND Track_isInLibrary = 1
-            LEFT JOIN Album ON Album_albumId = Track_albumId
-        WHERE NOT EXISTS(
-            SELECT * FROM AlbumArtist JOIN Album ON AlbumArtist_albumId = Album_albumId
-            WHERE Album_isInLibrary = 1 AND AlbumArtist_artistId = Artist_id
-        )
-        GROUP BY Artist_id        
-        ORDER BY LOWER(Artist_name)
-        """
-    )
-    abstract fun flowTrackArtistCombos(): Flow<List<ArtistCombo>>
 
     @Query("SELECT * FROM Artist WHERE Artist_id = :id")
     abstract suspend fun getArtist(id: UUID): Artist?

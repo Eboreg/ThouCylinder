@@ -19,8 +19,8 @@ import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
-import us.huseli.thoucylinder.dataclasses.combos.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
@@ -55,8 +55,7 @@ class ArtistRepository @Inject constructor(
     private val localMusicUri = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri())
 
     val artistsWithTracksOrAlbums = artistDao.flowArtistsWithTracksOrAlbums().distinctUntilChanged()
-    val trackArtistCombos = artistDao.flowTrackArtistCombos()
-    val albumArtistCombos = artistDao.flowAlbumArtistCombos()
+    val artistCombos = artistDao.flowArtistCombos()
     val artistCache = ArtistCache()
     val artistImageUriCache = MutexCache<ArtistCombo, UUID, Uri?>(
         itemToKey = { it.artist.id },

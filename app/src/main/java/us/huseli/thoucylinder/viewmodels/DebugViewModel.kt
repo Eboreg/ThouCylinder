@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.extensions.slice
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.launchOnIOThread
 import javax.inject.Inject
 

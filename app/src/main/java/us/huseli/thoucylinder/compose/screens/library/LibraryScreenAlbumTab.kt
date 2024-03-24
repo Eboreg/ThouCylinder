@@ -22,7 +22,7 @@ import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 

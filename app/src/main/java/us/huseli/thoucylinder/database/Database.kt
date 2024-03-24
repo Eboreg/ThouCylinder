@@ -6,8 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
@@ -24,7 +27,7 @@ import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackAudioFeatures
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import java.util.concurrent.Executors
 
@@ -51,10 +54,13 @@ import java.util.concurrent.Executors
         TrackArtistCredit::class,
         TrackCombo::class,
         AlbumCombo::class,
-        RadioView::class,
+        RadioCombo::class,
+        PlaylistTrackCombo::class,
+        QueueTrackCombo::class,
+        ArtistCombo::class,
     ],
     exportSchema = false,
-    version = 96,
+    version = 99,
 )
 @TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {

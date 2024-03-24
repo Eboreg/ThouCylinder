@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.repositories
 import androidx.room.withTransaction
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.combos.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -58,7 +58,7 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
 
     fun flowPlaylist(playlistId: UUID) = playlistDao.flowPlaylist(playlistId)
 
-    fun flowPlaylistTracks(playlistId: UUID) = playlistDao.flowTrackCombos(playlistId)
+    fun flowPlaylistTracks(playlistId: UUID) = playlistDao.flowTrackCombosByPlaylistId(playlistId)
 
     suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection): Int {
         val selectionTracks = listSelectionTracks(selection)
@@ -75,10 +75,10 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
     suspend fun listPlaylistAlbums(playlistId: UUID): List<Album> = playlistDao.listAlbums(playlistId)
 
     suspend fun listPlaylistTrackCombos(playlistId: UUID): List<PlaylistTrackCombo> =
-        playlistDao.listTrackCombos(playlistId)
+        playlistDao.listTrackCombosByPlaylistId(playlistId)
 
     suspend fun listPlaylistTrackCombosById(ids: Collection<UUID>) =
-        if (ids.isNotEmpty()) playlistDao.listTrackCombosById(*ids.toTypedArray()) else emptyList()
+        if (ids.isNotEmpty()) playlistDao.listTrackCombosByPlaylistTrackId(*ids.toTypedArray()) else emptyList()
 
     suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack> = playlistDao.listPlaylistTracks(playlistId)
 

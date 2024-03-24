@@ -1,6 +1,4 @@
-package us.huseli.thoucylinder.dataclasses.abstr
-
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+package us.huseli.thoucylinder.dataclasses
 
 open class BaseArtist(
     open val name: String,

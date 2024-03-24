@@ -14,10 +14,10 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.combos.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.launchOnIOThread

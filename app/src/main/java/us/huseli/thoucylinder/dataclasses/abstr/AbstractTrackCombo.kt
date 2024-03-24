@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.dataclasses.abstr
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit

@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.listItemsBetween
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks

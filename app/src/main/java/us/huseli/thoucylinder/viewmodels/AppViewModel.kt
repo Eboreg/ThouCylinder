@@ -20,14 +20,14 @@ import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.RadioType
-import us.huseli.thoucylinder.Repositories
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.BaseArtist
+import us.huseli.thoucylinder.dataclasses.BaseArtist
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -36,7 +36,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
-import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.launchOnIOThread
@@ -59,7 +59,7 @@ class AppViewModel @Inject constructor(
     private val radioUsedLocalTrackIds = mutableListOf<UUID>()
     private val radioUsedSpotifyTrackIds = mutableListOf<String>()
 
-    val activeRadio: StateFlow<RadioView?> = repos.radio.activeRadio
+    val activeRadio: StateFlow<RadioCombo?> = repos.radio.activeRadio
     val isWelcomeDialogShown: StateFlow<Boolean> = repos.settings.isWelcomeDialogShown
     val libraryRadioNovelty: StateFlow<Float> = repos.settings.libraryRadioNovelty
     val playlists: Flow<List<PlaylistPojo>> = repos.playlist.playlistsPojos
@@ -314,7 +314,7 @@ class AppViewModel @Inject constructor(
         repos.album.setAlbumsIsLocal(noLongerLocalAlbums.keys.map { it.albumId }, false)
     }
 
-    private suspend fun getInitialRadioRecommendations(radio: RadioView): SpotifyTrackRecommendations? =
+    private suspend fun getInitialRadioRecommendations(radio: RadioCombo): SpotifyTrackRecommendations? =
         when (radio.type) {
             RadioType.LIBRARY -> repos.spotify.getTrackRecommendations(
                 spotifyTrackIds = listRandomLibrarySpotifyTrackIds(5),
@@ -393,7 +393,7 @@ class AppViewModel @Inject constructor(
         return null
     }
 
-    private suspend fun initializeRadio(radio: RadioView, context: Context) {
+    private suspend fun initializeRadio(radio: RadioCombo, context: Context) {
         /** Run the first time a radio is started (i.e. not every time it's REstarted). */
         val channel = Channel<QueueTrackCombo?>(capacity = Channel.BUFFERED)
         val recommendations = getInitialRadioRecommendations(radio)
@@ -460,7 +460,7 @@ class AppViewModel @Inject constructor(
         return spotifyTrackIds.toList()
     }
 
-    private suspend fun restartRadio(radio: RadioView) {
+    private suspend fun restartRadio(radio: RadioCombo) {
         val channel = Channel<QueueTrackCombo?>(capacity = Channel.BUFFERED)
 
         withContext(Dispatchers.Main) {

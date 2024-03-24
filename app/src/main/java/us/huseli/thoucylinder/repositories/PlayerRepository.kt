@@ -41,12 +41,12 @@ import us.huseli.thoucylinder.RadioState
 import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
-import us.huseli.thoucylinder.dataclasses.combos.QueueTrackCombo
-import us.huseli.thoucylinder.dataclasses.combos.containsWithPosition
-import us.huseli.thoucylinder.dataclasses.combos.reindexed
-import us.huseli.thoucylinder.dataclasses.combos.toMediaItems
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.containsWithPosition
+import us.huseli.thoucylinder.dataclasses.views.reindexed
+import us.huseli.thoucylinder.dataclasses.views.toMediaItems
 import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
-import us.huseli.thoucylinder.dataclasses.views.RadioView
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.widget.AppWidget
 import java.util.UUID
 import javax.inject.Inject
@@ -243,7 +243,7 @@ class PlayerRepository @Inject constructor(
     }
 
     fun activateRadio(
-        radio: RadioView,
+        radio: RadioCombo,
         channel: Channel<QueueTrackCombo?>,
         callbacks: RadioCallbacks,
         clearAndPlay: Boolean,

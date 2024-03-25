@@ -143,7 +143,7 @@ fun App(
     val appCallbacks = remember {
         AppCallbacks(
             onAddAlbumToLibraryClick = { combo ->
-                viewModel.addAlbumToLibrary(combo.album.albumId)
+                viewModel.addAlbumsToLibrary(listOf(combo.album.albumId))
                 SnackbarEngine.addInfo(
                     context.getString(R.string.added_x_to_the_library, combo.album.title)
                         .umlautify()

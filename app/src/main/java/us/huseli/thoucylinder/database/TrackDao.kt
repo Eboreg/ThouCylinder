@@ -215,6 +215,9 @@ abstract class TrackDao {
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId = :albumId")
     abstract suspend fun setIsInLibraryByAlbumId(albumId: UUID, isInLibrary: Boolean)
 
+    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId IN (:albumIds)")
+    abstract suspend fun setIsInLibraryByAlbumId(isInLibrary: Boolean, vararg albumIds: UUID)
+
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
     abstract suspend fun setIsInLibrary(trackIds: Collection<UUID>, isInLibrary: Boolean)
 

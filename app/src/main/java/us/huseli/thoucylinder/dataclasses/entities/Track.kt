@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.dataclasses.entities
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.WorkerThread
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
@@ -15,12 +14,10 @@ import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
-import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
-import us.huseli.thoucylinder.getBitmapByUrl
 import us.huseli.thoucylinder.getParentDirectory
 import us.huseli.thoucylinder.matchFiles
 import java.util.UUID
@@ -106,9 +103,6 @@ data class Track(
     fun getPositionString(albumDiscCount: Int): String =
         if (albumDiscCount > 1 && discNumber != null && albumPosition != null) "$discNumber.$albumPosition"
         else albumPosition?.toString() ?: ""
-
-    suspend fun getThumbnail(context: Context): ImageBitmap? = image?.getThumbnailImageBitmap(context)
-        ?: youtubeVideo?.thumbnail?.url?.getBitmapByUrl()?.asThumbnailImageBitmap(context)
 
     fun toString(
         showAlbumPosition: Boolean = true,

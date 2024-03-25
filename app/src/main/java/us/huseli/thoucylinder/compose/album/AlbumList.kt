@@ -46,6 +46,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbumIds: ImmutableList<UUID>,
     albumDownloadTasks: ImmutableList<AlbumDownloadTask>,
+    modifier: Modifier = Modifier,
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
     progressIndicatorStringRes: Int? = null,
@@ -58,6 +59,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
         SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = albumSelectionCallbacks)
 
         ItemList(
+            modifier = modifier,
             things = combos,
             isSelected = isSelected,
             onClick = { _, combo -> albumCallbacks(combo).onAlbumClick?.invoke() },

@@ -47,6 +47,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
     albumCallbacks: (T) -> AlbumCallbacks,
     albumSelectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbumIds: List<UUID>,
+    modifier: Modifier = Modifier,
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     albumDownloadTasks: List<AlbumDownloadTask>,
@@ -59,6 +60,7 @@ fun <T : AbstractAlbumCombo> AlbumGrid(
     SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = albumSelectionCallbacks)
 
     ItemGrid(
+        modifier = modifier,
         things = combos,
         onClick = { _, combo -> albumCallbacks(combo).onAlbumClick?.invoke() },
         onLongClick = { _, combo -> albumCallbacks(combo).onAlbumLongClick?.invoke() },

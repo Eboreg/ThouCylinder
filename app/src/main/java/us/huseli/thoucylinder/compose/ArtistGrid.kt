@@ -31,6 +31,7 @@ import java.util.UUID
 @Composable
 fun ArtistGrid(
     artistCombos: List<ArtistCombo>,
+    modifier: Modifier = Modifier,
     progressIndicatorText: String? = null,
     onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
@@ -43,6 +44,7 @@ fun ArtistGrid(
         contentPadding = contentPadding,
         progressIndicatorText = progressIndicatorText,
         onEmpty = onEmpty,
+        modifier = modifier,
     ) { _, combo ->
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 

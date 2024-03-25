@@ -3,24 +3,19 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ViewList
 import androidx.compose.material.icons.sharp.GridView
-import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.stringResource
 
 enum class DisplayType { LIST, GRID }
 
@@ -35,31 +30,22 @@ fun ListSettingsRow(
     modifier: Modifier = Modifier,
     availableDisplayTypes: List<DisplayType> = DisplayType.entries,
     excludeListTypes: List<ListType> = emptyList(),
-    tonalElevation: Dp = 2.dp,
 ) {
-    Surface(
-        color = BottomAppBarDefaults.containerColor,
-        tonalElevation = tonalElevation,
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceAround,
     ) {
         Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp)
-                .padding(bottom = 10.dp, top = if (isInLandscapeMode()) 10.dp else 0.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes)
-            }
-            ListDisplayTypeButton(
-                current = displayType,
-                onChange = onDisplayTypeChange,
-                available = availableDisplayTypes,
-            )
+            ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes)
         }
+        ListDisplayTypeButton(
+            current = displayType,
+            onChange = onDisplayTypeChange,
+            available = availableDisplayTypes,
+        )
     }
 }
 

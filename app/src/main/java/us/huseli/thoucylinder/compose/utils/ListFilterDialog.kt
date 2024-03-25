@@ -37,7 +37,7 @@ import us.huseli.thoucylinder.umlautify
 @Composable
 fun ListFilterDialog(
     modifier: Modifier = Modifier,
-    selectedTagPojos: List<TagPojo>? = null,
+    selectedTagPojos: List<TagPojo>,
     tagPojos: List<TagPojo>? = null,
     availabilityFilter: AvailabilityFilter? = null,
     onCancelClick: () -> Unit,
@@ -120,12 +120,12 @@ fun ListFilterDialog(
                                 ) {
                                     chunk.forEach { pojo ->
                                         FilterChip(
-                                            selected = localSelectedTagPojos?.contains(pojo) == true,
+                                            selected = localSelectedTagPojos.contains(pojo),
                                             onClick = {
-                                                localSelectedTagPojos = localSelectedTagPojos?.toMutableList()?.apply {
+                                                localSelectedTagPojos = localSelectedTagPojos.toMutableList().apply {
                                                     if (contains(pojo)) remove(pojo)
                                                     else add(pojo)
-                                                }?.also(onTagsChange)
+                                                }.also(onTagsChange)
                                             },
                                             label = {
                                                 Text(pojo.name.umlautify())

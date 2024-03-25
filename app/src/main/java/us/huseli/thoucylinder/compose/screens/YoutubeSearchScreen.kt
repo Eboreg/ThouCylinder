@@ -5,16 +5,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.BottomAppBarDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,7 +36,9 @@ import us.huseli.thoucylinder.compose.album.AlbumGrid
 import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.track.TrackGrid
 import us.huseli.thoucylinder.compose.track.TrackList
+import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
+import us.huseli.thoucylinder.compose.utils.rememberToolbarScrollConnection
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
@@ -71,6 +73,8 @@ fun YoutubeSearchScreen(
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var latestSelectedTrackIndex by rememberSaveable(selectedTrackIds) { mutableStateOf<Int?>(null) }
     var listType by rememberSaveable { mutableStateOf(ListType.ALBUMS) }
+    var showToolbars by remember { mutableStateOf(true) }
+    val nestedScrollConnection = rememberToolbarScrollConnection { showToolbars = it }
 
     val isSearching = when (listType) {
         ListType.ALBUMS -> isSearchingAlbums
@@ -80,30 +84,25 @@ fun YoutubeSearchScreen(
     }
 
     Column(modifier = modifier) {
-        Surface(color = BottomAppBarDefaults.containerColor, tonalElevation = 2.dp) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(bottom = 10.dp).padding(horizontal = 10.dp),
-            ) {
-                SearchForm(
-                    isSearching = isSearching,
-                    initialQuery = query,
-                    onSearch = { viewModel.search(it) },
-                )
+        CollapsibleToolbar(show = showToolbars) {
+            SearchForm(
+                isSearching = isSearching,
+                initialQuery = query,
+                onSearch = { viewModel.search(it) },
+            )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ListTypeChips(
-                            current = listType,
-                            onChange = { listType = it },
-                            exclude = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
-                        )
-                    }
-                    ListDisplayTypeButton(current = displayType, onChange = { displayType = it })
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ListTypeChips(
+                        current = listType,
+                        onChange = { listType = it },
+                        exclude = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
+                    )
                 }
+                ListDisplayTypeButton(current = displayType, onChange = { displayType = it })
             }
         }
 
@@ -111,6 +110,7 @@ fun YoutubeSearchScreen(
 
         when (listType) {
             ListType.ALBUMS -> AlbumSearchResults(
+                modifier = Modifier.nestedScroll(nestedScrollConnection),
                 albumCombos = albumCombos,
                 displayType = displayType,
                 selectedAlbumIds = selectedAlbumIds.toImmutableList(),
@@ -143,6 +143,7 @@ fun YoutubeSearchScreen(
                 albumSelectionCallbacks = viewModel.getAlbumSelectionCallbacks(appCallbacks, context),
             )
             ListType.TRACKS -> TrackSearchResults(
+                modifier = Modifier.nestedScroll(nestedScrollConnection),
                 tracks = trackCombos,
                 selectedTrackIds = selectedTrackIds,
                 viewModel = viewModel,
@@ -193,6 +194,7 @@ fun AlbumSearchResults(
     selectedAlbumIds: ImmutableList<UUID>,
     albumDownloadTasks: ImmutableList<AlbumDownloadTask>,
     getThumbnail: suspend (AlbumWithTracksCombo) -> ImageBitmap?,
+    modifier: Modifier = Modifier,
 ) {
     when (displayType) {
         DisplayType.LIST -> {
@@ -206,6 +208,7 @@ fun AlbumSearchResults(
                 },
                 albumDownloadTasks = albumDownloadTasks,
                 getThumbnail = getThumbnail,
+                modifier = modifier,
             )
         }
         DisplayType.GRID -> {
@@ -218,6 +221,7 @@ fun AlbumSearchResults(
                     if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                 },
                 albumDownloadTasks = albumDownloadTasks,
+                modifier = modifier,
             )
         }
     }
@@ -234,6 +238,7 @@ fun TrackSearchResults(
     tracks: LazyPagingItems<TrackCombo>,
     trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: YoutubeSearchViewModel,
+    modifier: Modifier = Modifier,
 ) {
     when (displayType) {
         DisplayType.LIST -> {
@@ -247,6 +252,7 @@ fun TrackSearchResults(
                 onEmpty = {
                     if (!isSearching) Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                 },
+                modifier = modifier,
             )
         }
         DisplayType.GRID -> {
@@ -260,6 +266,7 @@ fun TrackSearchResults(
                 onEmpty = {
                     if (!isSearching) Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                 },
+                modifier = modifier,
             )
         }
     }

@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,6 +32,8 @@ import kotlin.math.max
 
 @Composable
 fun LastFmImport(
+    showToolbars: Boolean,
+    nestedScrollConnection: NestedScrollConnection,
     viewModel: LastFmViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
     onGotoSettingsClick: () -> Unit,
@@ -87,6 +91,7 @@ fun LastFmImport(
         importButtonEnabled = progress == null && selectedExternalAlbumIds.isNotEmpty(),
         progress = progress,
         backendSelection = backendSelection,
+        show = showToolbars,
     )
 
     if (username == null) {
@@ -122,5 +127,6 @@ fun LastFmImport(
         listState = listState,
         selectedExternalAlbumIds = selectedExternalAlbumIds,
         externalAlbums = externalAlbums,
+        modifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 }

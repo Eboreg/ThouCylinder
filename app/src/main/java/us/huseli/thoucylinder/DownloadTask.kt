@@ -35,7 +35,7 @@ enum class DownloadTaskState { CREATED, RUNNING, CANCELLED, FINISHED, ERROR }
 
 @Suppress("unused")
 enum class DownloadStatus(@StringRes val stringId: Int) {
-    STARTING(R.string.starting),
+    WAITING(R.string.waiting),
     DOWNLOADING(R.string.downloading),
     CONVERTING(R.string.converting),
     MOVING(R.string.moving),
@@ -47,7 +47,7 @@ abstract class AbstractDownloadTask {
     abstract val downloadProgress: Flow<Double>
     abstract val state: Flow<DownloadTaskState>
 
-    val isActive: Flow<Boolean>
+    open val isActive: Flow<Boolean>
         get() = state.map { it == DownloadTaskState.RUNNING }
 }
 
@@ -72,12 +72,15 @@ class TrackDownloadTask(
 ) : AbstractDownloadTask() {
     private var job: Job? = null
     private val _state = MutableStateFlow(DownloadTaskState.CREATED)
-    private val _downloadStatus = MutableStateFlow(DownloadStatus.STARTING)
+    private val _downloadStatus = MutableStateFlow(DownloadStatus.WAITING)
     private val _downloadProgress = MutableStateFlow(0.0)
 
     override val downloadProgress = _downloadProgress.asStateFlow()
     override val state = _state.asStateFlow()
     val downloadStatus = _downloadStatus.asStateFlow()
+
+    override val isActive: Flow<Boolean>
+        get() = _state.map { it == DownloadTaskState.RUNNING || it == DownloadTaskState.CREATED }
 
     var started: Instant = Instant.now()
         private set
@@ -109,14 +112,13 @@ class TrackDownloadTask(
                 _state.value = DownloadTaskState.ERROR
                 error = e
                 onError(e)
-                throw e
             }
         }
     }
 
     private suspend fun run(context: Context): Track {
         val youtubeMetadata = repos.youtube.getBestMetadata(trackCombo.track)
-            ?: throw Exception("Could not get Youtube metadata for $trackCombo")
+            ?: throw Exception("Could not get Youtube metadata for ${trackCombo.track} (youtubeVideo=${trackCombo.track.youtubeVideo})")
         val basename = trackCombo.track.generateBasename(
             includeArtist = albumCombo == null,
             artist = trackCombo.artists.joined(),

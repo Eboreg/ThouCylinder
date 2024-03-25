@@ -23,7 +23,8 @@ class AlbumRepository @Inject constructor(database: Database) {
     private val albumDao = database.albumDao()
     private val selectedAlbumIds = mutableMapOf<String, MutableStateFlow<List<UUID>>>()
 
-    suspend fun addAlbumToLibrary(albumId: UUID) = albumDao.setIsInLibrary(true, albumId)
+    suspend fun addAlbumsToLibrary(albumIds: Collection<UUID>) =
+        albumDao.setIsInLibrary(true, *albumIds.toTypedArray())
 
     suspend fun clearAlbums() = albumDao.clearAlbums()
 
@@ -80,6 +81,9 @@ class AlbumRepository @Inject constructor(database: Database) {
     suspend fun listDeletionMarkedAlbumCombos(): List<AlbumCombo> = albumDao.listDeletionMarkedAlbumCombos()
 
     suspend fun listTags(): List<Tag> = albumDao.listTags()
+
+    suspend fun removeAlbumsFromLibrary(albumIds: Collection<UUID>) =
+        albumDao.setIsInLibrary(false, *albumIds.toTypedArray())
 
     fun selectAlbumIds(selectionKey: String, albumIds: Iterable<UUID>) {
         mutableFlowSelectedAlbumIds(selectionKey).also { flow ->

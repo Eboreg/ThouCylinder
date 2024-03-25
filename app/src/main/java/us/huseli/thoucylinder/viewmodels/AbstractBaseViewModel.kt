@@ -84,7 +84,9 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
                 repos.localMedia.importNewLocalAlbums(
                     treeDocumentFile = localMusicDirectory,
                     existingTrackUris = repos.track.listTrackLocalUris(),
-                    onEach = { combo -> updateFromMusicBrainz(combo, TrackMergeStrategy.KEEP_SELF) },
+                    onEach = { combo ->
+                        launchOnIOThread { updateFromMusicBrainz(combo, TrackMergeStrategy.KEEP_SELF) }
+                    },
                     getArtist = { repos.artist.artistCache.getByName(it) },
                     existingAlbumsCombos = repos.album.listAlbumCombos(),
                 )

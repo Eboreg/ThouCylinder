@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,6 +25,7 @@ fun <A : IExternalAlbum> ImportItemList(
     selectedExternalAlbumIds: List<String>,
     onGotoAlbumClick: (UUID) -> Unit,
     albumThirdRow: @Composable (A) -> Unit,
+    modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
@@ -35,6 +37,7 @@ fun <A : IExternalAlbum> ImportItemList(
     }
 
     ItemList(
+        modifier = modifier,
         things = externalAlbums,
         cardHeight = 60.dp,
         key = { _, album -> album.id },

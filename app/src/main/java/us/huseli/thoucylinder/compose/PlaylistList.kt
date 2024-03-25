@@ -39,8 +39,10 @@ fun PlaylistList(
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
     getImage: suspend (UUID) -> ImageBitmap?,
+    modifier: Modifier = Modifier,
 ) {
     ItemList(
+        modifier = modifier,
         things = playlists,
         onClick = { _, pojo -> onPlaylistClick(pojo) },
         cardHeight = 60.dp,

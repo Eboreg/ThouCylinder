@@ -32,6 +32,9 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.ArtistGrid
 import us.huseli.thoucylinder.compose.ArtistList
 import us.huseli.thoucylinder.compose.DisplayType
+import us.huseli.thoucylinder.compose.ListSettingsRow
+import us.huseli.thoucylinder.compose.ListType
+import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.ArtistListViewModel
@@ -41,8 +44,13 @@ import java.util.UUID
 fun LibraryScreenArtistTab(
     displayType: DisplayType,
     isImporting: Boolean,
-    viewModel: ArtistListViewModel = hiltViewModel(),
     onArtistClick: (UUID) -> Unit,
+    onDisplayTypeChange: (DisplayType) -> Unit,
+    onListTypeChange: (ListType) -> Unit,
+    showToolbars: Boolean,
+    modifier: Modifier = Modifier,
+    listModifier: Modifier = Modifier,
+    viewModel: ArtistListViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     var isFilterDialogOpen by rememberSaveable { mutableStateOf(false) }
@@ -94,7 +102,14 @@ fun LibraryScreenArtistTab(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    CollapsibleToolbar(show = showToolbars) {
+        ListSettingsRow(
+            displayType = displayType,
+            listType = ListType.ARTISTS,
+            onDisplayTypeChange = onDisplayTypeChange,
+            onListTypeChange = onListTypeChange,
+            availableDisplayTypes = listOf(DisplayType.LIST, DisplayType.GRID),
+        )
         ListActions(
             initialSearchTerm = searchTerm,
             sortParameter = sortParameter,
@@ -118,7 +133,9 @@ fun LibraryScreenArtistTab(
                 )
             }
         )
+    }
 
+    Column(modifier = modifier.fillMaxSize()) {
         when (displayType) {
             DisplayType.LIST -> ArtistList(
                 onArtistClick = onArtistClick,
@@ -126,6 +143,7 @@ fun LibraryScreenArtistTab(
                 artistCombos = artistCombos,
                 onEmpty = onEmpty,
                 getImage = { viewModel.getArtistImage(it, context) },
+                modifier = listModifier,
             )
             DisplayType.GRID -> ArtistGrid(
                 onArtistClick = onArtistClick,
@@ -133,6 +151,7 @@ fun LibraryScreenArtistTab(
                 progressIndicatorText = progressIndicatorText,
                 onEmpty = onEmpty,
                 getImage = { viewModel.getArtistImage(it, context) },
+                modifier = listModifier,
             )
         }
     }

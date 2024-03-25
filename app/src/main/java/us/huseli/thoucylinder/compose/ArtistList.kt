@@ -31,6 +31,7 @@ import java.util.UUID
 @Composable
 fun ArtistList(
     artistCombos: List<ArtistCombo>,
+    modifier: Modifier = Modifier,
     progressIndicatorText: String? = null,
     onArtistClick: (UUID) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
@@ -41,6 +42,7 @@ fun ArtistList(
         progressIndicatorText = progressIndicatorText,
         onClick = { _, combo -> onArtistClick(combo.artist.id) },
         onEmpty = onEmpty,
+        modifier = modifier,
     ) { _, combo ->
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 

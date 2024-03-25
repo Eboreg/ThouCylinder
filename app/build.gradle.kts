@@ -1,3 +1,4 @@
+import dagger.hilt.android.plugin.util.capitalize
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -24,6 +25,32 @@ android {
     namespace = "us.huseli.thoucylinder"
     compileSdk = 34
 
+    applicationVariants.all {
+        outputs.all {
+            val variantName = name
+            val taskSuffix = variantName.capitalize()
+            val assembleTaskName = "assemble$taskSuffix"
+            val bundleTaskName = "bundle$taskSuffix"
+
+            val archiveTask = tasks.create(name = "archive$taskSuffix") {
+                actions.add(
+                    Action {
+                        val inDir = outputFile.parentFile
+                        val outDir =
+                            File("${inDir.parentFile.path}/$variantName-$versionName").apply { mkdirs() }
+
+                        inDir.listFiles()?.filter { it.isFile && it.name.contains(versionName) }?.forEach { file ->
+                            file.copyTo(File(outDir, file.name), overwrite = true)
+                        }
+                    }
+                )
+            }
+
+            tasks[assembleTaskName]?.finalizedBy(archiveTask)
+            tasks[bundleTaskName]?.finalizedBy(archiveTask)
+        }
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file(keystoreProperties["storeFile"] as String)
@@ -46,8 +73,8 @@ android {
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.3.3"
+        versionCode = 6
+        versionName = "0.4.0"
 
         manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -56,6 +83,7 @@ android {
         }
 
         setProperty("archivesBaseName", "thoucylinder_$versionName")
+
         buildConfigField("String", "youtubeApiKey", "\"$youtubeApiKey\"")
         buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
@@ -108,7 +136,7 @@ android {
 
 val lifecycleVersion = "2.7.0"
 val roomVersion = "2.6.1"
-val daggerVersion = "2.50"
+val daggerVersion = "2.51"
 val media3Version = "1.3.0"
 val pagingVersion = "3.3.0-alpha05"
 
@@ -157,6 +185,7 @@ dependencies {
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
+    // implementation("com.arthenica:ffmpeg-kit-audio:6.0-2")
     implementation("com.arthenica:smart-exception-java:0.2.1")
 
     // Splashscreen:

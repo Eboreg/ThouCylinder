@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,6 +33,8 @@ import kotlin.math.max
 
 @Composable
 fun SpotifyImport(
+    showToolbars: Boolean,
+    nestedScrollConnection: NestedScrollConnection,
     viewModel: SpotifyImportViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
     onGotoLibraryClick: () -> Unit,
@@ -95,6 +99,7 @@ fun SpotifyImport(
         onAuthorizeClick = { uriHandler.openUri(viewModel.getAuthUrl()) },
         onUnauthorizeClick = { viewModel.unauthorize() },
         backendSelection = backendSelection,
+        show = showToolbars,
     )
 
     if (externalAlbums.isEmpty()) {
@@ -125,5 +130,6 @@ fun SpotifyImport(
         listState = listState,
         selectedExternalAlbumIds = selectedExternalAlbumIds,
         externalAlbums = externalAlbums,
+        modifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 }

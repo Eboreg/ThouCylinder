@@ -75,6 +75,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) :
             return release.toAlbumWithTracks(
                 getArtist = { repos.artist.artistCache.get(it) },
                 albumArt = externalAlbum.image.toMediaStoreImage(),
+                isInLibrary = true,
             )
         }
 

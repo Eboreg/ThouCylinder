@@ -25,7 +25,8 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     private val trackDao = database.trackDao()
     private val selectedTrackIds = mutableMapOf<String, MutableStateFlow<List<UUID>>>()
 
-    suspend fun addToLibraryByAlbumId(albumId: UUID) = trackDao.setIsInLibraryByAlbumId(albumId, true)
+    suspend fun addToLibraryByAlbumId(albumIds: Collection<UUID>) =
+        trackDao.setIsInLibraryByAlbumId(true, *albumIds.toTypedArray())
 
     suspend fun clearLocalUris(trackIds: Collection<UUID>) {
         if (trackIds.isNotEmpty()) trackDao.clearLocalUris(trackIds)
@@ -93,6 +94,9 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
 
     fun pageTrackCombosByArtist(artistId: UUID): Pager<Int, TrackCombo> =
         Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombosByArtist(artistId) }
+
+    suspend fun removeFromLibraryByAlbumId(albumIds: Collection<UUID>) =
+        trackDao.setIsInLibraryByAlbumId(false, *albumIds.toTypedArray())
 
     fun selectTrackIds(selectionKey: String, trackIds: Iterable<UUID>) {
         mutableFlowSelectedTrackIds(selectionKey).also {

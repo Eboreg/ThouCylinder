@@ -17,8 +17,11 @@ import us.huseli.thoucylinder.AlbumSortParameter
 import us.huseli.thoucylinder.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.DisplayType
+import us.huseli.thoucylinder.compose.ListSettingsRow
+import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.album.AlbumGrid
 import us.huseli.thoucylinder.compose.album.AlbumList
+import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
@@ -33,6 +36,9 @@ fun LibraryScreenAlbumTab(
     albumCombos: ImmutableList<AlbumCombo>,
     isImporting: Boolean,
     displayType: DisplayType,
+    showToolbars: Boolean,
+    modifier: Modifier = Modifier,
+    listModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val albumDownloadTasks by viewModel.albumDownloadTasks.collectAsStateWithLifecycle()
@@ -82,7 +88,14 @@ fun LibraryScreenAlbumTab(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    CollapsibleToolbar(show = showToolbars) {
+        ListSettingsRow(
+            displayType = displayType,
+            listType = ListType.ALBUMS,
+            onDisplayTypeChange = { viewModel.setDisplayType(it) },
+            onListTypeChange = { viewModel.setListType(it) },
+            availableDisplayTypes = listOf(DisplayType.LIST, DisplayType.GRID),
+        )
         ListActions(
             initialSearchTerm = searchTerm,
             sortParameter = sortParameter,
@@ -91,14 +104,16 @@ fun LibraryScreenAlbumTab(
             sortDialogTitle = stringResource(R.string.album_order),
             onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
             onSearch = { viewModel.setAlbumSearchTerm(it) },
-            tagPojos = tagPojos.toImmutableList(),
-            selectedTagPojos = selectedTagPojos.toImmutableList(),
-            onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
-            availabilityFilter = availabilityFilter,
-            onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
             filterButtonSelected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
+            tagPojos = tagPojos,
+            selectedTagPojos = selectedTagPojos,
+            availabilityFilter = availabilityFilter,
+            onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
+            onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
         )
+    }
 
+    Column(modifier = modifier.fillMaxSize()) {
         when (displayType) {
             DisplayType.LIST -> AlbumList(
                 combos = albumCombos,
@@ -108,7 +123,9 @@ fun LibraryScreenAlbumTab(
                 onEmpty = onEmpty,
                 albumDownloadTasks = albumDownloadTasks.toImmutableList(),
                 progressIndicatorStringRes = progressIndicatorStringRes,
-            ) { viewModel.getAlbumThumbnail(it, context) }
+                modifier = listModifier,
+                getThumbnail = { viewModel.getAlbumThumbnail(it, context) },
+            )
             DisplayType.GRID -> AlbumGrid(
                 combos = albumCombos,
                 albumCallbacks = albumCallbacks,
@@ -117,6 +134,7 @@ fun LibraryScreenAlbumTab(
                 onEmpty = onEmpty,
                 albumDownloadTasks = albumDownloadTasks.toImmutableList(),
                 progressIndicatorStringRes = progressIndicatorStringRes,
+                modifier = listModifier,
             )
         }
     }

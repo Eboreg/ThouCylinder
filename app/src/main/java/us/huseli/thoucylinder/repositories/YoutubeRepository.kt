@@ -464,6 +464,7 @@ class YoutubeRepository @Inject constructor(
     @OptIn(ExperimentalPagingApi::class)
     fun searchTracks(query: String): Pager<Int, Track> {
         _isSearchingTracks.value = true
+
         return Pager(
             config = PagingConfig(pageSize = 20, initialLoadSize = 20, prefetchDistance = 10),
             remoteMediator = YoutubeTrackSearchMediator(query, this, database),

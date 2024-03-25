@@ -178,7 +178,7 @@
     <string name="start_library_radio">Start library radio</string>
     <string name="start_radio">Start radio</string>
     <string name="start_x_x_radio">Start <b>%1$s</b> %2$s radio</string>
-    <string name="starting">Starting</string>
+    <string name="waiting">Waiting</string>
     <string name="stop_radio">Stop radio</string>
     <string name="tagging">Tagging</string>
     <string name="tags">Tags</string>
@@ -218,7 +218,7 @@
     <string name="radio_dialog_help_1">Artist, album, and track radios are generated using Spotify\'s track recommendation API (but does not require you to have a Spotify account).</string>
     <string name="radio_dialog_help_2">The library radio will contain a mix of random tracks from your library, and Spotify recommendations based on your library. The ratio between them can be set using the \'library radio novelty\' slider.</string>
     <string name="library_radio_novelty">Library radio novelty</string>
-    <string name="radio_dialog_help_3">0% = only library tracks, 100% = only Spotify recommendations</string>
+    <string formatted="false" name="radio_dialog_help_3">0\% = only library tracks, 100\% = only Spotify recommendations</string>
     <plurals name="deleted_local_album_files">
         <item quantity="one">Deleted the local files of one album.</item>
         <item quantity="other">Deleted the local files of %1$d albums.</item>

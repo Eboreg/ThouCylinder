@@ -5,6 +5,7 @@ import androidx.room.Embedded
 import kotlinx.parcelize.Parcelize
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.stripCommonFixes
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
@@ -60,6 +61,12 @@ data class YoutubeVideo(
         albumPosition = albumPosition,
         youtubeVideo = this,
         durationMs = metadata?.durationMs ?: durationMs,
+        image = fullImage?.let {
+            MediaStoreImage.fromUrls(
+                fullImageUrl = it.url,
+                thumbnailUrl = thumbnail?.url ?: it.url,
+            )
+        },
     )
 
     fun toTrackCombo(isInLibrary: Boolean, artist: String? = null, album: Album? = null, albumPosition: Int? = null) =

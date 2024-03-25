@@ -81,9 +81,9 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun addAlbumToLibrary(albumId: UUID) = launchOnIOThread {
-        repos.album.addAlbumToLibrary(albumId)
-        repos.track.addToLibraryByAlbumId(albumId)
+    fun addAlbumsToLibrary(albumIds: Collection<UUID>) = launchOnIOThread {
+        repos.album.addAlbumsToLibrary(albumIds)
+        repos.track.addToLibraryByAlbumId(albumIds)
     }
 
     fun addSelectionToPlaylist(
@@ -148,6 +148,12 @@ class AppViewModel @Inject constructor(
 
     suspend fun listSelectionTracks(selection: Selection) =
         withContext(Dispatchers.IO) { repos.playlist.listSelectionTracks(selection) }
+
+    fun removeAlbumsFromLibrary(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+        repos.album.removeAlbumsFromLibrary(albumIds)
+        repos.track.removeFromLibraryByAlbumId(albumIds)
+        onFinish()
+    }
 
     fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
 

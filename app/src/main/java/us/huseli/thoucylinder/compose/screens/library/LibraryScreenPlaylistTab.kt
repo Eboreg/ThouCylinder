@@ -16,7 +16,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.DisplayType
+import us.huseli.thoucylinder.compose.ListSettingsRow
+import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.PlaylistList
+import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
@@ -25,15 +29,28 @@ import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 fun LibraryScreenPlaylistTab(
     viewModel: LibraryViewModel,
     appCallbacks: AppCallbacks,
+    showToolbars: Boolean,
     modifier: Modifier = Modifier,
+    listModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+
+    CollapsibleToolbar(show = showToolbars) {
+        ListSettingsRow(
+            displayType = DisplayType.LIST,
+            listType = ListType.PLAYLISTS,
+            onDisplayTypeChange = { viewModel.setDisplayType(it) },
+            onListTypeChange = { viewModel.setListType(it) },
+            availableDisplayTypes = listOf(DisplayType.LIST),
+        )
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
         val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
 
         PlaylistList(
+            modifier = listModifier,
             playlists = playlists,
             onPlaylistClick = { appCallbacks.onPlaylistClick(it.playlistId) },
             onPlaylistPlayClick = { viewModel.playPlaylist(it.playlistId) },

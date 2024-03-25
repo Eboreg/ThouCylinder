@@ -94,13 +94,14 @@ data class MusicBrainzRelease(
             ?.toInt()
 
     suspend fun toAlbumWithTracks(
+        isInLibrary: Boolean,
         isLocal: Boolean = false,
         albumArt: MediaStoreImage? = null,
         getArtist: suspend (BaseArtist) -> Artist,
     ): AlbumWithTracksCombo {
         val album = Album(
             title = title,
-            isInLibrary = true,
+            isInLibrary = isInLibrary,
             isLocal = isLocal,
             year = year,
             musicBrainzReleaseId = id,
@@ -119,18 +120,19 @@ data class MusicBrainzRelease(
             album = album,
             tags = allGenres.toInternal(),
             artists = albumArtists,
-            trackCombos = media.toTrackCombos(album = album, getArtist = getArtist),
+            trackCombos = media.toTrackCombos(album = album, getArtist = getArtist, isInLibrary = isInLibrary),
         )
     }
 
     private suspend fun Iterable<Media>.toTrackCombos(
+        isInLibrary: Boolean,
         album: Album? = null,
         getArtist: suspend (BaseArtist) -> Artist,
     ): List<TrackCombo> = flatMap { medium ->
         medium.tracks.map {
             val track = Track(
                 title = it.title,
-                isInLibrary = true,
+                isInLibrary = isInLibrary,
                 albumPosition = it.position,
                 discNumber = medium.position,
                 year = it.year,

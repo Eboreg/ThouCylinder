@@ -61,6 +61,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
     selectedTrackIds: List<UUID>,
     trackDownloadTasks: List<TrackDownloadTask>,
     viewModel: AbstractBaseViewModel,
+    modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     showAlbum: Boolean = false,
@@ -84,7 +85,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = contentPadding,
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = modifier.padding(horizontal = 10.dp),
         ) {
             items(count = trackCombos.itemCount) { index ->
                 trackCombos[index]?.also { combo ->

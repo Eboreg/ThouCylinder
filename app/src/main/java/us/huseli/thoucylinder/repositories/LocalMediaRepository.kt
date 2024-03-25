@@ -102,10 +102,11 @@ class LocalMediaRepository @Inject constructor(
         existingTrackUris: Collection<Uri>,
         existingAlbumsCombos: Collection<AbstractAlbumCombo>,
         getArtist: suspend (String) -> Artist,
-        onEach: suspend (AlbumWithTracksCombo) -> Unit = {},
+        onEach: (AlbumWithTracksCombo) -> Unit = {},
     ) {
         val albumCombos = mutableSetOf<AlbumWithTracksCombo>()
         val trackCombos = mutableListOf<TrackCombo>()
+
         val getExistingAlbum: suspend (ID3Data, String?, String) -> Album? =
             { id3, artistName, title ->
                 val combo = existingAlbumsCombos.find {
@@ -126,6 +127,7 @@ class LocalMediaRepository @Inject constructor(
                     } else combo.album
                 } else null
             }
+
         val getAlbumCombo: suspend (ID3Data, String?, String) -> AlbumWithTracksCombo =
             { id3, artistName, title ->
                 val combo = albumCombos.find {

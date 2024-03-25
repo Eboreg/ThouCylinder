@@ -166,7 +166,7 @@ fun AppCallbacksComposables(
         val albumIds = combos.map { it.album.albumId }
 
         if (combos.all { !it.album.isLocal && !it.isPartiallyDownloaded }) {
-            viewModel.hideAlbums(albumIds) {
+            viewModel.removeAlbumsFromLibrary(albumIds) {
                 SnackbarEngine.addInfo(
                     message = context.resources.getQuantityString(
                         R.plurals.removed_x_albums_from_library,
@@ -174,7 +174,7 @@ fun AppCallbacksComposables(
                         combos.size,
                     ).umlautify(),
                     actionLabel = context.getString(R.string.undo).umlautify(),
-                    onActionPerformed = { viewModel.unhideAlbums(albumIds) },
+                    onActionPerformed = { viewModel.addAlbumsToLibrary(albumIds) },
                 )
             }
             onCancel()

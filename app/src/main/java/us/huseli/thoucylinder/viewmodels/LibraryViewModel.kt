@@ -31,7 +31,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(
+open class LibraryViewModel @Inject constructor(
     private val repos: Repositories,
 ) : AbstractAlbumListViewModel("LibraryViewModel", repos) {
     private val _displayType = MutableStateFlow(DisplayType.LIST)

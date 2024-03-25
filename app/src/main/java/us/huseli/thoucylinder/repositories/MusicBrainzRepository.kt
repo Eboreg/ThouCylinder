@@ -117,7 +117,13 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         val releaseIds =
             gson.fromJson(search("release", params), MusicBrainzReleaseSearch::class.java)?.releaseIds
         val matches = releaseIds?.mapNotNull { releaseId ->
-            getRelease(releaseId)?.toAlbumWithTracks(isLocal = combo.album.isLocal, getArtist = getArtist)?.match(combo)
+            getRelease(releaseId)
+                ?.toAlbumWithTracks(
+                    isLocal = combo.album.isLocal,
+                    getArtist = getArtist,
+                    isInLibrary = combo.album.isInLibrary,
+                )
+                ?.match(combo)
         }
 
         return matches?.filter { it.distance <= maxDistance }

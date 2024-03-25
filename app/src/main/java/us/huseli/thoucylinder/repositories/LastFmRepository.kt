@@ -238,7 +238,7 @@ class LastFmRepository @Inject constructor(
     /** OVERRIDDEN METHODS ****************************************************/
     override suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {
         _sessionKey.value?.also { sessionKey ->
-            if (_scrobble.value) {
+            if (_scrobble.value && state == PlaybackState.PLAYING) {
                 val nowPlaying = combo?.let {
                     it.artists.joined()?.let { artist ->
                         LastFmNowPlaying(

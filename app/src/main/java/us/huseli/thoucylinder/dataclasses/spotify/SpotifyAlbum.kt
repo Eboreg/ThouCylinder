@@ -164,10 +164,10 @@ data class SpotifyAlbum(
 }
 
 
-fun List<SpotifyAlbum>.filterBySearchTerm(term: String): List<SpotifyAlbum> {
+fun List<SpotifyAlbum?>.filterBySearchTerm(term: String): List<SpotifyAlbum> {
     val words = term.lowercase().split(Regex(" +"))
 
-    return filter { album ->
+    return filterNotNull().filter { album ->
         words.all {
             album.artists.artistString().lowercase().contains(it) ||
                 album.name.lowercase().contains(it) ||

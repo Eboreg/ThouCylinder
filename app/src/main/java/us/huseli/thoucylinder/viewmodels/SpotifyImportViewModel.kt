@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -13,12 +12,12 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.spotify.filterBySearchTerm
 import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.umlautify
 import javax.inject.Inject
 import kotlin.math.max
@@ -68,7 +67,7 @@ class SpotifyImportViewModel @Inject constructor(private val repos: Repositories
         try {
             repos.spotify.oauth2PKCE.handleIntent(intent)
         } catch (e: Exception) {
-            Log.e(javaClass.simpleName, "handleIntent: $e", e)
+            logError("handleIntent: $e", e)
             SnackbarEngine.addError(context.getString(R.string.spotify_authorization_failed, e).umlautify())
         }
     }

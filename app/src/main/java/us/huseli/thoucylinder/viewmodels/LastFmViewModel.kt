@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -12,13 +11,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.filterBySearchTerm
 import us.huseli.thoucylinder.dataclasses.lastFm.toMediaStoreImage
 import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.umlautify
 import javax.inject.Inject
 import kotlin.math.max
@@ -59,7 +58,7 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) :
                 repos.lastFm.fetchSession(authToken)
             } catch (e: Exception) {
                 repos.lastFm.setScrobble(false)
-                Log.e(javaClass.simpleName, "handleIntent: $e", e)
+                logError("handleIntent: $e", e)
                 SnackbarEngine.addError(context.getString(R.string.last_fm_authorization_failed, e).umlautify())
             }
         }

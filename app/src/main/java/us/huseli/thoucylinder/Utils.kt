@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaFormat
 import android.net.Uri
-import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -41,6 +40,30 @@ import java.io.IOException
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+object Logger : ILogger
+
+fun <T> List<T>.replace(index: Int, other: Collection<T>): List<T> {
+    if (index > size) throw Exception("Index ($index) is larger than size of list ($size)")
+
+    return take(index).plus(other).let {
+        if (index + other.size < size) it.plus(subList(index + other.size, size))
+        else it
+    }
+}
+
+fun <T> List<T>.replaceNullPadding(index: Int, other: Collection<T>): List<T?> {
+    /**
+     * Examples:
+     * listOf(0, 1, 2).replaceNullPadding(4, listOf(4, 5, 6)) = [0, 1, 2, null, 4, 5, 6]
+     * listOf(0, 0, 0, 0, 4).replaceNullPadding(1, listOf(1, 2, 3)) = [0, 1, 2, 3, 4]
+     */
+    val result: MutableList<T?> = take(index).toMutableList()
+    if (index > result.size) result.addAll(List(index - result.size) { null })
+    result.addAll(other)
+    if (index + other.size < size) result.addAll(subList(index + other.size, size))
+    return result.toList()
+}
 
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     val splitKeys = keys.split(".", limit = 2)
@@ -109,10 +132,10 @@ suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
     try {
         Request(this@getBitmapByUrl).getBitmap()
     } catch (e: HTTPResponseError) {
-        Log.e("String", "getBitmapByUrl: $e", e)
+        Logger.logError("String", "getBitmapByUrl: $e", e)
         null
     } catch (e: IOException) {
-        Log.e("String", "getBitmapByUrl: $e", e)
+        Logger.logError("String", "getBitmapByUrl: $e", e)
         null
     }
 }
@@ -129,20 +152,20 @@ inline fun <reified T> String.fromJson(): T = gson.fromJson(this, T::class.java)
 fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
     getInteger(name)
 } catch (e: NullPointerException) {
-    Log.e("MediaFormat", "getIntegerOrNull: $e", e)
+    Logger.logError("MediaFormat", "getIntegerOrNull: $e", e)
     null
 } catch (e: ClassCastException) {
-    Log.e("MediaFormat", "getIntegerOrNull: $e", e)
+    Logger.logError("MediaFormat", "getIntegerOrNull: $e", e)
     null
 }
 
 fun MediaFormat.getLongOrNull(name: String): Long? = try {
     getLong(name)
 } catch (e: NullPointerException) {
-    Log.e("MediaFormat", "getLongOrNull: $e", e)
+    Logger.logError("MediaFormat", "getLongOrNull: $e", e)
     null
 } catch (e: ClassCastException) {
-    Log.e("MediaFormat", "getLongOrNull: $e", e)
+    Logger.logError("MediaFormat", "getLongOrNull: $e", e)
     null
 }
 
@@ -206,10 +229,10 @@ suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.I
             this@getBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it) }
         }
     } catch (e: HTTPResponseError) {
-        Log.e("Uri", "getBitmap: $e", e)
+        Logger.logError("Uri", "getBitmap: $e", e)
         null
     } catch (e: IOException) {
-        Log.e("Uri", "getBitmap: $e", e)
+        Logger.logError("Uri", "getBitmap: $e", e)
         null
     }
 }
@@ -220,10 +243,10 @@ suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.I
 fun DocumentFile.toByteArray(context: Context): ByteArray? = try {
     openInputStream(context)?.use { it.readBytes() }
 } catch (e: FileNotFoundException) {
-    Log.e("DocumentFile", "toByteArray: $e", e)
+    Logger.logError("DocumentFile", "toByteArray: $e", e)
     null
 } catch (e: IllegalArgumentException) {
-    Log.e("DocumentFile", "toByteArray: $e", e)
+    Logger.logError("DocumentFile", "toByteArray: $e", e)
     null
 }
 

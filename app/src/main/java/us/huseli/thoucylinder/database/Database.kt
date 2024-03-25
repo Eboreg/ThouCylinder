@@ -1,16 +1,11 @@
 package us.huseli.thoucylinder.database
 
 import android.content.Context
-import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
-import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
@@ -27,8 +22,13 @@ import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackAudioFeatures
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import java.util.concurrent.Executors
 
 @androidx.room.Database(
@@ -80,7 +80,7 @@ abstract class Database : RoomDatabase() {
                 .fallbackToDestructiveMigration()
 
             if (BuildConfig.DEBUG) {
-                class DBQueryCallback : QueryCallback {
+                class DBQueryCallback : QueryCallback, ILogger {
                     override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
                         if (
                             !sqlQuery.startsWith("BEGIN DEFERRED TRANSACTION")
@@ -91,7 +91,7 @@ abstract class Database : RoomDatabase() {
                         ) {
                             var index = 0
 
-                            Log.i("Database", sqlQuery.replace(Regex("\\?")) { "'${bindArgs.getOrNull(index++)}'" })
+                            log("Database", sqlQuery.replace(Regex("\\?")) { "'${bindArgs.getOrNull(index++)}'" })
                         }
                     }
                 }

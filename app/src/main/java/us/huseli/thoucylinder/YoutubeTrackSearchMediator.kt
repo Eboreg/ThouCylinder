@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder
 
-import android.util.Log
 import androidx.paging.ExperimentalPagingApi
 import androidx.paging.LoadType
 import androidx.paging.PagingState
@@ -16,7 +15,7 @@ class YoutubeTrackSearchMediator(
     private val query: String,
     private val repo: YoutubeRepository,
     private val database: Database,
-) : RemoteMediator<Int, Track>() {
+) : RemoteMediator<Int, Track>(), ILogger {
     override suspend fun load(loadType: LoadType, state: PagingState<Int, Track>): MediatorResult {
         return try {
             val key = when (loadType) {
@@ -41,7 +40,7 @@ class YoutubeTrackSearchMediator(
             }
             MediatorResult.Success(endOfPaginationReached = result.nextToken == null)
         } catch (e: Exception) {
-            Log.e(javaClass.simpleName, "load: $e", e)
+            logError("load: $e", e)
             MediatorResult.Error(e)
         }
     }

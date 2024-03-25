@@ -3,13 +3,13 @@ package us.huseli.thoucylinder.dataclasses
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.Parcelable
-import android.util.Log
 import android.webkit.MimeTypeMap
 import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.MediaInformation
 import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.extensions.bytesToString
 import us.huseli.retaintheme.extensions.formattedString
+import us.huseli.thoucylinder.Logger
 import us.huseli.thoucylinder.getIntegerOrDefault
 import us.huseli.thoucylinder.getLongOrNull
 import java.io.File
@@ -83,7 +83,7 @@ fun File.extractTrackMetadata(ff: MediaInformation?): TrackMetadata? {
 
         metadata.copy(size = length()).also { extractor.release() }
     } catch (e: Exception) {
-        Log.e("File", "extractTrackMetadata", e)
+        Logger.logError("File", "extractTrackMetadata", e)
         null
     }
 }

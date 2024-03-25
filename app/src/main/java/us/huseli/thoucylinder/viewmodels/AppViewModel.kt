@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.DpSize
 import androidx.media3.common.PlaybackException
@@ -20,14 +19,11 @@ import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.RadioType
-import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
@@ -36,11 +32,14 @@ import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrack
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.repositories.PlayerRepository
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.umlautify
 import java.util.UUID
 import javax.inject.Inject
@@ -501,7 +500,7 @@ class AppViewModel @Inject constructor(
 
             if (newTags.isNotEmpty()) repos.album.insertTags(newTags)
         } catch (e: Exception) {
-            Log.e(javaClass.simpleName, "updateGenreList: $e", e)
+            logError("updateGenreList: $e", e)
         }
     }
 

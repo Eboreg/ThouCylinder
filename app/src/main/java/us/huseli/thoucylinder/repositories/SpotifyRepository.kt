@@ -49,6 +49,7 @@ import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
 import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getNext
+import us.huseli.thoucylinder.replaceNullPadding
 import java.net.URLEncoder
 import java.util.UUID
 import javax.inject.Inject
@@ -90,12 +91,12 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
     private val _allUserAlbumsFetched = MutableStateFlow(false)
     private val _nextUserAlbumIdx = MutableStateFlow(0)
     private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
-    private val _userAlbums = MutableStateFlow<List<SpotifyAlbum>>(emptyList())
+    private val _userAlbums = MutableStateFlow<List<SpotifyAlbum?>>(emptyList())
 
     val oauth2PKCE = SpotifyOAuth2PKCE(context)
     val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
     val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
-    val userAlbums: StateFlow<List<SpotifyAlbum>> = _userAlbums.asStateFlow()
+    val userAlbums: StateFlow<List<SpotifyAlbum?>> = _userAlbums.asStateFlow()
 
     init {
         scope.launch {
@@ -151,9 +152,8 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             apiResponseCache.getOrNull(job, retryOnNull = true)
                 ?.fromJson(object : TypeToken<SpotifyResponse<SpotifySavedAlbumObject>>() {})
                 ?.also { response ->
-                    val userAlbums = _userAlbums.value.toMutableList().apply {
-                        this.addAll(response.offset, response.items.map { it.album })
-                    }
+                    val userAlbums =
+                        _userAlbums.value.replaceNullPadding(response.offset, response.items.map { it.album })
                     _nextUserAlbumIdx.value = userAlbums.size
                     _userAlbums.value = userAlbums
                     _allUserAlbumsFetched.value = response.next == null

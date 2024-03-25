@@ -23,7 +23,7 @@ data class Request(
     private val headers: Map<String, String> = emptyMap(),
     private val method: Method = Method.GET,
     private val body: String? = null,
-) {
+) : ILogger {
     constructor(
         url: String,
         headers: Map<String, String> = emptyMap(),
@@ -38,8 +38,8 @@ data class Request(
 
     suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
         requestStart = System.currentTimeMillis()
-        Log.i("Request", "START ${method.value} $url")
-        if (body != null) Log.d("Request", "BODY $body")
+        log("Request", "START ${method.value} $url")
+        if (body != null) log(Log.DEBUG, "Request", "BODY $body")
 
         (URL(url).openConnection() as HttpURLConnection).apply {
             if (BuildConfig.DEBUG) {
@@ -72,7 +72,7 @@ data class Request(
                 message += ", ${receivedBytes}B ($kbps KB/s)"
             }
 
-            Log.i("Request", message)
+            log("Request", message)
         }
     }
 

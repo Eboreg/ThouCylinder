@@ -3,7 +3,6 @@ package us.huseli.thoucylinder
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +21,7 @@ import java.util.Base64
 
 enum class AuthorizationStatus { AUTHORIZED, UNAUTHORIZED, UNKNOWN }
 
-abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: String, context: Context) {
+abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: String, context: Context) : ILogger {
     protected val preferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
     protected val token: MutableStateFlow<T?> = MutableStateFlow(
         preferences.getString(tokenPrefKey, null)?.let { jsonToToken(it) }
@@ -76,7 +75,7 @@ class SpotifyOAuth2ClientCredentials(context: Context) :
 
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
-        Log.e(javaClass.simpleName, e.toString())
+        logError(e)
         token.value = null
         null
     }
@@ -143,7 +142,7 @@ class SpotifyOAuth2PKCE(context: Context) :
 
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
-        Log.e(javaClass.simpleName, e.toString())
+        logError(e)
         token.value = null
         null
     }
@@ -175,7 +174,7 @@ class SpotifyOAuth2PKCE(context: Context) :
 
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
-        Log.e(javaClass.simpleName, e.toString())
+        logError(e)
         this.token.value = null
         null
     }

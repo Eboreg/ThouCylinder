@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.repositories
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.annotation.WorkerThread
 import androidx.documentfile.provider.DocumentFile
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.padStart
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyFrom
 import us.huseli.thoucylinder.copyTo
@@ -45,7 +45,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class LocalMediaRepository @Inject constructor(@ApplicationContext private val context: Context, database: Database) {
+class LocalMediaRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    database: Database,
+) : ILogger {
     private val albumDao = database.albumDao()
     private val artistDao = database.artistDao()
     private val trackDao = database.trackDao()
@@ -262,8 +265,7 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         val documentFile = trackCombo.track.getDocumentFile(context)
 
         if (documentFile != null) {
-            if (!documentFile.isWritable(context))
-                Log.e(this::class.simpleName, "tagAlbumTracks: Cannot write to $documentFile")
+            if (!documentFile.isWritable(context)) logError("tagAlbumTracks: Cannot write to $documentFile")
             else tagTrack(trackCombo = trackCombo, documentFile = documentFile, albumArtists = albumArtists)
         }
     }
@@ -282,7 +284,7 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         val ffmpegCommand =
             "-i \"${tmpInFile.path}\" -y -codec copy -id3v2_version 3 $tagCommands \"${tmpOutFile.path}\""
 
-        Log.i(javaClass.simpleName, "tagTrack: running ffmpeg $ffmpegCommand")
+        log("tagTrack: running ffmpeg $ffmpegCommand")
         documentFile.copyTo(tmpInFile, context)
 
         val tagSession = FFmpegKit.execute(ffmpegCommand)
@@ -290,11 +292,11 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         if (tagSession.returnCode.isValueSuccess) {
             documentFile.copyFrom(tmpOutFile, context)
         } else if (tagSession.returnCode.isValueError) {
-            Log.e(javaClass.simpleName, "tagTrack: error, return code=${tagSession.returnCode.value}")
-            tagSession.allLogsAsString?.also { Log.e(javaClass.simpleName, it) }
+            logError("tagTrack: error, return code=${tagSession.returnCode.value}")
+            tagSession.allLogsAsString?.also { logError(it) }
         } else if (tagSession.returnCode.isValueCancel) {
-            Log.w(javaClass.simpleName, "tagTrack: cancel, return code=${tagSession.returnCode.value}")
-            tagSession.allLogsAsString?.also { Log.e(javaClass.simpleName, it) }
+            logWarning("tagTrack: cancel, return code=${tagSession.returnCode.value}")
+            tagSession.allLogsAsString?.also { logError(it) }
         }
 
         tmpInFile.delete()

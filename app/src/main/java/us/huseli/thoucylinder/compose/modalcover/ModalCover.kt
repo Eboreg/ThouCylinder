@@ -3,7 +3,6 @@
 package us.huseli.thoucylinder.compose.modalcover
 
 import android.content.res.Configuration
-import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -169,7 +168,7 @@ fun BoxWithConstraintsScope.ModalCover(
     val horizontalSwipeState = rememberSwipeableState(
         initialValue = "current",
         confirmStateChange = { newValue ->
-            Log.i("ModalCover", "newValue=$newValue")
+            viewModel.log("ModalCover", "newValue=$newValue")
             when (newValue) {
                 "next" -> viewModel.skipToNext()
                 "previous" -> viewModel.skipToPrevious()

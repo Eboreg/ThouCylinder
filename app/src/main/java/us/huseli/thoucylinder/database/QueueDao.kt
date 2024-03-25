@@ -2,7 +2,6 @@
 
 package us.huseli.thoucylinder.database
 
-import android.util.Log
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -10,13 +9,14 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import java.util.UUID
 
 @Dao
-abstract class QueueDao {
+abstract class QueueDao : ILogger {
     @Insert
     protected abstract suspend fun _insertQueueTracks(vararg queueTracks: QueueTrack)
 
@@ -45,14 +45,14 @@ abstract class QueueDao {
                     try {
                         _updateQueueTracks(it)
                     } catch (e: Exception) {
-                        Log.e("QueueDao", "_updateQueueTracks($it): $e")
+                        logError("_updateQueueTracks($it): $e", e)
                     }
                 }
                 toInsert.forEach {
                     try {
                         _insertQueueTracks(it)
                     } catch (e: Exception) {
-                        Log.e("QueueDao", "_insertQueueTracks($it): $e")
+                        logError("_insertQueueTracks($it): $e", e)
                     }
                 }
             }

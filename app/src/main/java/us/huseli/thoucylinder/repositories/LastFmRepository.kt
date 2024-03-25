@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
-import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.preference.PreferenceManager
 import com.thoughtworks.xstream.XStream
@@ -27,21 +26,22 @@ import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.PlaybackState
-import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmNowPlaying
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopArtistsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.getThumbnail
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getBitmapByUrl
 import us.huseli.thoucylinder.getMutexCache
+import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -50,7 +50,7 @@ import kotlin.time.Duration.Companion.seconds
 class LastFmRepository @Inject constructor(
     database: Database,
     @ApplicationContext private val context: Context,
-) : PlayerRepositoryListener {
+) : PlayerRepositoryListener, ILogger {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val albumDao = database.albumDao()
     private val scrobbleMutex = Mutex()
@@ -226,7 +226,7 @@ class LastFmRepository @Inject constructor(
                 ),
             ).getString()
         } catch (e: Exception) {
-            Log.e(javaClass.simpleName, "postAndGetString $method: $e", e)
+            logError("postAndGetString $method: $e", e)
             null
         }
     }

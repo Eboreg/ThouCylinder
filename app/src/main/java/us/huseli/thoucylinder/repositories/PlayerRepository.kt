@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.repositories
 
 import android.content.ComponentName
 import android.content.Context
-import android.util.Log
 import androidx.annotation.MainThread
 import androidx.glance.appwidget.updateAll
 import androidx.media3.common.MediaItem
@@ -35,18 +34,19 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.thoucylinder.Constants.PREF_CURRENT_TRACK_POSITION
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.PlaybackService
 import us.huseli.thoucylinder.PlaybackState
 import us.huseli.thoucylinder.RadioState
-import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
+import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.containsWithPosition
 import us.huseli.thoucylinder.dataclasses.views.reindexed
 import us.huseli.thoucylinder.dataclasses.views.toMediaItems
-import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
-import us.huseli.thoucylinder.dataclasses.views.RadioCombo
+import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.widget.AppWidget
 import java.util.UUID
 import javax.inject.Inject
@@ -60,7 +60,7 @@ import kotlin.time.DurationUnit
 class PlayerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueDao: QueueDao,
-) : Player.Listener {
+) : Player.Listener, ILogger {
     enum class LastAction { PLAY, STOP, PAUSE }
 
     private val listeners = mutableListOf<PlayerRepositoryListener>()
@@ -106,7 +106,6 @@ class PlayerRepository @Inject constructor(
     val radioPojo = combine(_radioState, _radioPojo) { state, pojo ->
         if (state != RadioState.INACTIVE) pojo else null
     }
-    val radioState: StateFlow<RadioState> = _radioState.asStateFlow()
 
     private val tracksLeft = combine(playedQueueTrackIds, _queue) { playedIds, queue ->
         playedIds.filter { id -> queue.map { it.queueTrackId }.contains(id) }.toSet().sorted()
@@ -484,7 +483,7 @@ class PlayerRepository @Inject constructor(
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
-        if (isPlaying) Log.i(javaClass.simpleName, "Playing: ${player?.currentMediaItem?.localConfiguration?.uri}")
+        if (isPlaying) log("Playing: ${player?.currentMediaItem?.localConfiguration?.uri}")
         playbackState.value = when {
             isPlaying -> {
                 if (currentTrackPlayStartTimestamp.value == null)
@@ -506,7 +505,7 @@ class PlayerRepository @Inject constructor(
                 saveQueueIndex()
                 val combo = findQueueTrackByMediaItem(mediaItem)
                 if (combo != _currentCombo.value) {
-                    Log.i("PlayerRepository", "current track URI: ${combo?.uri}")
+                    log("current track URI: ${combo?.uri}")
                     _currentCombo.value = combo
                     combo?.also { playedQueueTrackIds.value += it.queueTrackId }
                     player?.currentPosition?.also { _currentPositionMs.value = it }
@@ -557,7 +556,7 @@ class PlayerRepository @Inject constructor(
                     .reindexed()
                 val newAndChanged = queueReindexed.filter { !_queue.value.containsWithPosition(it) }
                 val removed = _queue.value.filter { !queueTrackIds.contains(it.queueTrackId.toString()) }
-                Log.i("PlayerRepository", "onTimelineChanged: queueReindexed=$queueReindexed")
+                log("onTimelineChanged: queueReindexed=$queueReindexed")
 
                 withContext(Dispatchers.IO) {
                     queueDao.upsertQueueTracks(*newAndChanged.map { it.queueTrack }.toTypedArray())

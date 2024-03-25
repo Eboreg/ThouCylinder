@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
@@ -23,7 +24,7 @@ import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.launchOnIOThread
 
-abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel() {
+abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel(), ILogger {
     val totalAreaSize: Flow<DpSize> =
         combine(repos.settings.contentAreaSize, repos.settings.innerPadding) { size, padding -> // including menu
             size.plus(

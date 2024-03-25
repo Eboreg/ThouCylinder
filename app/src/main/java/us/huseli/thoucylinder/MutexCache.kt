@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,7 +15,7 @@ open class MutexCache<I, K, V>(
     private val fetchMethod: suspend MutexCache<I, K, V>.(I) -> V?,
     private val debugLabel: String? = null,
     private val retentionMs: Long = 20_000L,
-) {
+) : ILogger {
     private val cache = mutableMapOf<K, CachedValue<V>>()
     private val mutexes = mutableMapOf<K, Mutex>()
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -27,7 +26,7 @@ open class MutexCache<I, K, V>(
                 val oldKeys = cache.filterValues { it.timestamp < System.currentTimeMillis() - retentionMs }.keys
                 if (oldKeys.isNotEmpty()) {
                     val prefix = debugLabel?.let { "[$it] " } ?: ""
-                    Log.i("MutexCache", "${prefix}Throwing ${oldKeys.size} items")
+                    log("${prefix}Throwing ${oldKeys.size} items")
                     cache.minusAssign(oldKeys)
                 }
                 delay(retentionMs)
@@ -43,7 +42,7 @@ open class MutexCache<I, K, V>(
     suspend fun getOrNull(item: I, forceReload: Boolean = false, retryOnNull: Boolean = false): V? = try {
         getValueSync(item = item, forceReload = forceReload, retryOnNull = retryOnNull)
     } catch (e: Exception) {
-        Log.e(javaClass.simpleName, e.toString())
+        logError(e.toString(), e)
         null
     }
 

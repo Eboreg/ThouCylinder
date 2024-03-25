@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
+import us.huseli.retaintheme.extensions.replaceNullPadding
 import us.huseli.retaintheme.extensions.slice
 import us.huseli.thoucylinder.AbstractSpotifyOAuth2
 import us.huseli.thoucylinder.DeferredRequestJob
@@ -49,7 +50,6 @@ import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
 import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getNext
-import us.huseli.thoucylinder.replaceNullPadding
 import java.net.URLEncoder
 import java.util.UUID
 import javax.inject.Inject

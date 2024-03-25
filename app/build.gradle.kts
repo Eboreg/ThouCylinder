@@ -46,8 +46,8 @@ android {
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.2"
+        versionCode = 4
+        versionName = "0.3.3"
 
         manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -153,7 +153,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:4.2.0")
+    implementation("com.github.Eboreg:RetainTheme:4.3.1")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))

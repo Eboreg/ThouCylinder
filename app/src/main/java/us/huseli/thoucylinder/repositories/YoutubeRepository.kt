@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.dpToPx
+import us.huseli.retaintheme.extensions.mergeWith
 import us.huseli.retaintheme.extensions.toDuration
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
@@ -38,7 +39,6 @@ import us.huseli.thoucylinder.dataclasses.youtube.YoutubeMetadataList
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.getMutexCache
-import us.huseli.thoucylinder.mergeWith
 import us.huseli.thoucylinder.yquery
 import java.io.File
 import java.util.regex.Pattern

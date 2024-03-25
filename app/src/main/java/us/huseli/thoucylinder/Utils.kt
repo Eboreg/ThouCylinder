@@ -43,28 +43,6 @@ import kotlin.math.roundToInt
 
 object Logger : ILogger
 
-fun <T> List<T>.replace(index: Int, other: Collection<T>): List<T> {
-    if (index > size) throw Exception("Index ($index) is larger than size of list ($size)")
-
-    return take(index).plus(other).let {
-        if (index + other.size < size) it.plus(subList(index + other.size, size))
-        else it
-    }
-}
-
-fun <T> List<T>.replaceNullPadding(index: Int, other: Collection<T>): List<T?> {
-    /**
-     * Examples:
-     * listOf(0, 1, 2).replaceNullPadding(4, listOf(4, 5, 6)) = [0, 1, 2, null, 4, 5, 6]
-     * listOf(0, 0, 0, 0, 4).replaceNullPadding(1, listOf(1, 2, 3)) = [0, 1, 2, 3, 4]
-     */
-    val result: MutableList<T?> = take(index).toMutableList()
-    if (index > result.size) result.addAll(List(index - result.size) { null })
-    result.addAll(other)
-    if (index + other.size < size) result.addAll(subList(index + other.size, size))
-    return result.toList()
-}
-
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     val splitKeys = keys.split(".", limit = 2)
     val key = splitKeys[0]
@@ -99,30 +77,6 @@ fun ViewModel.launchOnIOThread(block: suspend CoroutineScope.() -> Unit) =
 
 fun ViewModel.launchOnMainThread(block: suspend CoroutineScope.() -> Unit) =
     viewModelScope.launch(Dispatchers.Main, block = block)
-
-inline fun <S, T : S, K> Iterable<T>.distinctWith(operation: (acc: S, T) -> S, selector: (T) -> K): List<S> {
-    /** Produces distinct values selected by `selector` while also running a "reduce" operation. */
-    val result = mutableMapOf<K, S>()
-    forEach { item ->
-        val key = selector(item)
-        result[key] = result[key]?.let { operation(it, item) } ?: item
-    }
-    return result.values.toList()
-}
-
-fun <K, V> Map<out K, V>.mergeWith(other: Map<out K, V>): Map<K, *> {
-    val result: MutableMap<K, Any?> = this.toMutableMap()
-
-    other.forEach { (key, value) ->
-        val ownValue = this[key]
-
-        if (ownValue is Map<*, *> && value is Map<*, *>) {
-            result[key] = ownValue.mergeWith(value)
-        } else result[key] = value
-    }
-
-    return result.toMap()
-}
 
 
 /** STRING ********************************************************************/

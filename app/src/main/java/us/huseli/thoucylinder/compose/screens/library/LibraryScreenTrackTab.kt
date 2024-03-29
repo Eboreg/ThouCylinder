@@ -21,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import kotlinx.collections.immutable.toImmutableList
-import us.huseli.thoucylinder.AvailabilityFilter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.TrackSortParameter
+import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType

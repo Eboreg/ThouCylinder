@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
-import us.huseli.thoucylinder.AlbumSortParameter
-import us.huseli.thoucylinder.AvailabilityFilter
+import us.huseli.thoucylinder.enums.AlbumSortParameter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow

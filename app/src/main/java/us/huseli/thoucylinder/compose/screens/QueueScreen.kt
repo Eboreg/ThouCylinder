@@ -35,7 +35,7 @@ import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.RadioType
+import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton

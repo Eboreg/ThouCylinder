@@ -27,7 +27,7 @@ import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
 import us.huseli.thoucylinder.ILogger
-import us.huseli.thoucylinder.PlaybackState
+import us.huseli.thoucylinder.enums.PlaybackState
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.asFullImageBitmap
 import us.huseli.thoucylinder.database.Database

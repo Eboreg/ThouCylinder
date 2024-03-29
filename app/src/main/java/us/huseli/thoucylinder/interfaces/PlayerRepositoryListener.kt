@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder.interfaces
 
 import androidx.media3.common.PlaybackException
-import us.huseli.thoucylinder.PlaybackState
+import us.huseli.thoucylinder.enums.PlaybackState
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.repositories.PlayerRepository
 

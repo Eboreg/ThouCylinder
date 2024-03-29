@@ -16,9 +16,9 @@ import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.AvailabilityFilter
-import us.huseli.thoucylinder.SortOrder
-import us.huseli.thoucylinder.TrackSortParameter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.SortOrder
+import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist

@@ -3,7 +3,7 @@ package us.huseli.thoucylinder.dataclasses.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import us.huseli.thoucylinder.RadioType
+import us.huseli.thoucylinder.enums.RadioType
 import java.util.UUID
 
 @Entity

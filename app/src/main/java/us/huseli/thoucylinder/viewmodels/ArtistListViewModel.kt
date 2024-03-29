@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
-import us.huseli.thoucylinder.ArtistSortParameter
-import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.enums.ArtistSortParameter
+import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.getBitmap

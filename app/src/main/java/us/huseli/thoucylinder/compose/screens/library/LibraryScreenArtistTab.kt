@@ -27,7 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.thoucylinder.ArtistSortParameter
+import us.huseli.thoucylinder.enums.ArtistSortParameter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.ArtistGrid
 import us.huseli.thoucylinder.compose.ArtistList

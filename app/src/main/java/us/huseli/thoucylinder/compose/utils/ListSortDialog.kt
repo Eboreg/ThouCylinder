@@ -23,7 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)

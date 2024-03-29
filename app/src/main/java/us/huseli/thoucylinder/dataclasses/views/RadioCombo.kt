@@ -7,7 +7,7 @@ import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.RadioType
+import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.RadioTrack

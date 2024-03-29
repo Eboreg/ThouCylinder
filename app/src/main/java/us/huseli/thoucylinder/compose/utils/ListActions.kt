@@ -26,9 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableMap
-import us.huseli.thoucylinder.AvailabilityFilter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
 import us.huseli.thoucylinder.stringResource
 

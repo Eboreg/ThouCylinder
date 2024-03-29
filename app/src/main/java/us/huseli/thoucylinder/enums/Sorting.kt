@@ -1,12 +1,13 @@
-package us.huseli.thoucylinder
+package us.huseli.thoucylinder.enums
 
 import android.content.Context
-import androidx.annotation.StringRes
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
+import us.huseli.thoucylinder.umlautify
 
 interface SortParameter<T> {
     val stringRes: Int
@@ -52,23 +53,6 @@ enum class ArtistSortParameter : SortParameter<ArtistCombo> {
         fun withLabels(context: Context): ImmutableMap<ArtistSortParameter, String> =
             entries.associateWith { context.getString(it.stringRes).umlautify() }.toImmutableMap()
     }
-}
-
-enum class AvailabilityFilter(@StringRes val stringRes: Int) {
-    ALL(R.string.all),
-    ONLY_PLAYABLE(R.string.only_playable),
-    ONLY_LOCAL(R.string.only_local),
-}
-
-enum class PlaybackState { STOPPED, PLAYING, PAUSED }
-
-enum class RadioState { INACTIVE, LOADING, LOADED_FIRST, LOADED }
-
-enum class RadioType(@StringRes val stringRes: Int) {
-    LIBRARY(R.string.library),
-    ARTIST(R.string.artist),
-    ALBUM(R.string.album),
-    TRACK(R.string.track),
 }
 
 enum class SortOrder(val sql: String) { ASCENDING("ASC"), DESCENDING("DESC") }

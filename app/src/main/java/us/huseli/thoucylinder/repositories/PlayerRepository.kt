@@ -36,8 +36,8 @@ import us.huseli.thoucylinder.Constants.PREF_CURRENT_TRACK_POSITION
 import us.huseli.thoucylinder.Constants.PREF_QUEUE_INDEX
 import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.PlaybackService
-import us.huseli.thoucylinder.PlaybackState
-import us.huseli.thoucylinder.RadioState
+import us.huseli.thoucylinder.enums.PlaybackState
+import us.huseli.thoucylinder.enums.RadioState
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
 import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo

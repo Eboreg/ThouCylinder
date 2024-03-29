@@ -5,9 +5,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import us.huseli.thoucylinder.AlbumSortParameter
-import us.huseli.thoucylinder.AvailabilityFilter
-import us.huseli.thoucylinder.SortOrder
+import us.huseli.thoucylinder.enums.AlbumSortParameter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.views.AlbumCombo

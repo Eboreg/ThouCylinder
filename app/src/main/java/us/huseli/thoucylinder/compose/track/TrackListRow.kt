@@ -96,7 +96,7 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                         )
                         secondRow?.also {
                             Text(
-                                text = it,
+                                text = it.umlautify(),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalTitleSecondary,

@@ -60,13 +60,13 @@ fun TrackInfoDialog(
                 if (albumTitle != null)
                     TrackInfoTextRow(
                         label = stringResource(R.string.album),
-                        value = albumTitle,
+                        value = albumTitle.umlautify(),
                         modifier = rowModifier,
                     )
                 if (albumArtist != null)
                     TrackInfoTextRow(
                         label = stringResource(R.string.album_artist),
-                        value = albumArtist,
+                        value = albumArtist.umlautify(),
                         modifier = rowModifier,
                     )
                 TrackInfoTextRow(

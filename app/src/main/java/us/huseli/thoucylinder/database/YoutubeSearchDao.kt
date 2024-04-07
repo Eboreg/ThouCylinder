@@ -10,7 +10,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
-import java.util.UUID
 
 @Dao
 abstract class YoutubeSearchDao {
@@ -29,7 +28,7 @@ abstract class YoutubeSearchDao {
         VALUES (:query, :trackId, (SELECT COALESCE(MAX(qt2.YoutubeQueryTrack_position), 0) + 1 FROM YoutubeQueryTrack qt2))
         """
     )
-    protected abstract suspend fun _insertQueryTrack(query: String, trackId: UUID)
+    protected abstract suspend fun _insertQueryTrack(query: String, trackId: String)
 
     @Transaction
     open suspend fun clearCache() {

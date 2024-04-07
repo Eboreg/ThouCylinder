@@ -1,12 +1,12 @@
 package us.huseli.thoucylinder.viewmodels
 
-import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,19 +15,20 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flattenMerge
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.withContext
-import us.huseli.thoucylinder.enums.AlbumSortParameter
-import us.huseli.thoucylinder.enums.AvailabilityFilter
-import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.enums.SortOrder
-import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import java.util.UUID
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.enums.AlbumSortParameter
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.SortOrder
+import us.huseli.thoucylinder.enums.TrackSortParameter
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
@@ -45,12 +46,12 @@ open class LibraryViewModel @Inject constructor(
     private val _trackSortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _albumSearchTerm = MutableStateFlow("")
     private val _trackSearchTerm = MutableStateFlow("")
-    private val _selectedAlbumTagPojos = MutableStateFlow<List<TagPojo>>(emptyList())
-    private val _selectedTrackTagPojos = MutableStateFlow<List<TagPojo>>(emptyList())
+    private val _selectedAlbumTagPojos = MutableStateFlow<ImmutableList<TagPojo>>(persistentListOf())
+    private val _selectedTrackTagPojos = MutableStateFlow<ImmutableList<TagPojo>>(persistentListOf())
     private val _availabilityFilter = MutableStateFlow(AvailabilityFilter.ALL)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override val albumCombos = combine(
+    override val albumViewStates: Flow<ImmutableList<Album.ViewState>> = combine(
         _albumSortParameter,
         _albumSortOrder,
         _albumSearchTerm,
@@ -58,7 +59,11 @@ open class LibraryViewModel @Inject constructor(
         _availabilityFilter,
     ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
         repos.album.flowAlbumCombos(sortParameter, sortOrder, searchTerm, tagPojos.map { it.name }, availability)
-    }.flattenMerge().onEach { _isLoadingAlbums.value = false }.distinctUntilChanged()
+            .map { combos -> combos.map { it.getViewState() }.toImmutableList() }
+    }
+        .flattenMerge()
+        .onEach { _isLoadingAlbums.value = false }
+        .distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagingTrackCombos: Flow<PagingData<TrackCombo>> =
@@ -82,7 +87,7 @@ open class LibraryViewModel @Inject constructor(
     val albumSortOrder = _albumSortOrder.asStateFlow()
     val albumSortParameter = _albumSortParameter.asStateFlow()
     @OptIn(ExperimentalCoroutinesApi::class)
-    val albumTagPojos = _availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }
+    val albumTagPojos = _availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }.map { it.toImmutableList() }
     val availabilityFilter = _availabilityFilter.asStateFlow()
     val displayType = _displayType.asStateFlow()
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
@@ -90,7 +95,7 @@ open class LibraryViewModel @Inject constructor(
     val isLoadingPlaylists = _isLoadingPlaylists.asStateFlow()
     val isLoadingTracks = _isLoadingTracks.asStateFlow()
     val listType = _listType.asStateFlow()
-    val playlists = repos.playlist.playlistsPojos
+    val playlists: Flow<ImmutableList<PlaylistPojo>> = repos.playlist.playlistsPojos
         .onStart { _isLoadingPlaylists.value = true }
         .onEach { _isLoadingPlaylists.value = false }
     val selectedAlbumTagPojos = _selectedAlbumTagPojos.asStateFlow()
@@ -100,12 +105,6 @@ open class LibraryViewModel @Inject constructor(
     val trackSortParameter = _trackSortParameter.asStateFlow()
     @OptIn(ExperimentalCoroutinesApi::class)
     val trackTagPojos = _availabilityFilter.flatMapMerge { repos.track.flowTagPojos(it) }
-
-    suspend fun getPlaylistImage(playlistId: UUID, context: Context): ImageBitmap? = withContext(Dispatchers.IO) {
-        repos.playlist.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
-            album.albumArt?.getThumbnailImageBitmap(context)
-        }
-    }
 
     fun setAlbumSearchTerm(value: String) {
         _albumSearchTerm.value = value
@@ -129,11 +128,11 @@ open class LibraryViewModel @Inject constructor(
     }
 
     fun setSelectedAlbumTagPojos(value: List<TagPojo>) {
-        _selectedAlbumTagPojos.value = value
+        _selectedAlbumTagPojos.value = _selectedAlbumTagPojos.value.plus(value).toImmutableList()
     }
 
     fun setSelectedTrackTagPojos(value: List<TagPojo>) {
-        _selectedTrackTagPojos.value = value
+        _selectedTrackTagPojos.value = value.toImmutableList()
     }
 
     fun setTrackSearchTerm(value: String) {

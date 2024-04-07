@@ -14,7 +14,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableMap
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.stringResource
@@ -30,7 +30,7 @@ import us.huseli.thoucylinder.stringResource
 @Composable
 fun <SortParameter : Enum<SortParameter>> ListSortDialog(
     modifier: Modifier = Modifier,
-    sortParameters: Map<SortParameter, String>,
+    sortParameters: ImmutableMap<SortParameter, String>,
     initialSortParameter: SortParameter,
     initialSortOrder: SortOrder,
     title: String,
@@ -45,7 +45,7 @@ fun <SortParameter : Enum<SortParameter>> ListSortDialog(
         onDismissRequest = onCancel,
         modifier = modifier,
         confirmButton = {
-            TextButton(
+            SaveButton(
                 onClick = { onSort(sortParameter, sortOrder) },
                 content = { Text(stringResource(R.string.sort)) },
             )

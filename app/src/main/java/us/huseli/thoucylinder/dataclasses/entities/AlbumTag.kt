@@ -4,7 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import java.util.UUID
 
 @Entity(
     primaryKeys = ["AlbumTag_albumId", "AlbumTag_tagName"],
@@ -27,6 +26,6 @@ import java.util.UUID
     ],
 )
 data class AlbumTag(
-    @ColumnInfo("AlbumTag_albumId") val albumId: UUID,
+    @ColumnInfo("AlbumTag_albumId") val albumId: String,
     @ColumnInfo("AlbumTag_tagName") val tagName: String,
 )

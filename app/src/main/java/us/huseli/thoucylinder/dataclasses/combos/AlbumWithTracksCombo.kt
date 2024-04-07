@@ -34,7 +34,7 @@ data class AlbumWithTracksCombo(
     override val artists: List<AlbumArtistCredit> = emptyList(),
     @Relation(parentColumn = "Album_albumId", entityColumn = "Track_albumId")
     val trackCombos: List<TrackCombo> = emptyList<TrackCombo>().let { combos ->
-        combos.map { it.copy(albumArtist = artists.joined()) }
+        combos.map { it.copy(albumArtists = artists) }
     },
 ) : AbstractAlbumCombo() {
     data class AlbumMatch(
@@ -134,13 +134,13 @@ data class AlbumWithTracksCombo(
         )
     }
 
-    private fun getTracksDistanceSum(otherTracks: Collection<Track>): Double = otherTracks.zip(trackCombos)
-        .filter { (other, our) -> !other.title.contains(our.track.title, true) }
-        .size.toDouble() + abs(trackCombos.size - otherTracks.size)
-
     private fun getTracksDistance(otherTracks: Collection<Track>): Double = otherTracks.takeIf { it.isNotEmpty() }
         ?.let { (getTracksDistanceSum(it) / otherTracks.size) * 2 }
         ?: 0.0
+
+    private fun getTracksDistanceSum(otherTracks: Collection<Track>): Double = otherTracks.zip(trackCombos)
+        .filter { (other, our) -> !other.title.contains(our.track.title, true) }
+        .size.toDouble() + abs(trackCombos.size - otherTracks.size)
 
     override fun toString() = album.toString()
 }

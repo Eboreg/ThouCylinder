@@ -1,8 +1,10 @@
 package us.huseli.thoucylinder.dataclasses.musicBrainz
 
+import android.content.Context
+import androidx.compose.ui.graphics.ImageBitmap
 import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -87,6 +89,8 @@ data class MusicBrainzRelease(
     override val artistName: String
         get() = artist
 
+    override suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? = null
+
     val year: Int?
         get() = releaseGroup.year ?: date
             ?.substringBefore('-')
@@ -97,7 +101,7 @@ data class MusicBrainzRelease(
         isInLibrary: Boolean,
         isLocal: Boolean = false,
         albumArt: MediaStoreImage? = null,
-        getArtist: suspend (BaseArtist) -> Artist,
+        getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumWithTracksCombo {
         val album = Album(
             title = title,
@@ -110,7 +114,7 @@ data class MusicBrainzRelease(
         )
         val albumArtists = artistCredit.mapIndexed { index, albumArtist ->
             albumArtist.toNativeAlbumArtist(
-                artist = getArtist(BaseArtist(name = albumArtist.name, musicBrainzId = albumArtist.artist.id)),
+                artist = getArtist(UnsavedArtist(name = albumArtist.name, musicBrainzId = albumArtist.artist.id)),
                 albumId = album.albumId,
                 position = index,
             )
@@ -127,7 +131,7 @@ data class MusicBrainzRelease(
     private suspend fun Iterable<Media>.toTrackCombos(
         isInLibrary: Boolean,
         album: Album? = null,
-        getArtist: suspend (BaseArtist) -> Artist,
+        getArtist: suspend (UnsavedArtist) -> Artist,
     ): List<TrackCombo> = flatMap { medium ->
         medium.tracks.map {
             val track = Track(
@@ -142,7 +146,7 @@ data class MusicBrainzRelease(
             )
             val artists = it.artistCredit.mapIndexed { index, trackArtist ->
                 trackArtist.toNativeTrackArtist(
-                    artist = getArtist(BaseArtist(name = trackArtist.name, musicBrainzId = trackArtist.artist.id)),
+                    artist = getArtist(UnsavedArtist(name = trackArtist.name, musicBrainzId = trackArtist.artist.id)),
                     trackId = track.trackId,
                     position = index,
                 )

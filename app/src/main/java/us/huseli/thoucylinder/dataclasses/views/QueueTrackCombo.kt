@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.dataclasses.views
 
-import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.room.ColumnInfo
@@ -26,18 +25,19 @@ import java.util.UUID
 data class QueueTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,
-    override val albumArtist: String?,
-    @ColumnInfo("QueueTrack_uri") val uri: Uri,
-    @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("QueueTrack_uri") val uri: String,
+    @ColumnInfo("QueueTrack_queueTrackId") val queueTrackId: String = UUID.randomUUID().toString(),
     @ColumnInfo("QueueTrack_position") val position: Int = 0,
     @Relation(parentColumn = "Track_trackId", entityColumn = "TrackArtist_trackId")
     override val artists: List<TrackArtistCredit>,
+    @Relation(parentColumn = "Track_albumId", entityColumn = "AlbumArtist_albumId")
+    override val albumArtists: List<AlbumArtistCredit> = emptyList(),
 ) : AbstractTrackCombo() {
     val queueTrack: QueueTrack
         get() = QueueTrack(queueTrackId = queueTrackId, trackId = track.trackId, uri = uri, position = position)
 
     fun toMediaItem(): MediaItem = MediaItem.Builder()
-        .setMediaId(queueTrackId.toString())
+        .setMediaId(queueTrackId)
         .setUri(uri)
         .setMediaMetadata(getMediaMetadata())
         .setTag(this)
@@ -47,11 +47,11 @@ data class QueueTrackCombo(
         return MediaMetadata.Builder()
             .setArtist(artists.joined()?.umlautify())
             .setTitle(track.title.umlautify())
-            .setAlbumArtist(albumArtist?.umlautify())
+            .setAlbumArtist(albumArtists.joined()?.umlautify())
             .setAlbumTitle(album?.title?.umlautify())
             .setDiscNumber(track.discNumber)
             .setReleaseYear(track.year ?: album?.year)
-            .setArtworkUri(album?.albumArt?.uri)
+            .setArtworkUri(album?.albumArt?.fullUri)
             .build()
     }
 

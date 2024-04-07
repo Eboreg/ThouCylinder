@@ -1,40 +1,27 @@
 package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.ILogger
-import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy
-import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.joined
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.repositories.Repositories
 
 abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewModel(), ILogger {
-    val totalAreaSize: Flow<DpSize> =
-        combine(repos.settings.contentAreaSize, repos.settings.innerPadding) { size, padding -> // including menu
-            size.plus(
-                DpSize(
-                    padding.calculateLeftPadding(LayoutDirection.Ltr) + padding.calculateRightPadding(LayoutDirection.Ltr),
-                    padding.calculateTopPadding() + padding.calculateBottomPadding(),
-                )
-            )
-        }
-
     fun deactivateRadio() = repos.player.deactivateRadio()
 
     suspend fun ensureTrackMetadata(track: Track, forceReload: Boolean = false, commit: Boolean = true): Track =
@@ -48,30 +35,24 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         ensureTrackMetadata(track, forceReload)
     }
 
-    suspend fun getAlbumThumbnail(albumCombo: AbstractAlbumCombo, context: Context): ImageBitmap? =
-        withContext(Dispatchers.IO) {
-            val albumArt = albumCombo.album.albumArt
+    suspend fun getAlbumFullImage(uri: Uri?): ImageBitmap? = repos.album.getFullImage(uri)
 
-            if (albumArt != null && albumCombo.album.isLocal && !albumArt.isLocal) launchOnIOThread {
-                repos.localMedia.saveInternalAlbumArtFiles(albumArt, albumCombo.album)?.also { localAlbumArt ->
-                    repos.settings.getAlbumDirectory(albumCombo)?.also { albumDirectory ->
-                        repos.localMedia.saveAlbumDirectoryAlbumArtFiles(localAlbumArt, albumDirectory)
-                    }
-                    repos.album.updateAlbumArt(albumCombo.album.albumId, localAlbumArt)
-                }
-            }
-
-            albumArt?.getThumbnailImageBitmap(context)
-        }
+    suspend fun getAlbumThumbnail(uri: Uri?): ImageBitmap? = uri?.let { repos.album.thumbnailCache.getOrNull(it) }
 
     fun getArtistNameSuggestions(name: String, limit: Int = 10) =
         repos.artist.getArtistNameSuggestions(name, limit)
 
-    suspend fun getTrackThumbnail(trackCombo: AbstractTrackCombo, context: Context): ImageBitmap? =
-        withContext(Dispatchers.IO) {
-            trackCombo.track.image?.getThumbnailImageBitmap(context)
-                ?: trackCombo.album?.albumArt?.getThumbnailImageBitmap(context)
-        }
+    suspend fun getTrackComboFullImage(trackCombo: AbstractTrackCombo): ImageBitmap? =
+        getTrackFullImage(trackCombo.track.image?.fullUri)
+            ?: getAlbumFullImage(trackCombo.album?.albumArt?.fullUri)
+
+    suspend fun getTrackComboThumbnail(trackCombo: AbstractTrackCombo): ImageBitmap? =
+        getTrackThumbnail(trackCombo.track.image?.thumbnailUri)
+            ?: getAlbumThumbnail(trackCombo.album?.albumArt?.thumbnailUri)
+
+    suspend fun getTrackFullImage(uri: Uri?): ImageBitmap? = repos.track.getFullImage(uri)
+
+    suspend fun getTrackThumbnail(uri: Uri?): ImageBitmap? = uri?.let { repos.track.thumbnailCache.getOrNull(it) }
 
     suspend fun importNewLocalAlbums(context: Context) {
         if (!repos.localMedia.isImportingLocalMedia.value) {
@@ -125,16 +106,57 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
         }
     }
 
+    protected suspend fun getQueueTrackComboByViewState(
+        state: Track.ViewState,
+        matchIfNeeded: Boolean = false,
+    ): QueueTrackCombo? = withContext(Dispatchers.IO) {
+        getQueueTrackCombo(
+            track = state.track,
+            album = state.album,
+            albumArtists = state.albumArtists,
+            trackArtists = state.trackArtists,
+            matchIfNeeded = matchIfNeeded,
+        )
+    }
+
     protected suspend fun getQueueTrackCombo(
         trackCombo: AbstractTrackCombo,
-        albumArtists: List<Artist> = emptyList(),
+        matchIfNeeded: Boolean = false,
+    ): QueueTrackCombo? = withContext(Dispatchers.IO) {
+        getQueueTrackCombo(
+            track = trackCombo.track,
+            album = trackCombo.album,
+            albumArtists = trackCombo.albumArtists,
+            trackArtists = trackCombo.artists,
+            matchIfNeeded = matchIfNeeded,
+        )
+    }
+
+    protected suspend fun getQueueTrackCombosByViewState(
+        states: Collection<Track.ViewState>,
+        matchIfNeeded: Boolean = false,
+    ): List<QueueTrackCombo> = states.mapNotNull {
+        getQueueTrackComboByViewState(state = it, matchIfNeeded = matchIfNeeded)
+    }
+
+    protected suspend fun getQueueTrackCombos(
+        trackCombos: Collection<AbstractTrackCombo>,
+        matchIfNeeded: Boolean = false,
+    ): List<QueueTrackCombo> = trackCombos.mapNotNull {
+        getQueueTrackCombo(trackCombo = it, matchIfNeeded = matchIfNeeded)
+    }
+
+    private suspend fun getQueueTrackCombo(
+        track: Track,
+        album: Album? = null,
+        albumArtists: Collection<AlbumArtistCredit>,
+        trackArtists: Collection<TrackArtistCredit>,
         matchIfNeeded: Boolean = false,
     ): QueueTrackCombo? = withContext(Dispatchers.IO) {
         val newTrack = repos.youtube.ensureTrackPlayUriOrNull(
-            track = trackCombo.track,
+            track = track,
             albumArtists = albumArtists,
-            albumArtist = trackCombo.albumArtist,
-            trackArtists = trackCombo.artists,
+            trackArtists = trackArtists,
             matchIfNeeded = matchIfNeeded,
             onChanged = { repos.track.updateTrack(it) },
         )
@@ -143,17 +165,10 @@ abstract class AbstractBaseViewModel(private val repos: Repositories) : ViewMode
             QueueTrackCombo(
                 track = newTrack,
                 uri = uri,
-                album = trackCombo.album,
-                albumArtist = trackCombo.albumArtist ?: albumArtists.joined(),
-                artists = trackCombo.artists,
+                album = album,
+                albumArtists = albumArtists.toList(),
+                artists = trackArtists.toList(),
             )
         }
-    }
-
-    protected suspend fun getQueueTrackCombos(
-        trackCombos: Collection<AbstractTrackCombo>,
-        matchIfNeeded: Boolean = false,
-    ): List<QueueTrackCombo> = trackCombos.mapNotNull {
-        getQueueTrackCombo(trackCombo = it, matchIfNeeded = matchIfNeeded)
     }
 }

@@ -9,12 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,15 +20,18 @@ import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.ItemList
+import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistDialog(
-    playlists: List<PlaylistPojo>,
+    playlists: ImmutableList<PlaylistPojo>,
     onSelect: (PlaylistPojo) -> Unit,
     onCreateNewClick: () -> Unit,
     onCancel: () -> Unit,
@@ -78,14 +79,8 @@ fun AddToPlaylistDialog(
                 if (playlists.isEmpty()) Text(text = stringResource(R.string.no_playlists_found))
 
                 Row(modifier = Modifier.align(Alignment.End)) {
-                    TextButton(
-                        onClick = onCancel,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        content = { Text(stringResource(R.string.cancel)) },
-                    )
-                    TextButton(onClick = onCreateNewClick) { Text(stringResource(R.string.create_new_playlist)) }
+                    CancelButton(onClick = onCancel)
+                    SaveButton(onClick = onCreateNewClick) { Text(stringResource(R.string.create_new_playlist)) }
                 }
             }
         }
@@ -105,8 +100,8 @@ fun AddDuplicatesToPlaylistDialog(
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
         confirmButton = {
-            TextButton(onClick = onAddDuplicatesClick) { Text(stringResource(R.string.add_anyway)) }
-            TextButton(onClick = onSkipDuplicatesCount) { Text(stringResource(R.string.skip)) }
+            CancelButton(onClick = onSkipDuplicatesCount) { Text(stringResource(R.string.skip)) }
+            SaveButton(onClick = onAddDuplicatesClick) { Text(stringResource(R.string.add_anyway)) }
         },
         modifier = modifier,
         text = {

@@ -10,10 +10,8 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 
 @DatabaseView(
     """
-    SELECT Track.*, Album.*, GROUP_CONCAT(AlbumArtist_name, '/') AS albumArtist
-    FROM Track
-        LEFT JOIN Album ON Track_albumId = Album_albumId
-        LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId
+    SELECT Track.*, Album.*
+    FROM Track LEFT JOIN Album ON Track_albumId = Album_albumId
     GROUP BY Track_trackId
     ORDER BY Track_discNumber, Track_albumPosition, Track_title
     """
@@ -21,10 +19,21 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 data class TrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album? = null,
-    override val albumArtist: String? = null,
     @Relation(parentColumn = "Track_trackId", entityColumn = "TrackArtist_trackId")
     override val artists: List<TrackArtistCredit> = emptyList(),
-) : AbstractTrackCombo()
+    @Relation(parentColumn = "Track_albumId", entityColumn = "AlbumArtist_albumId")
+    override val albumArtists: List<AlbumArtistCredit> = emptyList(),
+) : AbstractTrackCombo() {
+    fun toQueueTrackCombo(): QueueTrackCombo? = track.playUri?.let { uri ->
+        QueueTrackCombo(
+            track = track,
+            uri = uri,
+            album = album,
+            albumArtists = albumArtists,
+            artists = artists,
+        )
+    }
+}
 
 fun Iterable<TrackCombo>.stripTitleCommons(): List<TrackCombo> =
     zip(map { it.track.title }.stripCommonFixes()).map { (combo, title) ->

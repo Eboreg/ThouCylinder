@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
-import android.net.Uri
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -22,8 +21,8 @@ import java.util.UUID
     indices = [Index("QueueTrack_trackId")],
 )
 data class QueueTrack(
-    @ColumnInfo("QueueTrack_queueTrackId") @PrimaryKey val queueTrackId: UUID = UUID.randomUUID(),
-    @ColumnInfo("QueueTrack_trackId") val trackId: UUID,
-    @ColumnInfo("QueueTrack_uri") val uri: Uri,
+    @ColumnInfo("QueueTrack_queueTrackId") @PrimaryKey val queueTrackId: String = UUID.randomUUID().toString(),
+    @ColumnInfo("QueueTrack_trackId") val trackId: String,
+    @ColumnInfo("QueueTrack_uri") val uri: String,
     @ColumnInfo("QueueTrack_position") val position: Int,
 )

@@ -29,19 +29,20 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 
 @Composable
 fun ExpandedContent(
-    viewModel: QueueViewModel,
     endPositionMs: Float,
     canPlay: Boolean,
     canGotoNext: Boolean,
     isPlaying: Boolean,
     isLoading: Boolean,
     modifier: Modifier = Modifier,
+    viewModel: QueueViewModel = hiltViewModel(),
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.primary,
 ) {

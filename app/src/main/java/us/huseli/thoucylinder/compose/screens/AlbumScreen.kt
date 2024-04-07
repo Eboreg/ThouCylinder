@@ -37,13 +37,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.ImportProgressSection
 import us.huseli.thoucylinder.compose.album.AlbumBadges
 import us.huseli.thoucylinder.compose.album.AlbumButtons
 import us.huseli.thoucylinder.compose.album.AlbumTrackRow
-import us.huseli.thoucylinder.compose.album.AlbumTrackRowData
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.compose.utils.Thumbnail
@@ -53,7 +53,6 @@ import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
@@ -66,17 +65,17 @@ fun AlbumScreen(
     appCallbacks: AppCallbacks,
     onAlbumComboFetched: (AbstractAlbumCombo) -> Unit = {},
 ) {
-    val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
-    val (downloadProgress, downloadIsActive) = getDownloadProgress(
-        viewModel.albumDownloadTask.collectAsStateWithLifecycle(null)
-    )
-    val albumCombo by viewModel.albumCombo.collectAsStateWithLifecycle(null)
-    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
-    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
-    val albumNotFound by viewModel.albumNotFound.collectAsStateWithLifecycle()
-    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+
+    val albumArt by viewModel.albumArt.collectAsStateWithLifecycle(null)
+    val albumCombo by viewModel.albumCombo.collectAsStateWithLifecycle(null)
+    val albumNotFound by viewModel.albumNotFound.collectAsStateWithLifecycle()
+    val downloadState by viewModel.downloadState.collectAsStateWithLifecycle(null)
+    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
+    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
+    val trackDownloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
+
     var isPlayable by rememberSaveable { mutableStateOf(true) }
 
     if (albumNotFound) {
@@ -143,7 +142,7 @@ fun AlbumScreen(
                         modifier = Modifier.height(150.dp).padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
                         Thumbnail(
-                            image = albumArt,
+                            imageBitmap = { albumArt },
                             shape = MaterialTheme.shapes.extraSmall,
                             placeholderIcon = Icons.Sharp.Album,
                             modifier = Modifier.fillMaxHeight(),
@@ -169,7 +168,7 @@ fun AlbumScreen(
                             }
 
                             AlbumBadges(
-                                tags = combo.tags.map { it.name },
+                                tags = combo.tags.map { it.name }.toImmutableList(),
                                 year = combo.yearString,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -179,16 +178,17 @@ fun AlbumScreen(
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 AlbumButtons(
-                                    albumArtists = combo.artists,
+                                    albumArtists = combo.artists.toImmutableList(),
                                     isLocal = combo.album.isLocal,
                                     isInLibrary = combo.album.isInLibrary,
                                     modifier = Modifier.align(Alignment.Bottom),
-                                    isDownloading = downloadIsActive,
+                                    isDownloading = downloadState?.isActive == true,
                                     isPartiallyDownloaded = combo.isPartiallyDownloaded,
+                                    youtubeWebUrl = combo.album.youtubeWebUrl,
+                                    spotifyWebUrl = combo.album.spotifyWebUrl,
                                     callbacks = AlbumCallbacks(
-                                        combo = combo,
+                                        state = combo.getViewState(),
                                         appCallbacks = appCallbacks,
-                                        context = context,
                                         onPlayClick = if (isPlayable) {
                                             { viewModel.playTrackCombos(combo.trackCombos) }
                                         } else null,
@@ -205,11 +205,11 @@ fun AlbumScreen(
                     }
                 }
 
-                if (downloadIsActive) {
+                if (downloadState?.isActive == true) {
                     item {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(top = 5.dp),
-                            progress = { downloadProgress?.toFloat() ?: 0f },
+                            progress = { downloadState?.progress ?: 0f },
                         )
                     }
                 } else if (combo.isPartiallyDownloaded) {
@@ -254,32 +254,22 @@ fun AlbumScreen(
                     }
                 }
 
-                val rowDataObjects = combo.trackCombos.map { trackCombo ->
-                    AlbumTrackRowData(
-                        title = trackCombo.track.title,
-                        isDownloadable = trackCombo.track.isDownloadable,
-                        duration = trackCombo.track.duration,
-                        showArtist = trackCombo.artists.joined() != artistString,
-                        isSelected = selectedTrackIds.contains(trackCombo.track.trackId),
-                        downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == trackCombo.track.trackId },
-                        position = trackCombo.track.getPositionString(combo.discCount),
-                        isInLibrary = trackCombo.track.isInLibrary,
-                        artists = trackCombo.artists,
-                        isPlayable = trackCombo.track.isPlayable,
-                    )
-                }
-                val positionColumnWidth = rowDataObjects.maxOfOrNull { it.position.length * 10 }?.dp
+                val trackPositions = combo.trackCombos.map { it.track.getPositionString(combo.discCount) }
+                val positionColumnWidth = trackPositions.maxOfOrNull { it.length * 10 }?.dp
 
                 itemsIndexed(combo.trackCombos) { index, trackCombo ->
                     viewModel.ensureTrackMetadataAsync(trackCombo.track)
 
                     AlbumTrackRow(
-                        data = rowDataObjects[index],
+                        track = trackCombo.track,
+                        artists = trackCombo.artists.toImmutableList(),
+                        position = trackPositions[index],
+                        showArtist = trackCombo.artists.joined() != artistString,
+                        downloadState = trackDownloadStates.find { it.trackId == trackCombo.track.trackId },
                         positionColumnWidth = positionColumnWidth ?: 40.dp,
                         callbacks = TrackCallbacks(
-                            combo = trackCombo,
+                            state = trackCombo.getViewState(),
                             appCallbacks = appCallbacks,
-                            context = context,
                             onTrackClick = {
                                 if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(trackCombo.track.trackId)
                                 else if (trackCombo.track.isPlayable)

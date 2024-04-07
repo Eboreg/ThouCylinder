@@ -6,7 +6,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
 
 @Entity(
     foreignKeys = [
@@ -70,7 +69,7 @@ data class SpotifyTrackAudioFeatures(
     @SerializedName("time_signature") val timeSignature: Int?,
     // A link to the Web API endpoint providing full details of the track.
     @SerializedName("track_href") val trackHref: String?,
-    val trackId: UUID? = null,
+    val trackId: String? = null,
     // The Spotify URI for the track.
     val uri: String?,
     // A measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track. Tracks with high valence

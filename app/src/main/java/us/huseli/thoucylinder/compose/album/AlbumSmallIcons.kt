@@ -9,11 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 
 @Composable
-fun AlbumSmallIcons(combo: AbstractAlbumCombo, modifier: Modifier = Modifier) {
-    if (combo.album.isLocal) {
+fun AlbumSmallIcons(isLocal: Boolean, isOnYoutube: Boolean, modifier: Modifier = Modifier) {
+    if (isLocal) {
         Icon(
             painter = painterResource(R.drawable.hard_drive_filled),
             contentDescription = null,
@@ -21,7 +20,7 @@ fun AlbumSmallIcons(combo: AbstractAlbumCombo, modifier: Modifier = Modifier) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    if (combo.album.isOnYoutube) {
+    if (isOnYoutube) {
         Icon(
             painter = painterResource(R.drawable.youtube),
             contentDescription = null,

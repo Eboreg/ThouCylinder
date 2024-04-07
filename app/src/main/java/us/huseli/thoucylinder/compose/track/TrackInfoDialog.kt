@@ -15,7 +15,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +26,7 @@ import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
@@ -47,7 +47,7 @@ fun TrackInfoDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onClose,
-        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
+        dismissButton = { CancelButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
         confirmButton = {},
         text = {
             FlowRow(

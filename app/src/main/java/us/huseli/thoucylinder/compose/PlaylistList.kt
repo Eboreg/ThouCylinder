@@ -14,13 +14,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
@@ -30,16 +34,16 @@ import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun PlaylistList(
-    playlists: List<PlaylistPojo>,
+    playlists: ImmutableList<PlaylistPojo>,
     isLoading: Boolean,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
-    getImage: suspend (UUID) -> ImageBitmap?,
     modifier: Modifier = Modifier,
+    imageViewModel: ImageViewModel = hiltViewModel(),
 ) {
     ItemList(
         modifier = modifier,
@@ -55,10 +59,10 @@ fun PlaylistList(
         },
         progressIndicatorText = if (isLoading) stringResource(R.string.loading_playlists) else null,
     ) { _, playlist ->
-        val imageBitmap = remember(playlist) { mutableStateOf<ImageBitmap?>(null) }
+        var imageBitmap by remember(playlist) { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(playlist) {
-            getImage(playlist.playlistId)?.also { imageBitmap.value = it }
+            imageBitmap = imageViewModel.getPlaylistImage(playlist.playlistId)
         }
 
         Row(
@@ -66,7 +70,7 @@ fun PlaylistList(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Thumbnail(
-                image = imageBitmap.value,
+                imageBitmap = { imageBitmap },
                 shape = MaterialTheme.shapes.extraSmall,
                 placeholderIcon = Icons.AutoMirrored.Sharp.QueueMusic,
             )

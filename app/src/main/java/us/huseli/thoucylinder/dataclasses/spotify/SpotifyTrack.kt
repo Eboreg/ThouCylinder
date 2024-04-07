@@ -2,14 +2,14 @@ package us.huseli.thoucylinder.dataclasses.spotify
 
 import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.interfaces.IExternalTrack
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import java.util.UUID
 import kotlin.math.absoluteValue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -46,10 +46,10 @@ abstract class AbstractSpotifyTrack<AT : AbstractSpotifyArtist> : AbstractSpotif
     }
 
     open suspend fun toTrackCombo(
-        getArtist: suspend (BaseArtist) -> Artist,
+        getArtist: suspend (UnsavedArtist) -> Artist,
+        isLocal: Boolean,
+        isInLibrary: Boolean,
         album: Album? = null,
-        isLocal: Boolean = false,
-        isInLibrary: Boolean = true,
     ): TrackCombo {
         val track = toTrack(albumId = album?.albumId, isInLibrary = isInLibrary)
 
@@ -57,14 +57,14 @@ abstract class AbstractSpotifyTrack<AT : AbstractSpotifyArtist> : AbstractSpotif
             track = track,
             album = album,
             artists = artists.mapIndexed { index, artist ->
-                val baseArtist = BaseArtist(name = artist.name, spotifyId = artist.id)
-                TrackArtistCredit(artist = getArtist(baseArtist), trackId = track.trackId)
+                val unsavedArtist = UnsavedArtist(name = artist.name, spotifyId = artist.id)
+                TrackArtistCredit(artist = getArtist(unsavedArtist), trackId = track.trackId)
                     .copy(spotifyId = artist.id, position = index)
             },
         )
     }
 
-    open fun toTrack(albumId: UUID?, isInLibrary: Boolean = true) = Track(
+    open fun toTrack(albumId: String?, isInLibrary: Boolean) = Track(
         albumId = albumId,
         albumPosition = trackNumber,
         discNumber = discNumber,
@@ -111,10 +111,10 @@ data class SpotifyTrack(
         val spotifyTrack: SpotifyTrack,
     )
 
-    fun matchTrack(track: Track, album: Album? = null, artists: Collection<Artist> = emptyList()) =
+    fun matchTrack(track: Track, album: Album? = null, artists: Collection<AbstractArtist> = emptyList()) =
         TrackMatch(distance = getTrackDistance(track, album, artists), spotifyTrack = this)
 
-    private fun getTrackDistance(track: Track, album: Album?, artists: Collection<Artist>): Int {
+    private fun getTrackDistance(track: Track, album: Album?, artists: Collection<AbstractArtist>): Int {
         val levenshtein = LevenshteinDistance()
         val artistDistances = this.artists.getDistances(artists).plus(this.album.artists.getDistances(artists))
         var distance = levenshtein.apply(track.title, name)
@@ -129,17 +129,17 @@ data class SpotifyTrack(
         return distance
     }
 
-    override fun toTrack(albumId: UUID?, isInLibrary: Boolean): Track =
+    override fun toTrack(albumId: String?, isInLibrary: Boolean): Track =
         super.toTrack(albumId = albumId, isInLibrary = isInLibrary).copy(image = album.images.toMediaStoreImage())
 
     override suspend fun toTrackCombo(
-        getArtist: suspend (BaseArtist) -> Artist,
-        album: Album?,
+        getArtist: suspend (UnsavedArtist) -> Artist,
         isLocal: Boolean,
         isInLibrary: Boolean,
+        album: Album?,
     ) = super.toTrackCombo(getArtist = getArtist, album = album, isLocal = isLocal, isInLibrary = isInLibrary)
         .copy(album = album ?: this.album.toAlbum(isLocal = isLocal, isInLibrary = isInLibrary))
 }
 
 
-data class SpotifyTrackIdPair(val spotifyTrackId: String, val trackId: UUID)
+data class SpotifyTrackIdPair(val spotifyTrackId: String, val trackId: String)

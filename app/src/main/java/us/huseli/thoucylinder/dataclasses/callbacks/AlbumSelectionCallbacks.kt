@@ -6,5 +6,5 @@ data class AlbumSelectionCallbacks(
     val onEnqueueClick: () -> Unit,
     val onSelectAllClick: () -> Unit,
     val onUnselectAllClick: () -> Unit,
-    val onDeleteClick: () -> Unit,
+    val onDeleteClick: (() -> Unit)? = null,
 )

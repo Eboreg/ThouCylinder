@@ -3,6 +3,8 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +17,6 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
@@ -25,7 +26,6 @@ import us.huseli.thoucylinder.dataclasses.pojos.RadioPojo
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.launchOnMainThread
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.DurationUnit
 
@@ -50,8 +50,6 @@ class QueueViewModel @Inject constructor(
     val queue: StateFlow<List<QueueTrackCombo>> = _queue.asStateFlow()
     val radioPojo: Flow<RadioPojo?> = repos.player.radioPojo
 
-    override val trackDownloadTasks: Flow<List<TrackDownloadTask>> = repos.download.tasks
-
     init {
         viewModelScope.launch {
             repos.player.queue.collect { queue -> _queue.value = queue }
@@ -74,7 +72,7 @@ class QueueViewModel @Inject constructor(
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 
-    fun removeFromQueue(queueTrackId: UUID) {
+    fun removeFromQueue(queueTrackId: String) {
         repos.player.removeFromQueue(listOf(queueTrackId))
         unselectTracks(listOf(queueTrackId))
     }
@@ -122,10 +120,11 @@ class QueueViewModel @Inject constructor(
         )
     }
 
-    override suspend fun listSelectedTrackCombos(): List<QueueTrackCombo> =
-        repos.player.listQueueTrackCombosById(selectedTrackIds.value)
+    override suspend fun listSelectedTrackCombos() =
+        repos.player.listQueueTrackCombosById(selectedTrackIds.value).toImmutableList()
 
-    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
+    override suspend fun listSelectedTracks(): ImmutableList<Track> =
+        listSelectedTrackCombos().map { it.track }.toImmutableList()
 
     override fun playSelectedTracks() {
         launchOnMainThread { repos.player.moveNextAndPlay(selectedTrackIds.value) }

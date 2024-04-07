@@ -8,7 +8,6 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
 
 @DatabaseView(
     """
@@ -24,11 +23,12 @@ data class PlaylistTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,
     @Embedded val playlist: Playlist,
-    override val albumArtist: String?,
     @ColumnInfo("PlaylistTrack_position") val position: Int,
-    @ColumnInfo("PlaylistTrack_id") val id: UUID,
+    @ColumnInfo("PlaylistTrack_id") val id: String,
     @Relation(parentColumn = "Track_trackId", entityColumn = "TrackArtist_trackId")
     override val artists: List<TrackArtistCredit>,
+    @Relation(parentColumn = "Track_albumId", entityColumn = "AlbumArtist_albumId")
+    override val albumArtists: List<AlbumArtistCredit> = emptyList(),
 ) : AbstractTrackCombo() {
     override fun equals(other: Any?) = other is PlaylistTrackCombo &&
         other.id == id &&

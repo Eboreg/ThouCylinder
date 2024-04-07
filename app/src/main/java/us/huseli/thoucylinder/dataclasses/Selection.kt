@@ -1,17 +1,19 @@
 package us.huseli.thoucylinder.dataclasses
 
+import kotlinx.collections.immutable.ImmutableCollection
+import kotlinx.collections.immutable.persistentListOf
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 
 data class Selection(
-    val tracks: Collection<Track> = emptyList(),
-    val albums: Collection<Album> = emptyList(),
-    val albumsWithTracks: Collection<AlbumWithTracksCombo> = emptyList(),
+    val tracks: ImmutableCollection<Track> = persistentListOf(),
+    val albums: ImmutableCollection<Album> = persistentListOf(),
+    val albumsWithTracks: ImmutableCollection<AlbumWithTracksCombo> = persistentListOf(),
 ) {
-    constructor(track: Track) : this(tracks = listOf(track))
+    constructor(track: Track) : this(tracks = persistentListOf(track))
 
-    constructor(album: Album) : this(albums = listOf(album))
+    constructor(album: Album) : this(albums = persistentListOf(album))
 
-    constructor(albumWithTracks: AlbumWithTracksCombo) : this(albumsWithTracks = listOf(albumWithTracks))
+    constructor(albumWithTracks: AlbumWithTracksCombo) : this(albumsWithTracks = persistentListOf(albumWithTracks))
 }

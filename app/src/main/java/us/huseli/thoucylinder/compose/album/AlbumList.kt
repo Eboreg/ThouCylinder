@@ -15,80 +15,82 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.extensions.nullIfBlank
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
-fun <T : AbstractAlbumCombo> AlbumList(
-    combos: ImmutableList<T>,
-    albumCallbacks: (T) -> AlbumCallbacks,
-    albumSelectionCallbacks: AlbumSelectionCallbacks,
-    selectedAlbumIds: ImmutableList<UUID>,
-    albumDownloadTasks: ImmutableList<AlbumDownloadTask>,
+fun AlbumList(
+    states: ImmutableList<Album.ViewState>,
+    callbacks: (Album.ViewState) -> AlbumCallbacks,
+    selectionCallbacks: AlbumSelectionCallbacks,
+    selectedAlbumIds: ImmutableList<String>,
+    downloadStates: ImmutableList<AlbumDownloadTask.ViewState>,
     modifier: Modifier = Modifier,
+    imageViewModel: ImageViewModel = hiltViewModel(),
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
     progressIndicatorStringRes: Int? = null,
     onEmpty: @Composable (() -> Unit)? = null,
-    getThumbnail: suspend (T) -> ImageBitmap?,
 ) {
-    val isSelected = { combo: T -> selectedAlbumIds.contains(combo.album.albumId) }
+    val isSelected = { state: Album.ViewState -> selectedAlbumIds.contains(state.album.albumId) }
 
     Column {
-        SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = albumSelectionCallbacks)
+        SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = selectionCallbacks)
 
         ItemList(
             modifier = modifier,
-            things = combos,
+            things = states,
             isSelected = isSelected,
-            onClick = { _, combo -> albumCallbacks(combo).onAlbumClick?.invoke() },
-            onLongClick = { _, combo -> albumCallbacks(combo).onAlbumLongClick?.invoke() },
+            onClick = { _, combo -> callbacks(combo).onAlbumClick?.invoke() },
+            onLongClick = { _, combo -> callbacks(combo).onAlbumLongClick?.invoke() },
             onEmpty = onEmpty,
             listState = listState,
             cardHeight = 70.dp,
             progressIndicatorText = progressIndicatorStringRes?.let { stringResource(it) },
-        ) { _, combo ->
-            val (downloadProgress, downloadIsActive) =
-                getDownloadProgress(albumDownloadTasks.find { it.album.albumId == combo.album.albumId })
-            val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+        ) { _, state ->
+            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
-                pluralStringResource(R.plurals.x_tracks, combo.trackCount, combo.trackCount),
-                combo.yearString,
+                pluralStringResource(R.plurals.x_tracks, state.trackCount, state.trackCount),
+                state.yearString,
             ).joinToString(" • ").nullIfBlank()
-            val callbacks = remember(combo) { albumCallbacks(combo) }
-            val artistString = remember(combo) { combo.artists.joined() }
+            val albumCallbacks = remember(state) { callbacks(state) }
+            val downloadState = downloadStates.find { it.albumId == state.album.albumId }
+            val artistString = remember(state) { state.artists.joined() }
 
-            LaunchedEffect(combo.album.albumArt) {
-                imageBitmap.value = getThumbnail(combo)
+            LaunchedEffect(state.album.albumArt) {
+                imageBitmap = imageViewModel.getAlbumThumbnail(state.album.albumArt?.thumbnailUri)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Thumbnail(
-                    image = imageBitmap.value,
+                    imageBitmap = { imageBitmap },
                     shape = MaterialTheme.shapes.extraSmall,
                     placeholderIcon = Icons.Sharp.Album,
-                    borderWidth = if (isSelected(combo)) null else 1.dp,
+                    borderWidth = if (isSelected(state)) null else 1.dp,
                 )
 
                 Column {
@@ -102,7 +104,7 @@ fun <T : AbstractAlbumCombo> AlbumList(
                             verticalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             Text(
-                                text = combo.album.title.umlautify(),
+                                text = state.album.title.umlautify(),
                                 maxLines = if (artistString != null && showArtist) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -125,21 +127,28 @@ fun <T : AbstractAlbumCombo> AlbumList(
                         Column(
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxHeight(),
-                            content = { AlbumSmallIcons(combo = combo) },
+                            content = {
+                                AlbumSmallIcons(
+                                    isLocal = state.album.isLocal,
+                                    isOnYoutube = state.album.isOnYoutube,
+                                )
+                            },
                         )
 
                         AlbumContextMenuWithButton(
-                            isLocal = combo.album.isLocal,
-                            isInLibrary = combo.album.isInLibrary,
-                            isPartiallyDownloaded = combo.isPartiallyDownloaded,
-                            callbacks = callbacks,
-                            albumArtists = combo.artists,
+                            isLocal = state.album.isLocal,
+                            isInLibrary = state.album.isInLibrary,
+                            isPartiallyDownloaded = state.isPartiallyDownloaded,
+                            callbacks = albumCallbacks,
+                            albumArtists = state.artists.toImmutableList(),
+                            youtubeWebUrl = state.album.youtubeWebUrl,
+                            spotifyWebUrl = state.album.spotifyWebUrl,
                         )
                     }
 
-                    if (downloadIsActive) {
+                    if (downloadState?.isActive == true) {
                         LinearProgressIndicator(
-                            progress = { downloadProgress?.toFloat() ?: 0f },
+                            progress = { downloadState.progress },
                             modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }

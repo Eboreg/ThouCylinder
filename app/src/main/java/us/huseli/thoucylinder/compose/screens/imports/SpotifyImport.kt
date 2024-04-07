@@ -12,51 +12,64 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableMap
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.AuthorizationStatus
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
-import java.util.UUID
 import kotlin.math.max
 
 @Composable
 fun SpotifyImport(
     showToolbars: Boolean,
-    nestedScrollConnection: NestedScrollConnection,
+    nestedScrollConnection: () -> NestedScrollConnection,
     viewModel: SpotifyImportViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
     onGotoLibraryClick: () -> Unit,
-    onGotoAlbumClick: (UUID) -> Unit,
+    onGotoAlbumClick: (String) -> Unit,
     backendSelection: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+
     val authorizationStatus by viewModel.authorizationStatus.collectAsStateWithLifecycle(
         AuthorizationStatus.UNKNOWN
     )
+    val externalAlbums by viewModel.offsetExternalAlbums.collectAsStateWithLifecycle(persistentListOf())
     val filteredAlbumCount by viewModel.filteredAlbumCount.collectAsStateWithLifecycle(null)
-    val isAlbumCountExact by viewModel.isAlbumCountExact.collectAsStateWithLifecycle(false)
-
-    val externalAlbums by viewModel.offsetExternalAlbums.collectAsStateWithLifecycle(emptyList())
     val hasNext by viewModel.hasNext.collectAsStateWithLifecycle(false)
+    val importedAlbumIds by viewModel.importedAlbumIds.collectAsStateWithLifecycle()
+    val isAlbumCountExact by viewModel.isAlbumCountExact.collectAsStateWithLifecycle(false)
     val isAllSelected by viewModel.isAllSelected.collectAsStateWithLifecycle(false)
+    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+    val notFoundAlbumIds by viewModel.notFoundAlbumIds.collectAsStateWithLifecycle()
     val offset by viewModel.localOffset.collectAsStateWithLifecycle(0)
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val searchTerm by viewModel.searchTerm.collectAsStateWithLifecycle()
     val selectedExternalAlbumIds by viewModel.selectedExternalAlbumIds.collectAsStateWithLifecycle()
 
+    var importedAlbumStates by remember { mutableStateOf<List<Album.ViewState>?>(null) }
     var importMethodDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var notFoundAlbums by remember { mutableStateOf<List<SpotifyAlbum>?>(null) }
+    var postImportDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(authorizationStatus) {
         viewModel.setOffset(0)
@@ -65,16 +78,31 @@ fun SpotifyImport(
     if (importMethodDialogOpen) {
         ImportMethodDialog(
             title = stringResource(R.string.import_from_spotify),
-            viewModel = viewModel,
             onDismissRequest = { importMethodDialogOpen = false },
-            onGotoLibraryClick = onGotoLibraryClick,
-            onGotoAlbumClick = onGotoAlbumClick,
+            onImportClick = { matchYoutube ->
+                viewModel.importSelectedAlbums(matchYoutube = matchYoutube, context = context) { imported, notFound ->
+                    importedAlbumStates = imported
+                    notFoundAlbums = notFound
+                    postImportDialogOpen = true
+                }
+                importMethodDialogOpen = false
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.import_method_description_1))
                     Text(stringResource(R.string.import_method_description_2_spotify))
                 }
             },
+        )
+    }
+
+    if (postImportDialogOpen) {
+        PostImportDialog(
+            importedAlbumStates = importedAlbumStates?.toImmutableList() ?: persistentListOf(),
+            notFoundAlbums = notFoundAlbums?.toImmutableList() ?: persistentListOf(),
+            onGotoAlbumClick = onGotoAlbumClick,
+            onGotoLibraryClick = onGotoLibraryClick,
+            onDismissRequest = { postImportDialogOpen = false },
         )
     }
 
@@ -116,7 +144,6 @@ fun SpotifyImport(
     }
 
     ImportItemList(
-        viewModel = viewModel,
         onGotoAlbumClick = onGotoAlbumClick,
         albumThirdRow = { album ->
             val count = album.tracks.items.size
@@ -130,6 +157,11 @@ fun SpotifyImport(
         listState = listState,
         selectedExternalAlbumIds = selectedExternalAlbumIds,
         externalAlbums = externalAlbums,
-        modifier = Modifier.nestedScroll(nestedScrollConnection),
+        modifier = Modifier.nestedScroll(nestedScrollConnection()),
+        importedAlbumIds = importedAlbumIds.toImmutableMap(),
+        isSearching = isSearching,
+        notFoundAlbumIds = notFoundAlbumIds.toImmutableList(),
+        toggleSelected = { viewModel.toggleSelected(it) },
+        onLongClick = { id -> viewModel.selectFromLastSelected(id, externalAlbums.map { it.id }) },
     )
 }

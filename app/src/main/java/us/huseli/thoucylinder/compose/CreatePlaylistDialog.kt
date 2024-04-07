@@ -5,18 +5,19 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import us.huseli.retaintheme.extensions.nullIfBlank
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
+import us.huseli.thoucylinder.compose.utils.SaveButton
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun CreatePlaylistDialog(
@@ -30,13 +31,11 @@ fun CreatePlaylistDialog(
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
-        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { CancelButton(onClick = onCancel) },
         confirmButton = {
-            TextButton(
-                onClick = { name.nullIfBlank()?.also(onSave) },
-                enabled = name.isNotBlank(),
-                content = { Text(stringResource(R.string.save)) },
-            )
+            SaveButton(enabled = name.isNotBlank()) {
+                name.nullIfBlank()?.also(onSave)
+            }
         },
         title = { Text(stringResource(R.string.add_playlist)) },
         text = {

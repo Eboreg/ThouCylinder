@@ -12,9 +12,9 @@ import us.huseli.thoucylinder.dataclasses.entities.Artist
         Artist.*,
         COUNT(DISTINCT Track_trackId) AS trackCount,
         COUNT(DISTINCT Album_albumId) AS albumCount,
-        group_concat(DISTINCT quote(Album_albumArt_uri)) AS albumArtUris,
+        group_concat(DISTINCT quote(Album_albumArt_fullUriString)) AS albumArtUris,
         group_concat(DISTINCT quote(Album_youtubePlaylist_fullImage_url)) AS youtubeFullImageUrls,
-        group_concat(DISTINCT quote(Album_spotifyImage_uri)) AS spotifyFullImageUrls
+        group_concat(DISTINCT quote(Album_spotifyImage_fullUriString)) AS spotifyFullImageUrls
     FROM Artist
         LEFT JOIN AlbumArtist ON Artist_id = AlbumArtist_artistId
         LEFT JOIN Album ON Album_albumId = AlbumArtist_albumId AND Album_isInLibrary = 1

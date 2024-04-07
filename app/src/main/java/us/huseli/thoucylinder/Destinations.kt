@@ -8,7 +8,6 @@ import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.Constants.NAV_ARG_PLAYLIST
 import us.huseli.thoucylinder.compose.MenuItemId
-import java.util.UUID
 
 abstract class Destination(override val menuItemId: MenuItemId) :
     AbstractSimpleDestination<MenuItemId>(menuItemId.route, menuItemId)
@@ -34,7 +33,7 @@ object AlbumDestination : AbstractDestination<MenuItemId>() {
     override val arguments = listOf(navArgument(NAV_ARG_ALBUM) { type = NavType.StringType })
     override val menuItemId: MenuItemId? = null
 
-    fun route(albumId: UUID) = "album/$albumId"
+    fun route(albumId: String) = "album/$albumId"
 }
 
 object ArtistDestination : AbstractDestination<MenuItemId>() {
@@ -42,7 +41,7 @@ object ArtistDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "artist/{$NAV_ARG_ARTIST}"
     override val menuItemId: MenuItemId? = null
 
-    fun route(artistId: UUID) = "artist/$artistId"
+    fun route(artistId: String) = "artist/$artistId"
 }
 
 object PlaylistDestination : AbstractDestination<MenuItemId>() {
@@ -50,5 +49,5 @@ object PlaylistDestination : AbstractDestination<MenuItemId>() {
     override val arguments = listOf(navArgument(NAV_ARG_PLAYLIST) { type = NavType.StringType })
     override val menuItemId: MenuItemId? = null
 
-    fun route(playlistId: UUID) = "playlist/$playlistId"
+    fun route(playlistId: String) = "playlist/$playlistId"
 }

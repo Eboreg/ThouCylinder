@@ -20,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AddDestination
 import us.huseli.thoucylinder.AlbumDestination
@@ -48,16 +49,15 @@ import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
-import java.util.UUID
 
 @Composable
 fun App(
@@ -85,10 +85,10 @@ fun App(
     var addToPlaylist by rememberSaveable { mutableStateOf(false) }
     var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
     var createPlaylist by rememberSaveable { mutableStateOf(false) }
-    var deleteAlbumCombos by rememberSaveable { mutableStateOf<Collection<AbstractAlbumCombo>?>(null) }
-    var editAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
-    var editTrackCombo by rememberSaveable { mutableStateOf<AbstractTrackCombo?>(null) }
-    var infoTrackCombo by rememberSaveable { mutableStateOf<AbstractTrackCombo?>(null) }
+    var deleteAlbums by rememberSaveable { mutableStateOf<Collection<Album.ViewState>?>(null) }
+    var editAlbum by rememberSaveable { mutableStateOf<Album.ViewState?>(null) }
+    var editTrack by rememberSaveable { mutableStateOf<Track.ViewState?>(null) }
+    var infoTrack by rememberSaveable { mutableStateOf<Track?>(null) }
     var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
     var isRadioDialogOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -127,14 +127,14 @@ fun App(
     }
 
     val onPlaylistClick = remember {
-        { playlistId: UUID ->
+        { playlistId: String ->
             navController.navigate(PlaylistDestination.route(playlistId))
             isCoverExpanded = false
         }
     }
 
     val onAlbumClick = remember {
-        { albumId: UUID ->
+        { albumId: String ->
             navController.navigate(AlbumDestination.route(albumId))
             isCoverExpanded = false
         }
@@ -142,10 +142,10 @@ fun App(
 
     val appCallbacks = remember {
         AppCallbacks(
-            onAddAlbumToLibraryClick = { combo ->
-                viewModel.addAlbumsToLibrary(listOf(combo.album.albumId))
+            onAddAlbumToLibraryClick = { state ->
+                viewModel.addAlbumsToLibrary(listOf(state.album.albumId))
                 SnackbarEngine.addInfo(
-                    context.getString(R.string.added_x_to_the_library, combo.album.title)
+                    context.getString(R.string.added_x_to_the_library, state.album.title)
                         .umlautify()
                 )
             },
@@ -154,8 +154,8 @@ fun App(
                 addToPlaylist = true
             },
             onAlbumClick = onAlbumClick,
-            onArtistClick = { artistId ->
-                navController.navigate(ArtistDestination.route(artistId))
+            onArtistClick = {
+                navController.navigate(ArtistDestination.route(it))
                 isCoverExpanded = false
             },
             onBackClick = { if (!navController.popBackStack()) navController.navigate(LibraryDestination.route) },
@@ -178,13 +178,13 @@ fun App(
                     )
                 }
             },
-            onDownloadAlbumClick = { album -> addDownloadedAlbum = album },
-            onDownloadTrackClick = { trackCombo -> viewModel.downloadTrack(trackCombo) },
-            onEditAlbumClick = { combo -> editAlbum = combo.album },
+            onDownloadAlbumClick = { addDownloadedAlbum = it },
+            onDownloadTrackClick = { viewModel.downloadTrack(it) },
+            onEditAlbumClick = { editAlbum = it },
             onPlaylistClick = onPlaylistClick,
-            onShowTrackInfoClick = { combo -> infoTrackCombo = combo },
-            onDeleteAlbumCombosClick = { combos -> deleteAlbumCombos = combos },
-            onEditTrackClick = { editTrackCombo = it },
+            onShowTrackInfoClick = { combo -> infoTrack = combo },
+            onDeleteAlbumsClick = { states -> deleteAlbums = states },
+            onEditTrackClick = { editTrack = it },
             onStartAlbumRadioClick = { viewModel.startAlbumRadio(it) },
             onStartArtistRadioClick = { viewModel.startArtistRadio(it) },
             onStartTrackRadioClick = { viewModel.startTrackRadio(it) },
@@ -195,12 +195,12 @@ fun App(
         viewModel = viewModel,
         onCancel = {
             editAlbum = null
-            editTrackCombo = null
-            deleteAlbumCombos = null
+            editTrack = null
+            deleteAlbums = null
             addDownloadedAlbum = null
             createPlaylist = false
             addToPlaylist = false
-            infoTrackCombo = null
+            infoTrack = null
             addToPlaylistSelection = null
         },
         onPlaylistClick = onPlaylistClick,
@@ -210,13 +210,13 @@ fun App(
             createPlaylist = true
         },
         editAlbum = editAlbum,
-        editTrackCombo = editTrackCombo,
-        deleteAlbumCombos = deleteAlbumCombos,
+        editTrack = editTrack,
+        deleteAlbums = deleteAlbums?.toImmutableList(),
         addDownloadedAlbum = addDownloadedAlbum,
         createPlaylist = createPlaylist,
         addToPlaylist = addToPlaylist,
         addToPlaylistSelection = addToPlaylistSelection,
-        infoTrackCombo = infoTrackCombo,
+        infoTrack = infoTrack,
     )
 
     AskMusicImportPermissions()
@@ -246,8 +246,6 @@ fun App(
         modifier = modifier,
         activeMenuItemId = activeMenuItemId,
         onNavigate = onNavigate,
-        onInnerPaddingChange = { viewModel.setInnerPadding(it) },
-        onContentAreaSizeChange = { viewModel.setContentAreaSize(it) },
         onRadioClick = { isRadioDialogOpen = true },
     ) {
         NavHost(
@@ -325,18 +323,14 @@ fun App(
             }
         }
 
-        currentTrackCombo?.also { combo ->
+        currentTrackCombo?.getViewState()?.also { state ->
             ModalCover(
-                trackCombo = combo,
+                state = state,
                 viewModel = queueViewModel,
                 isExpanded = isCoverExpanded,
                 onExpand = { isCoverExpanded = true },
                 onCollapse = { isCoverExpanded = false },
-                trackCallbacks = TrackCallbacks(
-                    appCallbacks = appCallbacks,
-                    combo = combo,
-                    context = context,
-                ),
+                trackCallbacks = TrackCallbacks(appCallbacks = appCallbacks, state = state),
             )
         }
     }

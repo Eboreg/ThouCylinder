@@ -18,7 +18,6 @@ import us.huseli.thoucylinder.compose.screens.imports.LastFmImport
 import us.huseli.thoucylinder.compose.screens.imports.SpotifyImport
 import us.huseli.thoucylinder.compose.utils.rememberToolbarScrollConnection
 import us.huseli.thoucylinder.stringResource
-import java.util.UUID
 
 enum class ImportBackend { SPOTIFY, LAST_FM }
 
@@ -27,7 +26,7 @@ fun ImportScreen(
     modifier: Modifier = Modifier,
     onGotoSettingsClick: () -> Unit,
     onGotoLibraryClick: () -> Unit,
-    onGotoAlbumClick: (UUID) -> Unit,
+    onGotoAlbumClick: (String) -> Unit,
 ) {
     var showToolbars by remember { mutableStateOf(true) }
     val nestedScrollConnection = rememberToolbarScrollConnection { showToolbars = it }
@@ -56,7 +55,7 @@ fun ImportScreen(
                 onGotoLibraryClick = onGotoLibraryClick,
                 onGotoAlbumClick = onGotoAlbumClick,
                 backendSelection = backendSelection,
-                nestedScrollConnection = nestedScrollConnection,
+                nestedScrollConnection = { nestedScrollConnection },
                 showToolbars = showToolbars,
             )
             ImportBackend.LAST_FM -> LastFmImport(
@@ -64,7 +63,7 @@ fun ImportScreen(
                 onGotoLibraryClick = onGotoLibraryClick,
                 onGotoAlbumClick = onGotoAlbumClick,
                 backendSelection = backendSelection,
-                nestedScrollConnection = nestedScrollConnection,
+                nestedScrollConnection = { nestedScrollConnection },
                 showToolbars = showToolbars,
             )
         }

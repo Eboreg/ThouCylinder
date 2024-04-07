@@ -13,7 +13,6 @@ import us.huseli.thoucylinder.Constants.PREF_ACTIVE_RADIO_ID
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.Radio
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,7 +28,7 @@ class RadioRepository @Inject constructor(database: Database, @ApplicationContex
     init {
         scope.launch {
             preferences.getString(PREF_ACTIVE_RADIO_ID, null)?.also {
-                _activeRadio.value = radioDao.getRadioCombo(UUID.fromString(it))
+                _activeRadio.value = radioDao.getRadioCombo(it)
             }
         }
     }
@@ -41,13 +40,13 @@ class RadioRepository @Inject constructor(database: Database, @ApplicationContex
     }
 
     suspend fun setActiveRadio(radio: Radio) {
-        preferences.edit().putString(PREF_ACTIVE_RADIO_ID, radio.id.toString()).apply()
+        preferences.edit().putString(PREF_ACTIVE_RADIO_ID, radio.id).apply()
         radioDao.clearRadios()
         radioDao.insertRadio(radio)
         _activeRadio.value = radioDao.getRadioCombo(radio.id)
     }
 
-    suspend fun updateRadio(radioId: UUID, spotifyTrackIds: List<String>, localTrackIds: Iterable<UUID>) {
+    suspend fun updateRadio(radioId: String, spotifyTrackIds: List<String>, localTrackIds: Iterable<String>) {
         radioDao.setRadioSpotifyTrackIds(radioId = radioId, spotifyTrackIds = spotifyTrackIds)
         radioDao.setLocalTrackIds(radioId, localTrackIds)
     }

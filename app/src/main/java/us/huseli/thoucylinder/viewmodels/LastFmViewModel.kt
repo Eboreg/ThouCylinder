@@ -3,16 +3,16 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.filterBySearchTerm
 import us.huseli.thoucylinder.dataclasses.lastFm.toMediaStoreImage
@@ -26,25 +26,25 @@ import kotlin.math.min
 @HiltViewModel
 class LastFmViewModel @Inject constructor(private val repos: Repositories) :
     AbstractImportViewModel<LastFmTopAlbumsResponse.Album>(repos) {
-    override val externalAlbums: Flow<List<LastFmTopAlbumsResponse.Album>> =
+    override val externalAlbums: Flow<ImmutableList<LastFmTopAlbumsResponse.Album>> =
         combine(repos.lastFm.topAlbums, searchTerm) { albums, term ->
-            albums.filterBySearchTerm(term).filter { !pastImportedAlbumIds.contains(it.mbid) }
+            albums.filterBySearchTerm(term).filter { !pastImportedAlbumIds.contains(it.mbid) }.toImmutableList()
         }
     override val hasNext: Flow<Boolean> =
         combine(externalAlbums, repos.lastFm.allTopAlbumsFetched, localOffset) { albums, allFetched, offset ->
             (!allFetched && albums.isNotEmpty()) || albums.size >= offset + 50
         }
-    override val offsetExternalAlbums: Flow<List<LastFmTopAlbumsResponse.Album>> =
+    override val offsetExternalAlbums: Flow<ImmutableList<LastFmTopAlbumsResponse.Album>> =
         combine(externalAlbums, localOffset) { albums, offset ->
-            albums.subList(min(offset, max(albums.lastIndex, 0)), min(offset + 50, albums.size))
+            albums.subList(min(offset, max(albums.lastIndex, 0)), min(offset + 50, albums.size)).toImmutableList()
         }
-    override val totalAlbumCount: Flow<Int> = externalAlbums.map { it.size }
     override val isAllSelected: Flow<Boolean> =
         combine(offsetExternalAlbums, selectedExternalAlbumIds) { userAlbums, selectedIds ->
             userAlbums.isNotEmpty() && selectedIds.containsAll(userAlbums.map { it.id })
         }
 
     val username: StateFlow<String?> = repos.lastFm.username
+    val totalAlbumCount: Flow<Int> = externalAlbums.map { it.size }
 
     init {
         launchOnIOThread {
@@ -84,12 +84,9 @@ class LastFmViewModel @Inject constructor(private val repos: Repositories) :
 
     override suspend fun fetchExternalAlbums(): Boolean = repos.lastFm.fetchNextTopAlbums()
 
-    override suspend fun updateArtists(artists: Iterable<Artist>) {
+    override suspend fun updateArtists(artists: Iterable<AbstractArtist>) {
         artists.forEach { artist ->
-            artist.musicBrainzId?.also { repos.artist.setArtistMusicBrainzId(artist.id, it) }
+            artist.musicBrainzId?.also { repos.artist.setArtistMusicBrainzId(artist.artistId, it) }
         }
     }
-
-    override suspend fun getThumbnail(externalAlbum: LastFmTopAlbumsResponse.Album) =
-        withContext(Dispatchers.IO) { repos.lastFm.getThumbnail(externalAlbum) }
 }

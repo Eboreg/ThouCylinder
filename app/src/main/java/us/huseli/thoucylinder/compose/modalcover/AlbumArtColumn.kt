@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 
 @Composable
-fun AlbumArtColumn(imageBitmap: ImageBitmap?) {
+fun AlbumArtColumn(imageBitmap: () -> ImageBitmap?) {
     val configuration = LocalConfiguration.current
     val thumbnailMaxHeight =
         if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 250.dp
@@ -21,7 +21,7 @@ fun AlbumArtColumn(imageBitmap: ImageBitmap?) {
 
     Thumbnail(
         modifier = Modifier.sizeIn(maxHeight = thumbnailMaxHeight),
-        image = imageBitmap,
+        imageBitmap = imageBitmap,
         shape = MaterialTheme.shapes.extraSmall,
         placeholderIcon = Icons.Sharp.MusicNote,
     )

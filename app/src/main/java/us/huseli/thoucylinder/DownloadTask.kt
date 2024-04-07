@@ -2,10 +2,7 @@ package us.huseli.thoucylinder
 
 import android.content.Context
 import androidx.annotation.StringRes
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anggrayudi.storage.file.extension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,8 +17,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -51,25 +47,24 @@ abstract class AbstractDownloadTask {
         get() = state.map { it == DownloadTaskState.RUNNING }
 }
 
-@Composable
-fun getDownloadProgress(downloadTask: AbstractDownloadTask?): Pair<Double?, Boolean> = Pair(
-    downloadTask?.downloadProgress?.collectAsStateWithLifecycle(0.0)?.value,
-    downloadTask?.isActive?.collectAsStateWithLifecycle(false)?.value ?: false,
-)
-
-@Composable
-fun getDownloadProgress(downloadTaskState: State<AbstractDownloadTask?>): Pair<Double?, Boolean> =
-    getDownloadProgress(downloadTask = downloadTaskState.value)
-
 class TrackDownloadTask(
     private val scope: CoroutineScope,
-    val trackCombo: AbstractTrackCombo,
+    val track: Track,
+    val trackArtists: List<AbstractArtistCredit>,
     private val directory: DocumentFile,
     private val repos: Repositories,
-    val albumCombo: AbstractAlbumCombo? = null,
+    val album: Album? = null,
+    val albumArtists: List<AbstractArtistCredit>? = null,
     private val onError: (Throwable) -> Unit = {},
     private val onFinish: (Track) -> Unit = {},
 ) : AbstractDownloadTask() {
+    data class ViewState(
+        val trackId: String,
+        val isActive: Boolean,
+        val status: DownloadStatus,
+        val progress: Float,
+    )
+
     private var job: Job? = null
     private val _state = MutableStateFlow(DownloadTaskState.CREATED)
     private val _downloadStatus = MutableStateFlow(DownloadStatus.WAITING)
@@ -77,7 +72,16 @@ class TrackDownloadTask(
 
     override val downloadProgress = _downloadProgress.asStateFlow()
     override val state = _state.asStateFlow()
-    val downloadStatus = _downloadStatus.asStateFlow()
+
+    val viewState: Flow<ViewState?> =
+        combine(isActive, _downloadStatus, _downloadProgress) { isActive, status, progress ->
+            ViewState(
+                trackId = track.trackId,
+                isActive = isActive,
+                status = status,
+                progress = progress.toFloat(),
+            )
+        }
 
     override val isActive: Flow<Boolean>
         get() = _state.map { it == DownloadTaskState.RUNNING || it == DownloadTaskState.CREATED }
@@ -117,14 +121,14 @@ class TrackDownloadTask(
     }
 
     private suspend fun run(context: Context): Track {
-        val youtubeMetadata = repos.youtube.getBestMetadata(trackCombo.track)
-            ?: throw Exception("Could not get Youtube metadata for ${trackCombo.track} (youtubeVideo=${trackCombo.track.youtubeVideo})")
-        val basename = trackCombo.track.generateBasename(
-            includeArtist = albumCombo == null,
-            artist = trackCombo.artists.joined(),
+        val youtubeMetadata = repos.youtube.getBestMetadata(track)
+            ?: throw Exception("Could not get Youtube metadata for $track (youtubeVideo=${track.youtubeVideo})")
+        val basename = track.generateBasename(
+            includeArtist = album == null,
+            artist = trackArtists.joined(),
         )
         val filename = "$basename.${youtubeMetadata.fileExtension}"
-        val tempFile = File(context.cacheDir, "${trackCombo.track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
+        val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
 
         setProgress(0.0)
         setStatus(DownloadStatus.DOWNLOADING)
@@ -136,9 +140,11 @@ class TrackDownloadTask(
 
         setStatus(DownloadStatus.TAGGING)
         repos.localMedia.tagTrack(
-            trackCombo = trackCombo,
+            track = track,
+            albumArtists = albumArtists,
             documentFile = DocumentFile.fromFile(tempFile),
-            albumArtists = albumCombo?.artists,
+            trackArtists = trackArtists,
+            album = album,
         )
         setProgress(0.8)
 
@@ -161,11 +167,11 @@ class TrackDownloadTask(
 
         setStatus(DownloadStatus.SAVING)
         val metadata = tempFile.extractTrackMetadata()
-        val downloadedTrack = trackCombo.track.copy(
+        val downloadedTrack = track.copy(
             isInLibrary = true,
-            albumId = albumCombo?.album?.albumId ?: trackCombo.track.albumId,
+            albumId = album?.albumId ?: track.albumId,
             metadata = metadata,
-            localUri = documentFile.uri,
+            localUri = documentFile.uri.toString(),
             durationMs = metadata?.durationMs,
         )
         repos.track.updateTrack(downloadedTrack)
@@ -190,9 +196,9 @@ class TrackDownloadTask(
     }
 
     override fun equals(other: Any?) =
-        other is TrackDownloadTask && other.trackCombo == trackCombo && other.state.value == state.value
+        other is TrackDownloadTask && other.track == track && other.state.value == state.value
 
-    override fun hashCode() = 31 * trackCombo.hashCode() + state.value.hashCode()
+    override fun hashCode() = 31 * track.hashCode() + state.value.hashCode()
 }
 
 class AlbumDownloadTask(
@@ -207,6 +213,20 @@ class AlbumDownloadTask(
     override val downloadProgress =
         combine(trackTasks.map { it.downloadProgress }) { it.average() }.distinctUntilChanged()
     override val state = _state.asStateFlow()
+
+    data class ViewState(
+        val albumId: String,
+        val isActive: Boolean,
+        val progress: Float,
+    )
+
+    val viewState: Flow<ViewState?> = combine(isActive, downloadProgress) { isActive, progress ->
+        ViewState(
+            albumId = album.albumId,
+            isActive = isActive,
+            progress = progress.toFloat(),
+        )
+    }
 
     init {
         scope.launch {

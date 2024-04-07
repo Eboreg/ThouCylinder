@@ -43,6 +43,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -59,7 +60,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -70,10 +70,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.distance
+import us.huseli.thoucylinder.Logger
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.track.TrackContextMenu
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.getAverageColor
 import us.huseli.thoucylinder.stringResource
@@ -85,8 +87,8 @@ import kotlin.time.DurationUnit
 @Suppress("AnimateAsStateLabel")
 @Composable
 fun BoxWithConstraintsScope.ModalCover(
-    trackCombo: QueueTrackCombo,
-    trackCallbacks: TrackCallbacks<*>,
+    state: Track.ViewState,
+    trackCallbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
     viewModel: QueueViewModel = hiltViewModel(),
     isExpanded: Boolean,
@@ -95,7 +97,6 @@ fun BoxWithConstraintsScope.ModalCover(
 ) {
     val baseBackgroundColor = BottomAppBarDefaults.containerColor
     val configuration = LocalConfiguration.current
-    val context = LocalContext.current
     val density = LocalDensity.current
     val dpAnimationSpec = tween<Dp>(150)
     val floatAnimationSpec = tween<Float>(150)
@@ -103,22 +104,23 @@ fun BoxWithConstraintsScope.ModalCover(
     val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
 
     var backgroundColor by remember { mutableStateOf(baseBackgroundColor) }
-    val currentTrackEndPosition by remember(trackCombo.track.trackId) {
-        mutableStateOf(trackCombo.track.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 })
+    val currentTrackEndPosition by remember(state.track.trackId) {
+        mutableStateOf(state.track.duration?.toLong(DurationUnit.MILLISECONDS)?.takeIf { it > 0 })
     }
-    val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+    var imageBitmap by remember(state.track.trackId) { mutableStateOf<ImageBitmap?>(null) }
     var isCollapsing by remember { mutableStateOf(false) }
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var isExpanding by remember { mutableStateOf(false) }
-    val nextImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+    var nextImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var nextTrackCombo by remember { mutableStateOf<QueueTrackCombo?>(null) }
-    val previousImageBitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+    var previousImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var previousTrackCombo by remember { mutableStateOf<QueueTrackCombo?>(null) }
 
     val canGotoNext by viewModel.canGotoNext.collectAsStateWithLifecycle()
     val canPlay by viewModel.canPlay.collectAsStateWithLifecycle(false)
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(false)
+    val currentProgress by viewModel.currentProgress.collectAsStateWithLifecycle(0f)
 
     val animatedBackgroundColor by animateColorAsState(backgroundColor)
     val backgroundColorDistance by remember(backgroundColor) {
@@ -181,25 +183,27 @@ fun BoxWithConstraintsScope.ModalCover(
         if (isExpanded) verticalSwipeState.snapTo("expanded")
     }
 
-    LaunchedEffect(trackCombo.queueTrackId) {
-        withContext(Dispatchers.IO) {
-            imageBitmap.value = trackCombo.getFullImageBitmap(context)
-        }
+    LaunchedEffect(state.track.trackId) {
+        horizontalSwipeState.snapTo("current")
     }
 
-    LaunchedEffect(trackCombo.queueTrackId) {
-        horizontalSwipeState.snapTo("current")
+    LaunchedEffect(state.track.image?.fullUri, state.albumArt) {
+        imageBitmap = viewModel.getTrackFullImage(state.track.image?.fullUri)
+            ?: viewModel.getAlbumFullImage(state.albumArt?.fullUri)
+        Logger.log("ModalCover", "imageBitmap=$imageBitmap")
+    }
+
+    LaunchedEffect(state.track.trackId) {
         nextTrackCombo = viewModel.getNextCombo()
         previousTrackCombo = viewModel.getPreviousCombo()
-        withContext(Dispatchers.IO) {
-            nextImageBitmap.value = nextTrackCombo?.getFullImageBitmap(context)
-            previousImageBitmap.value = previousTrackCombo?.getFullImageBitmap(context)
-        }
+
+        nextImageBitmap = nextTrackCombo?.let { viewModel.getTrackComboFullImage(it) }
+        previousImageBitmap = previousTrackCombo?.let { viewModel.getTrackComboFullImage(it) }
     }
 
-    LaunchedEffect(imageBitmap.value) {
+    LaunchedEffect(imageBitmap) {
         withContext(Dispatchers.IO) {
-            backgroundColor = imageBitmap.value
+            backgroundColor = imageBitmap
                 ?.getAverageColor()
                 ?.copy(alpha = 0.3f)
                 ?.compositeOver(baseBackgroundColor)
@@ -258,12 +262,14 @@ fun BoxWithConstraintsScope.ModalCover(
                         content = { Icon(Icons.Sharp.MoreVert, null) },
                     )
                     TrackContextMenu(
-                        isDownloadable = trackCombo.track.isDownloadable,
-                        isInLibrary = trackCombo.track.isInLibrary,
+                        isDownloadable = state.track.isDownloadable,
+                        isInLibrary = state.track.isInLibrary,
                         callbacks = trackCallbacks,
                         isShown = isContextMenuShown,
                         onDismissRequest = { isContextMenuShown = false },
-                        trackArtists = trackCombo.artists,
+                        trackArtists = state.trackArtists,
+                        youtubeWebUrl = state.track.youtubeWebUrl,
+                        spotifyWebUrl = state.track.spotifyWebUrl,
                     )
                 }
             }
@@ -309,10 +315,9 @@ fun BoxWithConstraintsScope.ModalCover(
                         previousTrackCombo?.also { combo ->
                             AlbumArtAndTitlesColumn(
                                 modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
-                                imageBitmap = previousImageBitmap.value,
+                                imageBitmap = { previousImageBitmap },
                                 title = combo.track.title,
                                 artist = combo.artists.joined(),
-                                animationSpec = dpAnimationSpec,
                                 offsetX = 0,
                                 contentAlpha = expandedContentAlpha,
                                 isExpanded = true,
@@ -323,10 +328,9 @@ fun BoxWithConstraintsScope.ModalCover(
 
                     AlbumArtAndTitlesColumn(
                         modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
-                        imageBitmap = imageBitmap.value,
-                        title = trackCombo.track.title,
-                        artist = trackCombo.artists.joined(),
-                        animationSpec = dpAnimationSpec,
+                        imageBitmap = { imageBitmap },
+                        title = state.track.title,
+                        artist = state.trackArtists.joined(),
                         offsetX = if (previousTrackCombo != null && !isLandscape && isExpanded && !isExpanding)
                             maxWidthPx.toInt() else 0,
                         contentAlpha = expandedContentAlpha,
@@ -339,10 +343,9 @@ fun BoxWithConstraintsScope.ModalCover(
                         nextTrackCombo?.also { combo ->
                             AlbumArtAndTitlesColumn(
                                 modifier = Modifier.heightIn(min = this@ModalCover.maxHeight * 0.52f),
-                                imageBitmap = nextImageBitmap.value,
+                                imageBitmap = { nextImageBitmap },
                                 title = combo.track.title,
                                 artist = combo.artists.joined(),
-                                animationSpec = dpAnimationSpec,
                                 offsetX = maxWidthPx.toInt() * if (previousTrackCombo != null) 2 else 1,
                                 contentAlpha = expandedContentAlpha,
                                 isExpanded = true,
@@ -366,8 +369,8 @@ fun BoxWithConstraintsScope.ModalCover(
                             TitlesColumn(
                                 modifier = Modifier.weight(1f),
                                 isExpanded = false,
-                                title = trackCombo.track.title,
-                                artist = trackCombo.artists.joined(),
+                                title = state.track.title,
+                                artist = state.trackArtists.joined(),
                                 alpha = collapsedContentAlpha,
                             )
                             // Buttons:
@@ -424,8 +427,8 @@ fun BoxWithConstraintsScope.ModalCover(
                             if (isLandscape) {
                                 TitlesColumn(
                                     isExpanded = true,
-                                    title = trackCombo.track.title,
-                                    artist = trackCombo.artists.joined(),
+                                    title = state.track.title,
+                                    artist = state.trackArtists.joined(),
                                     alpha = expandedContentAlpha,
                                 )
                             }
@@ -447,7 +450,9 @@ fun BoxWithConstraintsScope.ModalCover(
                     }
                 }
             }
-            if (!isExpanded && !isCollapsing) CollapsedProgressBar(viewModel = viewModel)
+            if (!isExpanded && !isCollapsing) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), progress = { currentProgress })
+            }
         }
     }
 }

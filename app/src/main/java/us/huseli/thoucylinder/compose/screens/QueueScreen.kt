@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -53,7 +54,7 @@ fun QueueScreen(
     val context = LocalContext.current
     val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle(emptyList())
     val queue by viewModel.queue.collectAsStateWithLifecycle()
-    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
+    val trackDownloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
     val playerCurrentCombo by viewModel.currentCombo.collectAsStateWithLifecycle(null)
     val radioPojo by viewModel.radioPojo.collectAsStateWithLifecycle(null)
 
@@ -123,10 +124,10 @@ fun QueueScreen(
                 contentPadding = PaddingValues(10.dp),
             ) {
                 itemsIndexed(queue, key = { _, combo -> combo.queueTrackId }) { comboIdx, combo ->
-                    val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+                    var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
 
                     LaunchedEffect(combo.track.image, combo.album?.albumArt) {
-                        thumbnail.value = viewModel.getTrackThumbnail(combo, context)
+                        thumbnail = viewModel.getTrackComboThumbnail(combo)
                         viewModel.ensureTrackMetadata(combo.track)
                     }
 
@@ -142,12 +143,12 @@ fun QueueScreen(
                             combo = combo,
                             showArtist = true,
                             showAlbum = false,
-                            thumbnail = thumbnail.value,
+                            thumbnail = { thumbnail },
                             isSelected = isSelected,
+                            downloadState = trackDownloadStates.find { it.trackId == combo.track.trackId },
                             callbacks = TrackCallbacks(
-                                combo = combo,
+                                state = combo.getViewState(),
                                 appCallbacks = appCallbacks,
-                                context = context,
                                 onTrackClick = {
                                     if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.queueTrackId)
                                     else viewModel.skipTo(comboIdx)
@@ -166,7 +167,6 @@ fun QueueScreen(
                                     onClick = { viewModel.removeFromQueue(combo.queueTrackId) },
                                 )
                             },
-                            downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == combo.track.trackId },
                             containerColor = containerColor,
                             reorderableState = reorderableState,
                         )

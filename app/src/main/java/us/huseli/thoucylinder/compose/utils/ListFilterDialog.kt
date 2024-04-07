@@ -17,7 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
@@ -37,14 +37,14 @@ import us.huseli.thoucylinder.umlautify
 @Composable
 fun ListFilterDialog(
     modifier: Modifier = Modifier,
-    selectedTagPojos: List<TagPojo>,
-    tagPojos: List<TagPojo>? = null,
+    selectedTagPojos: ImmutableList<TagPojo>,
+    tagPojos: ImmutableList<TagPojo>? = null,
     availabilityFilter: AvailabilityFilter? = null,
     onCancelClick: () -> Unit,
     onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},
     onTagsChange: (List<TagPojo>) -> Unit = {},
 ) {
-    var localSelectedTagPojos by rememberSaveable { mutableStateOf(selectedTagPojos) }
+    var localSelectedTagPojos by rememberSaveable { mutableStateOf(selectedTagPojos.toList()) }
     var isTagSectionExpanded by rememberSaveable { mutableStateOf(true) }
     var localAvailabilityFilter by rememberSaveable { mutableStateOf(availabilityFilter) }
 
@@ -52,7 +52,7 @@ fun ListFilterDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancelClick,
-        confirmButton = { TextButton(onClick = onCancelClick, content = { Text(stringResource(R.string.close)) }) },
+        confirmButton = { CancelButton(onClick = onCancelClick, content = { Text(stringResource(R.string.close)) }) },
         modifier = modifier.padding(10.dp),
         title = { Text(stringResource(R.string.filters)) },
         text = {

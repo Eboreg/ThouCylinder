@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.combos
 
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
@@ -9,10 +10,7 @@ import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.youtube.stripTitleCommons
 import kotlin.math.max
 
-data class YoutubePlaylistCombo(
-    val playlist: YoutubePlaylist,
-    val videos: List<YoutubeVideo>,
-) {
+data class YoutubePlaylistCombo(val playlist: YoutubePlaylist, val videos: ImmutableList<YoutubeVideo>) {
     data class AlbumMatch(
         val distance: Double,
         val albumCombo: AlbumWithTracksCombo,

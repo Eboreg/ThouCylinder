@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.toImmutableList
 import org.burnoutcrew.reorderable.ReorderableLazyListState
 import org.burnoutcrew.reorderable.detectReorder
 import us.huseli.retaintheme.extensions.sensibleFormat
@@ -34,26 +35,23 @@ import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.getDownloadProgress
 import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 inline fun <T : AbstractTrackCombo> TrackListRow(
     combo: T,
-    thumbnail: ImageBitmap?,
+    noinline thumbnail: () -> ImageBitmap?,
     showArtist: Boolean,
     showAlbum: Boolean,
-    callbacks: TrackCallbacks<*>,
+    callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
-    downloadTask: TrackDownloadTask? = null,
+    downloadState: TrackDownloadTask.ViewState? = null,
     crossinline extraContextMenuItems: @Composable () -> Unit = {},
 ) {
-    val (downloadProgress, downloadIsActive) = getDownloadProgress(downloadTask)
-
     callbacks.onEach?.invoke()
 
     Card(
@@ -69,7 +67,7 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
-                image = thumbnail,
+                imageBitmap = thumbnail,
                 shape = MaterialTheme.shapes.extraSmall,
                 placeholderIcon = Icons.Sharp.MusicNote,
                 borderWidth = if (isSelected) null else 1.dp,
@@ -81,7 +79,10 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                     modifier = Modifier.padding(top = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween) {
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                    ) {
                         val albumString = if (showAlbum) combo.album?.title else null
                         val artistString = if (showArtist) combo.artists.joined() else null
                         val secondRow = listOfNotNull(artistString, albumString, combo.year?.toString())
@@ -90,7 +91,7 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
 
                         Text(
                             text = combo.track.title.umlautify(),
-                            maxLines = if (artistString == null) 2 else 1,
+                            maxLines = if (secondRow == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
                         )
@@ -117,7 +118,9 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                         callbacks = callbacks,
                         extraItems = extraContextMenuItems,
                         isInLibrary = combo.track.isInLibrary,
-                        trackArtists = combo.artists,
+                        trackArtists = combo.artists.toImmutableList(),
+                        youtubeWebUrl = combo.track.youtubeWebUrl,
+                        spotifyWebUrl = combo.track.spotifyWebUrl,
                     )
 
                     if (reorderableState != null) {
@@ -130,9 +133,9 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                 }
 
                 Row(modifier = Modifier.height(2.dp).fillMaxWidth()) {
-                    if (downloadIsActive) {
+                    if (downloadState?.isActive == true) {
                         LinearProgressIndicator(
-                            progress = { downloadProgress?.toFloat() ?: 0f },
+                            progress = { downloadState.progress },
                             modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }

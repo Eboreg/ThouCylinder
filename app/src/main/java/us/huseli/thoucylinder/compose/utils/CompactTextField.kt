@@ -38,7 +38,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 
 @Composable
-inline fun CompactTextField(
+fun CompactTextField(
     value: TextFieldValue,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -49,10 +49,10 @@ inline fun CompactTextField(
     showClearIcon: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     focusRequester: FocusRequester = remember { FocusRequester() },
-    crossinline trailingIcon: @Composable (TextFieldValue) -> Unit = {},
-    crossinline onValueChange: (TextFieldValue) -> Unit = {},
-    crossinline onImeAction: (TextFieldValue) -> Unit = {},
-    crossinline onFocusChange: (FocusState) -> Unit = {},
+    trailingIcon: @Composable (TextFieldValue) -> Unit = {},
+    onValueChange: (TextFieldValue) -> Unit = {},
+    onImeAction: (TextFieldValue) -> Unit = {},
+    onFocusChange: (FocusState) -> Unit = {},
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -121,7 +121,7 @@ inline fun CompactTextField(
 }
 
 @Composable
-inline fun CompactTextField(
+fun CompactTextField(
     value: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -132,10 +132,10 @@ inline fun CompactTextField(
     showClearIcon: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     focusRequester: FocusRequester = remember { FocusRequester() },
-    crossinline trailingIcon: @Composable (String) -> Unit = {},
-    crossinline onChange: (String) -> Unit = {},
-    crossinline onImeAction: (String) -> Unit = {},
-    crossinline onFocusChanged: (FocusState) -> Unit = {},
+    trailingIcon: @Composable (String) -> Unit = {},
+    onValueChange: (String) -> Unit = {},
+    onImeAction: (String) -> Unit = {},
+    onFocusChanged: (FocusState) -> Unit = {},
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),
 ) {
     CompactTextField(
@@ -150,7 +150,7 @@ inline fun CompactTextField(
         interactionSource = interactionSource,
         focusRequester = focusRequester,
         trailingIcon = { trailingIcon(it.text) },
-        onValueChange = { onChange(it.text) },
+        onValueChange = { onValueChange(it.text) },
         onImeAction = { onImeAction(it.text) },
         onFocusChange = onFocusChanged,
         keyboardOptions = keyboardOptions,
@@ -158,7 +158,7 @@ inline fun CompactTextField(
 }
 
 @Composable
-inline fun CompactSearchTextField(
+fun CompactSearchTextField(
     value: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -166,13 +166,13 @@ inline fun CompactSearchTextField(
     color: Color = MaterialTheme.colorScheme.onSurface,
     textStyle: TextStyle = MaterialTheme.typography.labelLarge.copy(color = color),
     placeholderText: String? = null,
-    crossinline onFocusChanged: (FocusState) -> Unit = {},
-    crossinline onChange: (String) -> Unit = {},
-    crossinline onSearch: (String) -> Unit = {},
+    onFocusChanged: (FocusState) -> Unit = {},
+    onChange: (String) -> Unit = {},
+    onSearch: (String) -> Unit = {},
 ) {
     CompactTextField(
         value = value,
-        onChange = onChange,
+        onValueChange = onChange,
         onImeAction = onSearch,
         continuousUpdate = continuousSearch,
         color = color,

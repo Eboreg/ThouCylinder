@@ -1,6 +1,8 @@
 package us.huseli.thoucylinder.repositories
 
 import androidx.room.withTransaction
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
@@ -8,7 +10,6 @@ import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,12 +19,11 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
     private val playlistDao = database.playlistDao()
     private val trackDao = database.trackDao()
 
-    val playlists = playlistDao.flowPlaylists()
-    val playlistsPojos = playlistDao.flowPojos()
+    val playlistsPojos = playlistDao.flowPojos().map { it.toImmutableList() }
 
     suspend fun addSelectionToPlaylist(
         selection: Selection,
-        playlistId: UUID,
+        playlistId: String,
         includeDuplicates: Boolean = true,
     ): Int = database.withTransaction {
         val selectionTracks = listSelectionTracks(selection)
@@ -56,11 +56,11 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
 
     suspend fun deletePlaylist(playlist: Playlist) = playlistDao.deletePlaylist(playlist)
 
-    fun flowPlaylist(playlistId: UUID) = playlistDao.flowPlaylist(playlistId)
+    fun flowPlaylist(playlistId: String) = playlistDao.flowPlaylist(playlistId)
 
-    fun flowPlaylistTracks(playlistId: UUID) = playlistDao.flowTrackCombosByPlaylistId(playlistId)
+    fun flowPlaylistTracks(playlistId: String) = playlistDao.flowTrackCombosByPlaylistId(playlistId)
 
-    suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection): Int {
+    suspend fun getDuplicatePlaylistTrackCount(playlistId: String, selection: Selection): Int {
         val selectionTracks = listSelectionTracks(selection)
         val currentTracks = playlistDao.listTracks(playlistId)
         return selectionTracks.intersect(currentTracks.toSet()).size
@@ -72,15 +72,15 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
         if (playlistTracks.isNotEmpty()) playlistDao.insertPlaylistTracks(*playlistTracks.toTypedArray())
     }
 
-    suspend fun listPlaylistAlbums(playlistId: UUID): List<Album> = playlistDao.listAlbums(playlistId)
+    suspend fun listPlaylistAlbums(playlistId: String): List<Album> = playlistDao.listAlbums(playlistId)
 
-    suspend fun listPlaylistTrackCombos(playlistId: UUID): List<PlaylistTrackCombo> =
+    suspend fun listPlaylistTrackCombos(playlistId: String): List<PlaylistTrackCombo> =
         playlistDao.listTrackCombosByPlaylistId(playlistId)
 
-    suspend fun listPlaylistTrackCombosById(ids: Collection<UUID>) =
+    suspend fun listPlaylistTrackCombosById(ids: Collection<String>) =
         if (ids.isNotEmpty()) playlistDao.listTrackCombosByPlaylistTrackId(*ids.toTypedArray()) else emptyList()
 
-    suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack> = playlistDao.listPlaylistTracks(playlistId)
+    suspend fun listPlaylistTracks(playlistId: String): List<PlaylistTrack> = playlistDao.listPlaylistTracks(playlistId)
 
     suspend fun listSelectionTracks(selection: Selection): Set<Track> = (
         selection.tracks +
@@ -88,9 +88,9 @@ class PlaylistRepository @Inject constructor(private val database: Database) {
             selection.albumsWithTracks.flatMap { it.trackCombos.map { trackCombo -> trackCombo.track } }
         ).toSet()
 
-    suspend fun movePlaylistTrack(playlistId: UUID, from: Int, to: Int) = playlistDao.moveTrack(playlistId, from, to)
+    suspend fun movePlaylistTrack(playlistId: String, from: Int, to: Int) = playlistDao.moveTrack(playlistId, from, to)
 
-    suspend fun removePlaylistTracks(playlistId: UUID, ids: Collection<UUID>) = database.withTransaction {
+    suspend fun removePlaylistTracks(playlistId: String, ids: Collection<String>) = database.withTransaction {
         if (ids.isNotEmpty()) {
             playlistDao.deletePlaylistTracks(*ids.toTypedArray())
             playlistDao.touchPlaylist(playlistId)

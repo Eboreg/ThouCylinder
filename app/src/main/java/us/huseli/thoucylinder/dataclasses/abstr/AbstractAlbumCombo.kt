@@ -5,6 +5,7 @@ import androidx.annotation.WorkerThread
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.file.CreateMode
 import com.anggrayudi.storage.file.makeFolder
+import kotlinx.collections.immutable.toImmutableList
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.R
@@ -80,6 +81,14 @@ abstract class AbstractAlbumCombo {
 
         return distances.min()
     }
+
+    fun getViewState() = Album.ViewState(
+        album = album,
+        trackCount = trackCount,
+        yearString = yearString,
+        artists = artists.toImmutableList(),
+        isPartiallyDownloaded = isPartiallyDownloaded,
+    )
 
     private fun getSubDirs(context: Context): List<String> = listOf(
         artists.joined()?.sanitizeFilename() ?: context.getString(R.string.unknown_artist),

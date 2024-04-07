@@ -1,31 +1,29 @@
 package us.huseli.thoucylinder.viewmodels
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.enums.ArtistSortParameter
 import us.huseli.thoucylinder.enums.SortOrder
-import us.huseli.thoucylinder.asThumbnailImageBitmap
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.getBitmap
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
-class ArtistListViewModel @Inject constructor(private val repos: Repositories) : ViewModel() {
+class ArtistListViewModel @Inject constructor(repos: Repositories) : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     private val _onlyShowArtistsWithAlbums = MutableStateFlow(false)
     private val _searchTerm = MutableStateFlow("")
     private val _sortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _sortParameter = MutableStateFlow(ArtistSortParameter.NAME)
 
-    val artistCombos = combine(
+    val artistCombos: Flow<ImmutableList<ArtistCombo>> = combine(
         repos.artist.artistCombos,
         _searchTerm,
         _sortParameter,
@@ -43,16 +41,14 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
                 }
             }
             .let { if (sortOrder == SortOrder.DESCENDING) it.reversed() else it }
+            .toImmutableList()
     }.onEach { _isLoading.value = false }
+
     val isLoading = _isLoading.asStateFlow()
     val onlyShowArtistsWithAlbums = _onlyShowArtistsWithAlbums.asStateFlow()
     val searchTerm = _searchTerm.asStateFlow()
     val sortOrder = _sortOrder.asStateFlow()
     val sortParameter = _sortParameter.asStateFlow()
-
-    suspend fun getArtistImage(combo: ArtistCombo, context: Context) = withContext(Dispatchers.IO) {
-        repos.artist.artistImageUriCache.getOrNull(combo)?.getBitmap(context)?.asThumbnailImageBitmap(context)
-    }
 
     fun setOnlyShowArtistsWithAlbums(value: Boolean) {
         _onlyShowArtistsWithAlbums.value = value

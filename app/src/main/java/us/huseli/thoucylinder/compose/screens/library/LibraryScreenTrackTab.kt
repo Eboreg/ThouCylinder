@@ -18,12 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import kotlinx.collections.immutable.toImmutableList
-import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
 import us.huseli.thoucylinder.compose.ListType
@@ -33,7 +32,10 @@ import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
@@ -41,7 +43,6 @@ import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 fun LibraryScreenTrackTab(
     trackCombos: LazyPagingItems<TrackCombo>,
     isImporting: Boolean,
-    viewModel: LibraryViewModel,
     appCallbacks: AppCallbacks,
     displayType: DisplayType,
     gridState: LazyGridState,
@@ -49,36 +50,37 @@ fun LibraryScreenTrackTab(
     showToolbars: Boolean,
     modifier: Modifier = Modifier,
     listModifier: Modifier = Modifier,
+    viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+
+    val availabilityFilter by viewModel.availabilityFilter.collectAsStateWithLifecycle()
+    val downloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
     val isLoadingTracks by viewModel.isLoadingTracks.collectAsStateWithLifecycle()
     val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle(null)
     val searchTerm by viewModel.trackSearchTerm.collectAsStateWithLifecycle()
+    val selectedTagPojos by viewModel.selectedTrackTagPojos.collectAsStateWithLifecycle()
     val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
     val sortOrder by viewModel.trackSortOrder.collectAsStateWithLifecycle()
     val sortParameter by viewModel.trackSortParameter.collectAsStateWithLifecycle()
-    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
     val tagPojos by viewModel.trackTagPojos.collectAsStateWithLifecycle(emptyList())
-    val selectedTagPojos by viewModel.selectedTrackTagPojos.collectAsStateWithLifecycle()
-    val availabilityFilter by viewModel.availabilityFilter.collectAsStateWithLifecycle()
 
     var latestSelectedIndex by rememberSaveable(selectedTrackIds) { mutableStateOf<Int?>(null) }
 
     val trackCallbacks = remember {
-        { index: Int, combo: TrackCombo ->
+        { index: Int, state: Track.ViewState ->
             TrackCallbacks(
-                combo = combo,
+                state = state,
                 appCallbacks = appCallbacks,
-                context = context,
                 onTrackClick = {
-                    if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.track.trackId)
-                    else if (combo.track.isPlayable) viewModel.playTrackCombo(combo)
+                    if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.track.trackId)
+                    else if (state.track.isPlayable) viewModel.playTrack(state)
                 },
-                onEnqueueClick = if (combo.track.isPlayable) {
-                    { viewModel.enqueueTrackCombo(combo, context) }
+                onEnqueueClick = if (state.track.isPlayable) {
+                    { viewModel.enqueueTrack(state, context) }
                 } else null,
                 onLongClick = {
-                    if (selectedTrackIds.isEmpty()) viewModel.toggleTrackSelected(combo.track.trackId)
+                    if (selectedTrackIds.isEmpty()) viewModel.toggleTrackSelected(state.track.trackId)
                     else viewModel.selectTracksBetweenIndices(
                         fromIndex = latestSelectedIndex,
                         toIndex = index,
@@ -86,7 +88,7 @@ fun LibraryScreenTrackTab(
                     )
                 },
                 onEach = {
-                    if (combo.track.trackId == latestSelectedTrackId)
+                    if (state.track.trackId == latestSelectedTrackId)
                         latestSelectedIndex = index
                 },
             )
@@ -140,26 +142,26 @@ fun LibraryScreenTrackTab(
             DisplayType.LIST -> TrackList(
                 trackCombos = trackCombos,
                 selectedTrackIds = selectedTrackIds.toImmutableList(),
-                viewModel = viewModel,
                 listState = listState,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
-                trackDownloadTasks = trackDownloadTasks.toImmutableList(),
                 onEmpty = onEmpty,
                 progressIndicatorText = progressIndicatorText,
                 modifier = listModifier,
+                downloadStates = downloadStates,
+                ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
             )
             DisplayType.GRID -> TrackGrid(
                 trackCombos = trackCombos,
-                viewModel = viewModel,
                 gridState = gridState,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
                 selectedTrackIds = selectedTrackIds.toImmutableList(),
-                trackDownloadTasks = trackDownloadTasks.toImmutableList(),
                 onEmpty = onEmpty,
                 progressIndicatorText = progressIndicatorText,
                 modifier = listModifier,
+                downloadStates = downloadStates,
+                ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
             )
         }
     }

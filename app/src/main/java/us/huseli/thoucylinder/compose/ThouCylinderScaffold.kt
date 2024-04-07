@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,14 +13,9 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.compose.ResponsiveScaffold
@@ -41,10 +35,8 @@ fun ThouCylinderScaffold(
     modifier: Modifier = Modifier,
     activeMenuItemId: MenuItemId?,
     onNavigate: (route: String) -> Unit,
-    onInnerPaddingChange: (PaddingValues) -> Unit,
-    onContentAreaSizeChange: (DpSize) -> Unit,
     onRadioClick: () -> Unit,
-    content: @Composable BoxWithConstraintsScope.() -> Unit,
+    content: @Composable (BoxWithConstraintsScope.() -> Unit),
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -99,21 +91,10 @@ fun ThouCylinderScaffold(
             },
             snackbarHost = { SnackbarHosts() },
         ) { innerPadding ->
-            LaunchedEffect(innerPadding) {
-                onInnerPaddingChange(innerPadding)
-            }
-
-            BoxWithConstraints(modifier = modifier.fillMaxSize().padding(innerPadding)) {
-                val contentAreaSize by remember(this.maxWidth, this.maxHeight) {
-                    mutableStateOf(DpSize(this.maxWidth, this.maxHeight))
-                }
-
-                LaunchedEffect(contentAreaSize) {
-                    onContentAreaSizeChange(contentAreaSize)
-                }
-
-                content()
-            }
+            BoxWithConstraints(
+                modifier = modifier.fillMaxSize().padding(innerPadding),
+                content = content,
+            )
         }
     }
 }

@@ -4,47 +4,45 @@ import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AlbumViewModel @Inject constructor(
     private val repos: Repositories,
     savedStateHandle: SavedStateHandle,
-    @ApplicationContext context: Context,
 ) : AbstractTrackListViewModel("AlbumViewModel", repos) {
-    private val _albumId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_ALBUM)!!)
+    private val _albumId: String = savedStateHandle.get<String>(NAV_ARG_ALBUM)!!
     private val _albumCombo = MutableStateFlow<AlbumWithTracksCombo?>(null)
     private val _albumNotFound = MutableStateFlow(false)
     private val _importProgress = MutableStateFlow<ProgressData?>(null)
 
     val albumArt: Flow<ImageBitmap?> =
-        _albumCombo.map { it?.album?.albumArt?.getFullImageBitmap(context) }.distinctUntilChanged()
-    val albumDownloadTask: Flow<AlbumDownloadTask?> = repos.youtube.albumDownloadTasks
-        .map { tasks -> tasks.find { it.album.albumId == _albumId } }
-        .distinctUntilChanged()
+        _albumCombo.map { combo -> combo?.album?.let { repos.album.getFullImage(it) } }.distinctUntilChanged()
     val albumCombo = _albumCombo.asStateFlow()
-    override val trackDownloadTasks = repos.download.tasks
-        .map { tasks -> tasks.filter { it.trackCombo.track.albumId == _albumId } }
-        .distinctUntilChanged()
     val albumNotFound = _albumNotFound.asStateFlow()
+    val downloadState: Flow<AlbumDownloadTask.ViewState?> = repos.youtube.albumDownloadTasks
+        .mapNotNull { tasks -> tasks.find { it.album.albumId == _albumId } }
+        .flatMapMerge { it.viewState }
     val importProgress = _importProgress.asStateFlow()
 
     init {

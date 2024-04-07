@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.database
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -60,9 +59,8 @@ import java.util.concurrent.Executors
         ArtistCombo::class,
     ],
     exportSchema = false,
-    version = 99,
+    version = 101,
 )
-@TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
     abstract fun artistDao(): ArtistDao
     abstract fun trackDao(): TrackDao

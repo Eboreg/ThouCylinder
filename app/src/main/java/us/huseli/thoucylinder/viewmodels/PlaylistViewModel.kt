@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,9 +14,7 @@ import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.launchOnIOThread
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,7 +24,7 @@ class PlaylistViewModel @Inject constructor(
 ) : AbstractTrackListViewModel("PlaylistViewModel", repos) {
     private val _trackCombos = MutableStateFlow<List<PlaylistTrackCombo>>(emptyList())
 
-    val playlistId: UUID = UUID.fromString(savedStateHandle.get<String>(NAV_ARG_PLAYLIST)!!)
+    val playlistId: String = savedStateHandle.get<String>(NAV_ARG_PLAYLIST)!!
     val playlist = repos.playlist.flowPlaylist(playlistId)
     val trackCombos = _trackCombos.asStateFlow()
 
@@ -47,15 +46,10 @@ class PlaylistViewModel @Inject constructor(
 
     fun playPlaylist(startAt: PlaylistTrackCombo? = null) = playPlaylist(playlistId, startAt?.track?.trackId)
 
-    fun removeTrackCombos(ids: List<UUID>) = launchOnIOThread {
+    fun removeTrackCombos(ids: List<String>) = launchOnIOThread {
         repos.playlist.removePlaylistTracks(playlistId, ids)
         unselectTracks(ids)
     }
-
-    override suspend fun listSelectedTrackCombos(): List<PlaylistTrackCombo> =
-        repos.playlist.listPlaylistTrackCombosById(selectedTrackIds.value)
-
-    override suspend fun listSelectedTracks(): List<Track> = listSelectedTrackCombos().map { it.track }
 
     override fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): TrackSelectionCallbacks {
         return super.getTrackSelectionCallbacks(appCallbacks, context).copy(
@@ -67,4 +61,9 @@ class PlaylistViewModel @Inject constructor(
             }
         )
     }
+
+    override suspend fun listSelectedTrackCombos() =
+        repos.playlist.listPlaylistTrackCombosById(selectedTrackIds.value).toImmutableList()
+
+    override suspend fun listSelectedTracks() = listSelectedTrackCombos().map { it.track }.toImmutableList()
 }

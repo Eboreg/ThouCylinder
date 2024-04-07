@@ -27,7 +27,7 @@ import us.huseli.thoucylinder.umlautify
 
 @Composable
 fun ImportableAlbumRow(
-    imageBitmap: ImageBitmap?,
+    imageBitmap: () -> ImageBitmap?,
     isImported: Boolean,
     isNotFound: Boolean,
     albumTitle: String,
@@ -36,7 +36,7 @@ fun ImportableAlbumRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Thumbnail(
-            image = imageBitmap,
+            imageBitmap = imageBitmap,
             shape = MaterialTheme.shapes.extraSmall,
             placeholderIcon = when {
                 isImported -> Icons.Sharp.CheckCircle

@@ -12,9 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.persistentListOf
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListSettingsRow
@@ -27,14 +28,12 @@ import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable
 fun LibraryScreenPlaylistTab(
-    viewModel: LibraryViewModel,
     appCallbacks: AppCallbacks,
     showToolbars: Boolean,
     modifier: Modifier = Modifier,
+    viewModel: LibraryViewModel = hiltViewModel(),
     listModifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-
     CollapsibleToolbar(show = showToolbars) {
         ListSettingsRow(
             displayType = DisplayType.LIST,
@@ -46,7 +45,7 @@ fun LibraryScreenPlaylistTab(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+        val playlists by viewModel.playlists.collectAsStateWithLifecycle(persistentListOf())
         val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
 
         PlaylistList(
@@ -55,7 +54,6 @@ fun LibraryScreenPlaylistTab(
             onPlaylistClick = { appCallbacks.onPlaylistClick(it.playlistId) },
             onPlaylistPlayClick = { viewModel.playPlaylist(it.playlistId) },
             isLoading = isLoadingPlaylists,
-            getImage = { viewModel.getPlaylistImage(it, context) },
         )
 
         FloatingActionButton(

@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.replaceNullPadding
-import us.huseli.retaintheme.extensions.slice
 import us.huseli.thoucylinder.AbstractSpotifyOAuth2
 import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.MutexCache
@@ -29,7 +28,8 @@ import us.huseli.thoucylinder.SpotifyOAuth2PKCE
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -51,7 +51,6 @@ import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getNext
 import java.net.URLEncoder
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -109,7 +108,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
 
                     if (lastMinuteRequestDistances.size >= REQUEST_LIMIT_PER_MINUTE) {
                         val delayMillis = 60_000L - lastMinuteRequestDistances
-                            .slice(0, lastMinuteRequestDistances.size - REQUEST_LIMIT_PER_MINUTE)
+                            .take(lastMinuteRequestDistances.size - REQUEST_LIMIT_PER_MINUTE)
                             .last()
 
                         delay(delayMillis)
@@ -194,7 +193,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             ?.fromJson<SpotifyArtistsResponse>()
             ?.artists
             ?.sortedByDescending { it.popularity }
-            ?.slice(0, limit)
+            ?.take(limit)
 
     suspend fun getSpotifyAlbums(albumIds: List<String>): List<SpotifyAlbum>? {
         val job = RequestJob(
@@ -207,8 +206,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         return apiResponseCache.getOrNull(job)?.fromJson<SpotifyAlbumsResponse>()?.albums
     }
 
-    suspend fun getThumbnail(externalAlbum: SpotifyAlbum) =
-        externalAlbum.images.toMediaStoreImage()?.getThumbnailImageBitmap(context)
+    suspend fun getThumbnail(externalAlbum: SpotifyAlbum) = externalAlbum.getThumbnailImageBitmap(context)
 
     suspend fun getTrackRecommendationsByAlbumCombo(
         albumCombo: AlbumWithTracksCombo,
@@ -240,7 +238,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
     suspend fun getTrackRecommendationsByTrack(
         track: Track,
         album: Album? = null,
-        artists: List<Artist> = emptyList(),
+        artists: List<AbstractArtist> = emptyList(),
         limit: Int,
     ): SpotifyTrackRecommendations? {
         val spotifyId = track.spotifyId ?: matchTrack(track, album, artists)?.id
@@ -258,28 +256,28 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
 
     suspend fun searchAlbumArt(
         combo: AbstractAlbumCombo,
-        getArtist: suspend (BaseArtist) -> Artist,
+        getArtist: suspend (UnsavedArtist) -> Artist,
     ): List<MediaStoreImage> = combo.album.spotifyImage?.let { image -> listOf(image) }
         ?: searchAlbums(combo)
             ?.albums
             ?.items
-            ?.map { it.toAlbumCombo(getArtist = getArtist) }
+            ?.map { it.toAlbumCombo(getArtist = getArtist, isLocal = false, isInLibrary = false) }
             ?.filter { combo.getLevenshteinDistance(it) < 10 }
             ?.mapNotNull { it.album.albumArt }
         ?: emptyList()
 
-    fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (UUID, String, MediaStoreImage?) -> Unit) {
+    fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String, MediaStoreImage?) -> Unit) {
         if (matchArtistsJob == null) matchArtistsJob = scope.launch {
-            val previousIds = mutableSetOf<UUID>()
+            val previousIds = mutableSetOf<String>()
 
             flow
-                .map { artists -> artists.filter { it.spotifyId == null && !previousIds.contains(it.id) } }
+                .map { artists -> artists.filter { it.spotifyId == null && !previousIds.contains(it.artistId) } }
                 .collect { artists ->
                     for (artist in artists) {
                         val match = matchArtist(artist.name, true)
 
-                        save(artist.id, match?.id ?: "", match?.images?.toMediaStoreImage())
-                        previousIds.add(artist.id)
+                        save(artist.artistId, match?.id ?: "", match?.images?.toMediaStoreImage())
+                        previousIds.add(artist.artistId)
                     }
                 }
         }
@@ -334,7 +332,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
     suspend fun matchTrack(
         track: Track,
         album: Album? = null,
-        artists: Collection<Artist> = emptyList(),
+        artists: Collection<AbstractArtist> = emptyList(),
     ): SpotifyTrack? {
         val params = mutableMapOf("track" to track.title)
 

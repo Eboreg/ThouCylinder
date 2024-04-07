@@ -32,8 +32,9 @@ import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.pow
 import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.retaintheme.extensions.square
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
+import us.huseli.retaintheme.extensions.toBitmap
+import us.huseli.thoucylinder.Constants.IMAGE_FULL_MAX_WIDTH_DP
+import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -42,6 +43,25 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 object Logger : ILogger
+
+@Suppress("UNCHECKED_CAST")
+fun Map<*, *>.yqueryString(key: String, failSilently: Boolean = true): String? {
+    val value = yquery<Any>(key, failSilently)
+
+    return try {
+        val castValue =
+            if (value is Map<*, *>)
+                (value["runs"] as? Collection<Map<*, *>>)?.firstOrNull()?.get("text") as? String
+                    ?: value["simpleText"] as? String
+            else value as? String
+
+        if (castValue == null && !failSilently) throw Exception("$value is not of correct type")
+        castValue
+    } catch (e: ClassCastException) {
+        if (!failSilently) throw Exception("$value is not of correct type")
+        null
+    }
+}
 
 fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     val splitKeys = keys.split(".", limit = 2)
@@ -53,12 +73,10 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
         @Suppress("UNCHECKED_CAST", "KotlinConstantConditions")
         return try {
             val castValue = value as? T
-            if (castValue == null && !failSilently)
-                throw Exception("$value is not of correct type")
+            if (castValue == null && !failSilently) throw Exception("$value is not of correct type")
             castValue
         } catch (e: ClassCastException) {
-            if (!failSilently)
-                throw Exception("$value is not of correct type")
+            if (!failSilently) throw Exception("$value is not of correct type")
             null
         }
     }
@@ -77,6 +95,9 @@ fun ViewModel.launchOnIOThread(block: suspend CoroutineScope.() -> Unit) =
 
 fun ViewModel.launchOnMainThread(block: suspend CoroutineScope.() -> Unit) =
     viewModelScope.launch(Dispatchers.Main, block = block)
+
+val Context.imageCacheDir: File
+    get() = File(cacheDir, "images").apply { mkdirs() }
 
 
 /** STRING ********************************************************************/
@@ -161,13 +182,10 @@ fun ImageBitmap.getAverageColor(): Color {
     )
 }
 
-fun ImageBitmap.getSquareSize() = min(width, height).pow(2)
-
-fun Bitmap.asFullImageBitmap(context: Context): ImageBitmap =
-    square().scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context).asImageBitmap()
+fun Bitmap.getSquareSize() = min(width, height).pow(2)
 
 fun Bitmap.asThumbnailImageBitmap(context: Context): ImageBitmap =
-    square().scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context).asImageBitmap()
+    square().scaleToMaxSize(IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp, context).asImageBitmap()
 
 
 /** URI ***********************************************************************/
@@ -177,7 +195,7 @@ fun Uri.getRelativePathWithoutFilename(): String? = getRelativePath()?.substring
 
 suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.IO) {
     try {
-        if (this@getBitmap.scheme?.startsWith("http") == true) {
+        if (this@getBitmap.isRemote) {
             Request(this@getBitmap.toString()).getBitmap()
         } else {
             this@getBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it) }
@@ -190,6 +208,37 @@ suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.I
         null
     }
 }
+
+val Uri.isRemote: Boolean
+    // Very primitive and incomplete check, but should be good enough for us.
+    get() = scheme?.matches(Regex("^(https?)|(ftps?)$", RegexOption.IGNORE_CASE)) == true
+
+private suspend fun Uri.getCachedBitmap(context: Context, thumbnail: Boolean): Bitmap? {
+    return withContext(Dispatchers.IO) {
+        val size = if (thumbnail) IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp else IMAGE_FULL_MAX_WIDTH_DP.dp
+
+        if (isRemote) {
+            val cacheFilename =
+                this@getCachedBitmap.hashCode().toString() + (if (thumbnail) "-thumbnail.jpg" else "-full.jpg")
+            val cacheFile = File(context.imageCacheDir, cacheFilename)
+
+            if (!cacheFile.exists()) {
+                getBitmap(context)?.square()?.scaleToMaxSize(size, context)?.also { bitmap ->
+                    cacheFile.outputStream().use { outputStream ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+                    }
+                }
+            }
+            cacheFile.toBitmap()
+        } else {
+            getBitmap(context)?.square()?.scaleToMaxSize(size, context)
+        }
+    }
+}
+
+suspend fun Uri.getCachedFullBitmap(context: Context) = getCachedBitmap(context, false)
+
+suspend fun Uri.getCachedThumbnailBitmap(context: Context) = getCachedBitmap(context, true)
 
 
 /** DOCUMENTFILE **************************************************************/

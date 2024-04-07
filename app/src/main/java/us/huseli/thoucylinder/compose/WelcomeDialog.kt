@@ -14,13 +14,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.SaveButton
 
 @Composable
 fun WelcomeDialog(modifier: Modifier = Modifier, onCancel: () -> Unit) {
@@ -28,7 +28,7 @@ fun WelcomeDialog(modifier: Modifier = Modifier, onCancel: () -> Unit) {
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onCancel,
-        confirmButton = { TextButton(onClick = onCancel, content = { Text(stringResource(R.string.ok)) }) },
+        confirmButton = { SaveButton(onClick = onCancel, content = { Text(stringResource(R.string.ok)) }) },
         title = { Text(stringResource(R.string.app_name)) },
         text = {
             Column(

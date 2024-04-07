@@ -30,16 +30,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.LazyPagingItems
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
@@ -49,30 +50,29 @@ import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.getDownloadProgress
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
-import us.huseli.thoucylinder.viewmodels.AbstractBaseViewModel
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T : AbstractTrackCombo> TrackGrid(
     trackCombos: LazyPagingItems<T>,
-    selectedTrackIds: List<UUID>,
-    trackDownloadTasks: List<TrackDownloadTask>,
-    viewModel: AbstractBaseViewModel,
+    selectedTrackIds: ImmutableList<String>,
+    downloadStates: ImmutableList<TrackDownloadTask.ViewState>,
     modifier: Modifier = Modifier,
+    imageViewModel: ImageViewModel = hiltViewModel(),
     gridState: LazyGridState = rememberLazyGridState(),
     showArtist: Boolean = true,
     showAlbum: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    trackCallbacks: (Int, T) -> TrackCallbacks<T>,
+    trackCallbacks: (Int, Track.ViewState) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     progressIndicatorText: String? = null,
+    ensureTrackMetadata: (Track) -> Unit,
     onEmpty: (@Composable () -> Unit)? = null,
 ) {
-    val context = LocalContext.current
-
     SelectedTracksButtons(trackCount = selectedTrackIds.size, callbacks = trackSelectionCallbacks)
 
     Box {
@@ -91,9 +91,8 @@ fun <T : AbstractTrackCombo> TrackGrid(
                 trackCombos[index]?.also { combo ->
                     val track = combo.track
                     val isSelected = selectedTrackIds.contains(combo.track.trackId)
-                    val (downloadProgress, downloadIsActive) =
-                        getDownloadProgress(trackDownloadTasks.find { it.trackCombo.track.trackId == track.trackId })
-                    val callbacks = trackCallbacks(index, combo)
+                    val callbacks = trackCallbacks(index, combo.getViewState())
+                    val downloadState = downloadStates.find { it.trackId == track.trackId }
 
                     callbacks.onEach?.invoke()
 
@@ -107,15 +106,16 @@ fun <T : AbstractTrackCombo> TrackGrid(
                             .let { if (isSelected) it.copy(width = it.width + 2.dp) else it },
                     ) {
                         Box(modifier = Modifier.aspectRatio(1f)) {
-                            val imageBitmap = remember(track) { mutableStateOf<ImageBitmap?>(null) }
+                            var imageBitmap by remember(track) { mutableStateOf<ImageBitmap?>(null) }
 
                             LaunchedEffect(track) {
-                                imageBitmap.value = combo.getFullImageBitmap(context)
-                                viewModel.ensureTrackMetadata(track)
+                                imageBitmap = imageViewModel.getTrackThumbnail(track.image?.thumbnailUri)
+                                    ?: imageViewModel.getAlbumThumbnail(combo.album?.albumArt?.thumbnailUri)
+                                ensureTrackMetadata(track)
                             }
 
                             Thumbnail(
-                                image = imageBitmap.value,
+                                imageBitmap = { imageBitmap },
                                 borderWidth = null,
                                 placeholderIcon = Icons.Sharp.MusicNote,
                             )
@@ -130,9 +130,9 @@ fun <T : AbstractTrackCombo> TrackGrid(
                             }
                         }
 
-                        if (downloadIsActive) {
+                        if (downloadState?.isActive == true) {
                             LinearProgressIndicator(
-                                progress = { downloadProgress?.toFloat() ?: 0f },
+                                progress = { downloadState.progress },
                                 modifier = Modifier.fillMaxWidth().height(2.dp),
                             )
                         }
@@ -141,7 +141,7 @@ fun <T : AbstractTrackCombo> TrackGrid(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(
-                                    top = if (downloadIsActive) 3.dp else 5.dp,
+                                    top = if (downloadState?.isActive == true) 3.dp else 5.dp,
                                     bottom = 5.dp,
                                     start = 5.dp,
                                 ),
@@ -177,19 +177,19 @@ fun <T : AbstractTrackCombo> TrackGrid(
                                 isDownloadable = track.isDownloadable,
                                 isInLibrary = track.isInLibrary,
                                 callbacks = callbacks,
-                                trackArtists = combo.artists,
+                                trackArtists = combo.artists.toImmutableList(),
+                                youtubeWebUrl = track.youtubeWebUrl,
+                                spotifyWebUrl = track.spotifyWebUrl,
                             )
                         }
 
-                        trackDownloadTasks.find { it.trackCombo.track == track }?.also { download ->
-                            val status by download.downloadStatus.collectAsStateWithLifecycle()
-                            val progress by download.downloadProgress.collectAsStateWithLifecycle()
-                            val statusText = stringResource(status.stringId)
+                        if (downloadState != null) {
+                            val statusText = stringResource(downloadState.status.stringId)
 
                             Column(modifier = Modifier.padding(bottom = 5.dp)) {
                                 Text(text = "$statusText …")
                                 LinearProgressIndicator(
-                                    progress = { progress.toFloat() },
+                                    progress = { downloadState.progress },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }

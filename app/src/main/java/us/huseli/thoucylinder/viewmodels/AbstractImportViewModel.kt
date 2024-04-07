@@ -1,7 +1,9 @@
 package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,26 +11,26 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import us.huseli.retaintheme.extensions.listItemsBetween
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.ProgressData
-import us.huseli.thoucylinder.dataclasses.abstr.toArtists
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.launchOnIOThread
-import java.util.UUID
+import us.huseli.thoucylinder.repositories.Repositories
 
 abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Repositories) :
     AbstractBaseViewModel(repos) {
-    private val _importedAlbumIds = MutableStateFlow<Map<String, UUID>>(emptyMap())
+    private val _importedAlbumIds = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _isSearching = MutableStateFlow(false)
     private val _localOffset = MutableStateFlow(0)
     private val _notFoundAlbumIds = MutableStateFlow<List<String>>(emptyList())
     private val _progress = MutableStateFlow<ProgressData?>(null)
     private val _searchTerm = MutableStateFlow("")
-    private val _selectedExternalAlbumIds = MutableStateFlow<List<String>>(emptyList())
+    private val _selectedExternalAlbumIds = MutableStateFlow<ImmutableList<String>>(persistentListOf())
 
     protected val pastImportedAlbumIds = mutableSetOf<String>()
 
@@ -40,11 +42,10 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
     val searchTerm: StateFlow<String> = _searchTerm.asStateFlow()
     val selectedExternalAlbumIds = _selectedExternalAlbumIds.asStateFlow()
 
-    abstract val externalAlbums: Flow<List<A>>
+    abstract val externalAlbums: Flow<ImmutableList<A>>
     abstract val hasNext: Flow<Boolean>
     abstract val isAllSelected: Flow<Boolean>
-    abstract val offsetExternalAlbums: Flow<List<A>>
-    abstract val totalAlbumCount: Flow<Int?>
+    abstract val offsetExternalAlbums: Flow<ImmutableList<A>>
 
     abstract suspend fun convertExternalAlbum(
         externalAlbum: A,
@@ -53,17 +54,15 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
 
     abstract suspend fun fetchExternalAlbums(): Boolean
 
-    abstract suspend fun getThumbnail(externalAlbum: A): ImageBitmap?
-
-    abstract suspend fun updateArtists(artists: Iterable<Artist>)
+    abstract suspend fun updateArtists(artists: Iterable<AbstractArtist>)
 
     fun importSelectedAlbums(
         matchYoutube: Boolean,
         context: Context,
-        onFinish: (importedIds: List<UUID>, notFoundCount: Int) -> Unit,
+        onFinish: (List<Album.ViewState>, List<A>) -> Unit,
     ) = launchOnIOThread {
-        var notFoundCount = 0
-        val importedIds = mutableListOf<UUID>()
+        val importedAlbumStates = mutableListOf<Album.ViewState>()
+        val notFoundAlbums = mutableListOf<A>()
         val selectedExternalAlbums =
             _selectedExternalAlbumIds.value.mapNotNull { id -> externalAlbums.first().find { it.id == id } }
 
@@ -94,17 +93,17 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
                 )
                 insertAlbumCombo(combo = combo)
                 _importedAlbumIds.value += externalAlbum.id to combo.album.albumId
-                importedIds.add(combo.album.albumId)
+                importedAlbumStates.add(combo.getViewState())
             } else {
-                notFoundCount++
+                notFoundAlbums.add(externalAlbum)
                 _notFoundAlbumIds.value += externalAlbum.id
             }
 
-            _selectedExternalAlbumIds.value -= externalAlbum.id
+            _selectedExternalAlbumIds.value = _selectedExternalAlbumIds.value.minus(externalAlbum.id).toImmutableList()
         }
 
         _progress.value = null
-        if (selectedExternalAlbums.isNotEmpty()) onFinish(importedIds, notFoundCount)
+        onFinish(importedAlbumStates, notFoundAlbums)
     }
 
     fun selectFromLastSelected(toId: String, allIds: List<String>) {
@@ -112,12 +111,12 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
             ?.let { allIds.listItemsBetween(it, toId).plus(toId) }
             ?: listOf(toId)
 
-        _selectedExternalAlbumIds.value += ids
+        _selectedExternalAlbumIds.value = _selectedExternalAlbumIds.value.plus(ids).toImmutableList()
     }
 
     fun setOffset(offset: Int) {
         _localOffset.value = offset
-        _selectedExternalAlbumIds.value = emptyList()
+        _selectedExternalAlbumIds.value = persistentListOf()
         launchOnIOThread { fetchExternalAlbumsIfNeeded() }
     }
 
@@ -131,17 +130,17 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
     fun setSelectAll(value: Boolean) = launchOnIOThread {
         if (value) _selectedExternalAlbumIds.value = offsetExternalAlbums.first().filter {
             !_importedAlbumIds.value.containsKey(it.id) && !_notFoundAlbumIds.value.contains(it.id)
-        }.map { it.id }
-        else _selectedExternalAlbumIds.value = emptyList()
+        }.map { it.id }.toImmutableList()
+        else _selectedExternalAlbumIds.value = persistentListOf()
     }
 
-    fun toggleSelected(externalAlbum: A) {
-        if (_selectedExternalAlbumIds.value.contains(externalAlbum.id))
-            _selectedExternalAlbumIds.value -= externalAlbum.id
+    fun toggleSelected(albumId: String) {
+        if (_selectedExternalAlbumIds.value.contains(albumId))
+            _selectedExternalAlbumIds.value = _selectedExternalAlbumIds.value.minus(albumId).toImmutableList()
         else if (
-            !_importedAlbumIds.value.containsKey(externalAlbum.id) &&
-            !_notFoundAlbumIds.value.contains(externalAlbum.id)
-        ) _selectedExternalAlbumIds.value += externalAlbum.id
+            !_importedAlbumIds.value.containsKey(albumId) &&
+            !_notFoundAlbumIds.value.contains(albumId)
+        ) _selectedExternalAlbumIds.value = _selectedExternalAlbumIds.value.plus(albumId).toImmutableList()
     }
 
 
@@ -161,9 +160,25 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
             combo = matchedCombo,
             progressCallback = { progressCallback(0.5 + (it * 0.5)) },
         ) ?: return null
-        val existingYoutubeCombo = repos.album.getAlbumWithTracksByPlaylistId(youtubeMatch.playlistCombo.playlist.id)
 
-        return existingYoutubeCombo ?: youtubeMatch.albumCombo
+        // If imported & converted album already exists, use that instead:
+        repos.album.getAlbumWithTracksByPlaylistId(youtubeMatch.playlistCombo.playlist.id)?.let { combo ->
+            combo.copy(
+                album = combo.album.copy(isInLibrary = true),
+                trackCombos = combo.trackCombos.map { trackCombo ->
+                    trackCombo.copy(track = trackCombo.track.copy(isInLibrary = true))
+                },
+            )
+        }?.also { return it }
+
+        // If newly imported album, try matching if with Musicbrainz too:
+        return youtubeMatch.albumCombo.let { combo ->
+            repos.musicBrainz.matchAlbumWithTracks(
+                combo = combo,
+                strategy = TrackMergeStrategy.KEEP_SELF,
+                getArtist = { repos.artist.artistCache.get(it) },
+            ) ?: combo
+        }
     }
 
     private suspend fun fetchExternalAlbumsIfNeeded() {
@@ -180,8 +195,8 @@ abstract class AbstractImportViewModel<A : IExternalAlbum>(private val repos: Re
         repos.artist.insertAlbumArtists(combo.artists.toAlbumArtists())
         repos.artist.insertTrackArtists(combo.trackCombos.flatMap { it.artists.toTrackArtists() })
         updateArtists(
-            combo.artists.toArtists()
-                .plus(combo.trackCombos.flatMap { it.artists.toArtists() })
+            combo.artists
+                .plus(combo.trackCombos.flatMap { it.artists })
                 .toSet()
         )
     }

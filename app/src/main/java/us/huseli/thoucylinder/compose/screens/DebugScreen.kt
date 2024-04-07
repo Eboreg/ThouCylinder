@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,6 +17,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,21 +27,37 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
+import us.huseli.thoucylinder.YoutubeAndroidClient
+import us.huseli.thoucylinder.YoutubeAndroidEmbeddedClient
+import us.huseli.thoucylinder.YoutubeAndroidUnpluggedClient
+import us.huseli.thoucylinder.YoutubeAndroidTestSuiteClient
+import us.huseli.thoucylinder.YoutubeIOSClient
+import us.huseli.thoucylinder.YoutubeWebClient
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 import us.huseli.thoucylinder.viewmodels.DebugViewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppViewModel = hiltViewModel()) {
     val density = LocalDensity.current
     val context = LocalContext.current
-    // val spotifyRecommendations by viewModel.spotifyRecommendations.collectAsStateWithLifecycle()
-    // val spotifyRelatedArtists by viewModel.spotifyRelatedArtists.collectAsStateWithLifecycle()
+    val region by viewModel.region.collectAsStateWithLifecycle()
+    val continuationTokens by viewModel.continuationTokens.collectAsStateWithLifecycle()
+    val clients = remember(region) {
+        mutableStateListOf(
+            YoutubeAndroidTestSuiteClient(region),
+            YoutubeAndroidClient(region),
+            YoutubeAndroidEmbeddedClient(region),
+            YoutubeAndroidUnpluggedClient(region),
+            YoutubeIOSClient(region),
+            YoutubeWebClient(region),
+        )
+    }
 
     Column(modifier = Modifier.padding(10.dp).verticalScroll(state = rememberScrollState())) {
-        // spotifyRecommendations.forEach { Row { Text("${it.artist} - ${it.name}") } }
-        // spotifyRelatedArtists.forEach { Row { Text(it.name) } }
-
         Button(
             onClick = { viewModel.clearDatabase() },
             content = { Text("Clear DB") }
@@ -45,6 +66,29 @@ fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppVi
             onClick = { appViewModel.doStartupTasks(context) },
             content = { Text("Do startup tasks") }
         )
+
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            clients.forEach { client ->
+                SmallOutlinedButton(
+                    onClick = { viewModel.getMetadata(client) },
+                    text = "getMetadata(${client.clientName})",
+                )
+                SmallOutlinedButton(
+                    onClick = { viewModel.getVideoSearchResult(context, client) },
+                    text = "getVideoSearchResult(${client.clientName})",
+                )
+                SmallOutlinedButton(
+                    onClick = { viewModel.searchPlaylistCombos(context, client) },
+                    text = "searchPlaylistCombos(${client.clientName})",
+                )
+                continuationTokens[client.clientName]?.also { token ->
+                    SmallOutlinedButton(
+                        onClick = { viewModel.getVideoSearchResultContinued(context, client, token) },
+                        text = "getVideoSearchResultContinued(${client.clientName})",
+                    )
+                }
+            }
+        }
 
         Text("1 dp = ${with(density) { 1.dp.toPx() }} px")
         Text("1 px = ${with(density) { 1.toDp() }} dp")

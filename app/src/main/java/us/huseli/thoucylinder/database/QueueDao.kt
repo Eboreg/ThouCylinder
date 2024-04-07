@@ -13,7 +13,6 @@ import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
-import java.util.UUID
 
 @Dao
 abstract class QueueDao : ILogger {
@@ -21,7 +20,7 @@ abstract class QueueDao : ILogger {
     protected abstract suspend fun _insertQueueTracks(vararg queueTracks: QueueTrack)
 
     @Query("SELECT QueueTrack_queueTrackId FROM QueueTrack")
-    protected abstract suspend fun _listQueueTrackIds(): List<UUID>
+    protected abstract suspend fun _listQueueTrackIds(): List<String>
 
     @Update
     protected abstract suspend fun _updateQueueTracks(vararg queueTracks: QueueTrack)

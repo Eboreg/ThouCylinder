@@ -48,7 +48,6 @@ import us.huseli.thoucylinder.dataclasses.views.reindexed
 import us.huseli.thoucylinder.dataclasses.views.toMediaItems
 import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.widget.AppWidget
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -81,7 +80,7 @@ class PlayerRepository @Inject constructor(
     private val currentTrackPlayTime = MutableStateFlow(0) // seconds
     private val isCurrentTrackHalfPlayedReported = MutableStateFlow(false)
     private val playbackState = MutableStateFlow(PlaybackState.STOPPED)
-    private val playedQueueTrackIds = MutableStateFlow<Set<UUID>>(emptySet())
+    private val playedQueueTrackIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val _canGotoNext = MutableStateFlow(player?.hasNextMediaItem() ?: false)
     private val _canPlay = MutableStateFlow(player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) ?: false)
@@ -164,8 +163,9 @@ class PlayerRepository @Inject constructor(
              */
             queueDao.flowTracksInQueue().distinctUntilChanged().collect { tracks ->
                 queueMutex.withLock {
-                    val uriMap =
-                        _queue.value.associateWith { combo -> tracks.find { it.trackId == combo.track.trackId }?.playUri }
+                    val uriMap = _queue.value.associateWith { combo ->
+                        tracks.find { it.trackId == combo.track.trackId }?.playUri
+                    }
 
                     // Handle updated URIs:
                     uriMap.filterValuesNotNull().forEach { (combo, uri) ->
@@ -337,15 +337,15 @@ class PlayerRepository @Inject constructor(
         play(index)
     }
 
-    fun listQueueTrackCombosById(queueTrackIds: Collection<UUID>): List<QueueTrackCombo> =
+    fun listQueueTrackCombosById(queueTrackIds: Collection<String>): List<QueueTrackCombo> =
         _queue.value.filter { queueTrackIds.contains(it.queueTrackId) }
 
-    fun moveNext(queueTrackIds: Collection<UUID>) {
+    fun moveNext(queueTrackIds: Collection<String>) {
         removeFromQueue(queueTrackIds)
         player?.addMediaItems(nextItemIndex, listQueueTrackCombosById(queueTrackIds).map { it.toMediaItem() })
     }
 
-    fun moveNextAndPlay(queueTrackIds: Collection<UUID>) {
+    fun moveNextAndPlay(queueTrackIds: Collection<String>) {
         moveNext(queueTrackIds)
         play(nextItemIndex)
     }
@@ -372,7 +372,7 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun removeFromQueue(queueTrackIds: Collection<UUID>) = scope.launch {
+    fun removeFromQueue(queueTrackIds: Collection<String>) = scope.launch {
         queueMutex.withLock {
             val indices = _queue.value.mapIndexedNotNull { index, combo ->
                 if (queueTrackIds.contains(combo.queueTrackId)) index else null
@@ -451,8 +451,7 @@ class PlayerRepository @Inject constructor(
 
     fun updateTrack(combo: QueueTrackCombo) {
         player?.also {
-            it.removeMediaItem(combo.position)
-            it.addMediaItem(combo.position, combo.toMediaItem())
+            it.replaceMediaItem(combo.position, combo.toMediaItem())
             if (combo.position <= it.currentMediaItemIndex && playbackState.value != PlaybackState.PLAYING)
                 it.seekTo(it.currentMediaItemIndex - 1, 0L)
         }
@@ -461,7 +460,7 @@ class PlayerRepository @Inject constructor(
 
     /** PRIVATE METHODS ******************************************************/
     private fun findQueueTrackByMediaItem(mediaItem: MediaItem?): QueueTrackCombo? =
-        mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId.toString() == itemId } }
+        mediaItem?.mediaId?.let { itemId -> _queue.value.find { it.queueTrackId == itemId } }
 
     private fun saveCurrentPosition() =
         player?.also { preferences.edit().putLong(PREF_CURRENT_TRACK_POSITION, it.currentPosition).apply() }
@@ -552,10 +551,10 @@ class PlayerRepository @Inject constructor(
                 }
 
                 val queueReindexed = queueTrackIds
-                    .mapNotNull { id -> _queue.value.plus(queue).find { it.queueTrackId.toString() == id } }
+                    .mapNotNull { id -> _queue.value.plus(queue).find { it.queueTrackId == id } }
                     .reindexed()
                 val newAndChanged = queueReindexed.filter { !_queue.value.containsWithPosition(it) }
-                val removed = _queue.value.filter { !queueTrackIds.contains(it.queueTrackId.toString()) }
+                val removed = _queue.value.filter { !queueTrackIds.contains(it.queueTrackId) }
                 log("onTimelineChanged: queueReindexed=$queueReindexed")
 
                 withContext(Dispatchers.IO) {

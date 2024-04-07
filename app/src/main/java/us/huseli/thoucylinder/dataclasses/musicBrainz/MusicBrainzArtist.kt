@@ -4,7 +4,6 @@ import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import java.util.UUID
 
 data class MusicBrainzArtistCredit(
     val artist: MusicBrainzArtist,
@@ -23,11 +22,11 @@ data class MusicBrainzArtistCredit(
         val typeId: String?,
     ) : AbstractMusicBrainzItem()
 
-    fun toNativeAlbumArtist(artist: Artist, albumId: UUID, position: Int) =
+    fun toNativeAlbumArtist(artist: Artist, albumId: String, position: Int) =
         AlbumArtistCredit(artist = artist, albumId = albumId)
             .copy(position = position, musicBrainzId = this.artist.id, joinPhrase = joinphrase ?: "/")
 
-    fun toNativeTrackArtist(artist: Artist, trackId: UUID, position: Int) =
+    fun toNativeTrackArtist(artist: Artist, trackId: String, position: Int) =
         TrackArtistCredit(artist = artist, trackId = trackId)
             .copy(position = position, musicBrainzId = this.artist.id, joinPhrase = joinphrase ?: "/")
 }

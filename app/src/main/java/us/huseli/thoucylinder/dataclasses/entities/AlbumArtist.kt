@@ -5,7 +5,6 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import us.huseli.retaintheme.extensions.combineEquals
-import java.util.UUID
 
 @Entity(
     primaryKeys = ["AlbumArtist_albumId", "AlbumArtist_artistId"],
@@ -28,8 +27,8 @@ import java.util.UUID
     ],
 )
 data class AlbumArtist(
-    @ColumnInfo("AlbumArtist_albumId") val albumId: UUID,
-    @ColumnInfo("AlbumArtist_artistId") val artistId: UUID,
+    @ColumnInfo("AlbumArtist_albumId") val albumId: String,
+    @ColumnInfo("AlbumArtist_artistId") val artistId: String,
     @ColumnInfo("AlbumArtist_joinPhrase") val joinPhrase: String = "/",
     @ColumnInfo("AlbumArtist_position") val position: Int = 0,
 ) : Comparable<AlbumArtist> {

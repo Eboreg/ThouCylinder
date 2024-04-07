@@ -17,12 +17,11 @@ import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import java.time.Instant
-import java.util.UUID
 
 @Dao
 abstract class PlaylistDao {
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId ORDER BY PlaylistTrack_position")
-    protected abstract suspend fun _listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
+    protected abstract suspend fun _listPlaylistTracks(playlistId: String): List<PlaylistTrack>
 
     @Update
     protected abstract suspend fun _updateTracks(vararg tracks: PlaylistTrack)
@@ -40,7 +39,7 @@ abstract class PlaylistDao {
     abstract suspend fun deleteOrphanPlaylistTracks()
 
     @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_id IN (:ids)")
-    abstract suspend fun deletePlaylistTracks(vararg ids: UUID)
+    abstract suspend fun deletePlaylistTracks(vararg ids: String)
 
     @Query(
         """
@@ -55,14 +54,11 @@ abstract class PlaylistDao {
     abstract fun flowPojos(): Flow<List<PlaylistPojo>>
 
     @Query("SELECT * FROM Playlist WHERE Playlist_playlistId = :playlistId")
-    abstract fun flowPlaylist(playlistId: UUID): Flow<Playlist?>
-
-    @Query("SELECT * FROM Playlist")
-    abstract fun flowPlaylists(): Flow<List<Playlist>>
+    abstract fun flowPlaylist(playlistId: String): Flow<Playlist?>
 
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
-    abstract fun flowTrackCombosByPlaylistId(playlistId: UUID): Flow<List<PlaylistTrackCombo>>
+    abstract fun flowTrackCombosByPlaylistId(playlistId: String): Flow<List<PlaylistTrackCombo>>
 
     @Insert
     abstract suspend fun insertPlaylists(vararg playlists: Playlist)
@@ -79,24 +75,24 @@ abstract class PlaylistDao {
         WHERE PlaylistTrack_playlistId = :playlistId
         """
     )
-    abstract suspend fun listAlbums(playlistId: UUID): List<Album>
+    abstract suspend fun listAlbums(playlistId: String): List<Album>
 
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
-    abstract suspend fun listPlaylistTracks(playlistId: UUID): List<PlaylistTrack>
+    abstract suspend fun listPlaylistTracks(playlistId: String): List<PlaylistTrack>
 
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
-    abstract suspend fun listTrackCombosByPlaylistId(playlistId: UUID): List<PlaylistTrackCombo>
+    abstract suspend fun listTrackCombosByPlaylistId(playlistId: String): List<PlaylistTrackCombo>
 
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE PlaylistTrack_id IN (:ids)")
-    abstract suspend fun listTrackCombosByPlaylistTrackId(vararg ids: UUID): List<PlaylistTrackCombo>
+    abstract suspend fun listTrackCombosByPlaylistTrackId(vararg ids: String): List<PlaylistTrackCombo>
 
     @Query("SELECT Track.* FROM PlaylistTrack JOIN Track ON Track_trackId = PlaylistTrack_trackId WHERE PlaylistTrack_playlistId = :playlistId")
-    abstract suspend fun listTracks(playlistId: UUID): List<Track>
+    abstract suspend fun listTracks(playlistId: String): List<Track>
 
     @Transaction
-    open suspend fun moveTrack(playlistId: UUID, from: Int, to: Int) {
+    open suspend fun moveTrack(playlistId: String, from: Int, to: Int) {
         val tracks = _listPlaylistTracks(playlistId)
         val updatedTracks = tracks
             .toMutableList()
@@ -107,5 +103,5 @@ abstract class PlaylistDao {
     }
 
     @Query("UPDATE Playlist SET Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")
-    abstract suspend fun touchPlaylist(playlistId: UUID, updated: Instant = Instant.now())
+    abstract suspend fun touchPlaylist(playlistId: String, updated: String = Instant.now().toString())
 }

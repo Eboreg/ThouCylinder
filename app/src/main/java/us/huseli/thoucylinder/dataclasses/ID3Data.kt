@@ -2,9 +2,10 @@ package us.huseli.thoucylinder.dataclasses
 
 import com.arthenica.ffmpegkit.MediaInformation
 import us.huseli.retaintheme.extensions.filterValuesNotNull
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.getIntOrNull
 import us.huseli.thoucylinder.getStringOrNull
 
@@ -38,22 +39,25 @@ data class ID3Data(
     ).filterValuesNotNull()
 
     companion object {
-        fun fromTrackCombo(trackCombo: AbstractTrackCombo, albumArtists: List<AlbumArtistCredit>? = null): ID3Data {
-            return ID3Data(
-                album = trackCombo.album?.title,
-                albumArtist = albumArtists?.joined(),
-                artist = trackCombo.artists.joined() ?: albumArtists?.joined(),
-                discNumber = trackCombo.track.discNumber,
-                musicBrainzAlbumArtistId = albumArtists?.firstNotNullOfOrNull { it.musicBrainzId },
-                musicBrainzArtistId = trackCombo.artists.firstNotNullOfOrNull { it.musicBrainzId },
-                musicBrainzReleaseGroupId = trackCombo.album?.musicBrainzReleaseGroupId,
-                musicBrainzReleaseId = trackCombo.album?.musicBrainzReleaseId,
-                musicBrainzTrackId = trackCombo.track.musicBrainzId,
-                title = trackCombo.track.title,
-                trackNumber = trackCombo.track.albumPosition,
-                year = trackCombo.track.year ?: trackCombo.album?.year,
-            )
-        }
+        fun fromTrack(
+            track: Track,
+            trackArtists: List<AbstractArtistCredit>,
+            album: Album?,
+            albumArtists: List<AbstractArtistCredit>? = null,
+        ) = ID3Data(
+            album = album?.title,
+            albumArtist = albumArtists?.joined(),
+            artist = trackArtists.joined() ?: albumArtists?.joined(),
+            discNumber = track.discNumber,
+            musicBrainzAlbumArtistId = albumArtists?.firstNotNullOfOrNull { it.musicBrainzId },
+            musicBrainzArtistId = trackArtists.firstNotNullOfOrNull { it.musicBrainzId },
+            musicBrainzReleaseGroupId = album?.musicBrainzReleaseGroupId,
+            musicBrainzReleaseId = album?.musicBrainzReleaseId,
+            musicBrainzTrackId = track.musicBrainzId,
+            title = track.title,
+            trackNumber = track.albumPosition,
+            year = track.year ?: album?.year,
+        )
     }
 }
 

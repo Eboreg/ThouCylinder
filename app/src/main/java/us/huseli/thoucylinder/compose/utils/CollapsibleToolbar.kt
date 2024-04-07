@@ -41,12 +41,13 @@ fun CollapsibleToolbar(
 
 @Composable
 inline fun rememberToolbarScrollConnection(
+    limit: Int = 10,
     crossinline onShowToolbarChange: @DisallowComposableCalls (Boolean) -> Unit,
 ) = remember {
     object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (available.y < -5) onShowToolbarChange(false)
-            else if (available.y > 5) onShowToolbarChange(true)
+            if (available.y < -limit) onShowToolbarChange(false)
+            else if (available.y > limit) onShowToolbarChange(true)
             return Offset.Zero
         }
     }

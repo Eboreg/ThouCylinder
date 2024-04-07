@@ -2,8 +2,6 @@ package us.huseli.thoucylinder.repositories
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.unit.DpSize
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
@@ -14,10 +12,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.thoucylinder.Constants.PREF_AUTO_IMPORT_LOCAL_MUSIC
 import us.huseli.thoucylinder.Constants.PREF_LIBRARY_RADIO_NOVELTY
 import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
+import us.huseli.thoucylinder.Constants.PREF_REGION
 import us.huseli.thoucylinder.Constants.PREF_UMLAUTIFY
 import us.huseli.thoucylinder.Constants.PREF_WELCOME_DIALOG_SHOWN
 import us.huseli.thoucylinder.Umlautify
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.enums.Region
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,23 +29,22 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             preferences.getBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, false)
         else null
     )
-    private val _contentAreaSize = MutableStateFlow(DpSize.Zero)
-    private val _innerPadding = MutableStateFlow(PaddingValues())
     private val _isWelcomeDialogShown = MutableStateFlow(preferences.getBoolean(PREF_WELCOME_DIALOG_SHOWN, false))
     private val _libraryRadioNovelty = MutableStateFlow(preferences.getFloat(PREF_LIBRARY_RADIO_NOVELTY, 0.5f))
     private val _localMusicUri = MutableStateFlow(preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri())
+    private val _region =
+        MutableStateFlow(preferences.getString(PREF_REGION, null)?.let { Region.valueOf(it) } ?: Region.SE)
     private val _umlautify = MutableStateFlow(preferences.getBoolean(PREF_UMLAUTIFY, false))
 
     val autoImportLocalMusic: StateFlow<Boolean?> = _autoImportLocalMusic.asStateFlow()
-    val contentAreaSize: StateFlow<DpSize> = _contentAreaSize.asStateFlow()
-    val innerPadding: StateFlow<PaddingValues> = _innerPadding.asStateFlow()
     val isWelcomeDialogShown: StateFlow<Boolean> = _isWelcomeDialogShown.asStateFlow()
     val libraryRadioNovelty: StateFlow<Float> = _libraryRadioNovelty.asStateFlow()
     val localMusicUri: StateFlow<Uri?> = _localMusicUri.asStateFlow()
+    val region: StateFlow<Region> = _region.asStateFlow()
     val umlautify: StateFlow<Boolean> = _umlautify.asStateFlow()
 
     init {
-        if (_umlautify.value) Umlautify.enabled = true
+        if (_umlautify.value) Umlautify.setEnabled(true)
     }
 
     fun createAlbumDirectory(albumCombo: AbstractAlbumCombo): DocumentFile? =
@@ -61,14 +60,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         preferences.edit().putBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, value).apply()
     }
 
-    fun setContentAreaSize(value: DpSize) {
-        _contentAreaSize.value = value
-    }
-
-    fun setInnerPadding(value: PaddingValues) {
-        _innerPadding.value = value
-    }
-
     fun setLibraryRadioNovelty(value: Float) {
         _libraryRadioNovelty.value = value
         preferences.edit().putFloat(PREF_LIBRARY_RADIO_NOVELTY, value).apply()
@@ -79,9 +70,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         preferences.edit().putString(PREF_LOCAL_MUSIC_URI, value?.toString()).apply()
     }
 
+    fun setRegion(value: Region) {
+        _region.value = value
+        preferences.edit().putString(PREF_REGION, value.name).apply()
+    }
+
     fun setUmlautify(value: Boolean) {
         _umlautify.value = value
-        Umlautify.enabled = value
+        Umlautify.setEnabled(value)
         preferences.edit().putBoolean(PREF_UMLAUTIFY, value).apply()
     }
 

@@ -10,48 +10,49 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.ImmutableCollection
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.album.DeleteAlbumsDialog
 import us.huseli.thoucylinder.compose.album.EditAlbumMethodDialog
-import us.huseli.thoucylinder.compose.screens.LocalMusicUriDialog
+import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
 import us.huseli.thoucylinder.compose.track.EditTrackDialog
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
+import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
-import java.util.UUID
 
 @Composable
 fun AppCallbacksComposables(
-    viewModel: AppViewModel,
+    viewModel: AppViewModel = hiltViewModel(),
     onCancel: () -> Unit,
-    onPlaylistClick: (UUID) -> Unit,
-    onAlbumClick: (UUID) -> Unit,
+    onPlaylistClick: (String) -> Unit,
+    onAlbumClick: (String) -> Unit,
     onOpenCreatePlaylistDialog: () -> Unit,
-    deleteAlbumCombos: Collection<AbstractAlbumCombo>? = null,
-    editTrackCombo: AbstractTrackCombo? = null,
-    editAlbum: Album? = null,
+    deleteAlbums: ImmutableCollection<Album.ViewState>? = null,
+    editTrack: Track.ViewState? = null,
+    editAlbum: Album.ViewState? = null,
     addDownloadedAlbum: Album? = null,
     createPlaylist: Boolean = false,
     addToPlaylist: Boolean = false,
     addToPlaylistSelection: Selection? = null,
-    infoTrackCombo: AbstractTrackCombo? = null,
+    infoTrack: Track? = null,
 ) {
     val context = LocalContext.current
     val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
 
-    val displayAddedToPlaylistMessage: (UUID, Int) -> Unit = { playlistId, trackCount ->
+    val displayAddedToPlaylistMessage: (String, Int) -> Unit = { playlistId, trackCount ->
         SnackbarEngine.addInfo(
             message = context.resources
                 .getQuantityString(R.plurals.x_tracks_added_to_playlist, trackCount, trackCount)
@@ -90,9 +91,9 @@ fun AppCallbacksComposables(
 
     if (addToPlaylist) {
         addToPlaylistSelection?.also { selection ->
-            val playlists by viewModel.playlists.collectAsStateWithLifecycle(emptyList())
+            val playlists by viewModel.playlistPojos.collectAsStateWithLifecycle(persistentListOf())
             val scope = rememberCoroutineScope()
-            var playlistId by rememberSaveable { mutableStateOf<UUID?>(null) }
+            var playlistId by rememberSaveable { mutableStateOf<String?>(null) }
             var duplicateCount by rememberSaveable { mutableIntStateOf(0) }
 
             if (duplicateCount > 0 && playlistId != null) {
@@ -162,16 +163,16 @@ fun AppCallbacksComposables(
         )
     }
 
-    deleteAlbumCombos?.also { combos ->
-        val albumIds = combos.map { it.album.albumId }
+    deleteAlbums?.also { states ->
+        val albumIds = states.map { it.album.albumId }
 
-        if (combos.all { !it.album.isLocal && !it.isPartiallyDownloaded }) {
+        if (states.all { !it.album.isLocal && !it.isPartiallyDownloaded }) {
             viewModel.removeAlbumsFromLibrary(albumIds) {
                 SnackbarEngine.addInfo(
                     message = context.resources.getQuantityString(
                         R.plurals.removed_x_albums_from_library,
-                        combos.size,
-                        combos.size,
+                        states.size,
+                        states.size,
                     ).umlautify(),
                     actionLabel = context.getString(R.string.undo).umlautify(),
                     onActionPerformed = { viewModel.addAlbumsToLibrary(albumIds) },
@@ -180,7 +181,7 @@ fun AppCallbacksComposables(
             onCancel()
         } else {
             DeleteAlbumsDialog(
-                count = combos.size,
+                count = states.size,
                 onCancel = onCancel,
                 onDeleteAlbumsClick = {
                     viewModel.hideAlbums(albumIds) {
@@ -226,29 +227,29 @@ fun AppCallbacksComposables(
         }
     }
 
-    editAlbum?.also { album ->
-        EditAlbumMethodDialog(albumId = album.albumId, onClose = onCancel)
+    editAlbum?.also { state ->
+        EditAlbumMethodDialog(albumId = state.album.albumId, albumTitle = state.album.title, onClose = onCancel)
     }
 
-    editTrackCombo?.also { combo ->
-        EditTrackDialog(trackCombo = combo, onClose = onCancel)
+    editTrack?.also { state ->
+        EditTrackDialog(state = state, onClose = onCancel)
     }
 
-    infoTrackCombo?.also { combo ->
+    infoTrack?.also { track ->
         var albumCombo by rememberSaveable { mutableStateOf<AlbumCombo?>(null) }
         var localPath by rememberSaveable { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
-            viewModel.ensureTrackMetadata(combo.track)
-            combo.track.albumId?.also { albumCombo = viewModel.getAlbumCombo(it) }
-            localPath = combo.track.getLocalAbsolutePath(context)
+            viewModel.ensureTrackMetadata(track)
+            track.albumId?.also { albumCombo = viewModel.getAlbumCombo(it) }
+            localPath = track.getLocalAbsolutePath(context)
         }
 
         TrackInfoDialog(
-            track = combo.track,
+            track = track,
             albumTitle = albumCombo?.album?.title,
             albumArtist = albumCombo?.artists?.joined(),
-            year = combo.track.year ?: albumCombo?.album?.year,
+            year = track.year ?: albumCombo?.album?.year,
             localPath = localPath,
             onClose = onCancel,
         )

@@ -4,7 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import java.util.UUID
 
 @Entity(
     foreignKeys = [
@@ -27,6 +26,6 @@ import java.util.UUID
     indices = [Index("RadioTrack_trackId")],
 )
 data class RadioTrack(
-    @ColumnInfo("RadioTrack_radioId") val radioId: UUID,
-    @ColumnInfo("RadioTrack_trackId") val trackId: UUID,
+    @ColumnInfo("RadioTrack_radioId") val radioId: String,
+    @ColumnInfo("RadioTrack_trackId") val trackId: String,
 )

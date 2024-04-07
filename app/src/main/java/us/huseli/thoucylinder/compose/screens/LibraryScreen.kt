@@ -16,7 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.screens.library.LibraryScreenAlbumTab
 import us.huseli.thoucylinder.compose.screens.library.LibraryScreenArtistTab
@@ -35,7 +35,7 @@ fun LibraryScreen(
     trackGridState: LazyGridState = rememberLazyGridState(),
     appCallbacks: AppCallbacks,
 ) {
-    val albumCombos by viewModel.albumCombos.collectAsStateWithLifecycle(emptyList())
+    val albumViewStates by viewModel.albumViewStates.collectAsStateWithLifecycle(persistentListOf())
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
     val isImportingLocalMedia by viewModel.isImportingLocalMedia.collectAsStateWithLifecycle()
@@ -48,7 +48,7 @@ fun LibraryScreen(
             ListType.ALBUMS -> LibraryScreenAlbumTab(
                 viewModel = viewModel,
                 appCallbacks = appCallbacks,
-                albumCombos = albumCombos.toImmutableList(),
+                viewStates = albumViewStates,
                 isImporting = isImportingLocalMedia,
                 displayType = displayType,
                 showToolbars = showToolbars,

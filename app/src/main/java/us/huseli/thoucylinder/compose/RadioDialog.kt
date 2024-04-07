@@ -13,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -26,14 +25,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.stringResource
-import java.util.UUID
 import kotlin.math.roundToInt
 
 @Composable
@@ -45,9 +43,9 @@ fun RadioDialog(
     libraryRadioNovelty: Float,
     onDeactivateClick: () -> Unit,
     onStartLibraryRadioClick: () -> Unit,
-    onStartArtistRadioClick: (UUID) -> Unit,
-    onStartAlbumRadioClick: (UUID) -> Unit,
-    onStartTrackRadioClick: (UUID) -> Unit,
+    onStartArtistRadioClick: (String) -> Unit,
+    onStartAlbumRadioClick: (String) -> Unit,
+    onStartTrackRadioClick: (String) -> Unit,
     onDismissRequest: () -> Unit,
     onLibraryRadioNoveltyChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -55,9 +53,9 @@ fun RadioDialog(
     val context = LocalContext.current
     val artists = setOfNotNull(
         activeArtist,
-        *(activeTrackCombo?.artists?.toArtists() ?: emptyList()).toTypedArray(),
-        *(activeAlbumCombo?.artists?.toArtists() ?: emptyList()).toTypedArray(),
-    ).filter { !it.isVariousArtists && activeRadio?.artist != it }
+        *(activeTrackCombo?.artists ?: emptyList()).toTypedArray(),
+        *(activeAlbumCombo?.artists ?: emptyList()).toTypedArray(),
+    ).filter { activeRadio?.artist != it }
     val albums = setOfNotNull(activeAlbumCombo?.album, activeTrackCombo?.album)
         .filter { activeRadio?.album != it }
     var localLibraryRadioNovelty by rememberSaveable(libraryRadioNovelty) { mutableFloatStateOf(libraryRadioNovelty) }
@@ -67,7 +65,7 @@ fun RadioDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = MaterialTheme.shapes.small,
         onDismissRequest = onDismissRequest,
-        dismissButton = { TextButton(onClick = onDismissRequest, content = { Text(stringResource(R.string.close)) }) },
+        dismissButton = { CancelButton(text = stringResource(R.string.close), onClick = onDismissRequest) },
         confirmButton = {},
         title = { Text(stringResource(R.string.radio)) },
         text = {
@@ -90,7 +88,7 @@ fun RadioDialog(
 
                 for (artist in artists.take(5)) {
                     OutlinedButton(
-                        onClick = { onStartArtistRadioClick(artist.id) },
+                        onClick = { onStartArtistRadioClick(artist.artistId) },
                         content = {
                             Text(
                                 stringResource(

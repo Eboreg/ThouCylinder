@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.viewmodels
 import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,8 +26,8 @@ import us.huseli.thoucylinder.dataclasses.entities.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.entities.toTrackArtistCredits
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.getCachedFullBitmap
 import us.huseli.thoucylinder.launchOnIOThread
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,15 +43,15 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
 
     private val _isLoadingAlbumArt = MutableStateFlow(false)
     private val albumArtMutex = Mutex()
-    private val albumArtFetchJobs = mutableMapOf<UUID, List<Job>>()
+    private val albumArtFetchJobs = mutableMapOf<String, List<Job>>()
 
     val allTags = repos.album.flowTags()
     val isLoadingAlbumArt = _isLoadingAlbumArt.asStateFlow()
 
-    fun cancelAlbumArtFetch(albumId: UUID) =
+    fun cancelAlbumArtFetch(albumId: String) =
         albumArtFetchJobs.remove(albumId)?.forEach { it.cancel() }
 
-    fun flowAlbumArt(albumId: UUID, context: Context) =
+    fun flowAlbumArt(albumId: String, context: Context) =
         MutableStateFlow<Set<AlbumArt>>(emptySet()).also { flow ->
             _isLoadingAlbumArt.value = true
 
@@ -104,14 +105,14 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
             }
         }.asStateFlow()
 
-    fun flowAlbumWithTracks(albumId: UUID) = repos.album.flowAlbumWithTracks(albumId)
+    fun flowAlbumWithTracks(albumId: String) = repos.album.flowAlbumWithTracks(albumId)
 
-    fun saveAlbumArtFromUri(albumId: UUID, uri: Uri, context: Context, onSuccess: () -> Unit, onFail: () -> Unit) =
+    fun saveAlbumArtFromUri(albumId: String, uri: Uri, context: Context, onSuccess: () -> Unit, onFail: () -> Unit) =
         launchOnIOThread {
             saveMediaStoreImage(albumId, MediaStoreImage.fromUri(uri, context), context, onSuccess, onFail)
         }
 
-    fun saveAlbumArt(albumId: UUID, albumArt: AlbumArt?, context: Context) = launchOnIOThread {
+    fun saveAlbumArt(albumId: String, albumArt: AlbumArt?, context: Context) = launchOnIOThread {
         saveMediaStoreImage(albumId, albumArt?.mediaStoreImage, context)
     }
 
@@ -144,7 +145,12 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         repos.album.updateAlbum(album)
         repos.album.setAlbumTags(combo.album.albumId, tags)
         trackCombos.forEach { trackCombo ->
-            repos.localMedia.tagTrack(trackCombo = trackCombo, albumArtists = albumArtists)
+            repos.localMedia.tagTrack(
+                track = trackCombo.track,
+                trackArtists = trackCombo.artists,
+                albumArtists = albumArtists,
+                album = album,
+            )
         }
     }
 
@@ -166,8 +172,10 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         }
         repos.track.updateTrack(updatedTrack)
         repos.localMedia.tagTrack(
-            trackCombo = combo.copy(track = updatedTrack, artists = trackArtists),
+            track = updatedTrack,
+            trackArtists = trackArtists,
             albumArtists = albumCombo.artists,
+            album = albumCombo.album,
         )
     }
 
@@ -191,15 +199,13 @@ class EditAlbumViewModel @Inject constructor(private val repos: Repositories) : 
         flow: MutableStateFlow<Set<AlbumArt>>,
         isCurrent: Boolean = false,
     ) {
-        mediaStoreImage.getFullImageBitmap(context)?.also {
-            albumArtMutex.withLock {
-                flow.value += AlbumArt(mediaStoreImage, it, isCurrent)
-            }
+        mediaStoreImage.fullUri.getCachedFullBitmap(context)?.asImageBitmap()?.also {
+            albumArtMutex.withLock { flow.value += AlbumArt(mediaStoreImage, it, isCurrent) }
         }
     }
 
     private suspend fun saveMediaStoreImage(
-        albumId: UUID,
+        albumId: String,
         albumArt: MediaStoreImage?,
         context: Context,
         onSuccess: () -> Unit = {},

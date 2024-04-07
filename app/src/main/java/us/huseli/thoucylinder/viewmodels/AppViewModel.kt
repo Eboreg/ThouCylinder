@@ -2,11 +2,10 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.unit.DpSize
 import androidx.media3.common.PlaybackException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -18,13 +17,9 @@ import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.enums.RadioType
-import us.huseli.thoucylinder.dataclasses.BaseArtist
 import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.toArtists
 import us.huseli.thoucylinder.dataclasses.callbacks.RadioCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
 import us.huseli.thoucylinder.dataclasses.entities.Radio
@@ -36,12 +31,12 @@ import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.min
 import kotlin.random.Random
@@ -55,13 +50,13 @@ class AppViewModel @Inject constructor(
     private var deletedPlaylistTracks: List<PlaylistTrack> = emptyList()
     private var enqueueRadioTracksJob: Job? = null
     private var radioHasMoreTracks = true
-    private val radioUsedLocalTrackIds = mutableListOf<UUID>()
+    private val radioUsedLocalTrackIds = mutableListOf<String>()
     private val radioUsedSpotifyTrackIds = mutableListOf<String>()
 
     val activeRadio: StateFlow<RadioCombo?> = repos.radio.activeRadio
     val isWelcomeDialogShown: StateFlow<Boolean> = repos.settings.isWelcomeDialogShown
     val libraryRadioNovelty: StateFlow<Float> = repos.settings.libraryRadioNovelty
-    val playlists: Flow<List<PlaylistPojo>> = repos.playlist.playlistsPojos
+    val playlistPojos: Flow<ImmutableList<PlaylistPojo>> = repos.playlist.playlistsPojos
     val umlautify: StateFlow<Boolean> = repos.settings.umlautify
 
     init {
@@ -81,14 +76,14 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun addAlbumsToLibrary(albumIds: Collection<UUID>) = launchOnIOThread {
+    fun addAlbumsToLibrary(albumIds: Collection<String>) = launchOnIOThread {
         repos.album.addAlbumsToLibrary(albumIds)
         repos.track.addToLibraryByAlbumId(albumIds)
     }
 
     fun addSelectionToPlaylist(
         selection: Selection,
-        playlistId: UUID,
+        playlistId: String,
         includeDuplicates: Boolean = true,
         onFinish: (added: Int) -> Unit = {},
     ) = launchOnIOThread {
@@ -107,7 +102,7 @@ class AppViewModel @Inject constructor(
         onFinish()
     }
 
-    fun deleteLocalAlbumFiles(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+    fun deleteLocalAlbumFiles(albumIds: Collection<String>, onFinish: () -> Unit = {}) = launchOnIOThread {
         repos.album.setAlbumsIsLocal(albumIds, false)
         repos.album.listAlbumsWithTracks(albumIds).forEach { combo ->
             deleteLocalAlbumFiles(combo)
@@ -123,22 +118,21 @@ class AppViewModel @Inject constructor(
         repos.track.deleteTempTracks()
         repos.album.deleteTempAlbums()
         deleteMarkedAlbums()
-        // repos.spotify.fetchTrackAudioFeatures(repos.track.listTrackSpotifyIds())
     }
 
-    suspend fun getDuplicatePlaylistTrackCount(playlistId: UUID, selection: Selection) = withContext(Dispatchers.IO) {
+    suspend fun getDuplicatePlaylistTrackCount(playlistId: String, selection: Selection) = withContext(Dispatchers.IO) {
         repos.playlist.getDuplicatePlaylistTrackCount(playlistId, selection)
     }
 
-    suspend fun getAlbumCombo(albumId: UUID): AlbumCombo? =
+    suspend fun getAlbumCombo(albumId: String): AlbumCombo? =
         withContext(Dispatchers.IO) { repos.album.getAlbumCombo(albumId) }
 
-    fun hideAlbums(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+    fun hideAlbums(albumIds: Collection<String>, onFinish: () -> Unit = {}) = launchOnIOThread {
         repos.album.setAlbumsIsHidden(albumIds, true)
         onFinish()
     }
 
-    fun hideAlbumsAndDeleteFiles(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+    fun hideAlbumsAndDeleteFiles(albumIds: Collection<String>, onFinish: () -> Unit = {}) = launchOnIOThread {
         repos.album.setAlbumsIsHidden(albumIds, true)
         repos.album.listAlbumsWithTracks(albumIds).forEach { combo ->
             deleteLocalAlbumFiles(combo)
@@ -149,27 +143,23 @@ class AppViewModel @Inject constructor(
     suspend fun listSelectionTracks(selection: Selection) =
         withContext(Dispatchers.IO) { repos.playlist.listSelectionTracks(selection) }
 
-    fun removeAlbumsFromLibrary(albumIds: Collection<UUID>, onFinish: () -> Unit = {}) = launchOnIOThread {
+    fun removeAlbumsFromLibrary(albumIds: Collection<String>, onFinish: () -> Unit = {}) = launchOnIOThread {
         repos.album.removeAlbumsFromLibrary(albumIds)
         repos.track.removeFromLibraryByAlbumId(albumIds)
         onFinish()
     }
 
-    fun setInnerPadding(value: PaddingValues) = repos.settings.setInnerPadding(value)
-
     fun setLibraryRadioNovelty(value: Float) = repos.settings.setLibraryRadioNovelty(value)
 
     fun setLocalMusicUri(value: Uri) = repos.settings.setLocalMusicUri(value)
 
-    fun setContentAreaSize(value: DpSize) = repos.settings.setContentAreaSize(value)
-
     fun setWelcomeDialogShown(value: Boolean) = repos.settings.setWelcomeDialogShown(value)
 
-    fun startAlbumRadio(albumId: UUID) = launchOnIOThread {
+    fun startAlbumRadio(albumId: String) = launchOnIOThread {
         repos.radio.setActiveRadio(Radio(albumId = albumId, type = RadioType.ALBUM))
     }
 
-    fun startArtistRadio(artistId: UUID) = launchOnIOThread {
+    fun startArtistRadio(artistId: String) = launchOnIOThread {
         repos.radio.setActiveRadio(Radio(artistId = artistId, type = RadioType.ARTIST))
     }
 
@@ -177,11 +167,11 @@ class AppViewModel @Inject constructor(
         repos.radio.setActiveRadio(Radio(type = RadioType.LIBRARY))
     }
 
-    fun startTrackRadio(trackId: UUID) = launchOnIOThread {
+    fun startTrackRadio(trackId: String) = launchOnIOThread {
         repos.radio.setActiveRadio(Radio(trackId = trackId, type = RadioType.TRACK))
     }
 
-    fun undoDeletePlaylist(onFinish: (UUID) -> Unit) = launchOnIOThread {
+    fun undoDeletePlaylist(onFinish: (String) -> Unit) = launchOnIOThread {
         deletedPlaylist?.also { playlist ->
             repos.playlist.insertPlaylist(playlist)
             repos.playlist.insertPlaylistTracks(deletedPlaylistTracks)
@@ -191,7 +181,7 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun unhideAlbums(albumIds: Collection<UUID>) = launchOnIOThread {
+    fun unhideAlbums(albumIds: Collection<String>) = launchOnIOThread {
         repos.album.setAlbumsIsHidden(albumIds, false)
     }
 
@@ -258,7 +248,7 @@ class AppViewModel @Inject constructor(
     }
 
     private suspend fun enqueueRadioTracks(
-        radioId: UUID,
+        radioId: String,
         radioType: RadioType,
         recommendations: SpotifyTrackRecommendations,
         channel: Channel<QueueTrackCombo?>,
@@ -334,8 +324,8 @@ class AppViewModel @Inject constructor(
             }
             RadioType.TRACK -> radio.track?.let { track ->
                 val albumCombo = track.albumId?.let { repos.album.getAlbumCombo(it) }
-                val artists = repos.artist.listTrackArtistCredits(track.trackId).toArtists()
-                    .plus(albumCombo?.artists?.toArtists() ?: emptyList())
+                val artists = repos.artist.listTrackArtistCredits(track.trackId)
+                    .plus(albumCombo?.artists ?: emptyList())
 
                 repos.spotify.getTrackRecommendationsByTrack(
                     track = track,
@@ -347,7 +337,7 @@ class AppViewModel @Inject constructor(
         }?.also { radioUsedSpotifyTrackIds.addAll(it.tracks.map { track -> track.id }) }
 
     private fun getRadioCallbacks(
-        radioId: UUID,
+        radioId: String,
         radioType: RadioType,
         channel: Channel<QueueTrackCombo?>,
     ) = RadioCallbacks(
@@ -375,7 +365,7 @@ class AppViewModel @Inject constructor(
     )
 
     private suspend fun getRandomLibraryQueueTrackCombo(
-        exceptTrackIds: Collection<UUID>? = null,
+        exceptTrackIds: Collection<String>? = null,
         exceptSpotifyTrackIds: Collection<String>? = null,
     ): QueueTrackCombo? {
         // Does a Youtube match if necessary.
@@ -448,8 +438,7 @@ class AppViewModel @Inject constructor(
                     val spotifyTrack = repos.spotify.matchTrack(
                         track = trackCombo.track,
                         album = trackCombo.album,
-                        artists = trackCombo.artists.toArtists()
-                            .let { artists -> trackCombo.albumArtist?.let { artists.plus(Artist(it)) } ?: artists },
+                        artists = trackCombo.artists.plus(trackCombo.albumArtists),
                     )
                     if (spotifyTrack != null) {
                         spotifyTrackIds.add(spotifyTrack.id)
@@ -484,10 +473,8 @@ class AppViewModel @Inject constructor(
             trackCombo = spotifyTrack.toTrackCombo(
                 getArtist = { repos.artist.artistCache.get(it) },
                 isInLibrary = false,
+                isLocal = false,
             ),
-            albumArtists = spotifyTrack.album.artists.map {
-                repos.artist.artistCache.get(BaseArtist(name = it.name, spotifyId = it.id))
-            },
             withMetadata = true,
         )?.also {
             repos.track.upsertTrack(it.track)

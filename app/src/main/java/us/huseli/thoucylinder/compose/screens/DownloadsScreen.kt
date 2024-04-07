@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.persistentListOf
 import us.huseli.retaintheme.extensions.isoDateTime
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.DownloadTaskState
@@ -45,7 +47,7 @@ import us.huseli.thoucylinder.viewmodels.DownloadsViewModel
 
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
-    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
+    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(persistentListOf())
     val context = LocalContext.current
 
     ItemList(
@@ -54,14 +56,13 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         gap = 5.dp,
         onEmpty = { Text(stringResource(R.string.no_downloads_found), modifier = Modifier.padding(10.dp)) },
     ) { _, task ->
-        val thumbnail = remember(task.trackCombo) { mutableStateOf<ImageBitmap?>(null) }
+        var thumbnail by remember(task.track) { mutableStateOf<ImageBitmap?>(null) }
         val progress by task.downloadProgress.collectAsStateWithLifecycle()
         val state by task.state.collectAsStateWithLifecycle()
 
-        LaunchedEffect(task.trackCombo.track.image, task.albumCombo?.album?.albumArt) {
-            thumbnail.value =
-                viewModel.getTrackThumbnail(task.trackCombo, context)
-                    ?: task.albumCombo?.let { viewModel.getAlbumThumbnail(it, context) }
+        LaunchedEffect(task.track.image, task.album?.albumArt) {
+            thumbnail = viewModel.getTrackThumbnail(task.track.image?.thumbnailUri)
+                ?: viewModel.getAlbumThumbnail(task.album?.albumArt?.thumbnailUri)
         }
 
         Row(
@@ -70,7 +71,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Thumbnail(
-                image = thumbnail.value,
+                imageBitmap = { thumbnail },
                 shape = MaterialTheme.shapes.extraSmall,
                 placeholderIcon = Icons.Sharp.MusicNote,
             )
@@ -81,7 +82,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
                 )
                 Text(
-                    text = task.trackCombo.track.title.umlautify(),
+                    text = task.track.title.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -93,7 +94,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                         color = LocalBasicColors.current.Red,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else (task.trackCombo.artists.joined() ?: task.albumCombo?.artists?.joined())?.also {
+                } else (task.trackArtists.joined() ?: task.albumArtists?.joined())?.also {
                     Text(
                         text = it.umlautify(),
                         maxLines = 1,

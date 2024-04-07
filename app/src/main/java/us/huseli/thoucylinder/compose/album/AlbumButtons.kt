@@ -17,16 +17,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableCollection
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun AlbumButtons(
-    albumArtists: Collection<AlbumArtistCredit>,
+    albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isDownloading: Boolean,
@@ -34,6 +35,8 @@ fun AlbumButtons(
     callbacks: AlbumCallbacks,
     modifier: Modifier = Modifier,
     iconSize: Dp = 40.dp,
+    spotifyWebUrl: String? = null,
+    youtubeWebUrl: String? = null,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
@@ -119,6 +122,8 @@ fun AlbumButtons(
                 callbacks = callbacks,
                 isPartiallyDownloaded = isPartiallyDownloaded,
                 albumArtists = albumArtists,
+                youtubeWebUrl = youtubeWebUrl,
+                spotifyWebUrl = spotifyWebUrl,
             )
         }
     }

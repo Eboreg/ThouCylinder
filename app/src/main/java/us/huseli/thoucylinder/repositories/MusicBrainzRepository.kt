@@ -21,7 +21,7 @@ import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.BaseArtist
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy
@@ -32,7 +32,6 @@ import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseGroup
 import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseSearch
 import us.huseli.thoucylinder.getMutexCache
 import us.huseli.thoucylinder.getNext
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -107,7 +106,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         combo: AlbumWithTracksCombo,
         maxDistance: Double = MAX_ALBUM_MATCH_DISTANCE,
         strategy: TrackMergeStrategy = TrackMergeStrategy.KEEP_LEAST,
-        getArtist: suspend (BaseArtist) -> Artist,
+        getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumWithTracksCombo? {
         val params = mutableMapOf(
             "release" to combo.album.title,
@@ -117,13 +116,11 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         val releaseIds =
             gson.fromJson(search("release", params), MusicBrainzReleaseSearch::class.java)?.releaseIds
         val matches = releaseIds?.mapNotNull { releaseId ->
-            getRelease(releaseId)
-                ?.toAlbumWithTracks(
-                    isLocal = combo.album.isLocal,
-                    getArtist = getArtist,
-                    isInLibrary = combo.album.isInLibrary,
-                )
-                ?.match(combo)
+            getRelease(releaseId)?.toAlbumWithTracks(
+                isLocal = combo.album.isLocal,
+                getArtist = getArtist,
+                isInLibrary = combo.album.isInLibrary,
+            )?.match(combo)
         }
 
         return matches?.filter { it.distance <= maxDistance }
@@ -132,12 +129,12 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
             ?.let { combo.updateWith(it, strategy) }
     }
 
-    fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (UUID, String) -> Unit) {
+    fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String) -> Unit) {
         if (matchArtistsJob == null) matchArtistsJob = scope.launch {
-            val previousIds = mutableSetOf<UUID>()
+            val previousIds = mutableSetOf<String>()
 
             flow
-                .map { artists -> artists.filter { it.musicBrainzId == null && !previousIds.contains(it.id) } }
+                .map { artists -> artists.filter { it.musicBrainzId == null && !previousIds.contains(it.artistId) } }
                 .collect { artists ->
                     for (artist in artists) {
                         val matchedId = search("artist", artist.name, true)
@@ -146,8 +143,8 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
                             ?.firstOrNull { it.matches(artist.name) }
                             ?.id
 
-                        save(artist.id, matchedId ?: "")
-                        previousIds.add(artist.id)
+                        save(artist.artistId, matchedId ?: "")
+                        previousIds.add(artist.artistId)
                     }
                 }
         }

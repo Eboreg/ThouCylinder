@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
@@ -12,14 +13,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
 import us.huseli.thoucylinder.launchOnIOThread
-import java.util.UUID
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,8 +33,10 @@ class YoutubeSearchViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     private val _albumCombos = MutableStateFlow<ImmutableList<AlbumWithTracksCombo>>(persistentListOf())
     private val _trackCombos = MutableStateFlow<PagingData<TrackCombo>>(PagingData.empty())
+    private val _albumViewStates = MutableStateFlow<ImmutableList<Album.ViewState>>(persistentListOf())
 
-    override val albumCombos: StateFlow<ImmutableList<AlbumWithTracksCombo>> = _albumCombos.asStateFlow()
+    override val albumViewStates = _albumViewStates.asStateFlow()
+
     val trackCombos: StateFlow<PagingData<TrackCombo>> = _trackCombos.asStateFlow()
     val isSearchingTracks: StateFlow<Boolean> = repos.youtube.isSearchingTracks
     val isSearchingAlbums: StateFlow<Boolean> = _isSearchingAlbums.asStateFlow()
@@ -63,6 +68,7 @@ class YoutubeSearchViewModel @Inject constructor(
                         )
                     }
                     _albumCombos.value = combos.toImmutableList()
+                    _albumViewStates.value = combos.map { it.getViewState() }.toImmutableList()
                     _isSearchingAlbums.value = false
                 }
 
@@ -75,9 +81,14 @@ class YoutubeSearchViewModel @Inject constructor(
         }
     }
 
-    fun updateFromMusicBrainzAsync(combo: AlbumWithTracksCombo) = launchOnIOThread { updateFromMusicBrainz(combo) }
+    fun updateFromMusicBrainz(albumId: String) = launchOnIOThread {
+        repos.album.getAlbumWithTracks(albumId)?.also { updateFromMusicBrainz(it) }
+    }
 
-    override fun onAllAlbumIds(callback: (Collection<UUID>) -> Unit) {
+    override fun getAlbumSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): AlbumSelectionCallbacks =
+        super.getAlbumSelectionCallbacks(appCallbacks, context).copy(onDeleteClick = null)
+
+    override fun onAllAlbumIds(callback: (Collection<String>) -> Unit) {
         callback(_albumCombos.value.map { it.album.albumId })
     }
 

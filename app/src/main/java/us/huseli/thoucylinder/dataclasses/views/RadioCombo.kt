@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.views
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.DatabaseView
 import androidx.room.Embedded
@@ -24,11 +25,12 @@ import java.util.UUID
         LEFT JOIN Track ON Radio_trackId = Track_trackId
     """
 )
+@Immutable
 data class RadioCombo(
-    @ColumnInfo("Radio_id") val id: UUID = UUID.randomUUID(),
+    @ColumnInfo("Radio_id") val id: String = UUID.randomUUID().toString(),
     @ColumnInfo("Radio_type") val type: RadioType,
     @ColumnInfo("Radio_title") val title: String?,
-    @ColumnInfo("Radio_usedSpotifyTrackIds") val usedSpotifyTrackIds: List<String>,
+    @ColumnInfo("Radio_usedSpotifyTrackIds") val usedSpotifyTrackIds: String? = null,
     @ColumnInfo("Radio_isInitialized") val isInitialized: Boolean = false,
     @Embedded val artist: Artist?,
     @Embedded val album: Album?,

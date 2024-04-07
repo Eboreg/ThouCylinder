@@ -59,10 +59,12 @@ fun SelectedAlbumsButtons(
                     onClick = callbacks.onEnqueueClick,
                     content = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, stringResource(R.string.enqueue)) },
                 )
-                SmallOutlinedButton(
-                    onClick = callbacks.onDeleteClick,
-                    content = { Icon(Icons.Sharp.Delete, stringResource(R.string.delete)) },
-                )
+                callbacks.onDeleteClick?.also { onDeleteClick ->
+                    SmallOutlinedButton(
+                        onClick = onDeleteClick,
+                        content = { Icon(Icons.Sharp.Delete, stringResource(R.string.delete)) },
+                    )
+                }
                 SmallOutlinedButton(
                     onClick = callbacks.onPlayClick,
                     content = { Icon(Icons.Sharp.PlayArrow, stringResource(R.string.play)) },

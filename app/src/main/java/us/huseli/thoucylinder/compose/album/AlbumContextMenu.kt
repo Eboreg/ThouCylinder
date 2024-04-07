@@ -23,18 +23,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableCollection
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 
 @Composable
 fun AlbumContextMenu(
-    albumArtists: Collection<AlbumArtistCredit>,
+    albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isPartiallyDownloaded: Boolean,
@@ -42,7 +44,11 @@ fun AlbumContextMenu(
     modifier: Modifier = Modifier,
     onDismissRequest: () -> Unit,
     callbacks: AlbumCallbacks,
+    spotifyWebUrl: String? = null,
+    youtubeWebUrl: String? = null,
 ) {
+    val uriHandler = LocalUriHandler.current
+
     DropdownMenu(
         modifier = modifier,
         onDismissRequest = onDismissRequest,
@@ -132,23 +138,23 @@ fun AlbumContextMenu(
             )
         }
 
-        callbacks.onPlayOnYoutubeClick?.also { onPlayOnYoutubeClick ->
+        youtubeWebUrl?.also {
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.play_on_youtube)) },
                 leadingIcon = { Icon(painterResource(R.drawable.youtube), null) },
                 onClick = {
-                    onPlayOnYoutubeClick()
+                    uriHandler.openUri(it)
                     onDismissRequest()
                 }
             )
         }
 
-        callbacks.onPlayOnSpotifyClick?.also { onPlayOnSpotifyClick ->
+        spotifyWebUrl?.also {
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.play_on_spotify)) },
                 leadingIcon = { Icon(painterResource(R.drawable.spotify), null) },
                 onClick = {
-                    onPlayOnSpotifyClick()
+                    uriHandler.openUri(it)
                     onDismissRequest()
                 }
             )
@@ -167,13 +173,15 @@ fun AlbumContextMenu(
 
 @Composable
 fun AlbumContextMenuWithButton(
-    albumArtists: Collection<AlbumArtistCredit>,
+    albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
     isPartiallyDownloaded: Boolean,
     modifier: Modifier = Modifier,
     callbacks: AlbumCallbacks,
     buttonIconSize: Dp = 30.dp,
+    spotifyWebUrl: String? = null,
+    youtubeWebUrl: String? = null,
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -189,6 +197,8 @@ fun AlbumContextMenuWithButton(
                 onDismissRequest = { isMenuShown = false },
                 callbacks = callbacks,
                 isPartiallyDownloaded = isPartiallyDownloaded,
+                youtubeWebUrl = youtubeWebUrl,
+                spotifyWebUrl = spotifyWebUrl,
             )
             Icon(Icons.Sharp.MoreVert, null, modifier = Modifier.size(buttonIconSize))
         }

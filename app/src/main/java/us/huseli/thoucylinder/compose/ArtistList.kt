@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
@@ -26,33 +28,33 @@ import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun ArtistList(
-    artistCombos: List<ArtistCombo>,
+    artistCombos: ImmutableList<ArtistCombo>,
     modifier: Modifier = Modifier,
     progressIndicatorText: String? = null,
-    onArtistClick: (UUID) -> Unit,
+    onArtistClick: (String) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
-    getImage: suspend (ArtistCombo) -> ImageBitmap?,
+    imageViewModel: ImageViewModel = hiltViewModel(),
 ) {
     ItemList(
         things = artistCombos,
         progressIndicatorText = progressIndicatorText,
-        onClick = { _, combo -> onArtistClick(combo.artist.id) },
+        onClick = { _, combo -> onArtistClick(combo.artist.artistId) },
         onEmpty = onEmpty,
         modifier = modifier,
     ) { _, combo ->
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(combo.artist) {
-            imageBitmap = getImage(combo)
+            imageBitmap = imageViewModel.getArtistImage(combo)
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Thumbnail(
-                image = imageBitmap,
+                imageBitmap = { imageBitmap },
                 shape = MaterialTheme.shapes.extraSmall,
                 placeholderIcon = Icons.Sharp.InterpreterMode,
             )

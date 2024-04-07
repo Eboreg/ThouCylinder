@@ -2,17 +2,18 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import us.huseli.thoucylinder.repositories.Repositories
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTopArtistMatch
-import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
+import us.huseli.thoucylinder.dataclasses.spotify.getThumbnailImageBitmap
 import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,7 +23,7 @@ class RecommendationsViewModel @Inject constructor(private val repos: Repositori
     private var existingArtistsFetched = false
 
     val spotifyRelatedArtistMatches =
-        _spotifyRelatedArtistMatches.map { matches -> matches.sortedByDescending { it.score } }
+        _spotifyRelatedArtistMatches.map { matches -> matches.sortedByDescending { it.score }.toImmutableList() }
 
     init {
         launchOnIOThread {
@@ -48,7 +49,7 @@ class RecommendationsViewModel @Inject constructor(private val repos: Repositori
     }
 
     suspend fun getArtistThumbnail(spotifyArtist: SpotifyArtist, context: Context) = withContext(Dispatchers.IO) {
-        spotifyArtist.images.toMediaStoreImage()?.getThumbnailImageBitmap(context)
+        spotifyArtist.images.getThumbnailImageBitmap(context)
     }
 
     private suspend fun getRelatedArtists(spotifyId: String, name: String, score: Int) {

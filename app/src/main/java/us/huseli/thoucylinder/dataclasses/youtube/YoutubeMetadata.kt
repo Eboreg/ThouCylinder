@@ -1,15 +1,17 @@
 package us.huseli.thoucylinder.dataclasses.youtube
 
-import android.net.Uri
 import android.os.Parcelable
 import androidx.core.net.toUri
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import kotlinx.parcelize.Parcelize
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 
 @Parcelize
 data class YoutubeMetadata(
     val mimeType: String,
-    val codecs: List<String>,
+    val codecs: String,
     val bitrate: Int,
     val sampleRate: Int,
     val url: String,
@@ -39,20 +41,20 @@ data class YoutubeMetadata(
         durationMs = durationMs,
     )
 
+    private val codecList: List<String>
+        get() = gson.fromJson(codecs, listType)
+
     private val expiresAt: Long?
-        get() = uri.getQueryParameter("expire")?.toLong()?.times(1000)
+        get() = url.toUri().getQueryParameter("expire")?.toLong()?.times(1000)
 
     val fileExtension: String
-        get() = (codecs.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
+        get() = (codecList.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
 
     val isOld: Boolean
         get() = expiresAt?.let { it < System.currentTimeMillis() } ?: false
 
     val quality: Long
         get() = bitrate.toLong() * sampleRate.toLong()
-
-    val uri: Uri
-        get() = url.toUri()
 
     fun toTrackMetadata() = TrackMetadata(
         durationMs = durationMs ?: 0L,
@@ -66,12 +68,23 @@ data class YoutubeMetadata(
     )
 
     companion object {
-        private fun extractCodecs(mimeType: String): List<String> = Regex("^.*codecs=\"?([^\"]*)\"?$")
-            .find(mimeType)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.split(",")
-            ?: emptyList()
+        val VIDEO_MIMETYPE_FILTER = Regex("^audio/.*$")
+        val VIDEO_MIMETYPE_EXCLUDE = null
+        val VIDEO_MIMETYPE_PREFERRED = listOf("audio/opus") // most preferred first
+        // val VIDEO_MIMETYPE_EXCLUDE = Regex("^audio/mp4; codecs=\"mp4a\\.40.*")
+        private val gson: Gson = GsonBuilder().create()
+        private val listType = object : TypeToken<List<String>>() {}
+
+        private fun extractCodecs(mimeType: String): String {
+            val codecList = Regex("^.*codecs=\"?([^\"]*)\"?$")
+                .find(mimeType)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.split(",")
+                ?: emptyList()
+
+            return gson.toJson(codecList)
+        }
 
         private fun extractMimeType(value: String): String {
             val mimeType = value.split(";").first()
@@ -84,20 +97,17 @@ data class YoutubeMetadata(
 }
 
 
-data class YoutubeMetadataList(val metadata: MutableList<YoutubeMetadata> = mutableListOf()) {
-    fun getBest(
-        mimeTypeFilter: Regex? = null,
-        mimeTypeExclude: Regex? = null,
-        preferredMimetypes: List<String> = emptyList(),
-    ): YoutubeMetadata? {
-        // First run through the preferred MIME types, returning the best metadata if found.
-        for (mimeType in preferredMimetypes) {
-            metadata.filter { it.mimeType == mimeType }.maxByOrNull { it.quality }?.also { return it }
-        }
-        // If no metadata with preferred MIME type found, go through them all.
-        return metadata
-            .filter { mimeTypeFilter?.matches(it.mimeType) ?: true }
-            .filter { mimeTypeExclude == null || !mimeTypeExclude.matches(it.mimeType) }
-            .maxByOrNull { it.quality }
+fun Iterable<YoutubeMetadata>.getBest(
+    mimeTypeFilter: Regex? = YoutubeMetadata.VIDEO_MIMETYPE_FILTER,
+    mimeTypeExclude: Regex? = YoutubeMetadata.VIDEO_MIMETYPE_EXCLUDE,
+    preferredMimetypes: List<String> = YoutubeMetadata.VIDEO_MIMETYPE_PREFERRED,
+): YoutubeMetadata? {
+    // First run through the preferred MIME types, returning the best metadata if found.
+    for (mimeType in preferredMimetypes) {
+        filter { it.mimeType == mimeType }.maxByOrNull { it.quality }?.also { return it }
     }
+    // If no metadata with preferred MIME type found, go through them all.
+    return filter { mimeTypeFilter?.matches(it.mimeType) ?: true }
+        .filter { mimeTypeExclude == null || !mimeTypeExclude.matches(it.mimeType) }
+        .maxByOrNull { it.quality }
 }

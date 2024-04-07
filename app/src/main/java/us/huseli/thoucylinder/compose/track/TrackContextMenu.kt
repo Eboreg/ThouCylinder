@@ -22,29 +22,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableCollection
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 inline fun TrackContextMenu(
-    trackArtists: Collection<TrackArtistCredit>,
+    trackArtists: ImmutableCollection<AbstractArtistCredit>,
     isShown: Boolean,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
-    callbacks: TrackCallbacks<AbstractTrackCombo>,
+    callbacks: TrackCallbacks,
     crossinline onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
+    youtubeWebUrl: String? = null,
+    spotifyWebUrl: String? = null,
     crossinline extraItems: @Composable () -> Unit = {},
 ) {
+    val uriHandler = LocalUriHandler.current
+
     DropdownMenu(
         modifier = modifier,
         expanded = isShown,
@@ -108,23 +114,23 @@ inline fun TrackContextMenu(
             )
         }
 
-        callbacks.onPlayOnYoutubeClick?.also { onPlayOnYoutubeClick ->
+        youtubeWebUrl?.also {
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.play_on_youtube)) },
                 leadingIcon = { Icon(painterResource(R.drawable.youtube), null) },
                 onClick = {
-                    onPlayOnYoutubeClick()
+                    uriHandler.openUri(it)
                     onDismissRequest()
                 }
             )
         }
 
-        callbacks.onPlayOnSpotifyClick?.also { onPlayOnSpotifyClick ->
+        spotifyWebUrl?.also {
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.play_on_spotify)) },
                 leadingIcon = { Icon(painterResource(R.drawable.spotify), null) },
                 onClick = {
-                    onPlayOnSpotifyClick()
+                    uriHandler.openUri(it)
                     onDismissRequest()
                 }
             )
@@ -170,13 +176,15 @@ inline fun TrackContextMenu(
 
 @Composable
 inline fun TrackContextButtonWithMenu(
-    trackArtists: Collection<TrackArtistCredit>,
+    trackArtists: ImmutableCollection<TrackArtistCredit>,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
-    callbacks: TrackCallbacks<AbstractTrackCombo>,
+    callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
+    youtubeWebUrl: String? = null,
+    spotifyWebUrl: String? = null,
     crossinline extraItems: @Composable () -> Unit = {},
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
@@ -196,6 +204,8 @@ inline fun TrackContextButtonWithMenu(
                 hideAlbum = hideAlbum,
                 extraItems = extraItems,
                 isInLibrary = isInLibrary,
+                youtubeWebUrl = youtubeWebUrl,
+                spotifyWebUrl = spotifyWebUrl,
             )
         }
     )

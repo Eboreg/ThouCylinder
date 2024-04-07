@@ -17,7 +17,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,14 +29,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.CancelButton
+import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.compose.utils.Thumbnail
+import us.huseli.thoucylinder.compose.utils.WarningButton
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
-import java.util.UUID
 
 @Composable
 fun EditAlbumCoverDialog(
-    albumId: UUID,
+    albumId: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
@@ -73,20 +74,14 @@ fun EditAlbumCoverDialog(
         shape = MaterialTheme.shapes.small,
         onDismissRequest = close,
         dismissButton = {
-            TextButton(
+            CancelButton(onClick = close)
+            WarningButton(text = stringResource(R.string.clear)) {
+                viewModel.saveAlbumArt(albumId, null, context)
+                close()
+            }
+            SaveButton(
                 onClick = { selectFileLauncher.launch(arrayOf("image/*")) },
-                content = { Text(stringResource(R.string.local_file)) },
-            )
-            TextButton(
-                onClick = {
-                    viewModel.saveAlbumArt(albumId, null, context)
-                    close()
-                },
-                content = { Text(stringResource(R.string.clear)) },
-            )
-            TextButton(
-                onClick = close,
-                content = { Text(text = stringResource(R.string.cancel)) },
+                text = stringResource(R.string.local_file),
             )
         },
         confirmButton = {},
@@ -105,7 +100,7 @@ fun EditAlbumCoverDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Thumbnail(
-                            image = albumArt.imageBitmap,
+                            imageBitmap = { albumArt.imageBitmap },
                             shape = MaterialTheme.shapes.extraSmall,
                             borderWidth = if (albumArt.isCurrent) 4.dp else 1.dp,
                             borderColor = if (albumArt.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,

@@ -58,7 +58,7 @@ fun PlaylistScreen(
     val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle(null)
     val playlistOrNull by viewModel.playlist.collectAsStateWithLifecycle(null)
     val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
-    val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(emptyList())
+    val trackDownloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
     val trackCombos: List<PlaylistTrackCombo> by viewModel.trackCombos.collectAsStateWithLifecycle()
 
     val reorderableState = rememberReorderableLazyListState(
@@ -126,10 +126,10 @@ fun PlaylistScreen(
                 },
             ) {
                 itemsIndexed(trackCombos, key = { _, combo -> combo.id }) { index, combo ->
-                    val thumbnail = remember { mutableStateOf<ImageBitmap?>(null) }
+                    var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
 
                     LaunchedEffect(combo.track.image, combo.album?.albumArt) {
-                        thumbnail.value = viewModel.getTrackThumbnail(combo, context)
+                        thumbnail = viewModel.getTrackComboThumbnail(combo)
                         viewModel.ensureTrackMetadata(combo.track)
                     }
 
@@ -143,14 +143,14 @@ fun PlaylistScreen(
                             combo = combo,
                             showArtist = true,
                             showAlbum = false,
-                            thumbnail = thumbnail.value,
+                            thumbnail = { thumbnail },
                             isSelected = isSelected,
                             containerColor = containerColor,
                             reorderableState = reorderableState,
+                            downloadState = trackDownloadStates.find { it.trackId == combo.track.trackId },
                             callbacks = TrackCallbacks(
-                                combo = combo,
+                                state = combo.getViewState(),
                                 appCallbacks = appCallbacks,
-                                context = context,
                                 onTrackClick = {
                                     if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.id)
                                     else if (combo.track.isPlayable) viewModel.playPlaylist(startAt = combo)
@@ -168,7 +168,6 @@ fun PlaylistScreen(
                                     if (combo.track.trackId == latestSelectedTrackId) latestSelectedTrackIndex = index
                                 },
                             ),
-                            downloadTask = trackDownloadTasks.find { it.trackCombo.track.trackId == combo.track.trackId },
                         )
                     }
                 }

@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.screens.LocalMusicUriDialog
+import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
 
 @Composable
@@ -42,7 +42,7 @@ fun AskMusicImportPermissions(viewModel: SettingsViewModel = hiltViewModel()) {
             title = { Text(stringResource(R.string.auto_import_local_music)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.if_you_want_to_auto_import_local_music_select_your_local_music_directory_here))
+                    Text(stringResource(R.string.if_you_want_to_auto_import_local_music))
                     Text(stringResource(R.string.you_can_always_change_this_later_in_the_settings))
                 }
             },

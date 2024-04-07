@@ -23,12 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.retaintheme.compose.ListWithNumericBar
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> ItemList(
-    things: List<T>,
+    things: ImmutableList<T>,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     cardHeight: Dp = 70.dp,

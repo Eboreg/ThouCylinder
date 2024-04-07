@@ -18,10 +18,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
-inline fun AnimatedSection(
+fun AnimatedSection(
     visible: Boolean,
     tonalElevation: Dp = 2.dp,
-    crossinline content: @Composable ColumnScope.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,

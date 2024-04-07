@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.spotify
 
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 
 abstract class AbstractSpotifyArtist : AbstractSpotifyItem() {
     abstract val href: String?
@@ -38,7 +38,7 @@ data class SpotifyTopArtistMatch(
 
 fun Collection<AbstractSpotifyArtist>.artistString() = joinToString("/") { it.name }
 
-fun Iterable<AbstractSpotifyArtist>.getDistances(artists: Iterable<Artist>): List<Int> {
+fun Iterable<AbstractSpotifyArtist>.getDistances(artists: Iterable<AbstractArtist>): List<Int> {
     val levenshtein = LevenshteinDistance()
 
     return artists.flatMap { artist ->

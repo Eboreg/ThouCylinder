@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
@@ -26,21 +28,21 @@ import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.umlautify
-import java.util.UUID
+import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun ArtistGrid(
-    artistCombos: List<ArtistCombo>,
+    artistCombos: ImmutableList<ArtistCombo>,
     modifier: Modifier = Modifier,
     progressIndicatorText: String? = null,
-    onArtistClick: (UUID) -> Unit,
+    onArtistClick: (String) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    getImage: suspend (ArtistCombo) -> ImageBitmap?,
+    imageViewModel: ImageViewModel = hiltViewModel(),
 ) {
     ItemGrid(
         things = artistCombos,
-        onClick = { _, combo -> onArtistClick(combo.artist.id) },
+        onClick = { _, combo -> onArtistClick(combo.artist.artistId) },
         contentPadding = contentPadding,
         progressIndicatorText = progressIndicatorText,
         onEmpty = onEmpty,
@@ -49,11 +51,11 @@ fun ArtistGrid(
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(combo.artist.image) {
-            imageBitmap = getImage(combo)
+            imageBitmap = imageViewModel.getArtistImage(combo)
         }
 
         Thumbnail(
-            image = imageBitmap,
+            imageBitmap = { imageBitmap },
             modifier = Modifier.fillMaxWidth(),
             borderWidth = null,
             placeholderIcon = Icons.Sharp.InterpreterMode,

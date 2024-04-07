@@ -13,24 +13,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.extensions.slice
 import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.MutexCache
+import us.huseli.thoucylinder.asThumbnailImageBitmap
 import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.BaseArtist
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.entities.enumerate
 import us.huseli.thoucylinder.dataclasses.pojos.TopLocalSpotifyArtistPojo
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
+import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.getBitmap
 import us.huseli.thoucylinder.matchDirectoriesRecursive
 import us.huseli.thoucylinder.matchFiles
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,12 +40,12 @@ class ArtistRepository @Inject constructor(
     database: Database,
     @ApplicationContext private val context: Context,
 ) : SharedPreferences.OnSharedPreferenceChangeListener {
-    inner class ArtistCache : MutexCache<BaseArtist, String, Artist>(
+    inner class ArtistCache : MutexCache<UnsavedArtist, String, Artist>(
         fetchMethod = { artistDao.createOrUpdateArtist(it) },
         itemToKey = { it.name },
         debugLabel = "artistCache",
     ) {
-        suspend fun getByName(name: String): Artist = get(BaseArtist(name = name))
+        suspend fun getByName(name: String): Artist = get(UnsavedArtist(name = name))
     }
 
     private val artistDao = database.artistDao()
@@ -57,11 +58,11 @@ class ArtistRepository @Inject constructor(
     val artistsWithTracksOrAlbums = artistDao.flowArtistsWithTracksOrAlbums().distinctUntilChanged()
     val artistCombos = artistDao.flowArtistCombos()
     val artistCache = ArtistCache()
-    val artistImageUriCache = MutexCache<ArtistCombo, UUID, Uri?>(
-        itemToKey = { it.artist.id },
+    val artistImageUriCache = MutexCache<ArtistCombo, String, Uri?>(
+        itemToKey = { it.artist.artistId },
         debugLabel = "ArtistRepository.artistImageUriCache",
         fetchMethod = { combo ->
-            combo.artist.image?.uri
+            combo.artist.image?.fullUri
                 ?: localMusicUri.value?.let { DocumentFile.fromTreeUri(context, it) }
                     ?.matchDirectoriesRecursive(Regex("^${combo.artist.name}"))
                     ?.map { it.matchFiles(Regex("^artist\\..*", RegexOption.IGNORE_CASE), Regex("^image/.*")) }
@@ -83,15 +84,19 @@ class ArtistRepository @Inject constructor(
 
     suspend fun clearArtists() = artistDao.clearArtists()
 
-    fun flowArtistById(id: UUID) = artistDao.flowArtistById(id)
+    fun flowArtistById(id: String) = artistDao.flowArtistById(id)
 
-    suspend fun getArtist(id: UUID) = artistDao.getArtist(id)
+    suspend fun getArtist(id: String) = artistDao.getArtist(id)
+
+    suspend fun getArtistImage(combo: ArtistCombo) = withContext(Dispatchers.IO) {
+        artistImageUriCache.getOrNull(combo)?.getBitmap(context)?.asThumbnailImageBitmap(context)
+    }
 
     fun getArtistNameSuggestions(name: String, limit: Int = 10) = allArtists.value
         .filter { it.name.contains(name, true) }
         .map { it.name }
         .sortedBy { levenshtein.apply(name.lowercase(), it.lowercase()) }
-        .slice(0, limit)
+        .take(limit)
 
     suspend fun insertAlbumArtists(albumArtists: Collection<AlbumArtist>) {
         if (albumArtists.isNotEmpty()) artistDao.insertAlbumArtists(*albumArtists.toTypedArray())
@@ -104,7 +109,7 @@ class ArtistRepository @Inject constructor(
     suspend fun listTopSpotifyArtists(limit: Int = 10): List<TopLocalSpotifyArtistPojo> =
         artistDao.listTopSpotifyArtists(limit)
 
-    suspend fun listTrackArtistCredits(trackId: UUID): List<TrackArtistCredit> =
+    suspend fun listTrackArtistCredits(trackId: String): List<TrackArtistCredit> =
         artistDao.listTrackArtistCredits(trackId)
 
     suspend fun setAlbumArtists(albumArtists: Collection<AlbumArtist>) {
@@ -114,19 +119,19 @@ class ArtistRepository @Inject constructor(
         }
     }
 
-    suspend fun setArtistMusicBrainzId(artistId: UUID, musicBrainzId: String) =
+    suspend fun setArtistMusicBrainzId(artistId: String, musicBrainzId: String) =
         artistDao.setMusicBrainzId(artistId, musicBrainzId)
 
-    suspend fun setArtistSpotifyData(artistId: UUID, spotifyId: String, image: MediaStoreImage?) =
+    suspend fun setArtistSpotifyData(artistId: String, spotifyId: String, image: MediaStoreImage?) =
         artistDao.setSpotifyData(
             artistId = artistId,
             spotifyId = spotifyId,
-            imageUri = image?.uri,
-            imageThumbnailUri = image?.thumbnailUri,
+            imageUri = image?.fullUriString,
+            imageThumbnailUri = image?.thumbnailUriString,
             imageHash = image?.hash
         )
 
-    suspend fun setArtistSpotifyId(artistId: UUID, spotifyId: String) = artistDao.setSpotifyId(artistId, spotifyId)
+    suspend fun setArtistSpotifyId(artistId: String, spotifyId: String) = artistDao.setSpotifyId(artistId, spotifyId)
 
     suspend fun setTrackArtists(trackArtists: Collection<TrackArtist>) {
         if (trackArtists.isNotEmpty()) {

@@ -1,5 +1,9 @@
 package us.huseli.thoucylinder.dataclasses.lastFm
 
+import android.content.Context
+import androidx.compose.ui.graphics.ImageBitmap
+import us.huseli.thoucylinder.asThumbnailImageBitmap
+import us.huseli.thoucylinder.getBitmapByUrl
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 
 data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
@@ -19,6 +23,11 @@ data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
             get() = name
         override val artistName: String
             get() = artist.name
+
+        override suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
+            image.getThumbnail()?.let { it.url.getBitmapByUrl()?.asThumbnailImageBitmap(context) }
+
+        override fun toString(): String = artistName.takeIf { it.isNotEmpty() }?.let { "$it - $title" } ?: title
     }
 
     data class Artist(

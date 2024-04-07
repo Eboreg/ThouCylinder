@@ -7,10 +7,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 data class PlaylistPojo(
-    @ColumnInfo("Playlist_playlistId") val playlistId: UUID = UUID.randomUUID(),
+    @ColumnInfo("Playlist_playlistId") val playlistId: String = UUID.randomUUID().toString(),
     @ColumnInfo("Playlist_name") val name: String = "",
-    @ColumnInfo("Playlist_created") val created: Instant? = Instant.now(),
-    @ColumnInfo("Playlist_updated") val updated: Instant? = Instant.now(),
+    @ColumnInfo("Playlist_created") val created: String = Instant.now().toString(),
+    @ColumnInfo("Playlist_updated") val updated: String = Instant.now().toString(),
     val trackCount: Int = 0,
     val totalDurationMs: Long = 0L,
 ) {

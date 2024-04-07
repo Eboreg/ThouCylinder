@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
@@ -30,9 +31,9 @@ import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun ExpandedProgressBar(
-    viewModel: QueueViewModel,
     endPositionMs: Float,
     modifier: Modifier = Modifier,
+    viewModel: QueueViewModel = hiltViewModel(),
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.primary,
 ) {

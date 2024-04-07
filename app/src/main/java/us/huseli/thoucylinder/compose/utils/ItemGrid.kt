@@ -17,11 +17,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.collections.immutable.ImmutableList
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> ItemGrid(
-    things: List<T>,
+    things: ImmutableList<T>,
     modifier: Modifier = Modifier,
     key: ((index: Int, item: T) -> Any)? = null,
     onClick: (Int, T) -> Unit,

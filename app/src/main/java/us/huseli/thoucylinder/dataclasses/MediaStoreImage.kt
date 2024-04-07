@@ -15,10 +15,8 @@ import kotlinx.parcelize.Parcelize
 import us.huseli.retaintheme.extensions.dpToPx
 import us.huseli.retaintheme.extensions.scaleToMaxSize
 import us.huseli.retaintheme.extensions.square
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_FULL
-import us.huseli.thoucylinder.Constants.IMAGE_MAX_DP_THUMBNAIL
-import us.huseli.thoucylinder.asFullImageBitmap
-import us.huseli.thoucylinder.asThumbnailImageBitmap
+import us.huseli.thoucylinder.Constants.IMAGE_FULL_MAX_WIDTH_DP
+import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import us.huseli.thoucylinder.getBitmap
@@ -26,11 +24,14 @@ import java.io.File
 
 @Parcelize
 @WorkerThread
-data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri, val hash: Int) : Parcelable {
-    constructor(uri: Uri, hash: Int) : this(uri, uri, hash)
+data class MediaStoreImage(val fullUriString: String, val thumbnailUriString: String, val hash: Int) : Parcelable {
+    constructor(uri: String, hash: Int) : this(uri, uri, hash)
 
-    val isLocal: Boolean
-        get() = uri.isRawFile
+    val fullUri: Uri
+        get() = fullUriString.toUri()
+
+    val thumbnailUri: Uri
+        get() = thumbnailUriString.toUri()
 
     fun deleteDirectoryFiles(context: Context, directory: DocumentFile) {
         deleteFullImageFile(context, directory)
@@ -38,20 +39,14 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri, val hash: Int) :
     }
 
     fun deleteInternalFiles() {
-        if (uri.isRawFile) uri.toFile().delete()
+        if (fullUri.isRawFile) fullUri.toFile().delete()
         if (thumbnailUri.isRawFile) thumbnailUri.toFile().delete()
     }
-
-    suspend fun getFullBitmap(context: Context): Bitmap? = uri.getBitmap(context)?.square()
-
-    suspend fun getFullImageBitmap(context: Context) = getFullBitmap(context)?.asFullImageBitmap(context)
-
-    suspend fun getThumbnailImageBitmap(context: Context) = getThumbnailBitmap(context)?.asThumbnailImageBitmap(context)
 
     suspend fun nullIfNotFound(context: Context): MediaStoreImage? = getFullBitmap(context)?.let { this }
 
     suspend fun saveInternal(album: Album, context: Context): MediaStoreImage? {
-        if (uri.isRawFile) return this
+        if (fullUri.isRawFile) return this
         return getFullBitmap(context)?.let { fromBitmap(it, context, album) }
     }
 
@@ -70,39 +65,41 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri, val hash: Int) :
         }
     }
 
+    private suspend fun getFullBitmap(context: Context): Bitmap? = fullUri.getBitmap(context)?.square()
+
     private suspend fun getThumbnailBitmap(context: Context): Bitmap? = thumbnailUri.getBitmap(context)?.square()
 
     companion object {
         fun fromBitmap(bitmap: Bitmap, context: Context, album: Album): MediaStoreImage {
             val (fullImageFilename, thumbnailFilename) = getInternalFilenames(album)
-            val fullBitmap = bitmap.square().scaleToMaxSize(IMAGE_MAX_DP_FULL.dp, context)
+            val fullBitmap = bitmap.square().scaleToMaxSize(IMAGE_FULL_MAX_WIDTH_DP.dp, context)
             val fullImageFile = getInternalFile(context, fullImageFilename)
 
             deleteInteralFiles(context, album)
             fullImageFile.outputStream().use { fullBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
 
-            val thumbnailFile: File = if (fullBitmap.width > context.dpToPx(IMAGE_MAX_DP_THUMBNAIL)) {
-                val thumbnailBitmap = fullBitmap.scaleToMaxSize(IMAGE_MAX_DP_THUMBNAIL.dp, context)
+            val thumbnailFile: File = if (fullBitmap.width > context.dpToPx(IMAGE_THUMBNAIL_MAX_WIDTH_DP)) {
+                val thumbnailBitmap = fullBitmap.scaleToMaxSize(IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp, context)
                 getInternalFile(context, thumbnailFilename)
                     .apply { outputStream().use { thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) } }
             } else fullImageFile
 
             return MediaStoreImage(
-                uri = fullImageFile.toUri(),
-                thumbnailUri = thumbnailFile.toUri(),
+                fullUriString = fullImageFile.toUri().toString(),
+                thumbnailUriString = thumbnailFile.toUri().toString(),
                 hash = fullBitmap.hashCode(),
             )
         }
 
-        suspend fun fromUri(fullImageUri: Uri, context: Context) = MediaStoreImage(
-            uri = fullImageUri,
-            hash = fullImageUri.getBitmap(context).hashCode(),
+        suspend fun fromUri(fullUri: Uri, context: Context) = MediaStoreImage(
+            uri = fullUri.toString(),
+            hash = fullUri.getBitmap(context).hashCode(),
         )
 
         fun fromUrls(fullImageUrl: String, thumbnailUrl: String? = fullImageUrl): MediaStoreImage {
             return MediaStoreImage(
-                uri = Uri.parse(fullImageUrl),
-                thumbnailUri = Uri.parse(thumbnailUrl ?: fullImageUrl),
+                fullUriString = fullImageUrl,
+                thumbnailUriString = thumbnailUrl ?: fullImageUrl,
                 hash = fullImageUrl.hashCode(),
             )
         }
@@ -127,7 +124,7 @@ data class MediaStoreImage(val uri: Uri, val thumbnailUri: Uri, val hash: Int) :
         private fun getInternalFile(context: Context, filename: String) = File(getInternalImageDir(context), filename)
 
         private fun getInternalFilenames(album: Album): Pair<String, String> =
-            album.albumId.toString().let { Pair("$it.jpg", "$it-thumbnail.jpg") }
+            Pair("${album.albumId}.jpg", "${album.albumId}-thumbnail.jpg")
 
         private fun getInternalImageDir(context: Context) = File(context.filesDir, "images").apply { mkdirs() }
     }

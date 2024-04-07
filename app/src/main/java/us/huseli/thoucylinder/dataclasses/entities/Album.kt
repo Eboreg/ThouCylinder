@@ -1,20 +1,23 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.os.Parcelable
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.parcelize.Parcelize
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import java.util.UUID
 
 @Entity(indices = [Index("Album_isInLibrary")])
 @Parcelize
 data class Album(
-    @PrimaryKey @ColumnInfo("Album_albumId") val albumId: UUID = UUID.randomUUID(),
+    @PrimaryKey @ColumnInfo("Album_albumId") val albumId: String = UUID.randomUUID().toString(),
     @ColumnInfo("Album_title") val title: String,
     @ColumnInfo("Album_isInLibrary") val isInLibrary: Boolean,
     @ColumnInfo("Album_isLocal") val isLocal: Boolean,
@@ -28,6 +31,15 @@ data class Album(
     @Embedded("Album_albumArt_") val albumArt: MediaStoreImage? = null,
     @Embedded("Album_spotifyImage_") val spotifyImage: MediaStoreImage? = null,
 ) : Parcelable {
+    @Immutable
+    data class ViewState(
+        val album: Album,
+        val trackCount: Int,
+        val yearString: String?,
+        val artists: ImmutableList<AlbumArtistCredit>,
+        val isPartiallyDownloaded: Boolean,
+    )
+
     val isOnYoutube: Boolean
         get() = youtubePlaylist != null
 

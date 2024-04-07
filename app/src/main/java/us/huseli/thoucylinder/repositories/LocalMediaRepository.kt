@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.annotation.WorkerThread
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.file.baseName
 import com.anggrayudi.storage.file.extension
@@ -24,11 +25,10 @@ import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.ID3Data
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
-import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
@@ -37,7 +37,10 @@ import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.escapeQuotes
+import us.huseli.thoucylinder.getBitmap
 import us.huseli.thoucylinder.getRelativePathWithoutFilename
 import us.huseli.thoucylinder.getSquareSize
 import java.io.File
@@ -65,7 +68,7 @@ class LocalMediaRepository @Inject constructor(
     fun collectNewLocalAlbumArtUris(combo: AlbumWithTracksCombo): List<Uri> =
         combo.trackCombos.map { it.track }.listCoverImages(context)
             .map { it.uri }
-            .filter { it != combo.album.albumArt?.uri }
+            .filter { it != combo.album.albumArt?.fullUri }
 
     @WorkerThread
     fun deleteAlbumDirectoryAlbumArt(
@@ -84,9 +87,9 @@ class LocalMediaRepository @Inject constructor(
         trackCombos: Collection<AbstractTrackCombo>,
         current: MediaStoreImage? = null,
     ): MediaStoreImage? = trackCombos.map { it.track }.listCoverImages(context)
-        .filter { it.uri != current?.uri }
+        .filter { it.uri != current?.fullUri }
         .map { MediaStoreImage.fromUri(it.uri, context) }
-        .maxByOrNull { albumArt -> albumArt.getFullImageBitmap(context)?.getSquareSize() ?: 0 }
+        .maxByOrNull { albumArt -> albumArt.fullUri.getBitmap(context)?.getSquareSize() ?: 0 }
 
     suspend fun saveAlbumDirectoryAlbumArtFiles(albumArt: MediaStoreImage, albumDirectory: DocumentFile) =
         albumArt.saveToDirectory(context, albumDirectory)
@@ -221,7 +224,7 @@ class LocalMediaRepository @Inject constructor(
                             year = id3.year,
                             albumId = albumId,
                             metadata = metadata,
-                            localUri = documentFile.uri,
+                            localUri = documentFile.uri.toString(),
                             musicBrainzId = id3.musicBrainzTrackId,
                             durationMs = metadata.durationMs,
                         )
@@ -258,29 +261,47 @@ class LocalMediaRepository @Inject constructor(
     fun listTracksWithBrokenLocalUris(allTracks: Collection<Track>): List<Track> {
         return allTracks.associateWith { it.localUri }
             .filterValuesNotNull()
-            .filter { (_, uri) -> DocumentFile.fromSingleUri(context, uri)?.exists() != true }
+            .filter { (_, uri) -> DocumentFile.fromSingleUri(context, uri.toUri())?.exists() != true }
             .map { it.key }
     }
 
     @WorkerThread
-    fun tagTrack(trackCombo: AbstractTrackCombo, albumArtists: List<AlbumArtistCredit>? = null) {
-        val documentFile = trackCombo.track.getDocumentFile(context)
+    fun tagTrack(
+        track: Track,
+        trackArtists: List<AbstractArtistCredit>,
+        album: Album? = null,
+        albumArtists: List<AbstractArtistCredit>? = null,
+    ) {
+        val documentFile = track.getDocumentFile(context)
 
         if (documentFile != null) {
             if (!documentFile.isWritable(context)) logError("tagAlbumTracks: Cannot write to $documentFile")
-            else tagTrack(trackCombo = trackCombo, documentFile = documentFile, albumArtists = albumArtists)
+            else tagTrack(
+                track = track,
+                documentFile = documentFile,
+                albumArtists = albumArtists,
+                trackArtists = trackArtists,
+                album = album,
+            )
         }
     }
 
     @WorkerThread
     fun tagTrack(
-        trackCombo: AbstractTrackCombo,
+        track: Track,
+        trackArtists: List<AbstractArtistCredit>,
         documentFile: DocumentFile,
-        albumArtists: List<AlbumArtistCredit>? = null,
+        album: Album? = null,
+        albumArtists: List<AbstractArtistCredit>? = null,
     ) {
         val tmpInFile = File(context.cacheDir, "${documentFile.baseName}.in.tmp.${documentFile.extension}")
         val tmpOutFile = File(context.cacheDir, "${documentFile.baseName}.out.tmp.${documentFile.extension}")
-        val tagCommands = ID3Data.fromTrackCombo(trackCombo, albumArtists).toTagMap().map { (key, value) ->
+        val tagCommands = ID3Data.fromTrack(
+            track = track,
+            albumArtists = albumArtists,
+            trackArtists = trackArtists,
+            album = album,
+        ).toTagMap().map { (key, value) ->
             "-metadata \"$key=${value.escapeQuotes()}\" -metadata:s \"$key=${value.escapeQuotes()}\""
         }.joinToString(" ")
         val ffmpegCommand =

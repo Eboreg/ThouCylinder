@@ -1,37 +1,34 @@
 package us.huseli.thoucylinder.dataclasses.abstr
 
 import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
+import android.graphics.Bitmap
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.getCachedFullBitmap
 
 abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
     abstract val track: Track
     abstract val album: Album?
     abstract val artists: List<TrackArtistCredit>
-    abstract val albumArtist: String?
+    abstract val albumArtists: List<AlbumArtistCredit>
 
     val year: Int?
         get() = track.year ?: album?.year
 
-    suspend fun getFullBitmap(context: Context) =
-        track.image?.getFullBitmap(context) ?: album?.albumArt?.getFullBitmap(context)
+    suspend fun getFullBitmap(context: Context): Bitmap? =
+        track.image?.fullUri?.getCachedFullBitmap(context) ?: album?.albumArt?.fullUri?.getCachedFullBitmap(context)
 
-    suspend fun getFullImageBitmap(context: Context): ImageBitmap? =
-        track.image?.getFullImageBitmap(context) ?: album?.albumArt?.getFullImageBitmap(context)
-
-    fun toQueueTrackCombo(): QueueTrackCombo? = track.playUri?.let { uri ->
-        QueueTrackCombo(
-            track = track,
-            uri = uri,
-            album = album,
-            albumArtist = albumArtist,
-            artists = artists,
-        )
-    }
+    fun getViewState() = Track.ViewState(
+        track = track,
+        trackArtists = artists.toImmutableList(),
+        album = album,
+        albumArtists = albumArtists.toImmutableList(),
+        albumArt = album?.albumArt,
+    )
 
     fun toString(
         showAlbumPosition: Boolean = true,
@@ -47,10 +44,11 @@ abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
             else if (track.albumPosition != null) string += "${track.albumPosition}. "
         }
         if (showArtist) {
-            val artistString = artists.joined()
+            val trackArtist = artists.joined()
+            val albumArtist = albumArtists.joined()
 
-            if (artistString != null && (showArtistIfSameAsAlbumArtist || artistString != albumArtist))
-                string += "$artistString - "
+            if (trackArtist != null && (showArtistIfSameAsAlbumArtist || trackArtist != albumArtist))
+                string += "$trackArtist - "
             else if (albumArtist != null && showArtistIfSameAsAlbumArtist)
                 string += "$albumArtist - "
         }
@@ -63,7 +61,7 @@ abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
     override fun equals(other: Any?) = other is AbstractTrackCombo
         && other.track == track
         && other.artists == artists
-        && other.albumArtist == albumArtist
+        && other.albumArtists == albumArtists
 
     override fun toString(): String = toString(showAlbumPosition = true, showArtist = true, showYear = false)
 
@@ -80,7 +78,7 @@ abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
         return track.title.compareTo(other.track.title)
     }
 
-    override fun hashCode(): Int = 31 * (31 * track.hashCode() + artists.hashCode()) + (albumArtist?.hashCode() ?: 0)
+    override fun hashCode(): Int = 31 * (31 * track.hashCode() + artists.hashCode()) + albumArtists.hashCode()
 }
 
 

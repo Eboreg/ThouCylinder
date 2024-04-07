@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.compose.modalcover
 
 import android.content.res.Configuration
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
@@ -20,16 +20,16 @@ import androidx.compose.ui.unit.dp
 @Suppress("AnimateAsStateLabel")
 @Composable
 fun AlbumArtAndTitlesColumn(
-    imageBitmap: ImageBitmap?,
+    imageBitmap: () -> ImageBitmap?,
     title: String,
     artist: String?,
-    animationSpec: AnimationSpec<Dp>,
     offsetX: Int,
     contentAlpha: Float,
     showTitles: Boolean,
     isExpanded: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val animationSpec = tween<Dp>(150)
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val width by animateDpAsState(

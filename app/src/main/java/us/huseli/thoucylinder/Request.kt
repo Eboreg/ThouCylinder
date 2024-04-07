@@ -10,9 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.zip.GZIPInputStream
 import kotlin.math.roundToInt
 import kotlin.text.Charsets.UTF_8
 
@@ -77,21 +79,28 @@ data class Request(
     }
 
     suspend fun getBitmap(): Bitmap? = withContext(Dispatchers.IO) {
-        connect().inputStream.use { BitmapFactory.decodeStream(it) }.also { finish() }
+        getInputStream().use { BitmapFactory.decodeStream(it) }.also { finish() }
     }
 
     suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
-        connect().inputStream.use {
+        getInputStream().use {
             gson.fromJson(it.bufferedReader(), jsonResponseType) ?: emptyMap<String, Any>()
         }.also { finish() }
     }
 
     suspend inline fun <reified T> getObject(): T? = withContext(Dispatchers.IO) {
-        connect().inputStream.use { gson.fromJson(it.bufferedReader(), T::class.java) }.also { finish() }
+        getInputStream().use { gson.fromJson(it.bufferedReader(), T::class.java) }.also { finish() }
     }
 
     suspend fun getString(): String = withContext(Dispatchers.IO) {
-        connect().inputStream.use { it.bufferedReader().readText() }.also { finish(it.length) }
+        getInputStream().use { it.bufferedReader().readText() }.also { finish(it.length) }
+    }
+
+    suspend fun getInputStream(): InputStream = withContext(Dispatchers.IO) {
+        val conn = connect()
+        val isGzipped = conn.headerFields["Content-Encoding"]?.contains("gzip") ?: false
+
+        if (isGzipped) GZIPInputStream(conn.inputStream) else conn.inputStream
     }
 
     companion object {

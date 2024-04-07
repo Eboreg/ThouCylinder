@@ -6,3 +6,22 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
     id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
 }
+
+subprojects {
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            if (project.findProperty("composeCompilerReports") != null) {
+                freeCompilerArgs += listOf(
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.buildDir.absolutePath}/compose_compiler",
+                )
+            }
+            if (project.findProperty("composeCompilerMetrics") != null) {
+                freeCompilerArgs += listOf(
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.buildDir.absolutePath}/compose_compiler",
+                )
+            }
+        }
+    }
+}

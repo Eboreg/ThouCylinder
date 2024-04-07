@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun Thumbnail(
-    image: ImageBitmap?,
+    imageBitmap: () -> ImageBitmap?,
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
     borderWidth: Dp? = 1.dp,
@@ -39,6 +39,8 @@ fun Thumbnail(
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = borderWidth?.let { BorderStroke(it, borderColor) },
     ) {
+        val image = imageBitmap()
+
         if (image != null) {
             Image(
                 bitmap = image,

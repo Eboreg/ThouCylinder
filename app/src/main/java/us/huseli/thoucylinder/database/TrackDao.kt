@@ -3,7 +3,6 @@
 package us.huseli.thoucylinder.database
 
 import android.database.DatabaseUtils
-import android.net.Uri
 import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
@@ -27,7 +26,6 @@ import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import java.util.UUID
 
 @Dao
 abstract class TrackDao {
@@ -40,7 +38,7 @@ abstract class TrackDao {
 
     /** Public methods ********************************************************/
     @Query("UPDATE Track SET Track_localUri = NULL WHERE Track_trackId IN (:trackIds)")
-    abstract suspend fun clearLocalUris(trackIds: Collection<UUID>)
+    abstract suspend fun clearLocalUris(trackIds: Collection<String>)
 
     @Query("DELETE FROM Track")
     abstract suspend fun clearTracks()
@@ -58,7 +56,7 @@ abstract class TrackDao {
     abstract suspend fun deleteTempTracks()
 
     @Query("DELETE FROM Track WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun deleteTracksByAlbumId(vararg albumIds: UUID)
+    abstract suspend fun deleteTracksByAlbumId(vararg albumIds: String)
 
     fun flowTagPojos(availabilityFilter: AvailabilityFilter): Flow<List<TagPojo>> {
         val availabilityQuery = when (availabilityFilter) {
@@ -89,7 +87,7 @@ abstract class TrackDao {
     abstract suspend fun listLibraryTracks(): List<Track>
 
     @Query("SELECT Track_localUri FROM Track WHERE Track_localUri IS NOT NULL")
-    abstract suspend fun listLocalUris(): List<Uri>
+    abstract suspend fun listLocalUris(): List<String>
 
     @Transaction
     @Query(
@@ -101,13 +99,13 @@ abstract class TrackDao {
     )
     abstract suspend fun listRandomLibraryTrackCombos(
         limit: Int,
-        exceptTrackIds: Collection<UUID> = emptyList(),
+        exceptTrackIds: Collection<String> = emptyList(),
         exceptSpotifyTrackIds: Collection<String> = emptyList(),
     ): List<TrackCombo>
 
     @Transaction
     @Query("SELECT * FROM TrackCombo WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun listTrackCombosByAlbumId(vararg albumIds: UUID): List<TrackCombo>
+    abstract suspend fun listTrackCombosByAlbumId(vararg albumIds: String): List<TrackCombo>
 
     @Transaction
     @Query(
@@ -122,11 +120,14 @@ abstract class TrackDao {
         GROUP BY Track_trackId
         """
     )
-    abstract suspend fun listTrackCombosByArtistId(artistId: UUID): List<TrackCombo>
+    abstract suspend fun listTrackCombosByArtistId(artistId: String): List<TrackCombo>
 
     @Transaction
     @Query("SELECT * FROM TrackCombo WHERE Track_trackId IN (:trackIds)")
-    abstract suspend fun listTrackCombosById(vararg trackIds: UUID): List<TrackCombo>
+    abstract suspend fun listTrackCombosById(vararg trackIds: String): List<TrackCombo>
+
+    @Query("SELECT * FROM Track WHERE Track_albumId IN (:albumIds)")
+    abstract suspend fun listTracksByAlbumId(vararg albumIds: String): List<Track>
 
     @Query(
         """
@@ -140,10 +141,10 @@ abstract class TrackDao {
         GROUP BY Track_trackId
         """
     )
-    abstract suspend fun listTracksByArtistId(artistId: UUID): List<Track>
+    abstract suspend fun listTracksByArtistId(artistId: String): List<Track>
 
     @Query("SELECT * FROM Track WHERE Track_trackId IN (:trackIds) ORDER BY Track_discNumber, Track_albumPosition")
-    abstract suspend fun listTracksById(vararg trackIds: UUID): List<Track>
+    abstract suspend fun listTracksById(vararg trackIds: String): List<Track>
 
     fun pageTrackCombos(
         sortParameter: TrackSortParameter,
@@ -204,25 +205,22 @@ abstract class TrackDao {
         ORDER BY LOWER(Track_title)
         """
     )
-    abstract fun pageTrackCombosByArtist(artistId: UUID): PagingSource<Int, TrackCombo>
+    abstract fun pageTrackCombosByArtist(artistId: String): PagingSource<Int, TrackCombo>
 
     @Transaction
-    open suspend fun setAlbumTracks(albumId: UUID, tracks: Collection<Track>) {
+    open suspend fun setAlbumTracks(albumId: String, tracks: Collection<Track>) {
         deleteTracksByAlbumId(albumId)
         if (tracks.isNotEmpty()) upsertTracks(*tracks.toTypedArray())
     }
 
-    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId = :albumId")
-    abstract suspend fun setIsInLibraryByAlbumId(albumId: UUID, isInLibrary: Boolean)
-
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun setIsInLibraryByAlbumId(isInLibrary: Boolean, vararg albumIds: UUID)
+    abstract suspend fun setIsInLibraryByAlbumId(isInLibrary: Boolean, vararg albumIds: String)
 
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
-    abstract suspend fun setIsInLibrary(trackIds: Collection<UUID>, isInLibrary: Boolean)
+    abstract suspend fun setIsInLibrary(trackIds: Collection<String>, isInLibrary: Boolean)
 
     @Query("UPDATE Track SET Track_spotifyId = :spotifyId WHERE Track_trackId = :trackId")
-    abstract suspend fun setTrackSpotifyId(trackId: UUID, spotifyId: String)
+    abstract suspend fun setTrackSpotifyId(trackId: String, spotifyId: String)
 
     @Update
     abstract suspend fun updateTracks(vararg tracks: Track)

@@ -2,31 +2,57 @@ package us.huseli.thoucylinder.compose.album
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.QueueMusic
+import androidx.compose.material.icons.sharp.Album
+import androidx.compose.material.icons.sharp.Photo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import us.huseli.thoucylinder.stringResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.utils.CancelButton
+import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
-import java.util.UUID
 
 enum class EditAlbumDialogType { ALBUM, TRACKS, COVER }
 
 @Composable
+fun EditAlbumMethodButton(
+    onClick: () -> Unit,
+    icon: ImageVector,
+    textRes: Int,
+) {
+    Button(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.extraSmall,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(10.dp),
+    ) {
+        Icon(icon, null, modifier = Modifier.padding(end = 15.dp))
+        Text(stringResource(textRes), modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
 fun EditAlbumMethodDialog(
-    albumId: UUID,
+    albumId: String,
+    albumTitle: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
@@ -37,30 +63,28 @@ fun EditAlbumMethodDialog(
         modifier = modifier,
         onDismissRequest = onClose,
         shape = MaterialTheme.shapes.small,
-        dismissButton = {
-            TextButton(onClick = onClose, content = { Text(stringResource(R.string.close)) })
-        },
+        dismissButton = { CancelButton(onClick = onClose, text = stringResource(R.string.close)) },
         confirmButton = {},
+        title = { Text(text = albumTitle.umlautify(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Button(
+                EditAlbumMethodButton(
                     onClick = { openDialogType = EditAlbumDialogType.ALBUM },
-                    content = { Text(stringResource(R.string.edit_album)) },
-                    shape = MaterialTheme.shapes.extraSmall,
+                    icon = Icons.Sharp.Album,
+                    textRes = R.string.edit_album,
                 )
-                Button(
+                EditAlbumMethodButton(
                     onClick = { openDialogType = EditAlbumDialogType.TRACKS },
-                    content = { Text(stringResource(R.string.edit_tracks)) },
-                    shape = MaterialTheme.shapes.extraSmall,
+                    icon = Icons.AutoMirrored.Sharp.QueueMusic,
+                    textRes = R.string.edit_tracks,
                 )
-                Button(
+                EditAlbumMethodButton(
                     onClick = { openDialogType = EditAlbumDialogType.COVER },
-                    content = { Text(stringResource(R.string.select_album_cover)) },
-                    shape = MaterialTheme.shapes.extraSmall,
+                    icon = Icons.Sharp.Photo,
+                    textRes = R.string.select_album_cover,
                 )
             }
         },

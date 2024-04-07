@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.WorkerThread
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
@@ -12,11 +12,14 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.getParentDirectory
 import us.huseli.thoucylinder.matchFiles
@@ -37,14 +40,14 @@ import kotlin.time.Duration.Companion.milliseconds
     indices = [Index("Track_albumId"), Index("Track_title"), Index("Track_isInLibrary")],
 )
 data class Track(
-    @ColumnInfo("Track_trackId") @PrimaryKey val trackId: UUID = UUID.randomUUID(),
+    @ColumnInfo("Track_trackId") @PrimaryKey val trackId: String = UUID.randomUUID().toString(),
     @ColumnInfo("Track_title") val title: String,
     @ColumnInfo("Track_isInLibrary") val isInLibrary: Boolean = true,
-    @ColumnInfo("Track_albumId") val albumId: UUID? = null,
+    @ColumnInfo("Track_albumId") val albumId: String? = null,
     @ColumnInfo("Track_albumPosition") val albumPosition: Int? = null,
     @ColumnInfo("Track_discNumber") val discNumber: Int? = null,
     @ColumnInfo("Track_year") val year: Int? = null,
-    @ColumnInfo("Track_localUri") val localUri: Uri? = null,
+    @ColumnInfo("Track_localUri") val localUri: String? = null,
     @ColumnInfo("Track_musicBrainzId") val musicBrainzId: String? = null,
     @ColumnInfo("Track_spotifyId") val spotifyId: String? = null,
     @ColumnInfo("Track_durationMs") val durationMs: Long? = null,
@@ -52,6 +55,14 @@ data class Track(
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
 ) : Comparable<Track> {
+    data class ViewState(
+        val track: Track,
+        val trackArtists: ImmutableList<TrackArtistCredit>,
+        val album: Album?,
+        val albumArtists: ImmutableList<AlbumArtistCredit>,
+        val albumArt: MediaStoreImage?,
+    )
+
     val albumPositionNonNull: Int
         get() = albumPosition ?: 0
 
@@ -76,8 +87,8 @@ data class Track(
     val isPlayable: Boolean
         get() = playUri != null
 
-    val playUri: Uri?
-        get() = localUri ?: youtubeVideo?.metadata?.uri
+    val playUri: String?
+        get() = localUri ?: youtubeVideo?.metadata?.url
 
     val spotifyWebUrl: String?
         get() = spotifyId?.let { "https://open.spotify.com/track/${it}" }
@@ -95,7 +106,8 @@ data class Track(
     }
 
     @WorkerThread
-    fun getDocumentFile(context: Context): DocumentFile? = localUri?.let { DocumentFileCompat.fromUri(context, it) }
+    fun getDocumentFile(context: Context): DocumentFile? =
+        localUri?.let { DocumentFileCompat.fromUri(context, it.toUri()) }
 
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()

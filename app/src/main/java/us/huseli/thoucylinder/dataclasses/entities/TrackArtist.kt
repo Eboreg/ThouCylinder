@@ -4,7 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import java.util.UUID
 
 @Entity(
     primaryKeys = ["TrackArtist_trackId", "TrackArtist_artistId"],
@@ -27,8 +26,8 @@ import java.util.UUID
     ],
 )
 data class TrackArtist(
-    @ColumnInfo("TrackArtist_trackId") val trackId: UUID,
-    @ColumnInfo("TrackArtist_artistId") val artistId: UUID,
+    @ColumnInfo("TrackArtist_trackId") val trackId: String,
+    @ColumnInfo("TrackArtist_artistId") val artistId: String,
     @ColumnInfo("TrackArtist_joinPhrase") val joinPhrase: String = "/",
     @ColumnInfo("TrackArtist_position") val position: Int = 0,
 ) : Comparable<TrackArtist> {

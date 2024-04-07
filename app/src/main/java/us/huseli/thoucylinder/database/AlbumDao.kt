@@ -3,7 +3,6 @@
 package us.huseli.thoucylinder.database
 
 import android.database.DatabaseUtils
-import android.net.Uri
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -28,13 +27,12 @@ import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.toAlbumTags
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import java.util.UUID
 
 @Dao
 abstract class AlbumDao {
     /** Protected methods *****************************************************/
     @Query("DELETE FROM AlbumTag WHERE AlbumTag_albumId IN (:albumIds)")
-    protected abstract suspend fun _deleteAlbumTags(vararg albumIds: UUID)
+    protected abstract suspend fun _deleteAlbumTags(vararg albumIds: String)
 
     @Transaction
     @RawQuery(observedEntities = [Album::class, Tag::class, AlbumTag::class, AlbumArtist::class])
@@ -48,15 +46,23 @@ abstract class AlbumDao {
 
     @Query(
         """
-        UPDATE Album SET Album_albumArt_uri = :uri, Album_albumArt_thumbnailUri = :thumbnailUri, Album_albumArt_hash = :hash 
+        UPDATE Album SET Album_albumArt_fullUriString = :fullUri,
+            Album_albumArt_thumbnailUriString = :thumbnailUri,
+            Album_albumArt_hash = :hash 
         WHERE Album_albumId = :albumId
         """
     )
-    protected abstract suspend fun _updateAlbumArt(albumId: UUID, uri: Uri, thumbnailUri: Uri, hash: Int)
+    protected abstract suspend fun _updateAlbumArt(albumId: String, fullUri: String, thumbnailUri: String, hash: Int)
 
     /** Public methods ********************************************************/
-    @Query("UPDATE Album SET Album_albumArt_uri = NULL, Album_albumArt_thumbnailUri = NULL WHERE Album_albumId = :albumId")
-    abstract suspend fun clearAlbumArt(albumId: UUID)
+    @Query(
+        """
+        UPDATE Album SET Album_albumArt_fullUriString = NULL,
+            Album_albumArt_thumbnailUriString = NULL
+        WHERE Album_albumId = :albumId
+        """
+    )
+    abstract suspend fun clearAlbumArt(albumId: String)
 
     @Query("DELETE FROM Album")
     abstract suspend fun clearAlbums()
@@ -74,12 +80,13 @@ abstract class AlbumDao {
         """
         SELECT AlbumCombo.* FROM AlbumCombo 
         JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId AND AlbumArtist_artistId = :artistId
+        WHERE Album_isInLibrary = 1
         GROUP BY Album_albumId
         ORDER BY LOWER(Album_title)
         """
     )
     @Transaction
-    abstract fun flowAlbumCombosByArtist(artistId: UUID): Flow<List<AlbumCombo>>
+    abstract fun flowAlbumCombosByArtist(artistId: String): Flow<List<AlbumCombo>>
 
     fun flowAlbumCombos(
         sortParameter: AlbumSortParameter,
@@ -125,7 +132,7 @@ abstract class AlbumDao {
 
     @Transaction
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
-    abstract fun flowAlbumWithTracks(albumId: UUID): Flow<AlbumWithTracksCombo?>
+    abstract fun flowAlbumWithTracks(albumId: String): Flow<AlbumWithTracksCombo?>
 
     fun flowTagPojos(availabilityFilter: AvailabilityFilter): Flow<List<TagPojo>> {
         val availabilityQuery = when (availabilityFilter) {
@@ -153,11 +160,11 @@ abstract class AlbumDao {
 
     @Query("SELECT * FROM AlbumCombo WHERE Album_albumId = :albumId")
     @Transaction
-    abstract suspend fun getAlbumCombo(albumId: UUID): AlbumCombo?
+    abstract suspend fun getAlbumCombo(albumId: String): AlbumCombo?
 
     @Transaction
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
-    abstract suspend fun getAlbumWithTracks(albumId: UUID): AlbumWithTracksCombo?
+    abstract suspend fun getAlbumWithTracks(albumId: String): AlbumWithTracksCombo?
 
     @Transaction
     @Query("SELECT * FROM Album WHERE Album_youtubePlaylist_id = :playlistId")
@@ -175,7 +182,7 @@ abstract class AlbumDao {
 
     @Transaction
     @Query("SELECT * FROM Album WHERE Album_albumId IN(:albumIds)")
-    abstract suspend fun listAlbumsWithTracks(vararg albumIds: UUID): List<AlbumWithTracksCombo>
+    abstract suspend fun listAlbumsWithTracks(vararg albumIds: String): List<AlbumWithTracksCombo>
 
     @Transaction
     @Query("SELECT * FROM AlbumCombo WHERE Album_isDeleted = 1")
@@ -196,10 +203,10 @@ abstract class AlbumDao {
     abstract suspend fun listMusicBrainzReleaseIds(): List<String>
 
     @Query("SELECT * FROM Track WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
-    abstract suspend fun listTracks(albumId: UUID): List<Track>
+    abstract suspend fun listTracks(albumId: String): List<Track>
 
     @Transaction
-    open suspend fun setAlbumTags(albumId: UUID, tags: Collection<Tag>) {
+    open suspend fun setAlbumTags(albumId: String, tags: Collection<Tag>) {
         _deleteAlbumTags(albumId)
         if (tags.isNotEmpty()) {
             insertTags(*tags.toTypedArray())
@@ -208,16 +215,16 @@ abstract class AlbumDao {
     }
 
     @Query("UPDATE Album SET Album_isHidden = :isHidden WHERE Album_albumId IN (:albumIds)")
-    abstract suspend fun setIsHidden(isHidden: Boolean, vararg albumIds: UUID)
+    abstract suspend fun setIsHidden(isHidden: Boolean, vararg albumIds: String)
 
     @Query("UPDATE Album SET Album_isInLibrary = :isInLibrary WHERE Album_albumId IN (:albumIds)")
-    abstract suspend fun setIsInLibrary(isInLibrary: Boolean, vararg albumIds: UUID)
+    abstract suspend fun setIsInLibrary(isInLibrary: Boolean, vararg albumIds: String)
 
     @Query("UPDATE Album SET Album_isLocal = :isLocal WHERE Album_albumId IN (:albumIds)")
-    abstract suspend fun setIsLocal(isLocal: Boolean, vararg albumIds: UUID)
+    abstract suspend fun setIsLocal(isLocal: Boolean, vararg albumIds: String)
 
-    suspend fun updateAlbumArt(albumId: UUID, albumArt: MediaStoreImage) =
-        _updateAlbumArt(albumId, albumArt.uri, albumArt.thumbnailUri, albumArt.hash)
+    suspend fun updateAlbumArt(albumId: String, albumArt: MediaStoreImage) =
+        _updateAlbumArt(albumId, albumArt.fullUriString, albumArt.thumbnailUriString, albumArt.hash)
 
     @Update
     abstract suspend fun updateAlbums(vararg albums: Album)

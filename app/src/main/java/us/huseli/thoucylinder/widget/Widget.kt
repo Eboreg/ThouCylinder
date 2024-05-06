@@ -38,12 +38,13 @@ import androidx.glance.unit.ColorProvider
 import us.huseli.thoucylinder.MainActivity
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.abstr.joined
+import us.huseli.thoucylinder.managers.ImageManager
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.umlautify
 
 @SuppressLint("RestrictedApi")
 @Composable
-fun Widget(playerRepo: PlayerRepository) {
+fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
     val context = LocalContext.current
     val canGotoNext by playerRepo.canGotoNext.collectAsState()
     val canPlay by playerRepo.canPlay.collectAsState(false)
@@ -61,7 +62,7 @@ fun Widget(playerRepo: PlayerRepository) {
         ?: context.getString(R.string.no_track_playing).umlautify()
 
     LaunchedEffect(currentCombo) {
-        bitmap.value = currentCombo?.getFullBitmap(context)
+        bitmap.value = currentCombo?.let { imageManager.getTrackComboFullBitmap(it) }
     }
 
     Box(

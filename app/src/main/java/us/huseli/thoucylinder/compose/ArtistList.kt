@@ -34,7 +34,7 @@ import us.huseli.thoucylinder.viewmodels.ImageViewModel
 fun ArtistList(
     artistCombos: ImmutableList<ArtistCombo>,
     modifier: Modifier = Modifier,
-    progressIndicatorText: String? = null,
+    progressIndicatorText: () -> String? = { null },
     onArtistClick: (String) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
     imageViewModel: ImageViewModel = hiltViewModel(),
@@ -49,7 +49,7 @@ fun ArtistList(
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(combo.artist) {
-            imageBitmap = imageViewModel.getArtistImage(combo)
+            imageBitmap = imageViewModel.getArtistThumbnailImageBitmap(combo)
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

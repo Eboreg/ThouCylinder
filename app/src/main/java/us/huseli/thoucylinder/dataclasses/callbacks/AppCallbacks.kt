@@ -1,27 +1,29 @@
 package us.huseli.thoucylinder.dataclasses.callbacks
 
-import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import androidx.compose.runtime.Stable
 
+@Stable
+data class AppDialogCallbacks(
+    val onAddAlbumsToPlaylistClick: (Collection<String>) -> Unit,
+    val onAddTracksToPlaylistClick: (Collection<String>) -> Unit,
+    val onCreatePlaylistClick: () -> Unit,
+    val onDeleteAlbumsClick: (Collection<String>) -> Unit,
+    val onDownloadAlbumClick: (String) -> Unit,
+    val onEditAlbumClick: (String) -> Unit,
+    val onEditTrackClick: (String) -> Unit,
+    val onRadioClick: () -> Unit,
+    val onShowTrackInfoClick: (String) -> Unit,
+)
+
+@Stable
 data class AppCallbacks(
-    val onAddAlbumToLibraryClick: (Album.ViewState) -> Unit,
-    val onAddToPlaylistClick: (Selection) -> Unit,
-    val onAlbumClick: (String) -> Unit,
+    val onAddAlbumsToPlaylistClick: (Collection<String>) -> Unit,
+    val onAddTracksToPlaylistClick: (Collection<String>) -> Unit,
     val onArtistClick: (String) -> Unit,
     val onBackClick: () -> Unit,
-    val onCancelAlbumDownloadClick: (String) -> Unit,
     val onCreatePlaylistClick: () -> Unit,
-    val onDeleteAlbumsClick: (Collection<Album.ViewState>) -> Unit,
-    val onDeletePlaylistClick: (Playlist) -> Unit,
-    val onDownloadAlbumClick: (Album) -> Unit,
-    val onDownloadTrackClick: (Track.ViewState) -> Unit,
-    val onEditAlbumClick: (Album.ViewState) -> Unit,
-    val onEditTrackClick: (Track.ViewState) -> Unit,
+    val onDeleteAlbumsClick: (Collection<String>) -> Unit,
+    val onDeletePlaylistClick: (String) -> Unit,
     val onPlaylistClick: (String) -> Unit,
-    val onShowTrackInfoClick: (Track) -> Unit,
-    val onStartAlbumRadioClick: (String) -> Unit,
     val onStartArtistRadioClick: (String) -> Unit,
-    val onStartTrackRadioClick: (String) -> Unit,
 )

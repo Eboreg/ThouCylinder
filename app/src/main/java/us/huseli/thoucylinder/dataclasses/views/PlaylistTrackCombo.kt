@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.views
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.DatabaseView
 import androidx.room.Embedded
@@ -19,6 +20,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
     ORDER BY PlaylistTrack_position
     """
 )
+@Immutable
 data class PlaylistTrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album?,

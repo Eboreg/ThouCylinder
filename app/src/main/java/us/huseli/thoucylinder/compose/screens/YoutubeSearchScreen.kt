@@ -23,14 +23,12 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListDisplayTypeButton
 import us.huseli.thoucylinder.compose.ListType
 import us.huseli.thoucylinder.compose.ListTypeChips
-import us.huseli.thoucylinder.compose.SearchForm
+import us.huseli.thoucylinder.compose.YoutubeSearchForm
 import us.huseli.thoucylinder.compose.album.AlbumGrid
 import us.huseli.thoucylinder.compose.album.AlbumList
 import us.huseli.thoucylinder.compose.track.TrackGrid
@@ -38,15 +36,13 @@ import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
 import us.huseli.thoucylinder.compose.utils.rememberToolbarScrollConnection
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
 
@@ -55,19 +51,19 @@ fun YoutubeSearchScreen(
     modifier: Modifier = Modifier,
     viewModel: YoutubeSearchViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
+    albumCallbacks: AlbumCallbacks,
+    trackCallbacks: TrackCallbacks,
 ) {
     val context = LocalContext.current
 
-    val albumDownloadStates by viewModel.albumDownloadStates.collectAsStateWithLifecycle()
-    val albumViewStates by viewModel.albumViewStates.collectAsStateWithLifecycle(persistentListOf())
+    val albumUiStates by viewModel.albumUiStates.collectAsStateWithLifecycle()
     val isSearchingAlbums by viewModel.isSearchingAlbums.collectAsStateWithLifecycle()
     val isSearchingTracks by viewModel.isSearchingTracks.collectAsStateWithLifecycle()
-    val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle(null)
+    val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
-    val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle(emptyList())
-    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle(emptyList())
-    val trackDownloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
-    val trackCombos = viewModel.trackCombos.collectAsLazyPagingItems()
+    val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle()
+    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
+    val trackUiStates = viewModel.trackUiStates.collectAsLazyPagingItems()
 
     var displayType by rememberSaveable { mutableStateOf(DisplayType.LIST) }
     var latestSelectedTrackIndex by rememberSaveable(selectedTrackIds) { mutableStateOf<Int?>(null) }
@@ -83,8 +79,8 @@ fun YoutubeSearchScreen(
     }
 
     Column(modifier = modifier) {
-        CollapsibleToolbar(show = showToolbars) {
-            SearchForm(
+        CollapsibleToolbar(show = { showToolbars }) {
+            YoutubeSearchForm(
                 isSearching = isSearching,
                 initialQuery = query,
                 onSearch = { viewModel.search(it) },
@@ -98,7 +94,7 @@ fun YoutubeSearchScreen(
                     ListTypeChips(
                         current = listType,
                         onChange = { listType = it },
-                        exclude = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
+                        exclude = persistentListOf(ListType.ARTISTS, ListType.PLAYLISTS),
                     )
                 }
                 ListDisplayTypeButton(current = displayType, onChange = { displayType = it })
@@ -110,72 +106,52 @@ fun YoutubeSearchScreen(
         when (listType) {
             ListType.ALBUMS -> AlbumSearchResults(
                 modifier = Modifier.nestedScroll(nestedScrollConnection),
-                states = albumViewStates,
+                states = { albumUiStates },
                 displayType = displayType,
                 selectedAlbumIds = selectedAlbumIds.toImmutableList(),
                 isSearching = isSearchingAlbums,
-                callbacks = { state: Album.ViewState ->
-                    AlbumCallbacks(
-                        state = state,
-                        appCallbacks = appCallbacks,
-                        onPlayClick = { viewModel.playAlbum(state.album.albumId) },
-                        onEnqueueClick = { viewModel.enqueueAlbum(state.album.albumId, context) },
-                        onAddToPlaylistClick = {
-                            viewModel.onAlbumTracks(state.album.albumId) {
-                                appCallbacks.onAddToPlaylistClick(Selection(tracks = it))
-                            }
-                        },
-                        onAlbumLongClick = {
-                            viewModel.selectAlbumsFromLastSelected(
-                                to = state.album.albumId,
-                                allAlbumIds = albumViewStates.map { it.album.albumId },
-                            )
-                        },
-                        onAlbumClick = {
-                            if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(state.album.albumId)
+                selectionCallbacks = viewModel.getAlbumSelectionCallbacks(appCallbacks, context),
+                callbacks = remember {
+                    albumCallbacks.copy(
+                        onPlayClick = { viewModel.playAlbum(it) },
+                        onEnqueueClick = { viewModel.enqueueAlbum(it) },
+                        onAlbumLongClick = { albumId -> viewModel.selectAlbumsFromLastSelected(to = albumId) },
+                        onAlbumClick = { albumId ->
+                            if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(albumId)
                             else {
-                                viewModel.updateFromMusicBrainz(state.album.albumId)
-                                appCallbacks.onAlbumClick(state.album.albumId)
+                                viewModel.updateFromMusicBrainz(albumId)
+                                albumCallbacks.onAlbumClick?.invoke(albumId)
                             }
-                        },
+                        }
                     )
                 },
-                selectionCallbacks = viewModel.getAlbumSelectionCallbacks(appCallbacks, context),
-                downloadStates = albumDownloadStates,
             )
             ListType.TRACKS -> TrackSearchResults(
-                modifier = Modifier.nestedScroll(nestedScrollConnection),
-                tracks = trackCombos,
-                selectedTrackIds = selectedTrackIds.toImmutableList(),
-                viewModel = viewModel,
                 displayType = displayType,
                 isSearching = isSearchingTracks,
-                trackSelectionCallbacks = viewModel.getTrackSelectionCallbacks(appCallbacks, context),
-                downloadStates = trackDownloadStates,
-                trackCallbacks = { index: Int, state: Track.ViewState ->
-                    TrackCallbacks(
-                        state = state,
-                        appCallbacks = appCallbacks,
-                        onEnqueueClick = if (state.track.isPlayable) {
-                            { viewModel.enqueueTrack(state, context) }
-                        } else null,
-                        onAddToPlaylistClick = { appCallbacks.onAddToPlaylistClick(Selection(track = state.track)) },
+                selectedTrackIds = selectedTrackIds.toImmutableList(),
+                trackCallbacks = { index: Int, state: TrackUiState ->
+                    trackCallbacks.copy(
                         onLongClick = {
                             viewModel.selectTracksBetweenIndices(
                                 fromIndex = latestSelectedTrackIndex,
                                 toIndex = index,
-                                getTrackIdAtIndex = { trackCombos[it]?.track?.trackId },
+                                getTrackIdAtIndex = { trackUiStates[it]?.trackId },
                             )
                         },
                         onTrackClick = {
-                            if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.track.trackId)
-                            else if (state.track.isPlayable) viewModel.playTrack(state)
+                            if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.trackId)
+                            else if (state.isPlayable) viewModel.playTrack(state)
                         },
                         onEach = {
-                            if (state.track.trackId == latestSelectedTrackId) latestSelectedTrackIndex = index
+                            if (state.trackId == latestSelectedTrackId) latestSelectedTrackIndex = index
                         },
                     )
                 },
+                trackSelectionCallbacks = viewModel.getTrackSelectionCallbacks(appCallbacks),
+                trackUiStates = trackUiStates,
+                modifier = Modifier.nestedScroll(nestedScrollConnection),
+                viewModel = viewModel,
             )
             ListType.ARTISTS -> {}
             ListType.PLAYLISTS -> {}
@@ -186,13 +162,12 @@ fun YoutubeSearchScreen(
 
 @Composable
 fun AlbumSearchResults(
-    callbacks: (Album.ViewState) -> AlbumCallbacks,
+    callbacks: AlbumCallbacks,
     selectionCallbacks: AlbumSelectionCallbacks,
-    states: ImmutableList<Album.ViewState>,
+    states: () -> ImmutableList<AlbumUiState>,
     displayType: DisplayType,
     isSearching: Boolean,
     selectedAlbumIds: ImmutableList<String>,
-    downloadStates: ImmutableList<AlbumDownloadTask.ViewState>,
     modifier: Modifier = Modifier,
 ) {
     when (displayType) {
@@ -206,21 +181,18 @@ fun AlbumSearchResults(
                     if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                 },
                 modifier = modifier,
-                downloadStates = downloadStates,
             )
         }
         DisplayType.GRID -> {
             AlbumGrid(
                 states = states,
                 callbacks = callbacks,
-                selectedAlbumIds = selectedAlbumIds,
                 selectionCallbacks = selectionCallbacks,
-                onEmpty = {
-                    if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
-                },
+                selectedAlbumIds = selectedAlbumIds,
                 modifier = modifier,
-                downloadStates = downloadStates,
-            )
+            ) {
+                if (!isSearching) Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+            }
         }
     }
 }
@@ -231,40 +203,36 @@ fun TrackSearchResults(
     displayType: DisplayType,
     isSearching: Boolean,
     selectedTrackIds: ImmutableList<String>,
-    trackCallbacks: (Int, Track.ViewState) -> TrackCallbacks,
+    trackCallbacks: (Int, TrackUiState) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
-    tracks: LazyPagingItems<TrackCombo>,
-    downloadStates: ImmutableList<TrackDownloadTask.ViewState>,
+    trackUiStates: LazyPagingItems<TrackUiState>,
     modifier: Modifier = Modifier,
     viewModel: YoutubeSearchViewModel = hiltViewModel(),
 ) {
     when (displayType) {
         DisplayType.LIST -> {
             TrackList(
-                trackCombos = tracks,
-                selectedTrackIds = selectedTrackIds,
+                uiStates = trackUiStates,
                 trackCallbacks = trackCallbacks,
+                selectedTrackIds = selectedTrackIds,
                 trackSelectionCallbacks = trackSelectionCallbacks,
-                onEmpty = {
-                    if (!isSearching) Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
-                },
                 modifier = modifier,
-                downloadStates = downloadStates,
-                ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
-            )
+                ensureTrackMetadata = { viewModel.ensureTrackMetadata(it) },
+            ) {
+                if (!isSearching) Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
+            }
         }
         DisplayType.GRID -> {
             TrackGrid(
-                trackCombos = tracks,
+                uiStates = trackUiStates,
                 trackCallbacks = trackCallbacks,
                 trackSelectionCallbacks = trackSelectionCallbacks,
                 selectedTrackIds = selectedTrackIds,
-                downloadStates = downloadStates,
                 onEmpty = {
                     if (!isSearching) Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                 },
                 modifier = modifier,
-                ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
+                ensureTrackMetadata = { viewModel.ensureTrackMetadata(it) },
             )
         }
     }

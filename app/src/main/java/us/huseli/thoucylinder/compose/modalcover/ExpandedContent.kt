@@ -22,32 +22,35 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.viewmodels.QueueViewModel
+import us.huseli.thoucylinder.dataclasses.callbacks.PlaybackCallbacks
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun ExpandedContent(
     endPositionMs: Float,
-    canPlay: Boolean,
-    canGotoNext: Boolean,
-    isPlaying: Boolean,
-    isLoading: Boolean,
+    canPlay: State<Boolean>,
+    canGotoNext: State<Boolean>,
+    isPlaying: State<Boolean>,
+    isLoading: State<Boolean>,
+    isRepeatEnabled: State<Boolean>,
+    isShuffleEnabled: State<Boolean>,
+    maxWidthPx: Float,
+    progress: State<Float>,
+    backgroundColor: () -> Color,
+    callbacks: PlaybackCallbacks,
     modifier: Modifier = Modifier,
-    viewModel: QueueViewModel = hiltViewModel(),
+    amplitudes: State<ImmutableList<Int>>,
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
-    val isRepeatEnabled by viewModel.isRepeatEnabled.collectAsStateWithLifecycle()
-    val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val toggleButtonColors = IconButtonDefaults.iconToggleButtonColors(
         checkedContentColor = LocalContentColor.current,
         contentColor = LocalContentColor.current.copy(alpha = 0.5f),
@@ -55,13 +58,17 @@ fun ExpandedContent(
 
     Column(
         modifier = modifier.padding(top = 15.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.SpaceEvenly,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        ExpandedProgressBar(
-            viewModel = viewModel,
-            containerColor = containerColor,
-            contentColor = contentColor,
+        ExpandedWaveForm(
+            amplitudes = amplitudes.value,
+            containerColor = { containerColor },
+            contentColor = { contentColor },
+            maxWidthPx = maxWidthPx,
             endPositionMs = endPositionMs,
+            backgroundColor = backgroundColor,
+            progress = progress,
+            seekToProgress = callbacks.seekToProgress,
         )
 
         // Large button row:
@@ -71,13 +78,13 @@ fun ExpandedContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             IconToggleButton(
-                checked = isShuffleEnabled,
-                onCheckedChange = { viewModel.toggleShuffle() },
+                checked = isShuffleEnabled.value,
+                onCheckedChange = { callbacks.toggleShuffle() },
                 content = { Icon(Icons.Sharp.Shuffle, null) },
                 colors = toggleButtonColors,
             )
             IconButton(
-                onClick = { viewModel.skipToStartOrPrevious() },
+                onClick = callbacks.skipToStartOrPrevious,
                 content = {
                     Icon(
                         imageVector = Icons.Sharp.SkipPrevious,
@@ -88,25 +95,25 @@ fun ExpandedContent(
                 modifier = Modifier.size(60.dp),
             )
             FilledTonalIconButton(
-                onClick = { viewModel.playOrPauseCurrent() },
+                onClick = callbacks.playOrPauseCurrent,
                 content = {
-                    if (isLoading) {
+                    if (isLoading.value) {
                         CircularProgressIndicator(
                             color = contentColor,
                             modifier = Modifier.size(24.dp),
                         )
                     } else {
                         val description =
-                            if (isPlaying) stringResource(R.string.pause)
+                            if (isPlaying.value) stringResource(R.string.pause)
                             else stringResource(R.string.play)
                         Icon(
-                            imageVector = if (isPlaying) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
+                            imageVector = if (isPlaying.value) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
                             contentDescription = description,
                             modifier = Modifier.scale(1.75f),
                         )
                     }
                 },
-                enabled = canPlay,
+                enabled = canPlay.value,
                 modifier = Modifier.size(80.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = containerColor,
@@ -114,7 +121,7 @@ fun ExpandedContent(
                 ),
             )
             IconButton(
-                onClick = { viewModel.skipToNext() },
+                onClick = callbacks.skipToNext,
                 content = {
                     Icon(
                         imageVector = Icons.Sharp.SkipNext,
@@ -122,12 +129,12 @@ fun ExpandedContent(
                         modifier = Modifier.scale(1.5f),
                     )
                 },
-                enabled = canGotoNext,
+                enabled = canGotoNext.value,
                 modifier = Modifier.size(60.dp),
             )
             IconToggleButton(
-                checked = isRepeatEnabled,
-                onCheckedChange = { viewModel.toggleRepeat() },
+                checked = isRepeatEnabled.value,
+                onCheckedChange = { callbacks.toggleRepeat() },
                 content = { Icon(Icons.Sharp.Repeat, null) },
                 colors = toggleButtonColors,
             )

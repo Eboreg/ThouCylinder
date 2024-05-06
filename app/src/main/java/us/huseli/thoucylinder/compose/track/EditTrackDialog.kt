@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
@@ -27,24 +26,24 @@ import us.huseli.thoucylinder.compose.utils.AutocompleteTextField
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.SaveButton
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.EditTrackViewModel
 
 @Composable
 fun EditTrackDialog(
-    state: Track.ViewState,
+    state: TrackUiState,
     modifier: Modifier = Modifier,
     viewModel: EditTrackViewModel = hiltViewModel(),
     onClose: () -> Unit,
 ) {
-    var title by rememberSaveable { mutableStateOf(state.track.title) }
+    var title by rememberSaveable { mutableStateOf(state.title) }
     var artistNames by rememberSaveable {
         mutableStateOf(state.trackArtists.map { it.name }.takeIf { it.isNotEmpty() } ?: listOf(""))
     }
-    var albumPosition by rememberSaveable { mutableStateOf(state.track.albumPosition?.toString() ?: "") }
-    var discNumber by rememberSaveable { mutableStateOf(state.track.discNumber?.toString() ?: "") }
-    var year by rememberSaveable { mutableStateOf(state.track.year?.toString() ?: "") }
+    var albumPosition by rememberSaveable { mutableStateOf(state.albumPosition?.toString() ?: "") }
+    var discNumber by rememberSaveable { mutableStateOf(state.discNumber?.toString() ?: "") }
+    var year by rememberSaveable { mutableStateOf(state.year?.toString() ?: "") }
 
     AlertDialog(
         modifier = modifier.padding(20.dp),
@@ -55,7 +54,7 @@ fun EditTrackDialog(
         confirmButton = {
             SaveButton(
                 onClick = {
-                    viewModel.updateTrackCombo(
+                    viewModel.updateTrack(
                         state = state,
                         title = title,
                         year = year.toIntOrNull(),
@@ -78,7 +77,7 @@ fun EditTrackDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                     Column(modifier = Modifier.weight(0.7f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        artistNames.fastForEachIndexed { index, artistName ->
+                        artistNames.forEachIndexed { index, artistName ->
                             val onTextChange: (String) -> Unit = {
                                 artistNames = artistNames.toMutableList().apply { set(index, it) }
                             }

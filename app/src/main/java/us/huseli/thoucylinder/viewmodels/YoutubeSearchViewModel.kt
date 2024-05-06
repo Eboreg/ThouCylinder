@@ -12,35 +12,52 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.dataclasses.views.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
-import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.getAlbumUiStateFlow
+import us.huseli.thoucylinder.getTrackUiStateFlow
+import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
 class YoutubeSearchViewModel @Inject constructor(
     private val repos: Repositories,
-) : AbstractAlbumListViewModel("YoutubeSearchViewModel", repos) {
+    private val managers: Managers,
+) : AbstractAlbumListViewModel("YoutubeSearchViewModel", repos, managers) {
     private val _isSearchingAlbums = MutableStateFlow(false)
     private val _query = MutableStateFlow("")
     private val _albumCombos = MutableStateFlow<ImmutableList<AlbumWithTracksCombo>>(persistentListOf())
-    private val _trackCombos = MutableStateFlow<PagingData<TrackCombo>>(PagingData.empty())
-    private val _albumViewStates = MutableStateFlow<ImmutableList<Album.ViewState>>(persistentListOf())
+    private val _trackUiStates = MutableStateFlow<PagingData<TrackUiState>>(PagingData.empty())
 
-    override val albumViewStates = _albumViewStates.asStateFlow()
+    override val albumUiStates = combine(
+        _albumCombos,
+        managers.library.albumDownloadTasks,
+    ) { combos, tasks ->
+        combos.map { combo ->
+            AlbumUiState.fromAlbumCombo(combo).copy(downloadState = tasks.getAlbumUiStateFlow(combo.album.albumId))
+        }.toImmutableList()
+    }.distinctUntilChanged().stateLazily(persistentListOf())
 
-    val trackCombos: StateFlow<PagingData<TrackCombo>> = _trackCombos.asStateFlow()
+    val trackUiStates: StateFlow<PagingData<TrackUiState>> = _trackUiStates.asStateFlow()
     val isSearchingTracks: StateFlow<Boolean> = repos.youtube.isSearchingTracks
     val isSearchingAlbums: StateFlow<Boolean> = _isSearchingAlbums.asStateFlow()
     val query: StateFlow<String> = _query.asStateFlow()
+
+    fun enqueueAlbum(albumId: String) = managers.player.enqueueAlbums(listOf(albumId))
+
+    fun ensureTrackMetadata(uiState: TrackUiState) = managers.library.ensureTrackMetadataAsync(uiState.trackId)
+
+    fun playAlbum(albumId: String) = managers.player.playAlbums(listOf(albumId))
 
     fun search(query: String) {
         if (query != _query.value) {
@@ -52,9 +69,10 @@ class YoutubeSearchViewModel @Inject constructor(
                 launchOnIOThread {
                     val combos = repos.youtube.searchPlaylistCombos(query)
                         .map { playlistCombo ->
-                            playlistCombo.toAlbumCombo(
+                            playlistCombo.toAlbumWithTracks(
                                 isInLibrary = false,
-                                getArtist = { repos.artist.artistCache.getByName(it) },
+                                isLocal = false,
+                                getArtist = { repos.artist.artistCache.get(it) },
                             )
                         }
 
@@ -68,22 +86,24 @@ class YoutubeSearchViewModel @Inject constructor(
                         )
                     }
                     _albumCombos.value = combos.toImmutableList()
-                    _albumViewStates.value = combos.map { it.getViewState() }.toImmutableList()
                     _isSearchingAlbums.value = false
                 }
 
                 launchOnIOThread {
-                    repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope).collectLatest { pagingData ->
-                        _trackCombos.value = pagingData.map { TrackCombo(track = it) }
+                    combine(
+                        repos.youtube.searchTracks(query).flow.cachedIn(viewModelScope),
+                        managers.library.trackDownloadTasks,
+                    ) { pagingData, tasks ->
+                        pagingData.map { track ->
+                            TrackUiState.fromTrack(track).copy(downloadState = tasks.getTrackUiStateFlow(track.trackId))
+                        }
                     }
                 }
             }
         }
     }
 
-    fun updateFromMusicBrainz(albumId: String) = launchOnIOThread {
-        repos.album.getAlbumWithTracks(albumId)?.also { updateFromMusicBrainz(it) }
-    }
+    fun updateFromMusicBrainz(albumId: String) = managers.library.updateAlbumFromMusicBrainz(albumId)
 
     override fun getAlbumSelectionCallbacks(appCallbacks: AppCallbacks, context: Context): AlbumSelectionCallbacks =
         super.getAlbumSelectionCallbacks(appCallbacks, context).copy(onDeleteClick = null)

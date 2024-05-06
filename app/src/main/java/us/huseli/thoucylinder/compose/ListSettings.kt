@@ -14,6 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.stringResource
 
@@ -28,8 +31,8 @@ fun ListSettingsRow(
     onDisplayTypeChange: (DisplayType) -> Unit,
     onListTypeChange: (ListType) -> Unit,
     modifier: Modifier = Modifier,
-    availableDisplayTypes: List<DisplayType> = DisplayType.entries,
-    excludeListTypes: List<ListType> = emptyList(),
+    availableDisplayTypes: ImmutableList<DisplayType> = DisplayType.entries.toImmutableList(),
+    excludeListTypes: ImmutableList<ListType> = persistentListOf(),
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -55,7 +58,7 @@ fun ListTypeChips(
     current: ListType,
     onChange: (ListType) -> Unit,
     modifier: Modifier = Modifier,
-    exclude: List<ListType> = emptyList(),
+    exclude: ImmutableList<ListType> = persistentListOf(),
 ) {
     if (!exclude.contains(ListType.ALBUMS)) {
         InputChip(
@@ -97,7 +100,7 @@ fun ListDisplayTypeButton(
     current: DisplayType,
     onChange: (DisplayType) -> Unit,
     modifier: Modifier = Modifier,
-    available: List<DisplayType> = DisplayType.entries,
+    available: ImmutableList<DisplayType> = DisplayType.entries.toImmutableList(),
 ) {
     val nextDisplayType = { dt: DisplayType ->
         available.indexOf(dt).let { index ->

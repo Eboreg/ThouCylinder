@@ -27,11 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentListOf
-import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.stringResource
 
 @Composable
@@ -46,8 +45,8 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
     modifier: Modifier = Modifier,
     showFilterButton: Boolean = true,
     filterButtonSelected: Boolean = false,
-    tagPojos: ImmutableList<TagPojo>? = null,
-    selectedTagPojos: ImmutableList<TagPojo>? = null,
+    tagPojos: () -> ImmutableList<TagPojo>,
+    selectedTagPojos: () -> ImmutableList<TagPojo>,
     availabilityFilter: AvailabilityFilter? = null,
     onTagsChange: (List<TagPojo>) -> Unit = {},
     onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},
@@ -58,8 +57,8 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
 
     if (isFilterDialogOpen) {
         ListFilterDialog(
-            tagPojos = tagPojos,
-            selectedTagPojos = selectedTagPojos ?: persistentListOf(),
+            tagPojos = tagPojos(),
+            selectedTagPojos = selectedTagPojos(),
             onCancelClick = { isFilterDialogOpen = false },
             availabilityFilter = availabilityFilter,
             onAvailabilityFilterChange = onAvailabilityFilterChange,

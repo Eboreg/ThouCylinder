@@ -1,15 +1,11 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.preference.PreferenceManager
 import com.thoughtworks.xstream.XStream
 import com.thoughtworks.xstream.security.AnyTypePermission
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,11 +19,11 @@ import kotlinx.coroutines.sync.withLock
 import us.huseli.retaintheme.extensions.join
 import us.huseli.retaintheme.extensions.md5
 import us.huseli.retaintheme.extensions.toHex
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SCROBBLE
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_SESSION_KEY
 import us.huseli.thoucylinder.Constants.PREF_LASTFM_USERNAME
-import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.abstr.joined
@@ -36,23 +32,20 @@ import us.huseli.thoucylinder.dataclasses.lastFm.LastFmScrobble
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.lastFm.LastFmTopArtistsResponse
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
-import us.huseli.thoucylinder.enums.PlaybackState
 import us.huseli.thoucylinder.fromJson
 import us.huseli.thoucylinder.getMutexCache
-import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
+import us.huseli.thoucylinder.interfaces.ILogger
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.time.Duration.Companion.seconds
 
 @Singleton
 class LastFmRepository @Inject constructor(
     database: Database,
     @ApplicationContext private val context: Context,
-) : PlayerRepositoryListener, ILogger {
+) : ILogger, AbstractScopeHolder() {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val albumDao = database.albumDao()
     private val scrobbleMutex = Mutex()
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var scrobbleJob: Job? = null
     private val apiResponseCache =
         getMutexCache("LastFmRepository.apiResponseCache") { url -> Request(url).getString() }
@@ -63,13 +56,15 @@ class LastFmRepository @Inject constructor(
     private val _scrobble = MutableStateFlow(preferences.getBoolean(PREF_LASTFM_SCROBBLE, false))
     private val _scrobbles = MutableStateFlow<List<LastFmScrobble>>(emptyList())
     private val _sessionKey = MutableStateFlow(preferences.getString(PREF_LASTFM_SESSION_KEY, null))
-    private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.Album>>(emptyList())
+    private val _topAlbums = MutableStateFlow<List<LastFmTopAlbumsResponse.LastFmAlbum>>(emptyList())
     private val _username = MutableStateFlow(preferences.getString(PREF_LASTFM_USERNAME, null))
 
     val allTopAlbumsFetched: StateFlow<Boolean> = _allTopAlbumsFetched.asStateFlow()
+    val importedReleaseIds: StateFlow<List<String>> =
+        albumDao.flowMusicBrainzReleaseIds().distinctUntilChanged().stateLazily(emptyList())
     val isAuthenticated = _sessionKey.map { it != null }.distinctUntilChanged()
     val scrobble: StateFlow<Boolean> = _scrobble.asStateFlow()
-    val topAlbums: StateFlow<List<LastFmTopAlbumsResponse.Album>> = _topAlbums.asStateFlow()
+    val topAlbums: StateFlow<List<LastFmTopAlbumsResponse.LastFmAlbum>> = _topAlbums.asStateFlow()
     val username: StateFlow<String?> = _username.asStateFlow()
 
     data class Session(
@@ -78,7 +73,7 @@ class LastFmRepository @Inject constructor(
     )
 
     init {
-        scope.launch {
+        launchOnIOThread {
             combine(_sessionKey, _scrobble) { sessionKey, scrobble -> Pair(sessionKey, scrobble) }
                 .collect { (sessionKey, scrobble) ->
                     if (!scrobble || sessionKey == null) {
@@ -167,9 +162,6 @@ class LastFmRepository @Inject constructor(
         }
     }
 
-    suspend fun getThumbnail(album: LastFmTopAlbumsResponse.Album): ImageBitmap? =
-        album.getThumbnailImageBitmap(context)
-
     suspend fun getTopArtists(limit: Int = 10): List<LastFmTopArtistsResponse.Artist> {
         return _username.value?.let { username ->
             val url = getApiUrl(
@@ -190,7 +182,44 @@ class LastFmRepository @Inject constructor(
         } ?: emptyList()
     }
 
-    suspend fun listImportedAlbumIds(): List<String> = albumDao.listMusicBrainzReleaseIds()
+    suspend fun sendNowPlaying(combo: QueueTrackCombo, artistString: String) {
+        val sessionKey = _sessionKey.value
+
+        if (_scrobble.value && sessionKey != null) {
+            val nowPlaying = LastFmNowPlaying(
+                artist = artistString,
+                track = combo.track.title,
+                duration = combo.track.duration?.inWholeSeconds?.toInt(),
+                album = combo.album?.title,
+                trackNumber = combo.track.albumPosition,
+                albumArtist = combo.albumArtists.joined(),
+                mbid = combo.track.musicBrainzId,
+            )
+
+            if (nowPlaying != _latestNowPlaying.value) {
+                postAndGetString(
+                    method = "track.updateNowPlaying",
+                    params = nowPlaying.toMap().plus("sk" to sessionKey)
+                )
+            }
+            _latestNowPlaying.value = nowPlaying
+        }
+    }
+
+    suspend fun sendScrobble(combo: QueueTrackCombo, artistString: String, startTimestamp: Long) {
+        if (_scrobble.value) scrobbleMutex.withLock {
+            _scrobbles.value += LastFmScrobble(
+                track = combo.track.title,
+                artist = artistString,
+                album = combo.album?.title,
+                albumArtist = combo.albumArtists.joined(),
+                mbid = combo.track.musicBrainzId,
+                trackNumber = combo.track.albumPosition,
+                duration = combo.track.duration?.inWholeSeconds?.toInt(),
+                timestamp = startTimestamp,
+            )
+        }
+    }
 
     fun setScrobble(value: Boolean) {
         _scrobble.value = value
@@ -207,7 +236,9 @@ class LastFmRepository @Inject constructor(
         }
     }
 
-    /** PRIVATE METHODS *******************************************************/
+
+    /** PRIVATE METHODS ***********************************************************************************************/
+
     private fun getApiUrl(params: Map<String, String> = emptyMap()): String =
         Request.getUrl(API_ROOT, params.plus("api_key" to BuildConfig.lastFmApiKey))
 
@@ -238,55 +269,6 @@ class LastFmRepository @Inject constructor(
     private fun withSignature(params: Map<String, String>): Map<String, String> =
         params.plus("api_sig" to getSignature(params))
 
-
-    /** OVERRIDDEN METHODS ****************************************************/
-    override suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {
-        _sessionKey.value?.also { sessionKey ->
-            if (_scrobble.value && state == PlaybackState.PLAYING) {
-                val nowPlaying = combo?.let {
-                    it.artists.joined()?.let { artist ->
-                        LastFmNowPlaying(
-                            artist = artist,
-                            track = it.track.title,
-                            duration = it.track.duration?.inWholeSeconds?.toInt(),
-                            album = it.album?.title,
-                            trackNumber = it.track.albumPosition,
-                            albumArtist = it.albumArtists.joined(),
-                            mbid = it.track.musicBrainzId,
-                        )
-                    }
-                }
-
-                if (nowPlaying != null && nowPlaying != _latestNowPlaying.value) {
-                    postAndGetString(
-                        method = "track.updateNowPlaying",
-                        params = nowPlaying.toMap().plus("sk" to sessionKey)
-                    )
-                }
-                _latestNowPlaying.value = nowPlaying
-            }
-        }
-    }
-
-    override suspend fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {
-        val artist = combo.artists.joined()
-        val duration = combo.track.duration
-
-        if (artist != null && duration != null && duration > 30.seconds && _scrobble.value) {
-            scrobbleMutex.withLock {
-                _scrobbles.value += LastFmScrobble(
-                    track = combo.track.title,
-                    artist = artist,
-                    album = combo.album?.title,
-                    albumArtist = combo.albumArtists.joined(),
-                    mbid = combo.track.musicBrainzId,
-                    trackNumber = combo.track.albumPosition,
-                    duration = combo.track.duration?.inWholeSeconds?.toInt(),
-                    timestamp = startTimestamp,
-                )
-            }
-        }
-    }
 
     companion object {
         // Don't know if Last.fm has any hard quota limit, but better not overdo it:

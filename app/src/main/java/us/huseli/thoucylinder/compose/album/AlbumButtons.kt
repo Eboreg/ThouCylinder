@@ -27,6 +27,7 @@ import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun AlbumButtons(
+    albumId: String,
     albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
@@ -41,7 +42,7 @@ fun AlbumButtons(
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Row {
             IconButton(
-                onClick = callbacks.onEditClick,
+                onClick = { callbacks.onEditClick(albumId) },
                 content = {
                     Icon(
                         imageVector = Icons.Sharp.Edit,
@@ -52,7 +53,7 @@ fun AlbumButtons(
             )
             if (isDownloading) {
                 IconButton(
-                    onClick = callbacks.onCancelDownloadClick,
+                    onClick = { callbacks.onCancelDownloadClick(albumId) },
                     content = {
                         Icon(
                             imageVector = Icons.Sharp.Cancel,
@@ -65,7 +66,7 @@ fun AlbumButtons(
                 )
             } else {
                 if (isInLibrary) IconButton(
-                    onClick = callbacks.onDeleteClick,
+                    onClick = { callbacks.onDeleteClick(albumId) },
                     content = {
                         Icon(
                             imageVector = Icons.Sharp.Delete,
@@ -76,7 +77,7 @@ fun AlbumButtons(
                     modifier = modifier.padding(horizontal = 5.dp),
                 )
                 else IconButton(
-                    onClick = callbacks.onAddToLibraryClick,
+                    onClick = { callbacks.onAddToLibraryClick(albumId) },
                     content = {
                         Icon(
                             imageVector = Icons.Sharp.BookmarkBorder,
@@ -88,7 +89,7 @@ fun AlbumButtons(
                 )
 
                 if (!isLocal || isPartiallyDownloaded) IconButton(
-                    onClick = callbacks.onDownloadClick,
+                    onClick = { callbacks.onDownloadClick(albumId) },
                     content = {
                         Icon(
                             imageVector = Icons.Sharp.Download,
@@ -102,7 +103,7 @@ fun AlbumButtons(
 
             callbacks.onPlayClick?.also { onPlayClick ->
                 IconButton(
-                    onClick = onPlayClick,
+                    onClick = { onPlayClick(albumId) },
                     content = {
                         Icon(
                             imageVector = Icons.Sharp.PlayArrow,
@@ -117,6 +118,7 @@ fun AlbumButtons(
 
         Row {
             AlbumContextMenuWithButton(
+                albumId = albumId,
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,
                 callbacks = callbacks,

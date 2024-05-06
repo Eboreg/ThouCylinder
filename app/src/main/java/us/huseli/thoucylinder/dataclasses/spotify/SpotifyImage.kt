@@ -2,11 +2,11 @@ package us.huseli.thoucylinder.dataclasses.spotify
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.net.toUri
 import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MIN_WIDTH_PX
-import us.huseli.thoucylinder.asThumbnailImageBitmap
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.getBitmap
+import us.huseli.thoucylinder.dataclasses.toMediaStoreImage
+import us.huseli.thoucylinder.getCachedThumbnailBitmap
 import kotlin.math.min
 
 data class SpotifyImage(
@@ -18,11 +18,11 @@ data class SpotifyImage(
         get() = min(width ?: 0, height ?: 0)
 }
 
-private fun Collection<SpotifyImage>.getThumbnailUrl(): String? =
+fun Collection<SpotifyImage>.getThumbnailUrl(): String? =
     filter { it.shortestSide >= IMAGE_THUMBNAIL_MIN_WIDTH_PX }.minByOrNull { it.shortestSide }?.url
 
 suspend fun Collection<SpotifyImage>.getThumbnailImageBitmap(context: Context): ImageBitmap? =
-    getThumbnailUrl()?.toUri()?.getBitmap(context)?.asThumbnailImageBitmap(context)
+    getThumbnailUrl()?.toUri()?.getCachedThumbnailBitmap(context)?.asImageBitmap()
 
-fun Collection<SpotifyImage>.toMediaStoreImage() =
-    maxByOrNull { it.shortestSide }?.url?.let { MediaStoreImage.fromUrls(it, getThumbnailUrl()) }
+suspend fun Collection<SpotifyImage>.toMediaStoreImage() =
+    maxByOrNull { it.shortestSide }?.url?.toMediaStoreImage(getThumbnailUrl())

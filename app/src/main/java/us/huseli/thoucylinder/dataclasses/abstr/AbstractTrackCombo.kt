@@ -1,14 +1,10 @@
 package us.huseli.thoucylinder.dataclasses.abstr
 
-import android.content.Context
-import android.graphics.Bitmap
-import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import us.huseli.thoucylinder.getCachedFullBitmap
 
 abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
     abstract val track: Track
@@ -18,17 +14,6 @@ abstract class AbstractTrackCombo : Comparable<AbstractTrackCombo> {
 
     val year: Int?
         get() = track.year ?: album?.year
-
-    suspend fun getFullBitmap(context: Context): Bitmap? =
-        track.image?.fullUri?.getCachedFullBitmap(context) ?: album?.albumArt?.fullUri?.getCachedFullBitmap(context)
-
-    fun getViewState() = Track.ViewState(
-        track = track,
-        trackArtists = artists.toImmutableList(),
-        album = album,
-        albumArtists = albumArtists.toImmutableList(),
-        albumArt = album?.albumArt,
-    )
 
     fun toString(
         showAlbumPosition: Boolean = true,

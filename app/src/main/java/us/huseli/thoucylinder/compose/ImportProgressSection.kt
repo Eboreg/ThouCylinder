@@ -15,24 +15,20 @@ import us.huseli.thoucylinder.dataclasses.ProgressData
 import us.huseli.thoucylinder.umlautify
 
 @Composable
-fun ImportProgressSection(progress: ProgressData?, modifier: Modifier = Modifier) {
-    if (progress != null) {
-        val text = progress.text.umlautify() + " ..."
-
-        Column(
-            modifier = modifier.padding(top = 5.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 1,
-            )
-            LinearProgressIndicator(
-                progress = { progress.progress.toFloat() },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+fun ImportProgressSection(progress: ProgressData, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(top = 5.dp).fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            text = progress.text.umlautify() + " ...",
+            style = MaterialTheme.typography.labelLarge,
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+        )
+        LinearProgressIndicator(
+            progress = { progress.progress.toFloat() },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

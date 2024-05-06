@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.dataclasses.entities
 
 import android.content.Context
 import androidx.annotation.WorkerThread
+import androidx.compose.runtime.Immutable
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.ColumnInfo
@@ -13,13 +14,12 @@ import androidx.room.PrimaryKey
 import com.anggrayudi.storage.file.DocumentFileCompat
 import com.anggrayudi.storage.file.getAbsolutePath
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.getParentDirectory
 import us.huseli.thoucylinder.matchFiles
@@ -39,6 +39,7 @@ import kotlin.time.Duration.Companion.milliseconds
     ],
     indices = [Index("Track_albumId"), Index("Track_title"), Index("Track_isInLibrary")],
 )
+@Immutable
 data class Track(
     @ColumnInfo("Track_trackId") @PrimaryKey val trackId: String = UUID.randomUUID().toString(),
     @ColumnInfo("Track_title") val title: String,
@@ -51,20 +52,16 @@ data class Track(
     @ColumnInfo("Track_musicBrainzId") val musicBrainzId: String? = null,
     @ColumnInfo("Track_spotifyId") val spotifyId: String? = null,
     @ColumnInfo("Track_durationMs") val durationMs: Long? = null,
+    @ColumnInfo("Track_amplitudes") val amplitudes: String? = null,
     @Embedded("Track_metadata_") val metadata: TrackMetadata? = null,
     @Embedded("Track_youtubeVideo_") val youtubeVideo: YoutubeVideo? = null,
     @Embedded("Track_image_") val image: MediaStoreImage? = null,
 ) : Comparable<Track> {
-    data class ViewState(
-        val track: Track,
-        val trackArtists: ImmutableList<TrackArtistCredit>,
-        val album: Album?,
-        val albumArtists: ImmutableList<AlbumArtistCredit>,
-        val albumArt: MediaStoreImage?,
-    )
-
     val albumPositionNonNull: Int
         get() = albumPosition ?: 0
+
+    val amplitudeList: ImmutableList<Int>?
+        get() = amplitudes?.let { a -> a.split(',').map { it.toInt() } }?.toImmutableList()
 
     val discNumberNonNull: Int
         get() = discNumber ?: 1
@@ -85,7 +82,10 @@ data class Track(
         get() = youtubeVideo != null
 
     val isPlayable: Boolean
-        get() = playUri != null
+        get() = localUri != null || youtubeVideo != null
+
+    val lofiUri: String?
+        get() = localUri ?: youtubeVideo?.metadata?.lofiUrl ?: youtubeVideo?.metadata?.url
 
     val playUri: String?
         get() = localUri ?: youtubeVideo?.metadata?.url
@@ -108,6 +108,8 @@ data class Track(
     @WorkerThread
     fun getDocumentFile(context: Context): DocumentFile? =
         localUri?.let { DocumentFileCompat.fromUri(context, it.toUri()) }
+
+    fun getFileSize(context: Context) = getDocumentFile(context)?.length()
 
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()

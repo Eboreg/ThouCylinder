@@ -2,22 +2,16 @@ package us.huseli.thoucylinder.compose.screens.imports
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -26,15 +20,14 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 
 @Composable
-fun <A : IExternalAlbum> PostImportDialog(
-    importedAlbumStates: ImmutableCollection<Album.ViewState>,
-    notFoundAlbums: ImmutableCollection<A>,
+fun PostImportDialog(
+    importedAlbumStates: ImmutableCollection<AlbumUiState>,
+    notFoundAlbums: ImmutableCollection<String>,
     onGotoAlbumClick: (String) -> Unit,
     onGotoLibraryClick: () -> Unit,
     onDismissRequest: () -> Unit,
@@ -57,24 +50,19 @@ fun <A : IExternalAlbum> PostImportDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
                             text = stringResource(R.string.successfully_imported),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                        importedAlbumStates.forEachIndexed { index, state ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                val albumString =
-                                    state.artists.joined()?.let { "$it - ${state.album.title}" } ?: state.album.title
+                        importedAlbumStates.forEach { state ->
+                            val albumString =
+                                state.artists.joined()?.let { "$it - ${state.title}" } ?: state.title
 
-                                Text(text = albumString.umlautify(), modifier = Modifier.weight(1f))
-                                IconButton(
-                                    onClick = { onGotoAlbumClick(state.album.albumId) },
-                                    content = { Icon(Icons.Sharp.Album, stringResource(R.string.go_to_album)) },
-                                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                                )
-                            }
-                            if (index < importedAlbumStates.size - 1) HorizontalDivider()
+                            OutlinedButton(
+                                onClick = { onGotoAlbumClick(state.albumId) },
+                                modifier = Modifier.fillMaxWidth(),
+                                content = { Text(text = albumString.umlautify(), modifier = Modifier.fillMaxWidth()) },
+                                shape = MaterialTheme.shapes.extraSmall,
+                                contentPadding = PaddingValues(10.dp),
+                            )
                         }
                     }
                 }
@@ -82,15 +70,17 @@ fun <A : IExternalAlbum> PostImportDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
                             text = stringResource(R.string.no_match_found),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                        notFoundAlbums.forEachIndexed { index, album ->
-                            val albumString =
-                                album.artistName?.takeIf { it.isNotEmpty() }?.let { "$it - ${album.title}" }
-                                    ?: album.title
-
-                            Text(text = albumString.umlautify(), modifier = Modifier.padding(vertical = 10.dp))
-                            if (index < notFoundAlbums.size - 1) HorizontalDivider()
+                        notFoundAlbums.forEach { album ->
+                            OutlinedButton(
+                                onClick = {},
+                                modifier = Modifier.fillMaxWidth(),
+                                content = { Text(text = album.umlautify(), modifier = Modifier.fillMaxWidth()) },
+                                shape = MaterialTheme.shapes.extraSmall,
+                                contentPadding = PaddingValues(10.dp),
+                                enabled = false,
+                            )
                         }
                     }
                 }

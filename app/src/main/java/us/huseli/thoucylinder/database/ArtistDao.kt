@@ -9,6 +9,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.Artist
@@ -21,22 +22,31 @@ import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 
 @Dao
 abstract class ArtistDao {
+    @Query("DELETE FROM AlbumArtist WHERE AlbumArtist_albumId = :albumId")
+    protected abstract suspend fun _clearAlbumArtists(albumId: String)
+
+    @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId = :trackId")
+    protected abstract suspend fun _clearTrackArtists(trackId: String)
+
     @Query("SELECT * FROM Artist WHERE LOWER(Artist_name) = LOWER(:name) LIMIT 1")
     protected abstract suspend fun _getArtistByName(name: String): Artist?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun _insertAlbumArtists(vararg albumArtists: AlbumArtist)
 
     @Insert
     protected abstract suspend fun _insertArtists(vararg artists: Artist)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun _insertTrackArtists(vararg trackArtists: TrackArtist)
+
     @Update
     protected abstract suspend fun _updateArtists(vararg artists: Artist)
-
-    @Query("DELETE FROM AlbumArtist WHERE AlbumArtist_albumId IN(:albumIds)")
-    abstract suspend fun clearAlbumArtists(vararg albumIds: String)
 
     @Query("DELETE FROM Artist")
     abstract suspend fun clearArtists()
 
-    @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId IN(:trackIds)")
+    @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId IN (:trackIds)")
     abstract suspend fun clearTrackArtists(vararg trackIds: String)
 
     @Query("SELECT * FROM Artist WHERE Artist_id = :id")
@@ -79,11 +89,21 @@ abstract class ArtistDao {
         } ?: Artist.fromBase(unsavedArtist).also { _insertArtists(it) }
     }
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertAlbumArtists(vararg albumArtists: AlbumArtist)
+    suspend fun insertAlbumArtists(albumArtists: Collection<AlbumArtist>) {
+        _insertAlbumArtists(
+            *albumArtists.combineEquals { a, b -> a.albumId == b.albumId }
+                .flatMap { it.mapIndexed { index, albumArtist -> albumArtist.copy(position = index) } }
+                .toTypedArray()
+        )
+    }
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertTrackArtists(vararg trackArtists: TrackArtist)
+    suspend fun insertTrackArtists(trackArtists: Collection<TrackArtist>) {
+        _insertTrackArtists(
+            *trackArtists.combineEquals { a, b -> a.trackId == b.trackId }
+                .flatMap { it.mapIndexed { index, trackArtist -> trackArtist.copy(position = index) } }
+                .toTypedArray()
+        )
+    }
 
     @Query(
         """
@@ -102,6 +122,11 @@ abstract class ArtistDao {
 
     @Query("SELECT * FROM TrackArtistCredit WHERE TrackArtist_trackId = :trackId ORDER BY TrackArtist_position")
     abstract suspend fun listTrackArtistCredits(trackId: String): List<TrackArtistCredit>
+
+    suspend fun setAlbumArtists(albumId: String, albumArtists: Collection<AlbumArtist>) {
+        _clearAlbumArtists(albumId)
+        insertAlbumArtists(albumArtists)
+    }
 
     @Query("UPDATE Artist SET Artist_musicBrainzId = :musicBrainzId WHERE Artist_id = :artistId")
     abstract suspend fun setMusicBrainzId(artistId: String, musicBrainzId: String)
@@ -126,6 +151,11 @@ abstract class ArtistDao {
 
     @Query("UPDATE Artist SET Artist_spotifyId = :spotifyId WHERE Artist_id = :artistId")
     abstract suspend fun setSpotifyId(artistId: String, spotifyId: String)
+
+    suspend fun setTrackArtists(trackId: String, trackArtists: Collection<TrackArtist>) {
+        _clearTrackArtists(trackId)
+        insertTrackArtists(trackArtists)
+    }
 
     suspend fun upsertSpotifyArtist(spotifyArtist: SpotifyArtist) {
         val artist = _getArtistByName(spotifyArtist.name)

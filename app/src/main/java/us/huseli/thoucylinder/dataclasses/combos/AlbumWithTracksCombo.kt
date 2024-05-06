@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.dataclasses.combos
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import us.huseli.retaintheme.extensions.sumOfOrNull
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Album
@@ -48,6 +49,12 @@ data class AlbumWithTracksCombo(
     val discCount: Int
         get() = trackCombos.mapNotNull { it.track.discNumber }.maxOrNull() ?: 1
 
+    val tracks: List<Track>
+        get() = trackCombos.map { it.track }
+
+    val trackIds: List<String>
+        get() = trackCombos.map { it.track.trackId }
+
     override val trackCount: Int
         get() = trackCombos.size
 
@@ -60,7 +67,10 @@ data class AlbumWithTracksCombo(
     override val isPartiallyDownloaded: Boolean
         get() = trackCombos.any { it.track.isDownloaded } && trackCombos.any { !it.track.isDownloaded }
 
-    val unplayableTrackCount: Int
+    override val durationMs: Long?
+        get() = trackCombos.sumOfOrNull { it.track.durationMs }
+
+    override val unplayableTrackCount: Int
         get() = trackCombos.count { !it.track.isPlayable }
 
     private fun getDistance(other: AlbumWithTracksCombo): Double {
@@ -73,8 +83,6 @@ data class AlbumWithTracksCombo(
 
         return result
     }
-
-    fun indexOfTrack(track: Track): Int = trackCombos.map { it.track.trackId }.indexOf(track.trackId)
 
     fun match(other: AlbumWithTracksCombo) = AlbumMatch(distance = getDistance(other), albumCombo = this)
 
@@ -141,6 +149,4 @@ data class AlbumWithTracksCombo(
     private fun getTracksDistanceSum(otherTracks: Collection<Track>): Double = otherTracks.zip(trackCombos)
         .filter { (other, our) -> !other.title.contains(our.track.title, true) }
         .size.toDouble() + abs(trackCombos.size - otherTracks.size)
-
-    override fun toString() = album.toString()
 }

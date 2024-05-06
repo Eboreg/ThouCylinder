@@ -9,7 +9,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.ILogger
+import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo

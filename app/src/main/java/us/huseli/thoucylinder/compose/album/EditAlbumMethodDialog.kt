@@ -15,8 +15,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.CancelButton
+import us.huseli.thoucylinder.dataclasses.uistates.EditAlbumUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
@@ -52,12 +55,16 @@ fun EditAlbumMethodButton(
 @Composable
 fun EditAlbumMethodDialog(
     albumId: String,
-    albumTitle: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
     var openDialogType by rememberSaveable { mutableStateOf<EditAlbumDialogType?>(null) }
+    var uiState by remember { mutableStateOf<EditAlbumUiState?>(null) }
+
+    LaunchedEffect(albumId) {
+        uiState = viewModel.getUiState(albumId)
+    }
 
     AlertDialog(
         modifier = modifier,
@@ -65,7 +72,11 @@ fun EditAlbumMethodDialog(
         shape = MaterialTheme.shapes.small,
         dismissButton = { CancelButton(onClick = onClose, text = stringResource(R.string.close)) },
         confirmButton = {},
-        title = { Text(text = albumTitle.umlautify(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        title = {
+            uiState?.title?.also {
+                Text(text = it.umlautify(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -92,11 +103,13 @@ fun EditAlbumMethodDialog(
 
     when (openDialogType) {
         EditAlbumDialogType.ALBUM -> {
-            EditAlbumInfoDialog(
-                albumId = albumId,
-                onClose = { openDialogType = null },
-                viewModel = viewModel,
-            )
+            uiState?.also {
+                EditAlbumInfoDialog(
+                    uiState = it,
+                    onClose = { openDialogType = null },
+                    viewModel = viewModel,
+                )
+            }
         }
         EditAlbumDialogType.TRACKS -> {
             EditAlbumTracksDialog(

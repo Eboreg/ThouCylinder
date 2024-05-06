@@ -24,68 +24,55 @@ import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.ListActions
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
 import us.huseli.thoucylinder.enums.AlbumSortParameter
 import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.getUmlautifiedString
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 
 @Composable
 fun LibraryScreenAlbumTab(
     appCallbacks: AppCallbacks,
-    viewStates: ImmutableList<Album.ViewState>,
-    isImporting: Boolean,
-    displayType: DisplayType,
-    showToolbars: Boolean,
+    albumCallbacks: AlbumCallbacks,
+    uiStates: () -> ImmutableList<AlbumUiState>,
     modifier: Modifier = Modifier,
+    isImporting: Boolean = false,
+    displayType: DisplayType = DisplayType.LIST,
+    showToolbars: () -> Boolean = { true },
     viewModel: LibraryViewModel = hiltViewModel(),
     listModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
 
-    val downloadStates by viewModel.albumDownloadStates.collectAsStateWithLifecycle()
     val availabilityFilter by viewModel.availabilityFilter.collectAsStateWithLifecycle()
     val isLoadingAlbums by viewModel.isLoadingAlbums.collectAsStateWithLifecycle()
     val searchTerm by viewModel.albumSearchTerm.collectAsStateWithLifecycle()
-    val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle(persistentListOf())
+    val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle()
     val selectedTagPojos by viewModel.selectedAlbumTagPojos.collectAsStateWithLifecycle()
     val sortOrder by viewModel.albumSortOrder.collectAsStateWithLifecycle()
     val sortParameter by viewModel.albumSortParameter.collectAsStateWithLifecycle()
-    val tagPojos by viewModel.albumTagPojos.collectAsStateWithLifecycle(persistentListOf())
+    val tagPojos by viewModel.albumTagPojos.collectAsStateWithLifecycle()
 
-    val albumCallbacks = remember {
-        { state: Album.ViewState ->
-            AlbumCallbacks(
-                state = state,
-                appCallbacks = appCallbacks,
-                onPlayClick = if (state.album.isPlayable) {
-                    { viewModel.playAlbum(state.album.albumId) }
-                } else null,
-                onEnqueueClick = if (state.album.isPlayable) {
-                    { viewModel.enqueueAlbum(state.album.albumId, context) }
-                } else null,
-                onAlbumLongClick = {
-                    viewModel.selectAlbumsFromLastSelected(state.album.albumId, viewStates.map { it.album.albumId })
-                },
-                onAlbumClick = {
-                    if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(state.album.albumId)
-                    else appCallbacks.onAlbumClick(state.album.albumId)
-                },
-            )
+    val albumSelectionCallbacks = remember { viewModel.getAlbumSelectionCallbacks(appCallbacks, context) }
+    val filterButtonSelected = remember(selectedTagPojos, availabilityFilter) {
+        selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL
+    }
+    val progressIndicatorText = remember(isImporting, isLoadingAlbums) {
+        {
+            if (isImporting) context.getUmlautifiedString(R.string.importing_local_albums)
+            else if (isLoadingAlbums) context.getUmlautifiedString(R.string.loading_albums)
+            else null
         }
     }
-    val albumSelectionCallbacks = remember { viewModel.getAlbumSelectionCallbacks(appCallbacks, context) }
-    val progressIndicatorStringRes = remember(isImporting, isLoadingAlbums) {
-        if (isImporting) R.string.importing_local_albums
-        else if (isLoadingAlbums) R.string.loading_albums
-        else null
-    }
-    val onEmpty: @Composable () -> Unit = {
-        if (!isImporting && !isLoadingAlbums) {
-            Text(
-                stringResource(R.string.no_albums_found),
-                modifier = Modifier.padding(10.dp)
-            )
+    val onEmpty: @Composable () -> Unit = remember {
+        {
+            if (!isImporting && !isLoadingAlbums) {
+                Text(
+                    stringResource(R.string.no_albums_found),
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
         }
     }
 
@@ -93,48 +80,56 @@ fun LibraryScreenAlbumTab(
         ListSettingsRow(
             displayType = displayType,
             listType = ListType.ALBUMS,
-            onDisplayTypeChange = { viewModel.setDisplayType(it) },
-            onListTypeChange = { viewModel.setListType(it) },
-            availableDisplayTypes = listOf(DisplayType.LIST, DisplayType.GRID),
+            onDisplayTypeChange = remember { { viewModel.setDisplayType(it) } },
+            onListTypeChange = remember { { viewModel.setListType(it) } },
+            availableDisplayTypes = persistentListOf(DisplayType.LIST, DisplayType.GRID),
         )
         ListActions(
             initialSearchTerm = searchTerm,
             sortParameter = sortParameter,
             sortOrder = sortOrder,
-            sortParameters = AlbumSortParameter.withLabels(context),
+            sortParameters = remember { AlbumSortParameter.withLabels(context) },
             sortDialogTitle = stringResource(R.string.album_order),
-            onSort = { param, order -> viewModel.setAlbumSorting(param, order) },
-            onSearch = { viewModel.setAlbumSearchTerm(it) },
-            filterButtonSelected = selectedTagPojos.isNotEmpty() || availabilityFilter != AvailabilityFilter.ALL,
-            tagPojos = tagPojos,
-            selectedTagPojos = selectedTagPojos,
+            onSort = remember { { param, order -> viewModel.setAlbumSorting(param, order) } },
+            onSearch = remember { { viewModel.setAlbumSearchTerm(it) } },
+            filterButtonSelected = filterButtonSelected,
+            tagPojos = { tagPojos },
+            selectedTagPojos = { selectedTagPojos },
             availabilityFilter = availabilityFilter,
-            onTagsChange = { viewModel.setSelectedAlbumTagPojos(it) },
-            onAvailabilityFilterChange = { viewModel.setAvailabilityFilter(it) },
+            onTagsChange = remember { { viewModel.setSelectedAlbumTagPojos(it) } },
+            onAvailabilityFilterChange = remember { { viewModel.setAvailabilityFilter(it) } },
         )
     }
 
     Column(modifier = modifier.fillMaxSize()) {
         when (displayType) {
             DisplayType.LIST -> AlbumList(
-                states = viewStates,
-                callbacks = albumCallbacks,
+                states = uiStates,
                 selectionCallbacks = albumSelectionCallbacks,
                 selectedAlbumIds = selectedAlbumIds,
                 onEmpty = onEmpty,
-                progressIndicatorStringRes = progressIndicatorStringRes,
+                progressIndicatorText = progressIndicatorText,
                 modifier = listModifier,
-                downloadStates = downloadStates,
+                callbacks = remember {
+                    albumCallbacks.copy(
+                        onAlbumClick = { viewModel.onAlbumClick(it, albumCallbacks.onAlbumClick) },
+                        onAlbumLongClick = { viewModel.onAlbumLongClick(it) },
+                    )
+                },
             )
             DisplayType.GRID -> AlbumGrid(
-                states = viewStates,
-                callbacks = albumCallbacks,
-                selectedAlbumIds = selectedAlbumIds,
+                states = uiStates,
+                callbacks = remember {
+                    albumCallbacks.copy(
+                        onAlbumClick = { viewModel.onAlbumClick(it, albumCallbacks.onAlbumClick) },
+                        onAlbumLongClick = { viewModel.onAlbumLongClick(it) },
+                    )
+                },
                 selectionCallbacks = albumSelectionCallbacks,
-                onEmpty = onEmpty,
-                progressIndicatorStringRes = progressIndicatorStringRes,
+                selectedAlbumIds = selectedAlbumIds,
                 modifier = listModifier,
-                downloadStates = downloadStates,
+                progressIndicatorText = progressIndicatorText,
+                onEmpty = onEmpty,
             )
         }
     }

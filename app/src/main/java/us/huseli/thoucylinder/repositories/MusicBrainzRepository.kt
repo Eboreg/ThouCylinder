@@ -1,23 +1,17 @@
 package us.huseli.thoucylinder.repositories
 
-import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import us.huseli.retaintheme.extensions.capitalized
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
+import us.huseli.thoucylinder.DeferredRequestJob
+import us.huseli.thoucylinder.DeferredRequestJobManager
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
-import us.huseli.thoucylinder.DeferredRequestJob
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
@@ -31,25 +25,39 @@ import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzRelease
 import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseGroup
 import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseSearch
 import us.huseli.thoucylinder.getMutexCache
-import us.huseli.thoucylinder.getNext
+import us.huseli.thoucylinder.interfaces.ILogger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MusicBrainzRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     class RequestJob(url: String, lowPrio: Boolean = false) : DeferredRequestJob(url, lowPrio) {
         override suspend fun request(): String =
             Request(url = url, headers = mapOf("User-Agent" to CUSTOM_USER_AGENT)).getString()
     }
 
+    object RequestJobManager : DeferredRequestJobManager<RequestJob>(), ILogger {
+        private var lastJobFinished: Long? = null
+
+        override suspend fun waitBeforeUnlocking() {
+            val timeSinceLast = lastJobFinished?.let { System.currentTimeMillis() - it }
+
+            if (timeSinceLast != null && timeSinceLast < MIN_REQUEST_INTERVAL_MS) {
+                log("timeSinceLast == $timeSinceLast, will delay for ${MIN_REQUEST_INTERVAL_MS - timeSinceLast} ms")
+                delay(MIN_REQUEST_INTERVAL_MS - timeSinceLast)
+            }
+        }
+
+        override fun onJobFinished(job: RequestJob, response: String?, timestamp: Long) {
+            lastJobFinished = timestamp
+        }
+    }
+
     private val gson: Gson = GsonBuilder().create()
-    private val apiResponseCache = MutexCache<RequestJob, String, String>(
+    private val apiResponseCache = MutexCache(
         itemToKey = { it.url },
-        fetchMethod = { job ->
-            requestQueue.value += job
-            job.run().also { requestQueue.value -= job }
-        },
-        debugLabel = "MusicBrainzRepository.apiResponseCache2",
+        fetchMethod = { RequestJobManager.runJob(it) },
+        debugLabel = "MusicBrainzRepository.apiResponseCache",
     )
     private val coverArtArchiveCache =
         getMutexCache<String, CoverArtArchiveResponse>("MusicBrainzRepository.coverArtArchiveCache") { releaseId ->
@@ -58,20 +66,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
                 headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
             ).getObject<CoverArtArchiveResponse>()
         }
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val requestQueue = MutableStateFlow<List<RequestJob>>(emptyList())
     private var matchArtistsJob: Job? = null
-
-    init {
-        scope.launch {
-            requestQueue.collect { jobs ->
-                jobs.getNext()?.also { job ->
-                    job.lock.unlock()
-                    delay(MIN_REQUEST_INTERVAL_MS)
-                }
-            }
-        }
-    }
 
     suspend fun getAllCoverArtArchiveImages(releaseId: String): List<CoverArtArchiveImage> =
         coverArtArchiveCache.getOrNull(releaseId)?.images?.filter { it.front } ?: emptyList()
@@ -82,8 +77,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
     )?.copy(id = id)
 
     suspend fun getReleaseCoverArt(releaseId: String): MediaStoreImage? = getRelease(releaseId)
-        ?.let { getCoverArtArchiveImage(it) }
-        ?.let { MediaStoreImage.fromUrls(it.image, it.thumbnails.thumb250).nullIfNotFound(context) }
+        ?.let { getCoverArtArchiveImage(it)?.toMediaStoreImage() }
 
     suspend fun getReleaseId(combo: AlbumWithTracksCombo): String? = combo.album.musicBrainzReleaseId
         ?: getReleaseId(artist = combo.artists.joined(), album = combo.album.title, trackCount = combo.trackCount)
@@ -95,11 +89,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
         val url = "$MUSICBRAINZ_API_ROOT/genre/all?fmt=txt"
         val headers = mapOf("User-Agent" to CUSTOM_USER_AGENT)
 
-        return Request(url = url, headers = headers)
-            .getString()
-            .split('\n')
-            .map { it.capitalized() }
-            .toSet()
+        return Request(url = url, headers = headers).getString().split('\n').toSet()
     }
 
     suspend fun matchAlbumWithTracks(
@@ -130,7 +120,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
     }
 
     fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String) -> Unit) {
-        if (matchArtistsJob == null) matchArtistsJob = scope.launch {
+        if (matchArtistsJob == null) matchArtistsJob = launchOnIOThread {
             val previousIds = mutableSetOf<String>()
 
             flow
@@ -151,7 +141,7 @@ class MusicBrainzRepository @Inject constructor(@ApplicationContext private val 
     }
 
 
-    /** PRIVATE METHODS *******************************************************/
+    /** PRIVATE METHODS ***********************************************************************************************/
 
     private fun escapeString(string: String): String =
         string.replace(Regex("([+\\-&|!(){}\\[\\]^\"~*?:\\\\/])"), "\\\\$1")

@@ -12,10 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SettingSection(
-    onClick: (() -> Unit)? = null,
-    content: @Composable RowScope.() -> Unit,
-) {
+fun SettingSection(onClick: (() -> Unit)? = null, content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier
             .let { if (onClick != null) it.clickable { onClick() } else it }

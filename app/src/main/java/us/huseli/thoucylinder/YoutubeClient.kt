@@ -5,10 +5,16 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import us.huseli.retaintheme.extensions.dpToPx
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 import us.huseli.retaintheme.extensions.mergeWith
 import us.huseli.retaintheme.extensions.toDuration
+import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_PX
 import us.huseli.thoucylinder.dataclasses.combos.YoutubePlaylistCombo
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeImage
@@ -16,13 +22,90 @@ import us.huseli.thoucylinder.dataclasses.youtube.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.enums.Region
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.util.regex.Pattern
 import kotlin.math.absoluteValue
+
+class PlaylistSearch(val query: String, private val client: AbstractYoutubeClient) {
+    private var nextToken: String? = null
+    private var primaryDone: Boolean = false
+    private var secondaryDone: Boolean = false
+    private val usedPlaylistIds: MutableList<String> = mutableListOf()
+    private val _hasMore = MutableStateFlow(true)
+
+    val hasMore = _hasMore.asStateFlow()
+
+    fun flowResults(limit: Int = 50): Flow<YoutubePlaylist> = flow {
+        var emitted = 0
+
+        if (!primaryDone) {
+            flowPrimaryResults().collect { playlist ->
+                emit(playlist)
+                emitted++
+            }
+            primaryDone = true
+        }
+
+        if (!secondaryDone && emitted < limit) {
+            flowSecondaryResults().collect { playlist ->
+                emit(playlist)
+                emitted++
+            }
+            secondaryDone = true
+        }
+
+        while (nextToken != null && emitted < limit) {
+            nextToken?.also {
+                flowContinuationResults(it).collect { playlist ->
+                    emit(playlist)
+                    emitted++
+                }
+            }
+        }
+    }
+
+    private fun flowPrimaryResults(): Flow<YoutubePlaylist> = flow {
+        getAndEmit(client.getPlaylistSearchResult(query = query, playlistSpecificSearch = true))
+    }
+
+    private fun flowSecondaryResults(): Flow<YoutubePlaylist> = flow {
+        val result = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = false)
+
+        getAndEmit(result)
+        _hasMore.value = result.nextToken != null
+    }
+
+    private fun flowContinuationResults(continuationToken: String): Flow<YoutubePlaylist> = flow {
+        val result = client.getNextPlaylistSearchResult(continuationToken)
+
+        getAndEmit(result)
+        _hasMore.value = result.nextToken != null
+    }
+
+    private suspend fun FlowCollector<YoutubePlaylist>.getAndEmit(result: AbstractYoutubeClient.PlaylistSearchResult) {
+        for (playlist in result.playlists) {
+            if (!usedPlaylistIds.contains(playlist.id)) {
+                usedPlaylistIds.add(playlist.id)
+                emit(playlist)
+            }
+        }
+        nextToken = result.nextToken
+    }
+}
 
 abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     abstract val clientName: String
     abstract val clientVersion: String
     abstract val key: String
+
+    data class PlaylistSearchResult(
+        val playlists: ImmutableList<YoutubePlaylist>,
+        val token: String? = null,
+        val nextToken: String? = null,
+    ) {
+        val playlistIds: List<String>
+            get() = playlists.map { it.id }
+    }
 
     data class VideoSearchResult(
         val videos: ImmutableList<YoutubeVideo>,
@@ -39,15 +122,8 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     )
 
 
-    /** ABSTRACT METHODS ******************************************************/
-    abstract suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String? = null,
-    ): VideoSearchResult
+    /** OPEN METHODS **************************************************************************************************/
 
-
-    /** OPEN METHODS **********************************************************/
     open fun getJson(videoId: String? = null): Map<String, Any?> {
         val map = mutableMapOf(
             "contentCheckOk" to true,
@@ -108,15 +184,16 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
             val bitrate = fmt["bitrate"] as? Double
             val sampleRate = fmt["audioSampleRate"] as? String
             val url = fmt["url"] as? String
+            val contentLength = fmt["contentLength"] as? String
 
-            if (mimeType != null && bitrate != null && sampleRate != null && url != null) {
+            if (mimeType != null && bitrate != null && sampleRate != null && url != null && contentLength != null) {
                 metadataList.add(
                     YoutubeMetadata(
                         mimeType = mimeType,
                         bitrate = bitrate.toInt(),
                         sampleRate = sampleRate.toInt(),
                         url = url,
-                        size = (fmt["contentLength"] as? String)?.toInt(),
+                        size = contentLength.toInt(),
                         channels = (fmt["audioChannels"] as? Double)?.toInt(),
                         loudnessDb = fmt["loudnessDb"] as? Double,
                         durationMs = (fmt["approxDurationMs"] as? String)?.toLong(),
@@ -135,6 +212,11 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
             ?.firstNotNullOfOrNull { it.yqueryString("nextContinuationData.continuation") }
     }
 
+    open fun getParams(videoId: String? = null): Map<String, String> = mapOf(
+        "prettyPrint" to "false",
+        "key" to key,
+    )
+
     open fun getPlaylistVideoRenderers(response: Map<String, *>): Collection<Map<*, *>>? {
         return response.yquery<Collection<Map<*, *>>>("contents.singleColumnBrowseResultsRenderer.tabs")
             ?.flatMap {
@@ -144,50 +226,67 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
             ?.mapNotNull { it.yquery<Map<*, *>>("playlistVideoRenderer") }
     }
 
-    open fun getParams(videoId: String? = null): Map<String, String> = mapOf(
-        "prettyPrint" to "false",
-        "key" to key,
-    )
+    open fun getPlaylistRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
+        return if (!isContinuationResponse)
+            response.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
+                ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
+                ?.mapNotNull { it.yquery<Map<*, *>>("playlistRenderer") }
+        else response.yquery<Collection<Map<*, *>>>("onResponseReceivedCommands")
+            ?.flatMap {
+                it.yquery<Collection<Map<*, *>>>("appendContinuationItemsAction.continuationItems") ?: emptyList()
+            }
+            ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
+            ?.mapNotNull { it.yquery<Map<*, *>>("playlistRenderer") }
+    }
+
+    open fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
+        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
+            ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
+            ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
+        else response.yquery<Collection<Map<*, *>>>("continuationContents.sectionListContinuation.contents")
+            ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
+            ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
+    }
+
+    open suspend fun getVideoSearchResult(
+        context: Context,
+        query: String,
+        continuationToken: String? = null,
+    ): VideoSearchResult {
+        val json =
+            if (continuationToken != null) mapOf("continuation" to continuationToken)
+            else mapOf("query" to query)
+        val response = postJson(url = SEARCH_URL, json = json)
+        val videoRenderers = getVideoRenderers(response, continuationToken != null)
+        val nextContinuationToken = getNextContinuationToken(response, continuationToken != null)
+        val videos = videoRenderers?.mapNotNull { loadVideoRenderer(it) } ?: emptyList()
+
+        return VideoSearchResult(
+            videos = videos.toImmutableList(),
+            token = continuationToken,
+            nextToken = nextContinuationToken,
+        )
+    }
 
     open suspend fun searchPlaylistCombos(
         context: Context,
         query: String,
         progressCallback: (Double) -> Unit = {},
     ): List<YoutubePlaylistCombo> {
-        val body = getString(url = RESULTS_URL, params = mapOf("search_query" to query))
+        val body = getStringResponse(url = RESULTS_URL, params = mapOf("search_query" to query))
         val ytDataJson = extractYtInitialData(body)
         val ytData = ytDataJson?.let { gson.fromJson(it, responseType) }
-        val playlists = mutableListOf<YoutubePlaylist>()
 
         if (ytData != null) {
-            val headers = ytData.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
+            val renderers = ytData.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
                 ?.mapNotNull { it.yquery<Map<*, *>>("universalWatchCardRenderer.header.watchCardRichHeaderRenderer") }
-
-            headers?.forEach { header ->
-                val listTitle = header.yqueryString("title")
-                val artist = header.yqueryString("subtitle")
-                    ?.takeIf { it.contains("Album • ") }
-                    ?.substringAfter("Album • ")
-                val playlistId =
-                    header.yqueryString("titleNavigationEndpoint.commandMetadata.webCommandMetadata.url")
-                        ?.split("=")
-                        ?.last()
-
-                if (listTitle != null && playlistId != null) {
-                    val title =
-                        artist?.let { listTitle.replace(Regex(Pattern.quote("^$it - ")), "") } ?: listTitle
-
-                    playlists.add(YoutubePlaylist(artist = artist, title = title, id = playlistId))
-                }
-            }
-
+            val playlists = renderers?.mapNotNull { loadWatchCardRichHeaderRenderer(it) } ?: emptyList()
             val progressIncrement = 1.0 / (playlists.size + 1)
 
             progressCallback(progressIncrement)
 
             return playlists.mapIndexedNotNull { index, playlist ->
-                getPlaylistComboFromPlaylist(
-                    context = context,
+                getPlaylistComboFromPlaylistId(
                     playlistId = playlist.id,
                     artist = playlist.artist,
                 ).also { progressCallback(progressIncrement * (index + 2)) }
@@ -198,18 +297,53 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     }
 
 
-    /** PUBLIC METHODS ********************************************************/
-    suspend fun getString(
-        url: String,
-        videoId: String? = null,
-        params: Map<String, String> = emptyMap(),
-        headers: Map<String, String> = emptyMap(),
-    ): String {
-        return Request(
-            url = url,
-            params = getParams(videoId).plus(params),
-            headers = getHeaders(videoId).plus(headers),
-        ).getString()
+    /** PUBLIC METHODS ************************************************************************************************/
+
+    suspend fun getNextPlaylistSearchResult(continuationToken: String): PlaylistSearchResult {
+        val response = postJson(url = SEARCH_URL, json = mapOf("continuation" to continuationToken))
+        val playlistRenderers = getPlaylistRenderers(response, true)
+        val nextToken = getNextContinuationToken(response, true)
+
+        return PlaylistSearchResult(
+            playlists = playlistRenderers
+                ?.mapNotNull { loadPlaylistRenderer(it) }
+                ?.toImmutableList()
+                ?: persistentListOf(),
+            token = continuationToken,
+            nextToken = nextToken,
+        )
+    }
+
+    suspend fun getPlaylistSearchResult(query: String, playlistSpecificSearch: Boolean): PlaylistSearchResult {
+        val params = mutableMapOf("search_query" to query)
+        if (!playlistSpecificSearch) params["sp"] = "EgIQAw=="
+        val body = getStringResponse(url = RESULTS_URL, params = params)
+        val ytDataJson = extractYtInitialData(body)
+        val ytData = ytDataJson?.let { gson.fromJson(it, responseType) }
+        val playlists = mutableListOf<YoutubePlaylist>()
+        var continuationToken: String? = null
+
+        if (ytData != null) {
+            val headerRenderers =
+                ytData.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.secondaryContents.secondarySearchContainerRenderer.contents")
+                    ?.mapNotNull { it.yquery<Map<*, *>>("universalWatchCardRenderer.header.watchCardRichHeaderRenderer") }
+            val playlistRenderers = getPlaylistRenderers(ytData, false)
+
+            continuationToken = getNextContinuationToken(ytData, false)
+            headerRenderers
+                ?.mapNotNull { loadWatchCardRichHeaderRenderer(it) }
+                ?.mapNotNull { getPlaylistFromPlaylistId(playlistId = it.id, artist = it.artist) }
+                ?.also { playlists.addAll(it) }
+            playlistRenderers
+                ?.mapNotNull { loadPlaylistRenderer(it) }
+                ?.filter { playlist -> !playlists.map { it.id }.contains(playlist.id) }
+                ?.also { playlists.addAll(it) }
+        }
+
+        return PlaylistSearchResult(
+            playlists = playlists.toImmutableList(),
+            nextToken = continuationToken,
+        )
     }
 
     suspend fun postJson(
@@ -228,36 +362,14 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     }
 
 
-    /** PROTECTED METHODS *****************************************************/
-    protected fun extractYtInitialData(body: String): String? {
-        val innerRegex = Regex("\\\\x(..)")
+    /** PROTECTED METHODS *********************************************************************************************/
 
-        Regex("var ytInitialData *= *(\\{.*?\\});", RegexOption.MULTILINE)
-            .find(body)
-            ?.groupValues
-            ?.lastOrNull()
-            ?.also { return it }
-
-        Regex("var ytInitialData *= *'(\\\\x7b.*?\\\\x7d)'", RegexOption.MULTILINE)
-            .find(body)
-            ?.groupValues
-            ?.lastOrNull()
-            ?.replace(innerRegex) { result ->
-                result.groupValues.last().toByte(16).toInt().toChar().toString()
-            }
-            ?.also { return it }
-
-        return null
-    }
-
-    protected fun getImageData(context: Context, thumbnails: Collection<Map<*, *>>?): ImageData? {
+    protected fun getImageData(thumbnails: Collection<Map<*, *>>?): ImageData? {
         /**
          * Extracts image URLs from API response, works for both playlists and videos.
          * Does not fetch the actual images.
-         * Used by getTrackSearchResult() & listPlaylistDetails().
          */
-        val thumbnailSizePx =
-            context.dpToPx(Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP * Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP)
+        val thumbnailSizePx = IMAGE_THUMBNAIL_MAX_WIDTH_PX * IMAGE_THUMBNAIL_MAX_WIDTH_PX
         val images = mutableListOf<YoutubeImage>()
 
         thumbnails?.forEach { thumbnail ->
@@ -278,42 +390,23 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
         else null
     }
 
-    protected suspend fun getPlaylistComboFromPlaylist(
-        context: Context,
-        playlistId: String,
-        artist: String? = null,
-    ): YoutubePlaylistCombo? {
+    suspend fun getPlaylistComboFromPlaylistId(playlistId: String, artist: String? = null): YoutubePlaylistCombo? {
         val response = postJson(url = BROWSE_URL, json = mapOf("browseId" to "VL$playlistId"))
-        val title = response.yqueryString("metadata.playlistMetadataRenderer.albumName") // only on web
-            ?: response.yqueryString("header.playlistHeaderRenderer.title")
-        val videoCount = response.yqueryString("header.playlistHeaderRenderer.numVideosText")
-        val playlistArtist = response.yqueryString("header.playlistHeaderRenderer.subtitle")
-            ?.substringBeforeLast(" • Album")  // only on web
         val playlistVideoRenderers = getPlaylistVideoRenderers(response)
+        val playlist = getPlaylistFromBrowseResponse(
+            playlistId = playlistId,
+            response = response,
+            artist = artist,
+        )
 
-        if (title != null) {
-            val imageData = getImageData(
-                context = context,
-                thumbnails = response.yquery<Collection<Map<*, *>>>(
-                    "header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails"
-                ),
-            )
+        if (playlist != null) {
             val videos = mutableListOf<YoutubeVideo>()
-            val playlist = YoutubePlaylist(
-                id = playlistId,
-                title = title,
-                artist = artist ?: playlistArtist,
-                videoCount = videoCount?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0,
-                thumbnail = imageData?.thumbnail,
-                fullImage = imageData?.fullImage,
-            )
 
             playlistVideoRenderers?.forEach { renderer ->
                 val videoId = renderer.yqueryString("videoId")
                 val videoTitle = renderer.yqueryString("title")
                 val lengthSeconds = renderer.yqueryString("lengthSeconds")
                 val videoImageData = getImageData(
-                    context = context,
                     thumbnails = renderer.yquery<Collection<Map<*, *>>>("thumbnail.thumbnails"),
                 )
 
@@ -336,6 +429,145 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
         return null
     }
 
+
+    /** PRIVATE METHODS ***********************************************************************************************/
+
+    private fun extractYtInitialData(body: String): String? {
+        val innerRegex = Regex("\\\\x(..)")
+
+        Regex("var ytInitialData *= *(\\{.*?\\});", RegexOption.MULTILINE)
+            .find(body)
+            ?.groupValues
+            ?.lastOrNull()
+            ?.also { return it }
+
+        Regex("var ytInitialData *= *'(\\\\x7b.*?\\\\x7d)'", RegexOption.MULTILINE)
+            .find(body)
+            ?.groupValues
+            ?.lastOrNull()
+            ?.replace(innerRegex) { result ->
+                result.groupValues.last().toByte(16).toInt().toChar().toString()
+            }
+            ?.also { return it }
+
+        return null
+    }
+
+    private fun getPlaylistFromBrowseResponse(
+        playlistId: String,
+        response: Map<String, *>,
+        artist: String? = null,
+    ): YoutubePlaylist? {
+        val title = response.yqueryString("metadata.playlistMetadataRenderer.albumName") // only on web
+            ?: response.yqueryString("header.playlistHeaderRenderer.title")
+        val videoCount = response.yqueryString("header.playlistHeaderRenderer.numVideosText")
+        val playlistArtist = response.yqueryString("header.playlistHeaderRenderer.subtitle")
+            ?.substringBeforeLast(" • Album")  // only on web
+
+        if (title != null) {
+            val imageData = getImageData(
+                thumbnails = response.yquery<Collection<Map<*, *>>>(
+                    "header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails"
+                ),
+            )
+
+            return YoutubePlaylist(
+                id = playlistId,
+                title = title,
+                artist = artist ?: playlistArtist,
+                videoCount = videoCount?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: 0,
+                thumbnail = imageData?.thumbnail,
+                fullImage = imageData?.fullImage,
+            )
+        }
+
+        return null
+    }
+
+    private suspend fun getPlaylistFromPlaylistId(playlistId: String, artist: String? = null): YoutubePlaylist? =
+        getPlaylistFromBrowseResponse(
+            playlistId = playlistId,
+            response = postJson(url = BROWSE_URL, json = mapOf("browseId" to "VL$playlistId")),
+            artist = artist,
+        )
+
+    private suspend fun getStringResponse(
+        url: String,
+        videoId: String? = null,
+        params: Map<String, String> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+    ): String {
+        return Request(
+            url = url,
+            params = getParams(videoId).plus(params),
+            headers = getHeaders(videoId).plus(headers),
+        ).getString()
+    }
+
+    private fun loadPlaylistRenderer(renderer: Map<*, *>): YoutubePlaylist? {
+        val playlistId = renderer.yqueryString("playlistId")
+        val title = renderer.yqueryString("title")
+        val videoCount = renderer.yqueryString("videoCount") ?: renderer.yqueryString("videoCountText")
+        val thumbnails = mutableListOf<Map<*, *>>()
+
+        renderer.yquery<Collection<Map<*, *>>>("thumbnails")
+            ?.flatMap { it.yquery<Collection<Map<*, *>>>("thumbnails") ?: emptyList() }
+            ?.also { thumbnails.addAll(it) }
+        renderer.yquery<Collection<Map<*, *>>>("thumbnailRenderer.playlistVideoThumbnailRenderer.thumbnail.thumbnails")
+            ?.also { thumbnails.addAll(it) }
+
+        val imageData = getImageData(thumbnails = thumbnails)
+
+        if (title != null && playlistId != null) {
+            return YoutubePlaylist(
+                id = playlistId,
+                title = title,
+                thumbnail = imageData?.thumbnail,
+                fullImage = imageData?.fullImage,
+                videoCount = videoCount?.toInt() ?: 0,
+            )
+        }
+        return null
+    }
+
+    private fun loadVideoRenderer(videoRenderer: Map<*, *>): YoutubeVideo? {
+        val videoId = videoRenderer.yqueryString("videoId")
+        val title = videoRenderer.yqueryString("title")
+        val imageData = getImageData(
+            thumbnails = videoRenderer.yquery<Collection<Map<*, *>>>("thumbnail.thumbnails"),
+        )
+        val lengthText = videoRenderer.yqueryString("lengthText")
+        val durationMs = lengthText?.toDuration()?.inWholeMilliseconds
+
+        if (videoId != null && title != null) {
+            return YoutubeVideo(
+                id = videoId,
+                title = title,
+                thumbnail = imageData?.thumbnail,
+                fullImage = imageData?.fullImage,
+                durationMs = durationMs,
+            )
+        }
+        return null
+    }
+
+    private fun loadWatchCardRichHeaderRenderer(renderer: Map<*, *>): YoutubePlaylist? {
+        val listTitle = renderer.yqueryString("title")
+        val artist = renderer.yqueryString("subtitle")
+            ?.takeIf { it.contains("Album • ") }
+            ?.substringAfter("Album • ")
+        val playlistId = renderer.yqueryString("titleNavigationEndpoint.commandMetadata.webCommandMetadata.url")
+            ?.split("=")
+            ?.last()
+
+        if (listTitle != null && playlistId != null) {
+            val title = artist?.let { listTitle.replace(Regex(Pattern.quote("^$it - ")), "") } ?: listTitle
+
+            return YoutubePlaylist(artist = artist, title = title, id = playlistId)
+        }
+        return null
+    }
+
     companion object {
         const val BROWSE_URL = "https://www.youtube.com/youtubei/v1/browse"
         const val PLAYER_URL = "https://www.youtube.com/youtubei/v1/player"
@@ -354,17 +586,6 @@ abstract class AbstractYoutubeAndroidClient(region: Region = Region.SE) : Abstra
 
     open val osName: String = "Android"
     open val userAgent: String = "com.google.android.youtube"
-
-    /** OPEN METHODS **********************************************************/
-    open fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
-        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
-            ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
-            ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
-        else response.yquery<Collection<Map<*, *>>>("continuationContents.sectionListContinuation.contents")
-            ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
-            ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
-    }
-
 
     /** OVERRIDDEN METHODS ****************************************************/
     override fun getHeaders(videoId: String?): Map<String, String> = super.getHeaders(videoId).plus(
@@ -388,49 +609,6 @@ abstract class AbstractYoutubeAndroidClient(region: Region = Region.SE) : Abstra
                 ),
                 "params" to "2AMBCgIQBg",
             )
-        )
-    }
-
-    override suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String?,
-    ): VideoSearchResult {
-        val json =
-            if (continuationToken != null) mapOf("continuation" to continuationToken)
-            else mapOf("query" to query)
-        val response = postJson(url = SEARCH_URL, json = json)
-        val videos = mutableListOf<YoutubeVideo>()
-        val videoRenderers = getVideoRenderers(response, continuationToken != null)
-        val nextContinuationToken = getNextContinuationToken(response, continuationToken != null)
-
-        videoRenderers?.forEach { videoRenderer ->
-            val videoId = videoRenderer.yqueryString("videoId")
-            val title = videoRenderer.yqueryString("title")
-            val imageData = getImageData(
-                context = context,
-                thumbnails = videoRenderer.yquery<Collection<Map<*, *>>>("thumbnail.thumbnails"),
-            )
-            val lengthText = videoRenderer.yqueryString("lengthText")
-            val durationMs = lengthText?.toDuration()?.inWholeMilliseconds
-
-            if (videoId != null && title != null) {
-                videos.add(
-                    YoutubeVideo(
-                        id = videoId,
-                        title = title,
-                        thumbnail = imageData?.thumbnail,
-                        fullImage = imageData?.fullImage,
-                        durationMs = durationMs,
-                    )
-                )
-            }
-        }
-
-        return VideoSearchResult(
-            videos = videos.toImmutableList(),
-            token = continuationToken,
-            nextToken = nextContinuationToken,
         )
     }
 }
@@ -602,7 +780,6 @@ class YoutubeIOSClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
         videoDataList?.forEach { videoData ->
             val title = videoData.yqueryString("videoData.metadata.title")
             val imageData = getImageData(
-                context = context,
                 thumbnails = videoData.yquery<Collection<Map<*, *>>>("videoData.thumbnail.image.sources"),
             )
             val durationMs = videoData.yqueryString("accessibilityText")
@@ -685,122 +862,33 @@ class YoutubeWebClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
             ?.mapNotNull { it.yquery<Map<*, *>>("playlistVideoRenderer") }
     }
 
-    override suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String?,
-    ): VideoSearchResult {
-        val json =
-            if (continuationToken != null) mapOf("continuation" to continuationToken)
-            else mapOf("query" to query)
-        val response = postJson(url = SEARCH_URL, json = json)
-        val videos = mutableListOf<YoutubeVideo>()
-        val videoRenderers = getVideoRenderers(response, continuationToken != null)
-        val nextContinuationToken: String? = getNextContinuationToken(response, continuationToken != null)
-
-        videoRenderers?.forEach { videoRenderer ->
-            val videoId = videoRenderer.yqueryString("videoId")
-            val title = videoRenderer.yqueryString("title")
-            val imageData = getImageData(
-                context = context,
-                thumbnails = videoRenderer.yquery<Collection<Map<*, *>>>("thumbnail.thumbnails"),
-            )
-            val lengthText = videoRenderer.yqueryString("lengthText")
-            val durationMs = lengthText?.toDuration()?.inWholeMilliseconds
-
-            if (videoId != null && title != null) {
-                videos.add(
-                    YoutubeVideo(
-                        id = videoId,
-                        title = title,
-                        thumbnail = imageData?.thumbnail,
-                        fullImage = imageData?.fullImage,
-                        durationMs = durationMs,
-                    )
-                )
-            }
-        }
-
-        return VideoSearchResult(
-            videos = videos.toImmutableList(),
-            token = continuationToken,
-            nextToken = nextContinuationToken,
-        )
-    }
-
     override suspend fun searchPlaylistCombos(
         context: Context,
         query: String,
         progressCallback: (Double) -> Unit,
     ): List<YoutubePlaylistCombo> {
-        val body = getString(url = RESULTS_URL, params = mapOf("search_query" to query))
-        val ytDataJson = extractYtInitialData(body)
-        val ytData = ytDataJson?.let { gson.fromJson(it, responseType) }
-        val playlists = mutableListOf<YoutubePlaylist>()
+        /**
+         * First do a default search, which hopefully will bring us an album section in the right side column (i.e.
+         * contents.twoColumnSearchResultsRenderer.secondaryContents). Then continue on with GET param sp="EgIQAw==",
+         * which for some reason is the way to filter for playlists.
+         */
+        val initialResult = getPlaylistSearchResult(query = query, playlistSpecificSearch = true)
+        val secondaryResult = getPlaylistSearchResult(query = query, playlistSpecificSearch = false)
+        val playlists =
+            initialResult.playlists.plus(secondaryResult.playlists.filter { !initialResult.playlistIds.contains(it.id) })
+        val progressIncrement = 1.0 / (playlists.size + 1)
 
-        if (ytData != null) {
-            val secondaryContents = ytData.yquery<Collection<Map<*, *>>>(
-                "contents.twoColumnSearchResultsRenderer.secondaryContents.secondarySearchContainerRenderer.contents"
-            ) ?: emptyList()
-            val headers = secondaryContents
-                .mapNotNull { it.yquery<Map<*, *>>("universalWatchCardRenderer.header.watchCardRichHeaderRenderer") }
+        progressCallback(progressIncrement)
 
-            headers.forEach { header ->
-                val listTitle = header.yqueryString("title")
-                val artist = header.yqueryString("subtitle")
-                    ?.takeIf { it.contains("Album • ") }
-                    ?.substringAfter("Album • ")
-                val playlistId =
-                    header.yqueryString("titleNavigationEndpoint.commandMetadata.webCommandMetadata.url")
-                        ?.split("=")
-                        ?.last()
-
-                if (listTitle != null && playlistId != null) {
-                    val title =
-                        artist?.let { listTitle.replace(Regex(Pattern.quote("^$it - ")), "") } ?: listTitle
-
-                    playlists.add(YoutubePlaylist(artist = artist, title = title, id = playlistId))
-                }
-            }
-
-            val primaryContents = ytData.yquery<Collection<Map<*, *>>>(
-                "contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents"
-            ) ?: emptyList()
-            val sections = primaryContents
-                .mapNotNull {
-                    it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents")
-                        ?.filter { section -> section.containsKey("playlistRenderer") }
-                }
-                .flatten()
-
-            sections.forEach { section ->
-                val playlistId = section.yqueryString("playlistRenderer.playlistId")
-                val listTitle = section.yqueryString("playlistRenderer.title")
-
-                if (
-                    listTitle != null
-                    && playlistId != null
-                    && !playlists.map { it.id }.contains(playlistId)
-                ) playlists.add(YoutubePlaylist(title = listTitle, id = playlistId))
-            }
-
-            val progressIncrement = 1.0 / (playlists.size + 1)
-
-            progressCallback(progressIncrement)
-
-            return playlists.mapIndexedNotNull { index, playlist ->
-                getPlaylistComboFromPlaylist(
-                    context = context,
-                    playlistId = playlist.id,
-                    artist = playlist.artist
-                ).also { progressCallback(progressIncrement * (index + 2)) }
-            }
+        return playlists.mapIndexedNotNull { index, playlist ->
+            getPlaylistComboFromPlaylistId(
+                playlistId = playlist.id,
+                artist = playlist.artist
+            ).also { progressCallback(progressIncrement * (index + 2)) }
         }
-
-        return emptyList()
     }
 
-    private fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
+    override fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
         return if (!isContinuationResponse)
             response.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
                 ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }

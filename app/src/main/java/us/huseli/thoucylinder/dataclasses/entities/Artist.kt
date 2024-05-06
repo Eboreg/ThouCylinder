@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.os.Parcelable
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -15,6 +16,7 @@ import java.util.UUID
 
 @Parcelize
 @Entity
+@Immutable
 data class Artist(
     @ColumnInfo("Artist_name") override val name: String,
     @ColumnInfo("Artist_id") @PrimaryKey override val artistId: String = UUID.randomUUID().toString(),

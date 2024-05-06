@@ -1,21 +1,17 @@
 package us.huseli.thoucylinder.dataclasses.callbacks
 
-import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.entities.Album
 
 data class AlbumCallbacks(
-    private val state: Album.ViewState,
-    private val appCallbacks: AppCallbacks,
-    val onAddToLibraryClick: () -> Unit = { appCallbacks.onAddAlbumToLibraryClick(state) },
-    val onAddToPlaylistClick: () -> Unit = { appCallbacks.onAddToPlaylistClick(Selection(album = state.album)) },
-    val onAlbumClick: (() -> Unit)? = null,
-    val onAlbumLongClick: (() -> Unit)? = null,
-    val onArtistClick: (String) -> Unit = appCallbacks.onArtistClick,
-    val onCancelDownloadClick: () -> Unit = { appCallbacks.onCancelAlbumDownloadClick(state.album.albumId) },
-    val onDeleteClick: () -> Unit = { appCallbacks.onDeleteAlbumsClick(listOf(state)) },
-    val onDownloadClick: () -> Unit = { appCallbacks.onDownloadAlbumClick(state.album) },
-    val onEditClick: () -> Unit = { appCallbacks.onEditAlbumClick(state) },
-    val onEnqueueClick: (() -> Unit)? = null,
-    val onPlayClick: (() -> Unit)? = null,
-    val onStartAlbumRadioClick: () -> Unit = { appCallbacks.onStartAlbumRadioClick(state.album.albumId) },
+    val onAddToLibraryClick: (String) -> Unit,
+    val onAddToPlaylistClick: (String) -> Unit,
+    val onAlbumClick: ((String) -> Unit)? = null,
+    val onAlbumLongClick: ((String) -> Unit)? = null,
+    val onArtistClick: (String) -> Unit,
+    val onCancelDownloadClick: (String) -> Unit,
+    val onDeleteClick: (String) -> Unit,
+    val onDownloadClick: (String) -> Unit,
+    val onEditClick: (String) -> Unit,
+    val onEnqueueClick: ((String) -> Unit)? = null,
+    val onPlayClick: ((String) -> Unit)? = null,
+    val onStartRadioClick: (String) -> Unit,
 )

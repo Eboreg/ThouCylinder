@@ -13,30 +13,34 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import us.huseli.retaintheme.ui.theme.DarkColors
 import us.huseli.retaintheme.ui.theme.LightColors
+import us.huseli.thoucylinder.managers.ImageManager
 import us.huseli.thoucylinder.repositories.PlayerRepository
 
 class AppWidget : GlanceAppWidget() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface AppWidgetEntryPoint {
+        fun imageManager(): ImageManager
         fun playerRepository(): PlayerRepository
     }
 
-    private fun getPlayerRepository(context: Context): PlayerRepository {
-        val entryPoint = EntryPointAccessors.fromApplication(context, AppWidgetEntryPoint::class.java)
-        return entryPoint.playerRepository()
-    }
+    private fun getImageManager(context: Context): ImageManager =
+        EntryPointAccessors.fromApplication(context, AppWidgetEntryPoint::class.java).imageManager()
+
+    private fun getPlayerRepository(context: Context): PlayerRepository =
+        EntryPointAccessors.fromApplication(context, AppWidgetEntryPoint::class.java).playerRepository()
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val colors = ColorProviders(
             light = LightColors,
             dark = DarkColors.copy(onSurfaceVariant = Color(0xFF899294)),
         )
+        val imageManager = getImageManager(context.applicationContext)
         val playerRepo = getPlayerRepository(context.applicationContext)
 
         provideContent {
             GlanceTheme(colors = colors) {
-                Widget(playerRepo = playerRepo)
+                Widget(playerRepo = playerRepo, imageManager = imageManager)
             }
         }
     }

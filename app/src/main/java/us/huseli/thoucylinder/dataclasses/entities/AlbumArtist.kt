@@ -1,10 +1,10 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import us.huseli.retaintheme.extensions.combineEquals
 
 @Entity(
     primaryKeys = ["AlbumArtist_albumId", "AlbumArtist_artistId"],
@@ -26,6 +26,7 @@ import us.huseli.retaintheme.extensions.combineEquals
         ),
     ],
 )
+@Immutable
 data class AlbumArtist(
     @ColumnInfo("AlbumArtist_albumId") val albumId: String,
     @ColumnInfo("AlbumArtist_artistId") val artistId: String,
@@ -34,6 +35,3 @@ data class AlbumArtist(
 ) : Comparable<AlbumArtist> {
     override fun compareTo(other: AlbumArtist): Int = position - other.position
 }
-
-fun Iterable<AlbumArtist>.enumerate() = combineEquals { a, b -> a.albumId == b.albumId }
-    .flatMap { albumArtists -> albumArtists.mapIndexed { index, albumArtist -> albumArtist.copy(position = index) } }

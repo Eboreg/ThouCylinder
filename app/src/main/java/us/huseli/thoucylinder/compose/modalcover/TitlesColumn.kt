@@ -41,7 +41,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
             fontSize = titleTextSize.sp,
             color = textColor,
-            modifier = Modifier.basicMarquee(Int.MAX_VALUE),
+            modifier = Modifier.basicMarquee(Int.MAX_VALUE, initialDelayMillis = 1000),
         )
         if (artist != null) {
             Text(
@@ -50,7 +50,7 @@ fun TitlesColumn(modifier: Modifier = Modifier, isExpanded: Boolean, title: Stri
                 overflow = TextOverflow.Ellipsis,
                 style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                 fontSize = artistTextSize.sp,
-                modifier = Modifier.padding(top = 5.dp).basicMarquee(Int.MAX_VALUE),
+                modifier = Modifier.padding(top = 5.dp).basicMarquee(Int.MAX_VALUE, initialDelayMillis = 1000),
                 color = textColor,
             )
         }

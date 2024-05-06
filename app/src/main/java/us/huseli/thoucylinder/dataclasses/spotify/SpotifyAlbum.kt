@@ -1,25 +1,23 @@
 package us.huseli.thoucylinder.dataclasses.spotify
 
-import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
 import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.musicBrainz.capitalizeGenreName
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-abstract class AbstractSpotifyAlbum : AbstractSpotifyItem(), IExternalAlbum {
+abstract class AbstractSpotifyAlbum : AbstractSpotifyItem() {
     abstract val albumType: String?
     abstract val artists: List<SpotifySimplifiedArtist>
     abstract val href: String?
@@ -36,41 +34,35 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem(), IExternalAlbum {
         val spotifyAlbum: AbstractSpotifyAlbum,
     )
 
-    override val title: String
-        get() = name
-
-    override val artistName: String
+    val artistName: String
         get() = artists.artistString()
 
     val year: Int?
         get() = releaseDate.substringBefore('-').toIntOrNull()
 
-    override suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
-        images.getThumbnailImageBitmap(context)
-
     fun matchAlbumCombo(albumCombo: AbstractAlbumCombo) =
         AlbumMatch(distance = getAlbumDistance(albumCombo), spotifyAlbum = this)
 
-    fun toAlbum(isLocal: Boolean, isInLibrary: Boolean, albumArt: MediaStoreImage? = null) = Album(
+    suspend fun toAlbum(isLocal: Boolean, isInLibrary: Boolean) = Album(
         title = name,
         isInLibrary = isInLibrary,
         isLocal = isLocal,
         year = year,
         spotifyId = id,
-        albumArt = albumArt ?: images.toMediaStoreImage(),
+        albumArt = images.toMediaStoreImage(),
     )
 
     open suspend fun toAlbumCombo(
         isLocal: Boolean,
         isInLibrary: Boolean,
-        albumArt: MediaStoreImage? = null,
         getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumCombo {
-        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary, albumArt = albumArt)
+        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary)
         val albumArtists = artists.mapIndexed { index, artist ->
-            val unsavedArtist = UnsavedArtist(name = artist.name, spotifyId = artist.id)
-            AlbumArtistCredit(artist = getArtist(unsavedArtist), albumId = album.albumId)
-                .copy(spotifyId = artist.id, position = index)
+            AlbumArtistCredit(
+                artist = getArtist(UnsavedArtist(name = artist.name, spotifyId = artist.id)),
+                albumId = album.albumId
+            ).copy(spotifyId = artist.id, position = index)
         }
 
         return AlbumCombo(album = album, artists = albumArtists, trackCount = totalTracks ?: 0)
@@ -85,7 +77,7 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem(), IExternalAlbum {
         return distance
     }
 
-    override fun toString(): String = artistName.takeIf { it.isNotEmpty() }?.let { "$it - $title" } ?: title
+    override fun toString(): String = artistName.takeIf { it.isNotEmpty() }?.let { "$it - $name" } ?: name
 }
 
 
@@ -126,33 +118,39 @@ data class SpotifyAlbum(
     val label: String,
     val popularity: Int,
     val tracks: SpotifyResponse<SpotifySimplifiedTrack>,
-) : AbstractSpotifyAlbum() {
-    val duration: Duration
-        get() = durationMs.milliseconds
-
-    val durationMs: Int
-        get() = tracks.items.sumOf { it.durationMs }
+) : AbstractSpotifyAlbum(), IExternalAlbum {
+    override val duration: Duration
+        get() = tracks.items.sumOf { it.durationMs }.milliseconds
 
     override val title: String
         get() = name
 
-    suspend fun toAlbumWithTracks(
+    override val playCount: Int?
+        get() = null
+
+    override val thumbnailUrl: String?
+        get() = images.getThumbnailUrl()
+
+    override val trackCount: Int?
+        get() = totalTracks
+
+    override suspend fun getMediaStoreImage(): MediaStoreImage? = images.toMediaStoreImage()
+
+    override suspend fun toAlbumWithTracks(
         isLocal: Boolean,
         isInLibrary: Boolean,
-        albumArt: MediaStoreImage? = null,
         getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumWithTracksCombo {
         val albumCombo = toAlbumCombo(
             getArtist = getArtist,
             isLocal = isLocal,
             isInLibrary = isInLibrary,
-            albumArt = albumArt,
         )
 
         return AlbumWithTracksCombo(
             album = albumCombo.album,
             artists = albumCombo.artists,
-            tags = genres.map { Tag(name = it.capitalized()) },
+            tags = genres.map { Tag(name = capitalizeGenreName(it)) },
             trackCombos = tracks.items.map {
                 it.toTrackCombo(
                     getArtist = getArtist,
@@ -167,27 +165,12 @@ data class SpotifyAlbum(
     override suspend fun toAlbumCombo(
         isLocal: Boolean,
         isInLibrary: Boolean,
-        albumArt: MediaStoreImage?,
         getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumCombo = super.toAlbumCombo(
         getArtist = getArtist,
         isLocal = isLocal,
         isInLibrary = isInLibrary,
-        albumArt = albumArt,
     ).copy(trackCount = tracks.total)
-}
-
-
-fun List<SpotifyAlbum?>.filterBySearchTerm(term: String): List<SpotifyAlbum> {
-    val words = term.lowercase().split(Regex(" +"))
-
-    return filterNotNull().filter { album ->
-        words.all {
-            album.artists.artistString().lowercase().contains(it) ||
-                album.name.lowercase().contains(it) ||
-                album.year?.toString()?.contains(it) == true
-        }
-    }
 }
 
 

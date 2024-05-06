@@ -8,12 +8,9 @@ import android.net.Uri
 import androidx.annotation.WorkerThread
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.anggrayudi.storage.extension.openInputStream
 import com.anggrayudi.storage.file.fullName
 import com.anggrayudi.storage.file.isWritable
@@ -23,9 +20,7 @@ import com.anggrayudi.storage.file.openOutputStream
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import us.huseli.retaintheme.extensions.nullIfEmpty
@@ -35,7 +30,9 @@ import us.huseli.retaintheme.extensions.square
 import us.huseli.retaintheme.extensions.toBitmap
 import us.huseli.thoucylinder.Constants.IMAGE_FULL_MAX_WIDTH_DP
 import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
 import kotlin.math.max
@@ -90,17 +87,12 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
     return null
 }
 
-fun ViewModel.launchOnIOThread(block: suspend CoroutineScope.() -> Unit) =
-    viewModelScope.launch(Dispatchers.IO, block = block)
-
-fun ViewModel.launchOnMainThread(block: suspend CoroutineScope.() -> Unit) =
-    viewModelScope.launch(Dispatchers.Main, block = block)
-
 val Context.imageCacheDir: File
     get() = File(cacheDir, "images").apply { mkdirs() }
 
 
-/** STRING ********************************************************************/
+/** STRING ************************************************************************************************************/
+
 fun String.escapeQuotes() = replace("\"", "\\\"")
 
 suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
@@ -122,8 +114,13 @@ fun <T> String.fromJson(typeOfT: TypeToken<T>): T = gson.fromJson(this, typeOfT)
 /** "Should not be used if the desired type is a generic type." */
 inline fun <reified T> String.fromJson(): T = gson.fromJson(this, T::class.java)
 
+fun String.stripArtist(artist: String?): String =
+    if (artist == null) this
+    else replace(Regex("^\\W*$artist\\W+(.*)$", RegexOption.IGNORE_CASE), "$1")
 
-/** MEDIAFORMAT ***************************************************************/
+
+/** MEDIAFORMAT *******************************************************************************************************/
+
 fun MediaFormat.getIntegerOrNull(name: String): Int? = try {
     getInteger(name)
 } catch (e: NullPointerException) {
@@ -147,14 +144,16 @@ fun MediaFormat.getLongOrNull(name: String): Long? = try {
 fun MediaFormat.getIntegerOrDefault(name: String, default: Int?): Int? = getIntegerOrNull(name) ?: default
 
 
-/** JSONOBJECT ****************************************************************/
+/** JSONOBJECT ********************************************************************************************************/
+
 fun JSONObject.getStringOrNull(name: String): String? = if (has(name)) getString(name) else null
 
 fun JSONObject.getIntOrNull(name: String): Int? =
     if (has(name)) getStringOrNull(name)?.takeWhile { it.isDigit() }?.toIntOrNull() else null
 
 
-/** BITMAP/IMAGEBITMAP ********************************************************/
+/** BITMAP/IMAGEBITMAP ************************************************************************************************/
+
 fun ImageBitmap.getAverageColor(): Color {
     val pixelMap = toPixelMap()
     var redSum = 0f
@@ -184,21 +183,19 @@ fun ImageBitmap.getAverageColor(): Color {
 
 fun Bitmap.getSquareSize() = min(width, height).pow(2)
 
-fun Bitmap.asThumbnailImageBitmap(context: Context): ImageBitmap =
-    square().scaleToMaxSize(IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp, context).asImageBitmap()
 
+/** URI ***************************************************************************************************************/
 
-/** URI ***********************************************************************/
 fun Uri.getRelativePath(): String? = lastPathSegment?.substringAfterLast(':')?.nullIfEmpty()
 
-fun Uri.getRelativePathWithoutFilename(): String? = getRelativePath()?.substringBeforeLast('/')?.nullIfEmpty()
-
-suspend fun Uri.getBitmap(context: Context): Bitmap? = withContext(Dispatchers.IO) {
+suspend fun Uri.getBitmap(context: Context? = null): Bitmap? = withContext(Dispatchers.IO) {
     try {
         if (this@getBitmap.isRemote) {
             Request(this@getBitmap.toString()).getBitmap()
-        } else {
+        } else if (context != null) {
             this@getBitmap.openInputStream(context)?.use { BitmapFactory.decodeStream(it) }
+        } else {
+            path?.let { FileInputStream(File(it)) }?.use { BitmapFactory.decodeStream(it) }
         }
     } catch (e: HTTPResponseError) {
         Logger.logError("Uri", "getBitmap: $e", e)
@@ -241,7 +238,8 @@ suspend fun Uri.getCachedFullBitmap(context: Context) = getCachedBitmap(context,
 suspend fun Uri.getCachedThumbnailBitmap(context: Context) = getCachedBitmap(context, true)
 
 
-/** DOCUMENTFILE **************************************************************/
+/** DOCUMENTFILE ******************************************************************************************************/
+
 @WorkerThread
 fun DocumentFile.toByteArray(context: Context): ByteArray? = try {
     openInputStream(context)?.use { it.readBytes() }

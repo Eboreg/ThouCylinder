@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,6 +32,7 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.getUmlautifiedString
 import us.huseli.thoucylinder.pluralStringResource
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
@@ -39,12 +41,14 @@ import us.huseli.thoucylinder.viewmodels.ImageViewModel
 @Composable
 fun PlaylistList(
     playlists: ImmutableList<PlaylistPojo>,
-    isLoading: Boolean,
     onPlaylistPlayClick: (PlaylistPojo) -> Unit,
     onPlaylistClick: (PlaylistPojo) -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
     imageViewModel: ImageViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+
     ItemList(
         modifier = modifier,
         things = playlists,
@@ -57,12 +61,12 @@ fun PlaylistList(
                 modifier = Modifier.padding(10.dp),
             )
         },
-        progressIndicatorText = if (isLoading) stringResource(R.string.loading_playlists) else null,
+        progressIndicatorText = { if (isLoading) context.getUmlautifiedString(R.string.loading_playlists) else null },
     ) { _, playlist ->
-        var imageBitmap by remember(playlist) { mutableStateOf<ImageBitmap?>(null) }
+        var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(playlist) {
-            imageBitmap = imageViewModel.getPlaylistImage(playlist.playlistId)
+            imageBitmap = imageViewModel.getPlaylistThumbnailImageBitmap(playlist.playlistId)
         }
 
         Row(

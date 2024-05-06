@@ -10,18 +10,16 @@ plugins {
 subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
-            if (project.findProperty("composeCompilerReports") != null) {
-                freeCompilerArgs += listOf(
-                    "-P",
-                    "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.buildDir.absolutePath}/compose_compiler",
-                )
-            }
-            if (project.findProperty("composeCompilerMetrics") != null) {
-                freeCompilerArgs += listOf(
-                    "-P",
-                    "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.buildDir.absolutePath}/compose_compiler",
-                )
-            }
+            val buildDir = project.layout.buildDirectory.asFile.get().absolutePath
+
+            freeCompilerArgs += listOf(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${buildDir}/compose_compiler",
+            )
+            freeCompilerArgs += listOf(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${buildDir}/compose_compiler",
+            )
         }
     }
 }

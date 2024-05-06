@@ -34,7 +34,7 @@ import us.huseli.thoucylinder.viewmodels.ImageViewModel
 fun ArtistGrid(
     artistCombos: ImmutableList<ArtistCombo>,
     modifier: Modifier = Modifier,
-    progressIndicatorText: String? = null,
+    progressIndicatorText: (() -> String?) = { null },
     onArtistClick: (String) -> Unit,
     onEmpty: @Composable (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
@@ -51,7 +51,7 @@ fun ArtistGrid(
         var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(combo.artist.image) {
-            imageBitmap = imageViewModel.getArtistImage(combo)
+            imageBitmap = imageViewModel.getArtistThumbnailImageBitmap(combo)
         }
 
         Thumbnail(

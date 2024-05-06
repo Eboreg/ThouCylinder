@@ -16,11 +16,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import us.huseli.retaintheme.extensions.bytesToString
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.retaintheme.isInLandscapeMode
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
@@ -42,6 +45,9 @@ fun TrackInfoDialog(
     localPath: String? = null,
     onClose: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val fileSize = remember { track.getFileSize(context) }
+
     AlertDialog(
         modifier = modifier.padding(horizontal = 20.dp),
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -89,7 +95,7 @@ fun TrackInfoDialog(
                     )
                     TrackInfoTextRow(
                         label = stringResource(R.string.file_size),
-                        value = metadata.sizeString ?: "-",
+                        value = fileSize?.bytesToString() ?: "-",
                         modifier = rowModifier,
                     )
                     TrackInfoTextRow(

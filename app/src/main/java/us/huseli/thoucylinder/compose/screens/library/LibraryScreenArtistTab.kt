@@ -42,20 +42,20 @@ import us.huseli.thoucylinder.viewmodels.ArtistListViewModel
 
 @Composable
 fun LibraryScreenArtistTab(
-    displayType: DisplayType,
-    isImporting: Boolean,
     onArtistClick: (String) -> Unit,
     onDisplayTypeChange: (DisplayType) -> Unit,
     onListTypeChange: (ListType) -> Unit,
-    showToolbars: Boolean,
     modifier: Modifier = Modifier,
+    showToolbars: () -> Boolean = { true },
+    displayType: DisplayType = DisplayType.LIST,
+    isImporting: Boolean = false,
     listModifier: Modifier = Modifier,
     viewModel: ArtistListViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     var isFilterDialogOpen by rememberSaveable { mutableStateOf(false) }
 
-    val artistCombos by viewModel.artistCombos.collectAsStateWithLifecycle(persistentListOf())
+    val artistCombos by viewModel.artistCombos.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val onlyShowArtistsWithAlbums by viewModel.onlyShowArtistsWithAlbums.collectAsStateWithLifecycle()
     val searchTerm by viewModel.searchTerm.collectAsStateWithLifecycle()
@@ -110,7 +110,7 @@ fun LibraryScreenArtistTab(
             listType = ListType.ARTISTS,
             onDisplayTypeChange = onDisplayTypeChange,
             onListTypeChange = onListTypeChange,
-            availableDisplayTypes = listOf(DisplayType.LIST, DisplayType.GRID),
+            availableDisplayTypes = persistentListOf(DisplayType.LIST, DisplayType.GRID),
         )
         ListActions(
             initialSearchTerm = searchTerm,
@@ -121,6 +121,8 @@ fun LibraryScreenArtistTab(
             onSort = { param, order -> viewModel.setSorting(param, order) },
             onSearch = { viewModel.setSearchTerm(it) },
             showFilterButton = false,
+            tagPojos = { persistentListOf() },
+            selectedTagPojos = { persistentListOf() },
             extraButtons = {
                 InputChip(
                     selected = onlyShowArtistsWithAlbums,
@@ -141,7 +143,7 @@ fun LibraryScreenArtistTab(
         when (displayType) {
             DisplayType.LIST -> ArtistList(
                 onArtistClick = onArtistClick,
-                progressIndicatorText = progressIndicatorText,
+                progressIndicatorText = { progressIndicatorText },
                 artistCombos = artistCombos,
                 onEmpty = onEmpty,
                 modifier = listModifier,
@@ -149,7 +151,7 @@ fun LibraryScreenArtistTab(
             DisplayType.GRID -> ArtistGrid(
                 onArtistClick = onArtistClick,
                 artistCombos = artistCombos,
-                progressIndicatorText = progressIndicatorText,
+                progressIndicatorText = { progressIndicatorText },
                 onEmpty = onEmpty,
                 modifier = listModifier,
             )

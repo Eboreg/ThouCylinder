@@ -1,6 +1,6 @@
 import dagger.hilt.android.plugin.util.capitalize
-import java.util.Properties
 import java.io.FileInputStream
+import java.util.Properties
 
 val keystoreProperties = Properties()
 val secretsProperties = Properties()
@@ -73,8 +73,8 @@ android {
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "0.4.9"
+        versionCode = 16
+        versionName = "0.5.0"
 
         manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -136,24 +136,24 @@ android {
 
 val lifecycleVersion = "2.7.0"
 val roomVersion = "2.6.1"
-val daggerVersion = "2.51"
-val media3Version = "1.3.0"
-val pagingVersion = "3.3.0-alpha05"
+val daggerVersion = "2.51.1"
+val media3Version = "1.3.1"
+val pagingVersion = "3.3.0-rc01"
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Compose:
-    implementation(platform("androidx.compose:compose-bom:2024.03.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
 
     // Material:
-    implementation("androidx.compose.material:material:1.6.4") // for swipeable
+    implementation("androidx.compose.material:material:1.6.7") // for swipeable
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
     // Compose related:
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
@@ -181,7 +181,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:4.3.1")
+    implementation("com.github.Eboreg:RetainTheme:4.4.0")
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
@@ -200,7 +200,7 @@ dependencies {
     implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
 
     // Levenshtein string distance:
-    implementation("org.apache.commons:commons-text:1.11.0")
+    implementation("org.apache.commons:commons-text:1.12.0")
 
     // SimpleStorage for easier file handling:
     implementation("com.anggrayudi:storage:1.5.5")
@@ -214,4 +214,11 @@ dependencies {
 
     // Trying out "immutable collection":
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.7")
+
+    // Track amplitude waveform shit:
+    implementation("com.github.lincollincol:amplituda:2.2.2")
+    implementation("com.github.lincollincol:compose-audiowaveform:1.1.2")
+
+    // Compose tracing for debugging/optimization:
+    implementation("androidx.compose.runtime:runtime-tracing:1.0.0-beta01")
 }

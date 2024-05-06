@@ -1,9 +1,7 @@
 package us.huseli.thoucylinder
 
-import android.content.Context
 import androidx.annotation.StringRes
 import androidx.documentfile.provider.DocumentFile
-import com.anggrayudi.storage.file.extension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,10 +9,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
@@ -24,7 +25,6 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
 import us.huseli.thoucylinder.repositories.Repositories
 import java.io.File
-import java.io.FileOutputStream
 import java.time.Instant
 
 enum class DownloadTaskState { CREATED, RUNNING, CANCELLED, FINISHED, ERROR }
@@ -34,6 +34,7 @@ enum class DownloadStatus(@StringRes val stringId: Int) {
     WAITING(R.string.waiting),
     DOWNLOADING(R.string.downloading),
     CONVERTING(R.string.converting),
+    CONVERTING_AND_TAGGING(R.string.converting_and_tagging),
     MOVING(R.string.moving),
     TAGGING(R.string.tagging),
     SAVING(R.string.saving),
@@ -41,7 +42,7 @@ enum class DownloadStatus(@StringRes val stringId: Int) {
 
 abstract class AbstractDownloadTask {
     abstract val downloadProgress: Flow<Double>
-    abstract val state: Flow<DownloadTaskState>
+    abstract val state: StateFlow<DownloadTaskState>
 
     open val isActive: Flow<Boolean>
         get() = state.map { it == DownloadTaskState.RUNNING }
@@ -56,9 +57,8 @@ class TrackDownloadTask(
     val album: Album? = null,
     val albumArtists: List<AbstractArtistCredit>? = null,
     private val onError: (Throwable) -> Unit = {},
-    private val onFinish: (Track) -> Unit = {},
 ) : AbstractDownloadTask() {
-    data class ViewState(
+    data class UiState(
         val trackId: String,
         val isActive: Boolean,
         val status: DownloadStatus,
@@ -73,24 +73,20 @@ class TrackDownloadTask(
     override val downloadProgress = _downloadProgress.asStateFlow()
     override val state = _state.asStateFlow()
 
-    val viewState: Flow<ViewState?> =
+    val uiState: StateFlow<UiState?> =
         combine(isActive, _downloadStatus, _downloadProgress) { isActive, status, progress ->
-            ViewState(
+            UiState(
                 trackId = track.trackId,
                 isActive = isActive,
                 status = status,
                 progress = progress.toFloat(),
             )
-        }
+        }.distinctUntilChanged().stateIn(scope, started = SharingStarted.Lazily, initialValue = null)
 
     override val isActive: Flow<Boolean>
         get() = _state.map { it == DownloadTaskState.RUNNING || it == DownloadTaskState.CREATED }
 
     var started: Instant = Instant.now()
-        private set
-
-    @Suppress("MemberVisibilityCanBePrivate")
-    var updated: Instant = Instant.now()
         private set
 
     var error: Exception? = null
@@ -101,15 +97,14 @@ class TrackDownloadTask(
         _state.value = DownloadTaskState.CANCELLED
     }
 
-    fun start(context: Context) {
+    fun start() {
         _state.value = DownloadTaskState.RUNNING
         started = Instant.now()
 
         job = scope.launch {
             try {
-                val track = run(context)
+                run()
                 _state.value = DownloadTaskState.FINISHED
-                onFinish(track)
             } catch (e: CancellationException) {
                 _state.value = DownloadTaskState.CANCELLED
             } catch (e: Exception) {
@@ -120,51 +115,41 @@ class TrackDownloadTask(
         }
     }
 
-    private suspend fun run(context: Context): Track {
+    private suspend fun run(): Track {
         val youtubeMetadata = repos.youtube.getBestMetadata(track)
             ?: throw Exception("Could not get Youtube metadata for $track (youtubeVideo=${track.youtubeVideo})")
         val basename = track.generateBasename(
             includeArtist = album == null,
             artist = trackArtists.joined(),
         )
-        val filename = "$basename.${youtubeMetadata.fileExtension}"
-        val tempFile = File(context.cacheDir, "${track.youtubeVideo!!.id}.${youtubeMetadata.fileExtension}")
 
         setProgress(0.0)
         setStatus(DownloadStatus.DOWNLOADING)
-        repos.youtube.downloadVideo(
-            url = youtubeMetadata.url,
-            tempFile = tempFile,
+        var tempFile: File = repos.youtube.downloadVideo(
+            video = track.youtubeVideo!!,
             progressCallback = { setProgress(it * 0.7) },
         )
 
-        setStatus(DownloadStatus.TAGGING)
-        repos.localMedia.tagTrack(
+        setStatus(DownloadStatus.CONVERTING_AND_TAGGING)
+        tempFile = repos.localMedia.convertAndTagTrack(
+            tmpInFile = tempFile,
+            extension = youtubeMetadata.containerFormat.audioFileExtension,
             track = track,
-            albumArtists = albumArtists,
-            documentFile = DocumentFile.fromFile(tempFile),
             trackArtists = trackArtists,
             album = album,
+            albumArtists = albumArtists,
         )
+
         setProgress(0.8)
-
         setStatus(DownloadStatus.MOVING)
-        directory.findFile(filename)?.delete()
-        val documentFile = directory.createFile(youtubeMetadata.mimeType, basename)
-            ?: throw Exception(
-                "DocumentFile.createFile() returned null. mimeType=${youtubeMetadata.mimeType}, " +
-                    "basename=$basename, directory=$directory"
-            )
+        val documentFile = repos.localMedia.copyTempAudioFile(
+            basename = basename,
+            tempFile = tempFile,
+            mimeType = youtubeMetadata.containerFormat.shortMimeType,
+            directory = directory,
+        )
 
-        if (documentFile.extension.isEmpty()) documentFile.renameTo(filename)
-
-        context.contentResolver.openFileDescriptor(documentFile.uri, "w")?.use {
-            FileOutputStream(it.fileDescriptor).use { outputStream ->
-                outputStream.write(tempFile.readBytes())
-            }
-            setProgress(0.9)
-        }
-
+        setProgress(0.9)
         setStatus(DownloadStatus.SAVING)
         val metadata = tempFile.extractTrackMetadata()
         val downloadedTrack = track.copy(
@@ -174,9 +159,10 @@ class TrackDownloadTask(
             localUri = documentFile.uri.toString(),
             durationMs = metadata?.durationMs,
         )
+
         repos.track.updateTrack(downloadedTrack)
-        tempFile.delete()
         setProgress(1.0)
+        tempFile.delete()
 
         return downloadedTrack
     }
@@ -184,21 +170,18 @@ class TrackDownloadTask(
     private fun setProgress(value: Double) {
         if (value != _downloadProgress.value) {
             _downloadProgress.value = value
-            updated = Instant.now()
         }
     }
 
     private fun setStatus(value: DownloadStatus) {
         if (value != _downloadStatus.value) {
             _downloadStatus.value = value
-            updated = Instant.now()
         }
     }
 
-    override fun equals(other: Any?) =
-        other is TrackDownloadTask && other.track == track && other.state.value == state.value
+    override fun equals(other: Any?) = other is TrackDownloadTask && other.track == track
 
-    override fun hashCode() = 31 * track.hashCode() + state.value.hashCode()
+    override fun hashCode() = track.hashCode()
 }
 
 class AlbumDownloadTask(
@@ -214,19 +197,19 @@ class AlbumDownloadTask(
         combine(trackTasks.map { it.downloadProgress }) { it.average() }.distinctUntilChanged()
     override val state = _state.asStateFlow()
 
-    data class ViewState(
+    data class UiState(
         val albumId: String,
         val isActive: Boolean,
         val progress: Float,
     )
 
-    val viewState: Flow<ViewState?> = combine(isActive, downloadProgress) { isActive, progress ->
-        ViewState(
+    val uiState: StateFlow<UiState?> = combine(isActive, downloadProgress) { isActive, progress ->
+        UiState(
             albumId = album.albumId,
             isActive = isActive,
             progress = progress.toFloat(),
         )
-    }
+    }.distinctUntilChanged().stateIn(scope, started = SharingStarted.Lazily, initialValue = null)
 
     init {
         scope.launch {
@@ -252,3 +235,9 @@ class AlbumDownloadTask(
         trackTasks.forEach { it.cancel() }
     }
 }
+
+fun Iterable<TrackDownloadTask>.getTrackUiStateFlow(trackId: String): StateFlow<TrackDownloadTask.UiState?> =
+    find { it.track.trackId == trackId }?.uiState ?: MutableStateFlow(null)
+
+fun Iterable<AlbumDownloadTask>.getAlbumUiStateFlow(albumId: String): StateFlow<AlbumDownloadTask.UiState?> =
+    find { it.album.albumId == albumId }?.uiState ?: MutableStateFlow(null)

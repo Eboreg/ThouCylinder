@@ -1,5 +1,8 @@
 package us.huseli.thoucylinder.dataclasses
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class UnsavedArtist(
     val name: String,
     val spotifyId: String? = null,

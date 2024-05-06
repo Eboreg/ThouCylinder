@@ -8,18 +8,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
 
 @Composable
 fun AskMusicImportPermissions(viewModel: SettingsViewModel = hiltViewModel()) {
-    val context = LocalContext.current
     val autoImportLocalMusic by viewModel.autoImportLocalMusic.collectAsStateWithLifecycle()
     val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
     var isDialogShown by rememberSaveable(autoImportLocalMusic) { mutableStateOf(autoImportLocalMusic == null) }
@@ -35,7 +33,7 @@ fun AskMusicImportPermissions(viewModel: SettingsViewModel = hiltViewModel()) {
                 viewModel.setAutoImportLocalMusic(true)
                 viewModel.setLocalMusicUri(uri)
                 isDialogShown = false
-                viewModel.importNewLocalAlbumsAsync(context)
+                viewModel.importNewLocalAlbums()
             },
             cancelButtonText = stringResource(R.string.don_t_import),
             onDismissRequest = { isDialogShown = false },

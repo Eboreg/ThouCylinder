@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses
 
+import androidx.compose.runtime.Immutable
 import com.arthenica.ffmpegkit.MediaInformation
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
@@ -9,6 +10,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.getIntOrNull
 import us.huseli.thoucylinder.getStringOrNull
 
+@Immutable
 data class ID3Data(
     val album: String? = null,
     val albumArtist: String? = null,
@@ -62,7 +64,7 @@ data class ID3Data(
 }
 
 fun MediaInformation.extractID3Data(): ID3Data {
-    val tags = streams.firstNotNullOfOrNull { it.tags }
+    val tags = this.tags ?: streams.firstNotNullOfOrNull { it.tags }
 
     return ID3Data(
         album = tags?.getStringOrNull("album"),

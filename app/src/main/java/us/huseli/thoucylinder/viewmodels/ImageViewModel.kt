@@ -4,29 +4,20 @@ import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.repositories.Repositories
+import us.huseli.thoucylinder.managers.Managers
 import javax.inject.Inject
 
 
 @HiltViewModel
-class ImageViewModel @Inject constructor(private val repos: Repositories) : ViewModel() {
-    suspend fun getAlbumFullImage(uri: Uri?): ImageBitmap? =
-        withContext(Dispatchers.IO) { repos.album.getFullImage(uri) }
+class ImageViewModel @Inject constructor(private val managers: Managers) : ViewModel() {
+    suspend fun getFullImageBitmap(uri: Uri?): ImageBitmap? = managers.image.getFullImageBitmap(uri)
 
-    suspend fun getAlbumThumbnail(uri: Uri?): ImageBitmap? =
-        withContext(Dispatchers.IO) { uri?.let { repos.album.thumbnailCache.getOrNull(it) } }
+    suspend fun getThumbnailImageBitmap(uri: Uri?): ImageBitmap? = managers.image.getThumbnailImageBitmap(uri)
 
-    suspend fun getArtistImage(combo: ArtistCombo): ImageBitmap? =
-        withContext(Dispatchers.IO) { repos.artist.getArtistImage(combo) }
+    suspend fun getArtistThumbnailImageBitmap(combo: ArtistCombo): ImageBitmap? =
+        managers.image.getArtistThumbnailImageBitmap(combo)
 
-    suspend fun getPlaylistImage(playlistId: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        repos.playlist.listPlaylistAlbums(playlistId).firstNotNullOfOrNull { album ->
-            album.albumArt?.thumbnailUri?.let { repos.album.thumbnailCache.getOrNull(it) }
-        }
-    }
-
-    suspend fun getTrackThumbnail(uri: Uri?): ImageBitmap? = uri?.let { repos.track.thumbnailCache.getOrNull(it) }
+    suspend fun getPlaylistThumbnailImageBitmap(playlistId: String): ImageBitmap? =
+        managers.image.getPlaylistThumbnailImageBitmap(playlistId)
 }

@@ -13,6 +13,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import us.huseli.retaintheme.compose.ResponsiveScaffold
 import us.huseli.retaintheme.compose.SnackbarHosts
-import us.huseli.thoucylinder.AddDestination
+import us.huseli.thoucylinder.SearchDestination
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.DebugDestination
 import us.huseli.thoucylinder.DownloadsDestination
@@ -40,19 +41,21 @@ fun ThouCylinderScaffold(
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val onMenuItemClick = { menuItem: MenuItemId ->
-        if (menuItem != activeMenuItemId) {
-            when (menuItem) {
-                MenuItemId.SEARCH_YOUTUBE -> onNavigate(AddDestination.route)
-                MenuItemId.LIBRARY -> onNavigate(LibraryDestination.route)
-                MenuItemId.QUEUE -> onNavigate(QueueDestination.route)
-                MenuItemId.IMPORT -> onNavigate(ImportDestination.route)
-                MenuItemId.DEBUG -> onNavigate(DebugDestination.route)
-                MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
-                MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
-                MenuItemId.MENU -> scope.launch { drawerState.open() }
-                MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
-                MenuItemId.RADIO -> onRadioClick()
+    val onMenuItemClick = remember(activeMenuItemId) {
+        { menuItem: MenuItemId ->
+            if (menuItem != activeMenuItemId) {
+                when (menuItem) {
+                    MenuItemId.SEARCH_YOUTUBE -> onNavigate(SearchDestination.route)
+                    MenuItemId.LIBRARY -> onNavigate(LibraryDestination.route)
+                    MenuItemId.QUEUE -> onNavigate(QueueDestination.route)
+                    MenuItemId.IMPORT -> onNavigate(ImportDestination.route)
+                    MenuItemId.DEBUG -> onNavigate(DebugDestination.route)
+                    MenuItemId.DOWNLOADS -> onNavigate(DownloadsDestination.route)
+                    MenuItemId.SETTINGS -> onNavigate(SettingsDestination.route)
+                    MenuItemId.MENU -> scope.launch { drawerState.open() }
+                    MenuItemId.RECOMMENDATIONS -> onNavigate(RecommendationsDestination.route)
+                    MenuItemId.RADIO -> onRadioClick()
+                }
             }
         }
     }
@@ -67,7 +70,7 @@ fun ThouCylinderScaffold(
             ) {
                 for (item in menuItems.filter { it.showInDrawer }) {
                     item.DrawerItem(
-                        activeItemId = activeMenuItemId,
+                        isActive = { activeMenuItemId == item.id },
                         onClick = {
                             scope.launch { drawerState.close() }
                             onMenuItemClick(item.id)
@@ -85,7 +88,10 @@ fun ThouCylinderScaffold(
             landscapeMenu = { innerPadding ->
                 NavigationRail(modifier = Modifier.padding(innerPadding)) {
                     for (item in menuItems.filter { it.showInMainMenu }) {
-                        item.RailItem(activeItemId = activeMenuItemId, onClick = { onMenuItemClick(item.id) })
+                        item.RailItem(
+                            isActive = { activeMenuItemId == item.id },
+                            onClick = { onMenuItemClick(item.id) },
+                        )
                     }
                 }
             },

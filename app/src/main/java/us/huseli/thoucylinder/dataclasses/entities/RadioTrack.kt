@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -25,6 +26,7 @@ import androidx.room.Index
     primaryKeys = ["RadioTrack_radioId", "RadioTrack_trackId"],
     indices = [Index("RadioTrack_trackId")],
 )
+@Immutable
 data class RadioTrack(
     @ColumnInfo("RadioTrack_radioId") val radioId: String,
     @ColumnInfo("RadioTrack_trackId") val trackId: String,

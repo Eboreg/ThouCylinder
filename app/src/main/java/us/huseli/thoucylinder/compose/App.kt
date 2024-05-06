@@ -3,7 +3,10 @@ package us.huseli.thoucylinder.compose
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisallowComposableCalls
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,10 +25,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.AddDestination
 import us.huseli.thoucylinder.AlbumDestination
 import us.huseli.thoucylinder.ArtistDestination
 import us.huseli.thoucylinder.BuildConfig
+import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
+import us.huseli.thoucylinder.Constants.NAV_ARG_ARTIST
 import us.huseli.thoucylinder.DebugDestination
 import us.huseli.thoucylinder.DownloadsDestination
 import us.huseli.thoucylinder.ImportDestination
@@ -34,7 +38,10 @@ import us.huseli.thoucylinder.PlaylistDestination
 import us.huseli.thoucylinder.QueueDestination
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.RecommendationsDestination
+import us.huseli.thoucylinder.SearchDestination
 import us.huseli.thoucylinder.SettingsDestination
+import us.huseli.thoucylinder.compose.album.DeleteAlbumsDialog
+import us.huseli.thoucylinder.compose.album.EditAlbumMethodDialog
 import us.huseli.thoucylinder.compose.modalcover.ModalCover
 import us.huseli.thoucylinder.compose.screens.AlbumScreen
 import us.huseli.thoucylinder.compose.screens.ArtistScreen
@@ -47,59 +54,48 @@ import us.huseli.thoucylinder.compose.screens.QueueScreen
 import us.huseli.thoucylinder.compose.screens.RecommendationsScreen
 import us.huseli.thoucylinder.compose.screens.SettingsScreen
 import us.huseli.thoucylinder.compose.screens.YoutubeSearchScreen
-import us.huseli.thoucylinder.dataclasses.Selection
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
+import us.huseli.thoucylinder.compose.track.EditTrackDialog
+import us.huseli.thoucylinder.compose.track.TrackInfoDialog
+import us.huseli.thoucylinder.dataclasses.abstr.joined
+import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.AppViewModel
-import us.huseli.thoucylinder.viewmodels.QueueViewModel
+import us.huseli.thoucylinder.viewmodels.RadioViewModel
+import us.huseli.thoucylinder.viewmodels.RootStateViewModel
 import us.huseli.thoucylinder.viewmodels.YoutubeSearchViewModel
 
 @Composable
 fun App(
     startDestination: String,
-    modifier: Modifier = Modifier,
     viewModel: AppViewModel = hiltViewModel(),
     youtubeSearchViewModel: YoutubeSearchViewModel = hiltViewModel(),
-    queueViewModel: QueueViewModel = hiltViewModel(),
+    radioViewModel: RadioViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val onBackPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val navController: NavHostController = rememberNavController()
 
-    val activeRadio by viewModel.activeRadio.collectAsStateWithLifecycle()
-    val currentTrackCombo by queueViewModel.currentCombo.collectAsStateWithLifecycle(null)
+    val currentTrackExists by viewModel.currentTrackExists.collectAsStateWithLifecycle()
+    val isCoverExpanded by viewModel.isCoverExpanded.collectAsStateWithLifecycle()
     val isWelcomeDialogShown by viewModel.isWelcomeDialogShown.collectAsStateWithLifecycle()
-    val libraryRadioNovelty by viewModel.libraryRadioNovelty.collectAsStateWithLifecycle()
     val umlautify by viewModel.umlautify.collectAsStateWithLifecycle()
 
-    var activeAlbumCombo by rememberSaveable { mutableStateOf<AbstractAlbumCombo?>(null) }
-    var activeArtist by rememberSaveable { mutableStateOf<Artist?>(null) }
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
-    var addDownloadedAlbum by rememberSaveable { mutableStateOf<Album?>(null) }
-    var addToPlaylist by rememberSaveable { mutableStateOf(false) }
-    var addToPlaylistSelection by rememberSaveable { mutableStateOf<Selection?>(null) }
-    var createPlaylist by rememberSaveable { mutableStateOf(false) }
-    var deleteAlbums by rememberSaveable { mutableStateOf<Collection<Album.ViewState>?>(null) }
-    var editAlbum by rememberSaveable { mutableStateOf<Album.ViewState?>(null) }
-    var editTrack by rememberSaveable { mutableStateOf<Track.ViewState?>(null) }
-    var infoTrack by rememberSaveable { mutableStateOf<Track?>(null) }
-    var isCoverExpanded by rememberSaveable { mutableStateOf(false) }
-    var isRadioDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     // This is just to forcefully recompose stuff when the value changes:
     LaunchedEffect(umlautify) {}
 
-    /** Weird onBackPressedCallback shit begin */
+    /** Weird onBackPressedCallback shit begins */
     val onBackPressedCallback = remember {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                isCoverExpanded = false
+                viewModel.collapseCover()
             }
         }
     }
@@ -119,9 +115,9 @@ fun App(
 
     val onNavigate = remember {
         { route: String ->
-            activeArtist = null
-            activeAlbumCombo = null
-            isCoverExpanded = false
+            radioViewModel.setActiveArtistId(null)
+            radioViewModel.setActiveAlbumId(null)
+            viewModel.collapseCover()
             navController.navigate(route)
         }
     }
@@ -129,95 +125,72 @@ fun App(
     val onPlaylistClick = remember {
         { playlistId: String ->
             navController.navigate(PlaylistDestination.route(playlistId))
-            isCoverExpanded = false
+            viewModel.collapseCover()
         }
     }
 
     val onAlbumClick = remember {
         { albumId: String ->
             navController.navigate(AlbumDestination.route(albumId))
-            isCoverExpanded = false
+            viewModel.collapseCover()
         }
     }
 
+    val dialogCallbaks = rememberDialogCallbacks(
+        onAlbumClick = onAlbumClick,
+        onPlaylistClick = onPlaylistClick,
+    )
+
     val appCallbacks = remember {
         AppCallbacks(
-            onAddAlbumToLibraryClick = { state ->
-                viewModel.addAlbumsToLibrary(listOf(state.album.albumId))
-                SnackbarEngine.addInfo(
-                    context.getString(R.string.added_x_to_the_library, state.album.title)
-                        .umlautify()
-                )
-            },
-            onAddToPlaylistClick = { selection ->
-                addToPlaylistSelection = selection
-                addToPlaylist = true
-            },
-            onAlbumClick = onAlbumClick,
+            onAddAlbumsToPlaylistClick = dialogCallbaks.onAddAlbumsToPlaylistClick,
+            onAddTracksToPlaylistClick = dialogCallbaks.onAddTracksToPlaylistClick,
             onArtistClick = {
                 navController.navigate(ArtistDestination.route(it))
-                isCoverExpanded = false
+                viewModel.collapseCover()
             },
             onBackClick = { if (!navController.popBackStack()) navController.navigate(LibraryDestination.route) },
-            onCancelAlbumDownloadClick = { viewModel.cancelAlbumDownload(it) },
-            onCreatePlaylistClick = { createPlaylist = true },
-            onDeletePlaylistClick = { playlist ->
-                viewModel.deletePlaylist(playlist) {
-                    SnackbarEngine.addInfo(
-                        message = context.getString(R.string.the_playlist_was_removed).umlautify(),
-                        actionLabel = context.getString(R.string.undo).umlautify(),
-                        onActionPerformed = {
-                            viewModel.undoDeletePlaylist { playlistId ->
-                                SnackbarEngine.addInfo(
-                                    message = context.getString(R.string.the_playlist_was_restored).umlautify(),
-                                    actionLabel = context.getString(R.string.go_to_playlist).umlautify(),
-                                    onActionPerformed = { onPlaylistClick(playlistId) },
-                                )
-                            }
-                        }
-                    )
-                }
+            onCreatePlaylistClick = dialogCallbaks.onCreatePlaylistClick,
+            onDeleteAlbumsClick = dialogCallbaks.onDeleteAlbumsClick,
+            onDeletePlaylistClick = { playlistId ->
+                viewModel.deletePlaylist(
+                    playlistId = playlistId,
+                    context = context,
+                    onRestored = { onPlaylistClick(playlistId) },
+                )
             },
-            onDownloadAlbumClick = { addDownloadedAlbum = it },
-            onDownloadTrackClick = { viewModel.downloadTrack(it) },
-            onEditAlbumClick = { editAlbum = it },
             onPlaylistClick = onPlaylistClick,
-            onShowTrackInfoClick = { combo -> infoTrack = combo },
-            onDeleteAlbumsClick = { states -> deleteAlbums = states },
-            onEditTrackClick = { editTrack = it },
-            onStartAlbumRadioClick = { viewModel.startAlbumRadio(it) },
             onStartArtistRadioClick = { viewModel.startArtistRadio(it) },
-            onStartTrackRadioClick = { viewModel.startTrackRadio(it) },
         )
     }
 
-    AppCallbacksComposables(
-        viewModel = viewModel,
-        onCancel = {
-            editAlbum = null
-            editTrack = null
-            deleteAlbums = null
-            addDownloadedAlbum = null
-            createPlaylist = false
-            addToPlaylist = false
-            infoTrack = null
-            addToPlaylistSelection = null
-        },
-        onPlaylistClick = onPlaylistClick,
-        onAlbumClick = onAlbumClick,
-        onOpenCreatePlaylistDialog = {
-            addToPlaylist = false
-            createPlaylist = true
-        },
-        editAlbum = editAlbum,
-        editTrack = editTrack,
-        deleteAlbums = deleteAlbums?.toImmutableList(),
-        addDownloadedAlbum = addDownloadedAlbum,
-        createPlaylist = createPlaylist,
-        addToPlaylist = addToPlaylist,
-        addToPlaylistSelection = addToPlaylistSelection,
-        infoTrack = infoTrack,
-    )
+    val trackCallbacks = remember {
+        TrackCallbacks(
+            onAddToPlaylistClick = { dialogCallbaks.onAddTracksToPlaylistClick(listOf(it)) },
+            onDownloadClick = { viewModel.downloadTrack(it) },
+            onEditClick = dialogCallbaks.onEditTrackClick,
+            onGotoArtistClick = appCallbacks.onArtistClick,
+            onShowInfoClick = dialogCallbaks.onShowTrackInfoClick,
+            onStartRadioClick = { viewModel.startTrackRadio(it) },
+            onGotoAlbumClick = { viewModel.getAlbumIdByTrackId(it, onAlbumClick) },
+            onEnqueueClick = { viewModel.enqueueTrack(it) },
+            onTrackClick = { viewModel.playTrack(it) },
+        )
+    }
+
+    val albumCallbacks = remember {
+        AlbumCallbacks(
+            onAddToLibraryClick = {},
+            onAddToPlaylistClick = { dialogCallbaks.onAddAlbumsToPlaylistClick(listOf(it)) },
+            onAlbumClick = onAlbumClick,
+            onArtistClick = appCallbacks.onArtistClick,
+            onCancelDownloadClick = { viewModel.cancelAlbumDownload(it) },
+            onDeleteClick = { dialogCallbaks.onDeleteAlbumsClick(listOf(it)) },
+            onDownloadClick = dialogCallbaks.onDownloadAlbumClick,
+            onEditClick = dialogCallbaks.onEditAlbumClick,
+            onStartRadioClick = { viewModel.startAlbumRadio(it) },
+        )
+    }
 
     AskMusicImportPermissions()
 
@@ -225,78 +198,81 @@ fun App(
         WelcomeDialog(onCancel = { viewModel.setWelcomeDialogShown(true) })
     }
 
-    if (isRadioDialogOpen) {
-        RadioDialog(
-            activeRadio = activeRadio,
-            activeTrackCombo = currentTrackCombo,
-            activeAlbumCombo = activeAlbumCombo,
-            activeArtist = activeArtist,
-            libraryRadioNovelty = libraryRadioNovelty,
-            onDeactivateClick = { viewModel.deactivateRadio() },
-            onStartLibraryRadioClick = { viewModel.startLibraryRadio() },
-            onStartArtistRadioClick = { viewModel.startArtistRadio(it) },
-            onStartAlbumRadioClick = { viewModel.startAlbumRadio(it) },
-            onStartTrackRadioClick = { viewModel.startTrackRadio(it) },
-            onDismissRequest = { isRadioDialogOpen = false },
-            onLibraryRadioNoveltyChange = { viewModel.setLibraryRadioNovelty(it) },
-        )
-    }
-
     ThouCylinderScaffold(
-        modifier = modifier,
+        modifier = Modifier.safeDrawingPadding(),
         activeMenuItemId = activeMenuItemId,
         onNavigate = onNavigate,
-        onRadioClick = { isRadioDialogOpen = true },
+        onRadioClick = dialogCallbaks.onRadioClick,
     ) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier
                 .matchParentSize()
-                .padding(bottom = if (currentTrackCombo != null) 80.dp else 0.dp)
+                .padding(bottom = if (currentTrackExists) 80.dp else 0.dp)
         ) {
-            composable(route = AddDestination.route) {
-                activeMenuItemId = AddDestination.menuItemId
-                YoutubeSearchScreen(viewModel = youtubeSearchViewModel, appCallbacks = appCallbacks)
+            composable(route = SearchDestination.route) {
+                activeMenuItemId = SearchDestination.menuItemId
+                YoutubeSearchScreen(
+                    viewModel = youtubeSearchViewModel,
+                    appCallbacks = appCallbacks,
+                    albumCallbacks = albumCallbacks,
+                    trackCallbacks = trackCallbacks,
+                )
             }
 
             composable(route = LibraryDestination.route) {
                 activeMenuItemId = LibraryDestination.menuItemId
-                LibraryScreen(appCallbacks = appCallbacks)
+                LibraryScreen(
+                    appCallbacks = appCallbacks,
+                    albumCallbacks = albumCallbacks,
+                    trackCallbacks = trackCallbacks,
+                )
             }
 
             composable(route = QueueDestination.route) {
                 activeMenuItemId = QueueDestination.menuItemId
-                QueueScreen(appCallbacks = appCallbacks)
+                QueueScreen(
+                    trackCallbacks = trackCallbacks,
+                    appCallbacks = appCallbacks,
+                )
             }
 
             composable(route = AlbumDestination.routeTemplate, arguments = AlbumDestination.arguments) {
                 activeMenuItemId = null
+                radioViewModel.setActiveAlbumId(it.savedStateHandle.get<String>(NAV_ARG_ALBUM))
                 AlbumScreen(
                     appCallbacks = appCallbacks,
-                    onAlbumComboFetched = { activeAlbumCombo = it },
+                    albumCallbacks = albumCallbacks,
+                    trackCallbacks = trackCallbacks,
                 )
             }
 
             composable(route = ArtistDestination.routeTemplate, arguments = ArtistDestination.arguments) {
                 activeMenuItemId = null
+                radioViewModel.setActiveArtistId(it.savedStateHandle.get<String>(NAV_ARG_ARTIST))
                 ArtistScreen(
                     appCallbacks = appCallbacks,
-                    onArtistFetched = { activeArtist = it },
+                    albumCallbacks = albumCallbacks,
+                    trackCallbacks = trackCallbacks,
                 )
             }
 
             composable(route = PlaylistDestination.routeTemplate, arguments = PlaylistDestination.arguments) {
                 activeMenuItemId = null
-                PlaylistScreen(appCallbacks = appCallbacks)
+                PlaylistScreen(
+                    appCallbacks = appCallbacks,
+                    trackCallbacks = trackCallbacks,
+                )
             }
 
             composable(route = ImportDestination.route) {
                 activeMenuItemId = ImportDestination.menuItemId
                 ImportScreen(
-                    onGotoLibraryClick = { navController.navigate(LibraryDestination.route) },
-                    onGotoSettingsClick = { navController.navigate(SettingsDestination.route) },
+                    onGotoLibraryClick = remember { { navController.navigate(LibraryDestination.route) } },
+                    onGotoSettingsClick = remember { { navController.navigate(SettingsDestination.route) } },
                     onGotoAlbumClick = onAlbumClick,
+                    onGotoSearchClick = remember { { navController.navigate(SearchDestination.route) } },
                 )
             }
 
@@ -314,7 +290,7 @@ fun App(
 
             composable(route = SettingsDestination.route) {
                 activeMenuItemId = SettingsDestination.menuItemId
-                SettingsScreen(appCallbacks = appCallbacks)
+                SettingsScreen(onBackClick = appCallbacks.onBackClick)
             }
 
             composable(route = RecommendationsDestination.route) {
@@ -323,15 +299,116 @@ fun App(
             }
         }
 
-        currentTrackCombo?.getViewState()?.also { state ->
-            ModalCover(
-                state = state,
-                viewModel = queueViewModel,
-                isExpanded = isCoverExpanded,
-                onExpand = { isCoverExpanded = true },
-                onCollapse = { isCoverExpanded = false },
-                trackCallbacks = TrackCallbacks(appCallbacks = appCallbacks, state = state),
+        ModalCover(
+            isExpanded = isCoverExpanded,
+            onExpand = remember { { viewModel.expandCover() } },
+            onCollapse = remember { { viewModel.collapseCover() } },
+            trackCallbacks = trackCallbacks,
+        )
+    }
+}
+
+
+@Composable
+inline fun rememberDialogCallbacks(
+    crossinline onAlbumClick: @DisallowComposableCalls (String) -> Unit,
+    crossinline onPlaylistClick: @DisallowComposableCalls (String) -> Unit,
+    viewModel: RootStateViewModel = hiltViewModel(),
+): AppDialogCallbacks {
+    val context = LocalContext.current
+
+    val addToPlaylistTrackIds by viewModel.addToPlaylistTrackIds.collectAsStateWithLifecycle()
+    val albumToDownload by viewModel.albumToDownload.collectAsStateWithLifecycle()
+    val createPlaylistActive by viewModel.createPlaylistActive.collectAsStateWithLifecycle()
+    val deleteAlbumIds by viewModel.deleteAlbums.collectAsStateWithLifecycle()
+    val editAlbumId by viewModel.editAlbumId.collectAsStateWithLifecycle()
+    val editTrackState by viewModel.editTrackState.collectAsStateWithLifecycle()
+    val localMusicUri by viewModel.localMusicUri.collectAsStateWithLifecycle()
+    val showInfoTrackCombo by viewModel.showInfoTrackCombo.collectAsStateWithLifecycle()
+    val showLibraryRadioDialog by viewModel.showLibraryRadioDialog.collectAsStateWithLifecycle()
+
+    addToPlaylistTrackIds.takeIf { it.isNotEmpty() }?.also { trackIds ->
+        PlaylistDialog(
+            trackIds = trackIds.toImmutableList(),
+            onPlaylistClick = { onPlaylistClick(it) },
+            onClose = { viewModel.setAddToPlaylistTrackIds(emptyList()) },
+        )
+    }
+
+    albumToDownload?.also { album ->
+        if (localMusicUri == null) {
+            LocalMusicUriDialog(
+                onSave = { viewModel.setLocalMusicUri(it) },
+                text = { Text(stringResource(R.string.you_need_to_select_your_local_music_root_folder)) },
             )
+        } else {
+            viewModel.setAlbumToDownloadId(null)
+            viewModel.downloadAlbum(
+                albumId = album.albumId,
+                onFinish = { hasErrors ->
+                    SnackbarEngine.addInfo(
+                        message = if (hasErrors)
+                            context.getString(R.string.album_was_downloaded_with_errors, album).umlautify()
+                        else context.getString(R.string.album_was_downloaded, album).umlautify(),
+                        actionLabel = context.getString(R.string.go_to_album).umlautify(),
+                        onActionPerformed = { onAlbumClick(album.albumId) },
+                    )
+                },
+            ) { track, throwable ->
+                SnackbarEngine.addError("Error on downloading $track: $throwable")
+            }
         }
+    }
+
+    if (createPlaylistActive) {
+        CreatePlaylistDialog(
+            onSave = { name ->
+                viewModel.createPlaylist(name = name, onFinish = { onPlaylistClick(it) })
+                viewModel.setCreatePlaylistActive(false)
+            },
+            onCancel = { viewModel.setCreatePlaylistActive(false) },
+        )
+    }
+
+    deleteAlbumIds.takeIf { it.isNotEmpty() }?.also { albumIds ->
+        DeleteAlbumsDialog(albumIds = albumIds, onClose = { viewModel.setDeleteAlbums(emptyList()) })
+    }
+
+    editAlbumId?.also {
+        EditAlbumMethodDialog(
+            albumId = it,
+            onClose = { viewModel.setEditAlbumId(null) },
+        )
+    }
+
+    editTrackState?.also { EditTrackDialog(state = it, onClose = { viewModel.setEditTrackId(null) }) }
+
+    showInfoTrackCombo?.also {
+        TrackInfoDialog(
+            track = it.track,
+            albumTitle = it.album?.title,
+            albumArtist = it.albumArtists.joined(),
+            year = it.year,
+            localPath = it.localPath,
+            onClose = { viewModel.setShowInfoTrackCombo(null) },
+        )
+    }
+
+    if (showLibraryRadioDialog) {
+        RadioDialog(onDismissRequest = { viewModel.setShowLibraryRadioDialog(false) })
+    }
+
+    return remember {
+        AppDialogCallbacks(
+            onAddAlbumsToPlaylistClick = { viewModel.setAddToPlaylistAlbumIds(it) },
+            onAddTracksToPlaylistClick = { viewModel.setAddToPlaylistTrackIds(it) },
+            onCreatePlaylistClick = { viewModel.setCreatePlaylistActive(true) },
+            onDeleteAlbumsClick = { viewModel.setDeleteAlbums(it) },
+            onDownloadAlbumClick = { viewModel.setAlbumToDownloadId(it) },
+            onEditAlbumClick = { viewModel.setEditAlbumId(it) },
+            onEditTrackClick = { viewModel.setEditTrackId(it) },
+            onShowTrackInfoClick = { viewModel.setShowInfoTrackCombo(it) },
+            onRadioClick = { viewModel.setShowLibraryRadioDialog(true) },
+        )
     }
 }

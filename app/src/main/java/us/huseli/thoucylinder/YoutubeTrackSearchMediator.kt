@@ -8,6 +8,7 @@ import androidx.room.withTransaction
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
+import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.repositories.YoutubeRepository
 
 @OptIn(ExperimentalPagingApi::class)

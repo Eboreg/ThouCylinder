@@ -28,7 +28,7 @@ fun EditAlbumTracksDialog(
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
-    val albumWithTracks by viewModel.flowAlbumWithTracks(albumId).collectAsStateWithLifecycle(null)
+    val albumWithTracks by viewModel.flowAlbumWithTracks(albumId).collectAsStateWithLifecycle()
 
     AlertDialog(
         modifier = modifier.padding(10.dp),

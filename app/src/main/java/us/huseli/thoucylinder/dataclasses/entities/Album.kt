@@ -7,15 +7,14 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import kotlinx.collections.immutable.ImmutableList
 import kotlinx.parcelize.Parcelize
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import java.util.UUID
 
 @Entity(indices = [Index("Album_isInLibrary")])
 @Parcelize
+@Immutable
 data class Album(
     @PrimaryKey @ColumnInfo("Album_albumId") val albumId: String = UUID.randomUUID().toString(),
     @ColumnInfo("Album_title") val title: String,
@@ -31,26 +30,5 @@ data class Album(
     @Embedded("Album_albumArt_") val albumArt: MediaStoreImage? = null,
     @Embedded("Album_spotifyImage_") val spotifyImage: MediaStoreImage? = null,
 ) : Parcelable {
-    @Immutable
-    data class ViewState(
-        val album: Album,
-        val trackCount: Int,
-        val yearString: String?,
-        val artists: ImmutableList<AlbumArtistCredit>,
-        val isPartiallyDownloaded: Boolean,
-    )
-
-    val isOnYoutube: Boolean
-        get() = youtubePlaylist != null
-
-    val isPlayable: Boolean
-        get() = isLocal || youtubePlaylist != null
-
-    val spotifyWebUrl: String?
-        get() = spotifyId?.let { "https://open.spotify.com/album/${it}" }
-
-    val youtubeWebUrl: String?
-        get() = youtubePlaylist?.let { "https://youtube.com/playlist?list=${it.id}" }
-
     override fun toString(): String = title
 }

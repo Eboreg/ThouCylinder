@@ -3,10 +3,8 @@ package us.huseli.thoucylinder.repositories
 import android.content.Context
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,20 +13,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.replaceNullPadding
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.AbstractSpotifyOAuth2
 import us.huseli.thoucylinder.DeferredRequestJob
+import us.huseli.thoucylinder.DeferredRequestJobManager
 import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.SpotifyOAuth2ClientCredentials
 import us.huseli.thoucylinder.SpotifyOAuth2PKCE
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.UnsavedArtist
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
@@ -49,14 +48,14 @@ import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendationResp
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackRecommendations
 import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
 import us.huseli.thoucylinder.fromJson
-import us.huseli.thoucylinder.getNext
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
 
 @Singleton
-class SpotifyRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
+class SpotifyRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) :
+    AbstractScopeHolder() {
     inner class RequestJob(
         url: String,
         private val oauth2: AbstractSpotifyOAuth2<*>,
@@ -65,61 +64,55 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         override suspend fun request(): String? = oauth2.getAccessToken()?.let { accessToken ->
             return Request(url = url, headers = mapOf("Authorization" to "Bearer $accessToken")).getString()
         }
+    }
 
-        override fun after(result: String?) {
-            requestTimes.value += System.currentTimeMillis()
+    object RequestJobManager : DeferredRequestJobManager<RequestJob>() {
+        private val requestTimes = MutableStateFlow<List<Long>>(emptyList())
+
+        override suspend fun waitBeforeUnlocking() {
+            // If more than the allowed number of requests have been made in the last minute: wait until this
+            // is not the case.
+            val now = System.currentTimeMillis()
+            val lastMinuteRequestDistances = requestTimes.value.map { now - it }.filter { it < 60_000L }
+
+            if (lastMinuteRequestDistances.size >= REQUEST_LIMIT_PER_MINUTE) {
+                val delayMillis = 60_000L - lastMinuteRequestDistances
+                    .take(lastMinuteRequestDistances.size - REQUEST_LIMIT_PER_MINUTE)
+                    .last()
+
+                delay(delayMillis)
+            }
+        }
+
+        override fun onJobFinished(job: RequestJob, response: String?, timestamp: Long) {
+            requestTimes.value += timestamp
         }
     }
 
     private val albumDao = database.albumDao()
-    private val apiResponseCache = MutexCache<RequestJob, String, String>(
+    private val apiResponseCache = MutexCache(
         itemToKey = { it.url },
-        fetchMethod = { job ->
-            requestQueue.value += job
-            job.run().also { requestQueue.value -= job }
-        },
+        fetchMethod = { RequestJobManager.runJob(it) },
         debugLabel = "SpotifyRepository.apiResponseCache",
     )
     private var matchArtistsJob: Job? = null
     private val oauth2CC = SpotifyOAuth2ClientCredentials(context)
-    private val requestTimes = MutableStateFlow<List<Long>>(emptyList())
-    private val requestQueue = MutableStateFlow<List<RequestJob>>(emptyList())
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val spotifyDao = database.spotifyDao()
 
     private val _allUserAlbumsFetched = MutableStateFlow(false)
     private val _nextUserAlbumIdx = MutableStateFlow(0)
     private val _totalUserAlbumCount = MutableStateFlow<Int?>(null)
-    private val _userAlbums = MutableStateFlow<List<SpotifyAlbum?>>(emptyList())
+    private val _userAlbums = MutableStateFlow<List<SpotifyAlbum>>(emptyList())
 
     val oauth2PKCE = SpotifyOAuth2PKCE(context)
     val allUserAlbumsFetched: StateFlow<Boolean> = _allUserAlbumsFetched.asStateFlow()
+    val importedAlbumIds: StateFlow<List<String>> =
+        albumDao.flowSpotifyAlbumIds().distinctUntilChanged().stateLazily(emptyList())
     val totalUserAlbumCount: StateFlow<Int?> = _totalUserAlbumCount.asStateFlow()
-    val userAlbums: StateFlow<List<SpotifyAlbum?>> = _userAlbums.asStateFlow()
+    val userAlbums: StateFlow<List<SpotifyAlbum>> = _userAlbums.asStateFlow()
 
     init {
-        scope.launch {
-            requestQueue.collect { jobs ->
-                jobs.getNext()?.also { job ->
-                    // If more than the allowed number of requests have been made in the last minute: wait until this
-                    // is not the case.
-                    val now = System.currentTimeMillis()
-                    val lastMinuteRequestDistances = requestTimes.value.map { now - it }.filter { it < 60_000L }
-
-                    if (lastMinuteRequestDistances.size >= REQUEST_LIMIT_PER_MINUTE) {
-                        val delayMillis = 60_000L - lastMinuteRequestDistances
-                            .take(lastMinuteRequestDistances.size - REQUEST_LIMIT_PER_MINUTE)
-                            .last()
-
-                        delay(delayMillis)
-                    }
-
-                    job.lock.unlock()
-                }
-            }
-        }
-
-        scope.launch {
+        launchOnIOThread {
             spotifyDao.flowSpotifyTrackIdsWithoutAudioFeatures()
                 .takeWhile { it.isNotEmpty() }
                 .distinctUntilChanged()
@@ -151,8 +144,10 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
             apiResponseCache.getOrNull(job, retryOnNull = true)
                 ?.fromJson(object : TypeToken<SpotifyResponse<SpotifySavedAlbumObject>>() {})
                 ?.also { response ->
-                    val userAlbums =
-                        _userAlbums.value.replaceNullPadding(response.offset, response.items.map { it.album })
+                    val userAlbums = _userAlbums.value
+                        .replaceNullPadding(response.offset, response.items.map { it.album })
+                        .filterNotNull()
+
                     _nextUserAlbumIdx.value = userAlbums.size
                     _userAlbums.value = userAlbums
                     _allUserAlbumsFetched.value = response.next == null
@@ -246,8 +241,6 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         return spotifyId?.let { getTrackRecommendations(params = mapOf("seed_tracks" to it), limit = limit) }
     }
 
-    suspend fun listImportedAlbumIds() = albumDao.listImportedSpotifyIds()
-
     suspend fun matchArtist(name: String, lowPrio: Boolean = false): SpotifyArtist? =
         search("artist", mapOf("artist" to name), lowPrio)
             ?.artists
@@ -267,7 +260,7 @@ class SpotifyRepository @Inject constructor(database: Database, @ApplicationCont
         ?: emptyList()
 
     fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String, MediaStoreImage?) -> Unit) {
-        if (matchArtistsJob == null) matchArtistsJob = scope.launch {
+        if (matchArtistsJob == null) matchArtistsJob = launchOnIOThread {
             val previousIds = mutableSetOf<String>()
 
             flow

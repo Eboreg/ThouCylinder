@@ -3,16 +3,19 @@ package us.huseli.thoucylinder.repositories
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.WorkerThread
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.net.toUri
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import com.anggrayudi.storage.extension.openInputStream
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import linc.com.amplituda.Amplituda
+import linc.com.amplituda.Compress
+import us.huseli.retaintheme.extensions.pruneOrPad
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
@@ -20,20 +23,19 @@ import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.enums.TrackSortParameter
-import us.huseli.thoucylinder.getCachedFullBitmap
-import us.huseli.thoucylinder.getCachedThumbnailBitmap
-import us.huseli.thoucylinder.getMutexCache
+import us.huseli.thoucylinder.interfaces.ILogger
+import us.huseli.thoucylinder.isRemote
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.ceil
 
 @Singleton
-class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
+class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) :
+    ILogger {
     private val trackDao = database.trackDao()
     private val selectedTrackIds = mutableMapOf<String, MutableStateFlow<List<String>>>()
 
-    val thumbnailCache = getMutexCache<Uri, ImageBitmap> { uri ->
-        uri.getCachedThumbnailBitmap(context)?.asImageBitmap()
-    }
+    suspend fun addToLibrary(trackIds: Collection<String>) = trackDao.setIsInLibrary(true, *trackIds.toTypedArray())
 
     suspend fun addToLibraryByAlbumId(albumIds: Collection<String>) =
         trackDao.setIsInLibraryByAlbumId(true, *albumIds.toTypedArray())
@@ -74,9 +76,42 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
         trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm, tagNames, availabilityFilter)
     }
 
-    suspend fun getFullImage(uri: Uri?): ImageBitmap? = uri?.getCachedFullBitmap(context)?.asImageBitmap()
+    fun flowTrackCombosByAlbumId(albumId: String) = trackDao.flowTrackCombosByAlbumId(albumId)
+
+    suspend fun getAlbumIdByTrackId(trackId: String): String? = trackDao.getAlbumIdByTrackId(trackId)
+
+    suspend fun getAmplitudes(track: Track): ImmutableList<Int>? {
+        track.amplitudeList?.also { return it }
+
+        val lofiUri = track.lofiUri ?: return null
+        val amplituda = Amplituda(context)
+        val samplesPerSecond = track.durationMs?.div(1000)?.let { if (it < 100) ceil(100.0 / it).toInt() else 1 } ?: 1
+        val comp = Compress.withParams(Compress.PEEK, samplesPerSecond)
+        val output = lofiUri.toUri().takeIf { !it.isRemote }?.let { uri ->
+            uri.openInputStream(context)?.use { amplituda.processAudio(it, comp) }
+        } ?: amplituda.processAudio(lofiUri, comp)
+        var amplitudes: ImmutableList<Int>? = null
+
+        output.get(
+            { result -> amplitudes = result.amplitudesAsList().pruneOrPad(100).toImmutableList() },
+            { exception -> logError("amplitudes $lofiUri", exception) },
+        )
+
+        return amplitudes?.also {
+            log("Got amplitudes for $track: max=${it.max()}, avg=${it.average()}")
+            trackDao.setTrackAmplitudes(track.trackId, it.joinToString(","))
+        }
+    }
 
     suspend fun getLibraryTrackCount(): Int = trackDao.getLibraryTrackCount()
+
+    fun getLocalAbsolutePath(track: Track): String? = track.getLocalAbsolutePath(context)
+
+    suspend fun getTrackById(trackId: String): Track? = trackDao.getTrackById(trackId)
+
+    suspend fun getTrackComboById(trackId: String): TrackCombo? = trackDao.getTrackComboById(trackId)
+
+    suspend fun listNonAlbumTracks() = trackDao.listNonLocalTracks()
 
     suspend fun listRandomLibraryTrackCombos(
         limit: Int,
@@ -95,13 +130,14 @@ class TrackRepository @Inject constructor(database: Database, @ApplicationContex
     suspend fun listTrackCombosById(trackIds: Collection<String>) =
         if (trackIds.isNotEmpty()) trackDao.listTrackCombosById(*trackIds.toTypedArray()) else emptyList()
 
+    suspend fun listTrackIdsByAlbumId(albumIds: Collection<String>) =
+        trackDao.listTrackIdsByAlbumId(*albumIds.toTypedArray()).toImmutableList()
+
     suspend fun listTrackLocalUris(): List<Uri> = trackDao.listLocalUris().map { it.toUri() }
 
-    suspend fun listTracks(): List<Track> = trackDao.listLibraryTracks()
+    suspend fun listTrackIdsByArtistId(artistId: String): List<String> = trackDao.listTrackIdsByArtistId(artistId)
 
-    suspend fun listTracksByAlbumId(albumId: String) = trackDao.listTracksByAlbumId(albumId).toImmutableList()
-
-    suspend fun listTracksByArtistId(artistId: String): List<Track> = trackDao.listTracksByArtistId(artistId)
+    suspend fun listTracksByAlbumId(albumId: String): List<Track> = trackDao.listTracksByAlbumId(albumId)
 
     suspend fun listTracksById(trackIds: Collection<String>) =
         if (trackIds.isNotEmpty()) trackDao.listTracksById(*trackIds.toTypedArray()) else emptyList()

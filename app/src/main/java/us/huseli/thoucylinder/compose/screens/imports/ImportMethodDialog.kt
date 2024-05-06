@@ -1,7 +1,6 @@
 package us.huseli.thoucylinder.compose.screens.imports
 
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import us.huseli.thoucylinder.R
@@ -11,11 +10,11 @@ import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun ImportMethodDialog(
-    title: String,
-    text: @Composable () -> Unit,
     onDismissRequest: () -> Unit,
     onImportClick: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
 ) {
     AlertDialog(
         modifier = modifier,
@@ -31,7 +30,7 @@ fun ImportMethodDialog(
             )
         },
         dismissButton = { CancelButton(onClick = onDismissRequest) },
-        title = { Text(title) },
+        title = title,
         text = text,
     )
 }

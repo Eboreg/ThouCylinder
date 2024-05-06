@@ -27,8 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,13 +40,13 @@ import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.joined
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.DownloadsViewModel
 
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
     val trackDownloadTasks by viewModel.trackDownloadTasks.collectAsStateWithLifecycle(persistentListOf())
-    val context = LocalContext.current
 
     ItemList(
         things = trackDownloadTasks,
@@ -56,13 +54,13 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         gap = 5.dp,
         onEmpty = { Text(stringResource(R.string.no_downloads_found), modifier = Modifier.padding(10.dp)) },
     ) { _, task ->
-        var thumbnail by remember(task.track) { mutableStateOf<ImageBitmap?>(null) }
+        var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
         val progress by task.downloadProgress.collectAsStateWithLifecycle()
         val state by task.state.collectAsStateWithLifecycle()
 
         LaunchedEffect(task.track.image, task.album?.albumArt) {
-            thumbnail = viewModel.getTrackThumbnail(task.track.image?.thumbnailUri)
-                ?: viewModel.getAlbumThumbnail(task.album?.albumArt?.thumbnailUri)
+            thumbnail = viewModel.getThumbnail(task.track.image?.thumbnailUri)
+                ?: viewModel.getThumbnail(task.album?.albumArt?.thumbnailUri)
         }
 
         Row(
@@ -118,7 +116,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     DownloadTaskState.CANCELLED, DownloadTaskState.ERROR -> Icon(
                         imageVector = Icons.Sharp.Download,
                         contentDescription = null,
-                        modifier = iconModifier.clickable { task.start(context) },
+                        modifier = iconModifier.clickable { task.start() },
                         tint = MaterialTheme.colorScheme.primaryContainer,
                     )
                     DownloadTaskState.FINISHED -> Icon(

@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.collections.immutable.persistentListOf
 import us.huseli.retaintheme.extensions.capitalized
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
@@ -47,9 +46,7 @@ fun RecommendationsScreen(
     modifier: Modifier = Modifier,
     viewModel: RecommendationsViewModel = hiltViewModel(),
 ) {
-    val spotifyRelatedArtistMatches by viewModel.spotifyRelatedArtistMatches.collectAsStateWithLifecycle(
-        persistentListOf()
-    )
+    val spotifyRelatedArtistMatches by viewModel.spotifyRelatedArtistMatches.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxWidth()) {

@@ -19,28 +19,28 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.collections.immutable.toImmutableList
 import org.burnoutcrew.reorderable.ReorderableLazyListState
 import org.burnoutcrew.reorderable.detectReorder
 import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-inline fun <T : AbstractTrackCombo> TrackListRow(
-    combo: T,
+inline fun TrackListRow(
+    state: TrackUiState,
     noinline thumbnail: () -> ImageBitmap?,
     showArtist: Boolean,
     showAlbum: Boolean,
@@ -49,10 +49,10 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
     isSelected: Boolean = false,
     containerColor: Color? = null,
     reorderableState: ReorderableLazyListState? = null,
-    downloadState: TrackDownloadTask.ViewState? = null,
+    downloadState: State<TrackDownloadTask.UiState?>? = null,
     crossinline extraContextMenuItems: @Composable () -> Unit = {},
 ) {
-    callbacks.onEach?.invoke()
+    callbacks.onEach(state.trackId)
 
     Card(
         colors = CardDefaults.outlinedCardColors(
@@ -61,8 +61,8 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
         ),
         shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier.fillMaxWidth().height(50.dp).combinedClickable(
-            onClick = { callbacks.onTrackClick?.invoke() },
-            onLongClick = callbacks.onLongClick,
+            onClick = { callbacks.onTrackClick(state.trackId) },
+            onLongClick = { callbacks.onLongClick(state.trackId) },
         ),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -83,14 +83,14 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceEvenly,
                     ) {
-                        val albumString = if (showAlbum) combo.album?.title else null
-                        val artistString = if (showArtist) combo.artists.joined() else null
-                        val secondRow = listOfNotNull(artistString, albumString, combo.year?.toString())
+                        val albumString = if (showAlbum) state.albumTitle else null
+                        val artistString = if (showArtist) state.trackArtists.joined() else null
+                        val secondRow = listOfNotNull(artistString, albumString, state.year?.toString())
                             .takeIf { it.isNotEmpty() }
                             ?.joinToString(" • ")
 
                         Text(
-                            text = combo.track.title.umlautify(),
+                            text = state.title.umlautify(),
                             maxLines = if (secondRow == null) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -105,7 +105,7 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                         }
                     }
 
-                    combo.track.duration?.also { duration ->
+                    state.duration?.also { duration ->
                         Text(
                             text = duration.sensibleFormat(),
                             modifier = Modifier.padding(start = 5.dp),
@@ -114,13 +114,15 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                     }
 
                     TrackContextButtonWithMenu(
-                        isDownloadable = combo.track.isDownloadable,
+                        trackId = state.trackId,
+                        artists = state.trackArtists,
+                        isDownloadable = state.isDownloadable,
+                        isInLibrary = state.isInLibrary,
                         callbacks = callbacks,
-                        extraItems = extraContextMenuItems,
-                        isInLibrary = combo.track.isInLibrary,
-                        trackArtists = combo.artists.toImmutableList(),
-                        youtubeWebUrl = combo.track.youtubeWebUrl,
-                        spotifyWebUrl = combo.track.spotifyWebUrl,
+                        extraItems = { extraContextMenuItems() },
+                        youtubeWebUrl = state.youtubeWebUrl,
+                        spotifyWebUrl = state.spotifyWebUrl,
+                        isPlayable = state.isPlayable,
                     )
 
                     if (reorderableState != null) {
@@ -133,11 +135,13 @@ inline fun <T : AbstractTrackCombo> TrackListRow(
                 }
 
                 Row(modifier = Modifier.height(2.dp).fillMaxWidth()) {
-                    if (downloadState?.isActive == true) {
-                        LinearProgressIndicator(
-                            progress = { downloadState.progress },
-                            modifier = Modifier.fillMaxWidth().height(2.dp),
-                        )
+                    downloadState?.value?.also { state ->
+                        if (state.isActive) {
+                            LinearProgressIndicator(
+                                progress = { state.progress },
+                                modifier = Modifier.fillMaxWidth().height(2.dp),
+                            )
+                        }
                     }
                 }
             }

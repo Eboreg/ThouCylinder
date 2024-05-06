@@ -12,250 +12,193 @@ import com.anggrayudi.storage.file.isWritable
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.extensions.filterValuesNotNull
+import us.huseli.retaintheme.extensions.mostCommonValue
 import us.huseli.retaintheme.extensions.nullIfEmpty
-import us.huseli.retaintheme.extensions.padStart
-import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyFrom
 import us.huseli.thoucylinder.copyTo
-import us.huseli.thoucylinder.database.Database
+import us.huseli.thoucylinder.dataclasses.ArtistTitlePair
 import us.huseli.thoucylinder.dataclasses.ID3Data
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
+import us.huseli.thoucylinder.dataclasses.LocalImportableAlbum
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.listCoverImages
 import us.huseli.thoucylinder.dataclasses.extractID3Data
 import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
-import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.escapeQuotes
-import us.huseli.thoucylinder.getBitmap
-import us.huseli.thoucylinder.getRelativePathWithoutFilename
-import us.huseli.thoucylinder.getSquareSize
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 
 @Singleton
-class LocalMediaRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-    database: Database,
-) : ILogger {
-    private val albumDao = database.albumDao()
-    private val artistDao = database.artistDao()
-    private val trackDao = database.trackDao()
+class LocalMediaRepository @Inject constructor(@ApplicationContext private val context: Context) : ILogger {
     private val _isImportingLocalMedia = MutableStateFlow(false)
 
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
 
-    fun setIsImporting(value: Boolean) {
-        _isImportingLocalMedia.value = value
+    @WorkerThread
+    fun convertAndTagTrack(
+        tmpInFile: File,
+        extension: String,
+        track: Track,
+        trackArtists: List<AbstractArtistCredit>,
+        album: Album? = null,
+        albumArtists: List<AbstractArtistCredit>? = null,
+    ): File {
+        val tmpOutFile = File(context.cacheDir, "${UUID.randomUUID()}.$extension")
+        val tagCommands = ID3Data.fromTrack(
+            track = track,
+            albumArtists = albumArtists,
+            trackArtists = trackArtists,
+            album = album,
+        ).toTagMap().map { (key, value) ->
+            "-metadata \"$key=${value.escapeQuotes()}\" -metadata:s \"$key=${value.escapeQuotes()}\""
+        }.joinToString(" ")
+        val ffmpegCommand =
+            "-i \"${tmpInFile.path}\" -y -c:a copy -id3v2_version 3 $tagCommands \"${tmpOutFile.path}\""
+
+        log("convertAndTagTrack: running ffmpeg $ffmpegCommand")
+
+        val session = FFmpegKit.execute(ffmpegCommand)
+
+        if (session.returnCode.isValueSuccess) {
+            tmpInFile.delete()
+            return tmpOutFile
+        }
+
+        session.allLogsAsString?.also { logError(it) }
+        throw Exception("Error when converting audio file: ${session.returnCode.value}")
     }
 
-    /** IMAGE RELATED METHODS ************************************************/
     @WorkerThread
-    fun collectNewLocalAlbumArtUris(combo: AlbumWithTracksCombo): List<Uri> =
-        combo.trackCombos.map { it.track }.listCoverImages(context)
-            .map { it.uri }
-            .filter { it != combo.album.albumArt?.fullUri }
+    fun copyTempAudioFile(
+        basename: String,
+        tempFile: File,
+        mimeType: String,
+        directory: DocumentFile,
+    ): DocumentFile {
+        val documentFile = directory.createFile(mimeType, basename) ?: throw Exception(
+            "DocumentFile.createFile() returned null. mimeType=$mimeType, basename=$basename, directory=$directory"
+        )
 
-    @WorkerThread
-    fun deleteAlbumDirectoryAlbumArt(
-        albumCombo: AbstractAlbumCombo,
-        albumDirectory: DocumentFile?,
-        tracks: Collection<Track>? = null,
-    ) {
+        if (documentFile.extension.isEmpty()) documentFile.renameTo("$basename.${tempFile.extension}")
+        context.contentResolver.openFileDescriptor(documentFile.uri, "w")?.use {
+            FileOutputStream(it.fileDescriptor).use { outputStream ->
+                outputStream.write(tempFile.readBytes())
+            }
+        }
+        return documentFile
+    }
+
+    fun deleteLocalAlbumArt(albumCombo: AlbumWithTracksCombo, albumDirectory: DocumentFile?) {
+        val tracks = albumCombo.trackCombos.map { it.track }
+
+        albumCombo.album.albumArt?.deleteInternalFiles()
         if (albumDirectory != null) albumCombo.album.albumArt?.deleteDirectoryFiles(context, albumDirectory)
-        tracks?.listCoverImages(context, includeThumbnails = true)?.forEach { documentFile ->
+        tracks.listCoverImages(context, includeThumbnails = true).forEach { documentFile ->
             if (documentFile.isFile && documentFile.canWrite()) documentFile.delete()
         }
     }
 
-    @WorkerThread
-    suspend fun getBestNewLocalAlbumArt(
-        trackCombos: Collection<AbstractTrackCombo>,
-        current: MediaStoreImage? = null,
-    ): MediaStoreImage? = trackCombos.map { it.track }.listCoverImages(context)
-        .filter { it.uri != current?.fullUri }
-        .map { MediaStoreImage.fromUri(it.uri, context) }
-        .maxByOrNull { albumArt -> albumArt.fullUri.getBitmap(context)?.getSquareSize() ?: 0 }
-
-    suspend fun saveAlbumDirectoryAlbumArtFiles(albumArt: MediaStoreImage, albumDirectory: DocumentFile) =
-        albumArt.saveToDirectory(context, albumDirectory)
-
-    @WorkerThread
-    suspend fun saveInternalAlbumArtFiles(albumArt: MediaStoreImage, album: Album): MediaStoreImage? =
-        albumArt.saveInternal(album, context)
-
-
-    /** AUDIO RELATED METHODS ************************************************/
-    suspend fun importNewLocalAlbums(
+    fun flowImportableAlbums(
         treeDocumentFile: DocumentFile,
         existingTrackUris: Collection<Uri>,
-        existingAlbumsCombos: Collection<AbstractAlbumCombo>,
-        getArtist: suspend (String) -> Artist,
-        onEach: (AlbumWithTracksCombo) -> Unit = {},
-    ) {
-        val albumCombos = mutableSetOf<AlbumWithTracksCombo>()
-        val trackCombos = mutableListOf<TrackCombo>()
-
-        val getExistingAlbum: suspend (ID3Data, String?, String) -> Album? =
-            { id3, artistName, title ->
-                val combo = existingAlbumsCombos.find {
-                    (it.album.title == title && it.artists.joined() == artistName) ||
-                        (it.album.musicBrainzReleaseId != null && it.album.musicBrainzReleaseId == id3.musicBrainzReleaseId)
-                }
-
-                if (combo != null) {
-                    if (
-                        (id3.musicBrainzReleaseId != null && combo.album.musicBrainzReleaseId == null) ||
-                        (id3.musicBrainzReleaseGroupId != null && combo.album.musicBrainzReleaseGroupId == null)
-                    ) {
-                        combo.album.copy(
-                            musicBrainzReleaseId = id3.musicBrainzReleaseId ?: combo.album.musicBrainzReleaseId,
-                            musicBrainzReleaseGroupId = id3.musicBrainzReleaseGroupId
-                                ?: combo.album.musicBrainzReleaseGroupId,
-                        ).also { albumDao.updateAlbums(it) }
-                    } else combo.album
-                } else null
-            }
-
-        val getAlbumCombo: suspend (ID3Data, String?, String) -> AlbumWithTracksCombo =
-            { id3, artistName, title ->
-                val combo = albumCombos.find {
-                    (it.album.title == title && it.artists.joined() == artistName) ||
-                        (it.album.musicBrainzReleaseId != null && it.album.musicBrainzReleaseId == id3.musicBrainzReleaseId)
-                }
-
-                if (combo != null) {
-                    if (
-                        (id3.musicBrainzReleaseId != null && combo.album.musicBrainzReleaseId == null) ||
-                        (id3.musicBrainzReleaseGroupId != null && combo.album.musicBrainzReleaseGroupId == null)
-                    ) {
-                        combo.copy(
-                            album = combo.album.copy(
-                                musicBrainzReleaseId = id3.musicBrainzReleaseId ?: combo.album.musicBrainzReleaseId,
-                                musicBrainzReleaseGroupId = id3.musicBrainzReleaseGroupId
-                                    ?: combo.album.musicBrainzReleaseGroupId,
-                            ),
-                        ).also { albumDao.updateAlbums(it.album) }
-                    } else combo
-                } else {
-                    val artist = artistName?.let { getArtist(it) }
-                    val album = Album(
-                        title = title,
-                        isInLibrary = true,
-                        isLocal = true,
-                        musicBrainzReleaseId = id3.musicBrainzReleaseId,
-                        musicBrainzReleaseGroupId = id3.musicBrainzReleaseGroupId,
-                    )
-                    val artistCredit = artist?.let { AlbumArtistCredit(artist = it, albumId = album.albumId) }
-
-                    AlbumWithTracksCombo(
-                        album = album,
-                        artists = artistCredit?.let { listOf(it) } ?: emptyList(),
-                    ).also { albumCombo ->
-                        albumCombos.add(albumCombo)
-                        albumDao.upsertAlbums(albumCombo.album)
-                        if (artistCredit != null) artistDao.insertAlbumArtists(artistCredit.toAlbumArtist())
-                    }
-                }
-            }
+    ): Flow<LocalImportableAlbum> = flow {
+        val tracks = mutableListOf<LocalImportableAlbum.LocalImportableTrack>()
+        val pathData = ArtistTitlePair.fromDirectory(treeDocumentFile)
+        val imageFiles = mutableListOf<DocumentFile>()
 
         treeDocumentFile.listFiles().forEach { documentFile ->
             if (documentFile.isDirectory) {
                 // Go through subdirectories recursively:
-                importNewLocalAlbums(
-                    treeDocumentFile = documentFile,
-                    existingTrackUris = existingTrackUris,
-                    getArtist = getArtist,
-                    onEach = onEach,
-                    existingAlbumsCombos = existingAlbumsCombos.plus(albumCombos),
+                emitAll(
+                    flowImportableAlbums(
+                        treeDocumentFile = documentFile,
+                        existingTrackUris = existingTrackUris,
+                    )
                 )
             } else if (documentFile.isFile && !existingTrackUris.contains(documentFile.uri)) {
-                // TODO: Seems like FFprobeKit doesn't get permission to access the file even though we have read/write
-                // permissions through the DocumentFile API. So we do this stupid copy to temp file shit until we have
-                // a better solution.
+                // Just to avoid copying lots of irrelevant files:
                 val mimeTypeGuess = MimeTypeMap.getSingleton().getMimeTypeFromExtension(documentFile.extension)
 
-                // Just to avoid copying lots of irrelevant files:
+                if (mimeTypeGuess?.startsWith("image/") == true) imageFiles.add(documentFile)
                 if (mimeTypeGuess?.startsWith("audio/") == true) {
-                    val tempFile = documentFile.copyTo(context, context.cacheDir).also { it.deleteOnExit() }
+                    // Seems like FFprobeKit doesn't get permission to access the file even though we have read/write
+                    // permissions through the DocumentFile API. So we do this stupid copy to temp file shit until we
+                    // have a better solution.
+                    val tempFile = documentFile.copyTo(context, context.cacheDir)
                     val mediaInfo = FFprobeKit.getMediaInformation(tempFile.path)?.mediaInformation
                     val metadata = tempFile.extractTrackMetadata(mediaInfo)
+
+                    tempFile.delete()
 
                     if (metadata?.mimeType?.startsWith("audio/") == true) {
                         // Make an educated guess on artist/album names from path. Segment 1 is most likely a standard
                         // directory like "Music", so drop it:
-                        val pathSegments = documentFile.uri.getRelativePathWithoutFilename()?.split('/')?.drop(1)
                         val id3 = mediaInfo?.extractID3Data() ?: ID3Data()
-                        val (pathArtist, pathTitle) = when (pathSegments?.size) {
-                            1 -> pathSegments[0].split(Regex(" +- +"), 2).padStart(2).toList()
-                            0 -> listOf(null, null)
-                            null -> listOf(null, null)
-                            else -> pathSegments.takeLast(2)
-                        }
                         val (filenameAlbumPosition, filenameTitle) =
                             Regex("^(\\d+)?[ -.]*(.*)$").find(documentFile.baseName)
                                 ?.groupValues
                                 ?.takeLast(2)
                                 ?.map { it.nullIfEmpty() }
                                 ?: listOf(null, null)
-                        val albumTitle = id3.album ?: pathTitle ?: context.getString(R.string.unknown_album)
-                        val albumArtist = id3.albumArtist ?: pathArtist
-                        val albumId = getExistingAlbum(id3, albumArtist, albumTitle)?.albumId
-                            ?: getAlbumCombo(id3, albumArtist, albumTitle).album.albumId
-                        val track = Track(
-                            title = id3.title ?: filenameTitle ?: context.getString(R.string.unknown_title),
-                            isInLibrary = true,
-                            albumPosition = id3.trackNumber ?: filenameAlbumPosition?.toIntOrNull(),
-                            discNumber = id3.discNumber,
-                            year = id3.year,
-                            albumId = albumId,
-                            metadata = metadata,
-                            localUri = documentFile.uri.toString(),
-                            musicBrainzId = id3.musicBrainzTrackId,
-                            durationMs = metadata.durationMs,
-                        )
-                        val artist = (id3.artist ?: pathArtist)?.let { getArtist(it) }
-                        val trackArtist = artist?.let { TrackArtistCredit(artist = it, trackId = track.trackId) }
-                        val trackCombo = TrackCombo(
-                            track = track,
-                            artists = trackArtist?.let { listOf(it) } ?: emptyList(),
-                        )
 
-                        trackDao.upsertTracks(trackCombo.track)
-                        if (trackArtist != null) artistDao.insertTrackArtists(trackArtist.toTrackArtist())
-                        trackCombos.add(trackCombo)
+                        tracks.add(
+                            LocalImportableAlbum.LocalImportableTrack(
+                                title = id3.title ?: filenameTitle ?: context.getString(R.string.unknown_title),
+                                albumPosition = id3.trackNumber ?: filenameAlbumPosition?.toIntOrNull(),
+                                metadata = metadata,
+                                localUri = documentFile.uri.toString(),
+                                id3 = id3,
+                            )
+                        )
                     }
                 }
             }
         }
 
-        albumCombos.forEach { albumCombo ->
-            val albumTrackCombos =
-                trackCombos.filter { it.track.albumId == albumCombo.album.albumId }.stripTitleCommons()
-            val albumArt = getBestNewLocalAlbumArt(albumTrackCombos)
-                ?.also { albumDao.updateAlbumArt(albumCombo.album.albumId, it) }
+        val coverImage = imageFiles
+            .sortedByDescending { it.length() }
+            .maxByOrNull { it.name?.startsWith("cover.") == true }
 
-            onEach(
-                albumCombo.copy(
-                    trackCombos = albumTrackCombos,
-                    album = albumCombo.album.copy(albumArt = albumArt),
+        // Group the tracks by distinct musicBrainzReleaseId tags and treat each group as an album. In the absence of
+        // such tags, we will work under the assumption "1 directory == 1 album" for now.
+        tracks.combineEquals { a, b -> a.id3.musicBrainzReleaseId == b.id3.musicBrainzReleaseId }
+            .forEach { albumTracks ->
+                val albumTitle = albumTracks.mapNotNull { it.id3.album }.mostCommonValue()
+                    ?: pathData.title
+                    ?: context.getString(R.string.unknown_album)
+                val albumArtist = albumTracks.mapNotNull { it.id3.albumArtist }.mostCommonValue()
+                    ?: albumTracks.mapNotNull { it.id3.artist }.mostCommonValue()
+                    ?: pathData.artist
+
+                emit(
+                    LocalImportableAlbum(
+                        title = albumTitle,
+                        artistName = albumArtist,
+                        trackCount = albumTracks.size,
+                        year = albumTracks.mapNotNull { it.id3.year }.toSet().takeIf { it.size == 1 }?.first(),
+                        musicBrainzReleaseId = albumTracks.map { it.id3.musicBrainzReleaseId }.first(),
+                        musicBrainzReleaseGroupId = albumTracks.firstNotNullOfOrNull { it.id3.musicBrainzReleaseGroupId },
+                        tracks = albumTracks,
+                        duration = albumTracks.sumOf { it.metadata.durationMs }.milliseconds,
+                        thumbnailUrl = coverImage?.uri?.toString(),
+                    )
                 )
-            )
-        }
+            }
     }
 
     fun listTracksWithBrokenLocalUris(allTracks: Collection<Track>): List<Track> {
@@ -263,6 +206,10 @@ class LocalMediaRepository @Inject constructor(
             .filterValuesNotNull()
             .filter { (_, uri) -> DocumentFile.fromSingleUri(context, uri.toUri())?.exists() != true }
             .map { it.key }
+    }
+
+    fun setIsImporting(value: Boolean) {
+        _isImportingLocalMedia.value = value
     }
 
     @WorkerThread
@@ -274,55 +221,43 @@ class LocalMediaRepository @Inject constructor(
     ) {
         val documentFile = track.getDocumentFile(context)
 
-        if (documentFile != null) {
-            if (!documentFile.isWritable(context)) logError("tagAlbumTracks: Cannot write to $documentFile")
-            else tagTrack(
+        if (documentFile == null) {
+            logError("tagTrack: DocumentFile not found")
+        } else if (!documentFile.isWritable(context)) {
+            logError("tagTrack: Cannot write to $documentFile")
+        } else {
+            val tmpInFile =
+                File(context.cacheDir, "${documentFile.baseName}.in.tmp.${documentFile.extension}")
+            val tmpOutFile =
+                File(context.cacheDir, "${documentFile.baseName}.out.tmp.${documentFile.extension}")
+            val tagCommands = ID3Data.fromTrack(
                 track = track,
-                documentFile = documentFile,
                 albumArtists = albumArtists,
                 trackArtists = trackArtists,
                 album = album,
-            )
+            ).toTagMap().map { (key, value) ->
+                "-metadata \"$key=${value.escapeQuotes()}\" -metadata:s \"$key=${value.escapeQuotes()}\""
+            }.joinToString(" ")
+            val ffmpegCommand =
+                "-i \"${tmpInFile.path}\" -y -codec copy -id3v2_version 3 $tagCommands \"${tmpOutFile.path}\""
+
+            log("tagTrack: running ffmpeg $ffmpegCommand")
+            documentFile.copyTo(tmpInFile, context)
+
+            val tagSession = FFmpegKit.execute(ffmpegCommand)
+
+            if (tagSession.returnCode.isValueSuccess) {
+                documentFile.copyFrom(tmpOutFile, context)
+            } else if (tagSession.returnCode.isValueError) {
+                logError("tagTrack: error, return code=${tagSession.returnCode.value}")
+                tagSession.allLogsAsString?.also { logError(it) }
+            } else if (tagSession.returnCode.isValueCancel) {
+                logWarning("tagTrack: cancel, return code=${tagSession.returnCode.value}")
+                tagSession.allLogsAsString?.also { logError(it) }
+            }
+
+            tmpInFile.delete()
+            tmpOutFile.delete()
         }
-    }
-
-    @WorkerThread
-    fun tagTrack(
-        track: Track,
-        trackArtists: List<AbstractArtistCredit>,
-        documentFile: DocumentFile,
-        album: Album? = null,
-        albumArtists: List<AbstractArtistCredit>? = null,
-    ) {
-        val tmpInFile = File(context.cacheDir, "${documentFile.baseName}.in.tmp.${documentFile.extension}")
-        val tmpOutFile = File(context.cacheDir, "${documentFile.baseName}.out.tmp.${documentFile.extension}")
-        val tagCommands = ID3Data.fromTrack(
-            track = track,
-            albumArtists = albumArtists,
-            trackArtists = trackArtists,
-            album = album,
-        ).toTagMap().map { (key, value) ->
-            "-metadata \"$key=${value.escapeQuotes()}\" -metadata:s \"$key=${value.escapeQuotes()}\""
-        }.joinToString(" ")
-        val ffmpegCommand =
-            "-i \"${tmpInFile.path}\" -y -codec copy -id3v2_version 3 $tagCommands \"${tmpOutFile.path}\""
-
-        log("tagTrack: running ffmpeg $ffmpegCommand")
-        documentFile.copyTo(tmpInFile, context)
-
-        val tagSession = FFmpegKit.execute(ffmpegCommand)
-
-        if (tagSession.returnCode.isValueSuccess) {
-            documentFile.copyFrom(tmpOutFile, context)
-        } else if (tagSession.returnCode.isValueError) {
-            logError("tagTrack: error, return code=${tagSession.returnCode.value}")
-            tagSession.allLogsAsString?.also { logError(it) }
-        } else if (tagSession.returnCode.isValueCancel) {
-            logWarning("tagTrack: cancel, return code=${tagSession.returnCode.value}")
-            tagSession.allLogsAsString?.also { logError(it) }
-        }
-
-        tmpInFile.delete()
-        tmpOutFile.delete()
     }
 }

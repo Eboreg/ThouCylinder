@@ -1,46 +1,81 @@
 package us.huseli.thoucylinder.dataclasses.lastFm
 
-import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
-import us.huseli.thoucylinder.asThumbnailImageBitmap
-import us.huseli.thoucylinder.getBitmapByUrl
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
+import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.entities.Artist
+import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
+import kotlin.time.Duration
 
 data class LastFmTopAlbumsResponse(val topalbums: TopAlbums) {
-    data class TopAlbums(val album: List<Album>)
+    data class TopAlbums(val album: List<LastFmAlbum>)
 
-    data class Album(
+    data class LastFmAlbum(
         val mbid: String,
         val url: String,
         val name: String,
-        val artist: Artist,
+        val artist: LastFmArtist,
         val image: List<LastFmImage>,
         val playcount: String?,
     ) : IExternalAlbum {
-        override val id: String
-            get() = mbid
-        override val title: String
-            get() = name
         override val artistName: String
             get() = artist.name
 
-        override suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? =
-            image.getThumbnail()?.let { it.url.getBitmapByUrl()?.asThumbnailImageBitmap(context) }
+        override val duration: Duration?
+            get() = null
+
+        override val id: String
+            get() = mbid
+
+        override val playCount: Int?
+            get() = playcount?.toInt()
+
+        override val thumbnailUrl: String?
+            get() = image.getThumbnail()?.url
+
+        override val title: String
+            get() = name
+
+        override val trackCount: Int?
+            get() = null
+
+        override val year: Int?
+            get() = null
+
+        override suspend fun getMediaStoreImage(): MediaStoreImage? = image.toMediaStoreImage()
+
+        override suspend fun toAlbumWithTracks(
+            isLocal: Boolean,
+            isInLibrary: Boolean,
+            getArtist: suspend (UnsavedArtist) -> Artist,
+        ): AlbumWithTracksCombo {
+            val album = Album(
+                title = title,
+                isInLibrary = isInLibrary,
+                isLocal = isLocal,
+                musicBrainzReleaseId = mbid,
+                albumArt = getMediaStoreImage(),
+            )
+
+            return AlbumWithTracksCombo(
+                album = album,
+                artists = listOf(
+                    AlbumArtistCredit(
+                        artist = getArtist(UnsavedArtist(name = artist.name, musicBrainzId = artist.mbid)),
+                        albumId = album.albumId,
+                    )
+                ),
+            )
+        }
 
         override fun toString(): String = artistName.takeIf { it.isNotEmpty() }?.let { "$it - $title" } ?: title
     }
 
-    data class Artist(
+    data class LastFmArtist(
         val url: String,
         val name: String,
         val mbid: String,
     )
-}
-
-fun List<LastFmTopAlbumsResponse.Album>.filterBySearchTerm(term: String): List<LastFmTopAlbumsResponse.Album> {
-    val words = term.lowercase().split(Regex(" +"))
-
-    return filter { album ->
-        words.all { album.artist.name.lowercase().contains(it) || album.name.lowercase().contains(it) }
-    }
 }

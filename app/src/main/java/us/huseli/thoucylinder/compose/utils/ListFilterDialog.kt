@@ -38,7 +38,7 @@ import us.huseli.thoucylinder.umlautify
 fun ListFilterDialog(
     modifier: Modifier = Modifier,
     selectedTagPojos: ImmutableList<TagPojo>,
-    tagPojos: ImmutableList<TagPojo>? = null,
+    tagPojos: ImmutableList<TagPojo>,
     availabilityFilter: AvailabilityFilter? = null,
     onCancelClick: () -> Unit,
     onAvailabilityFilterChange: (AvailabilityFilter) -> Unit = {},
@@ -94,7 +94,7 @@ fun ListFilterDialog(
                     }
                 }
 
-                if (tagPojos?.isNotEmpty() == true) {
+                if (tagPojos.isNotEmpty()) {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.tags), modifier = Modifier.weight(1f))

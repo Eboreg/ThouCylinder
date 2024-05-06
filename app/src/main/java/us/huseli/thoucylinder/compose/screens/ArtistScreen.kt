@@ -14,7 +14,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,14 +43,10 @@ import us.huseli.thoucylinder.compose.track.TrackGrid
 import us.huseli.thoucylinder.compose.track.TrackList
 import us.huseli.thoucylinder.compose.utils.CollapsibleToolbar
 import us.huseli.thoucylinder.compose.utils.rememberToolbarScrollConnection
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.ArtistViewModel
@@ -61,23 +56,23 @@ fun ArtistScreen(
     modifier: Modifier = Modifier,
     viewModel: ArtistViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
-    onArtistFetched: (Artist) -> Unit = {},
+    albumCallbacks: AlbumCallbacks,
+    trackCallbacks: TrackCallbacks,
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val artist by viewModel.artist.collectAsStateWithLifecycle(null)
+
+    val artist by viewModel.artist.collectAsStateWithLifecycle()
     val displayType by viewModel.displayType.collectAsStateWithLifecycle()
     val listType by viewModel.listType.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+
     var isContextMenuShown by rememberSaveable { mutableStateOf(false) }
     var showToolbars by remember { mutableStateOf(true) }
+
     val nestedScrollConnection = rememberToolbarScrollConnection { showToolbars = it }
 
-    LaunchedEffect(artist) {
-        artist?.also(onArtistFetched)
-    }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        CollapsibleToolbar(show = showToolbars) {
+        CollapsibleToolbar(show = { showToolbars }) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -106,10 +101,10 @@ fun ArtistScreen(
                                 onDismissRequest = { isContextMenuShown = false },
                                 onPlayClick = { viewModel.playArtist() },
                                 onStartRadioClick = { appCallbacks.onStartArtistRadioClick(artist.artistId) },
-                                onEnqueueClick = { viewModel.enqueueArtist(context) },
+                                onEnqueueClick = { viewModel.enqueueArtist() },
                                 onAddToPlaylistClick = {
-                                    viewModel.onAllArtistTracks {
-                                        appCallbacks.onAddToPlaylistClick(Selection(tracks = it))
+                                    viewModel.onAllArtistTrackIds {
+                                        appCallbacks.onAddTracksToPlaylistClick(it)
                                     }
                                 },
                                 onSpotifyClick = artist.spotifyWebUrl?.let { { uriHandler.openUri(it) } },
@@ -124,130 +119,93 @@ fun ArtistScreen(
                 listType = listType,
                 onDisplayTypeChange = { viewModel.setDisplayType(it) },
                 onListTypeChange = { viewModel.setListType(it) },
-                excludeListTypes = listOf(ListType.ARTISTS, ListType.PLAYLISTS),
+                excludeListTypes = persistentListOf(ListType.ARTISTS, ListType.PLAYLISTS),
             )
         }
 
         when (listType) {
             ListType.ALBUMS -> {
-                val downloadStates by viewModel.albumDownloadStates.collectAsStateWithLifecycle()
-                val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle(persistentListOf())
-                val viewStates by viewModel.albumViewStates.collectAsStateWithLifecycle(persistentListOf())
-
-                val albumCallbacks = { state: Album.ViewState ->
-                    AlbumCallbacks(
-                        state = state,
-                        appCallbacks = appCallbacks,
-                        onPlayClick = if (state.album.isPlayable) {
-                            { viewModel.playAlbum(state.album.albumId) }
-                        } else null,
-                        onEnqueueClick = if (state.album.isPlayable) {
-                            { viewModel.enqueueAlbum(state.album.albumId, context) }
-                        } else null,
-                        onAlbumLongClick = {
-                            viewModel.selectAlbumsFromLastSelected(
-                                state.album.albumId,
-                                viewStates.map { it.album.albumId },
-                            )
-                        },
-                        onAlbumClick = {
-                            if (selectedAlbumIds.isNotEmpty()) viewModel.toggleAlbumSelected(state.album.albumId)
-                            else appCallbacks.onAlbumClick(state.album.albumId)
-                        },
-                    )
-                }
+                val selectedAlbumIds by viewModel.filteredSelectedAlbumIds.collectAsStateWithLifecycle()
+                val uiStates by viewModel.albumUiStates.collectAsStateWithLifecycle()
                 val albumSelectionCallbacks = viewModel.getAlbumSelectionCallbacks(appCallbacks, context)
 
                 when (displayType) {
                     DisplayType.LIST -> AlbumList(
-                        states = viewStates,
-                        callbacks = albumCallbacks,
+                        states = { uiStates },
                         selectionCallbacks = albumSelectionCallbacks,
                         selectedAlbumIds = selectedAlbumIds,
                         showArtist = false,
                         onEmpty = {
                             Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
                         },
-                        // getThumbnail = { viewModel.getAlbumThumbnail(it?.thumbnailUri) },
                         modifier = Modifier.nestedScroll(nestedScrollConnection),
-                        downloadStates = downloadStates,
+                        callbacks = albumCallbacks,
                     )
                     DisplayType.GRID -> AlbumGrid(
-                        states = viewStates,
+                        states = { uiStates },
                         callbacks = albumCallbacks,
                         selectionCallbacks = albumSelectionCallbacks,
                         selectedAlbumIds = selectedAlbumIds,
-                        showArtist = false,
-                        onEmpty = {
-                            Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
-                        },
                         modifier = Modifier.nestedScroll(nestedScrollConnection),
-                        // getFullImage = { viewModel.getAlbumFullImage(it?.fullUri) },
-                        downloadStates = downloadStates,
-                    )
+                        showArtist = false,
+                    ) {
+                        Text(stringResource(R.string.no_albums_found), modifier = Modifier.padding(10.dp))
+                    }
                 }
             }
             ListType.TRACKS -> {
-                val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle(null)
-                val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle(emptyList())
-                val trackCombos: LazyPagingItems<TrackCombo> = viewModel.trackCombos.collectAsLazyPagingItems()
+                val latestSelectedTrackId by viewModel.latestSelectedTrackId.collectAsStateWithLifecycle()
+                val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
+                val trackUiStates: LazyPagingItems<TrackUiState> = viewModel.trackUiStates.collectAsLazyPagingItems()
 
                 var latestSelectedTrackIndex by rememberSaveable(selectedTrackIds) { mutableStateOf<Int?>(null) }
 
-                val trackCallbacks = { index: Int, state: Track.ViewState ->
-                    TrackCallbacks(
-                        state = state,
-                        appCallbacks = appCallbacks,
+                val trackCallbacks2 = { index: Int, state: TrackUiState ->
+                    trackCallbacks.copy(
                         onTrackClick = {
-                            if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.track.trackId)
-                            else if (state.track.isPlayable) viewModel.playTrack(state)
+                            if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.trackId)
+                            else if (state.isPlayable) viewModel.playTrack(state)
                         },
-                        onEnqueueClick = if (state.track.isPlayable) {
-                            { viewModel.enqueueTrack(state, context) }
-                        } else null,
                         onLongClick = {
                             viewModel.selectTracksBetweenIndices(
                                 fromIndex = latestSelectedTrackIndex,
                                 toIndex = index,
-                                getTrackIdAtIndex = { trackCombos[it]?.track?.trackId },
+                                getTrackIdAtIndex = { trackUiStates[it]?.trackId },
                             )
                         },
                         onEach = {
-                            if (state.track.trackId == latestSelectedTrackId) latestSelectedTrackIndex = index
+                            if (state.trackId == latestSelectedTrackId) latestSelectedTrackIndex = index
                         },
                     )
                 }
-                val trackSelectionCallbacks = viewModel.getTrackSelectionCallbacks(appCallbacks, context)
-                val downloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
+
+                val trackSelectionCallbacks = viewModel.getTrackSelectionCallbacks(appCallbacks)
 
                 when (displayType) {
                     DisplayType.LIST -> TrackList(
-                        trackCombos = trackCombos,
-                        showAlbum = true,
-                        showArtist = false,
+                        uiStates = trackUiStates,
+                        trackCallbacks = trackCallbacks2,
                         selectedTrackIds = selectedTrackIds.toImmutableList(),
-                        trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
-                        downloadStates = downloadStates,
-                        onEmpty = {
-                            Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
-                        },
                         modifier = Modifier.nestedScroll(nestedScrollConnection),
-                        ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
-                    )
+                        showArtist = false,
+                        showAlbum = true,
+                        ensureTrackMetadata = { viewModel.ensureTrackMetadata(it) },
+                    ) {
+                        Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
+                    }
                     DisplayType.GRID -> TrackGrid(
-                        trackCombos = trackCombos,
+                        uiStates = trackUiStates,
                         showArtist = false,
                         showAlbum = true,
-                        trackCallbacks = trackCallbacks,
                         trackSelectionCallbacks = trackSelectionCallbacks,
                         selectedTrackIds = selectedTrackIds.toImmutableList(),
-                        downloadStates = downloadStates,
                         onEmpty = {
                             Text(stringResource(R.string.no_tracks_found), modifier = Modifier.padding(10.dp))
                         },
                         modifier = Modifier.nestedScroll(nestedScrollConnection),
-                        ensureTrackMetadata = { viewModel.ensureTrackMetadataAsync(it) },
+                        ensureTrackMetadata = { viewModel.ensureTrackMetadata(it) },
+                        trackCallbacks = trackCallbacks2,
                     )
                 }
             }

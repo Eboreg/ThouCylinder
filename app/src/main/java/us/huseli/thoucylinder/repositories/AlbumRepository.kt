@@ -1,10 +1,5 @@
 package us.huseli.thoucylinder.repositories
 
-import android.content.Context
-import android.net.Uri
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,23 +14,18 @@ import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
 import us.huseli.thoucylinder.enums.AlbumSortParameter
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
-import us.huseli.thoucylinder.getCachedFullBitmap
-import us.huseli.thoucylinder.getCachedThumbnailBitmap
-import us.huseli.thoucylinder.getMutexCache
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AlbumRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) {
+class AlbumRepository @Inject constructor(database: Database) {
     private val albumDao = database.albumDao()
     private val selectedAlbumIds = mutableMapOf<String, MutableStateFlow<List<String>>>()
 
-    val thumbnailCache = getMutexCache<Uri, ImageBitmap> { uri ->
-        uri.getCachedThumbnailBitmap(context)?.asImageBitmap()
-    }
-
     suspend fun addAlbumsToLibrary(albumIds: Collection<String>) =
         albumDao.setIsInLibrary(true, *albumIds.toTypedArray())
+
+    suspend fun clearAlbumArt(albumId: String) = albumDao.clearAlbumArt(albumId)
 
     suspend fun clearAlbums() = albumDao.clearAlbums()
 
@@ -72,16 +62,15 @@ class AlbumRepository @Inject constructor(database: Database, @ApplicationContex
 
     fun flowTags(): Flow<List<Tag>> = albumDao.flowTags()
 
+    fun flowTagsByAlbumId(albumId: String): Flow<List<Tag>> = albumDao.flowTagsByAlbumId(albumId)
+
+    suspend fun getAlbum(albumId: String): Album? = albumDao.getAlbum(albumId)
+
     suspend fun getAlbumCombo(albumId: String): AlbumCombo? = albumDao.getAlbumCombo(albumId)
 
     suspend fun getAlbumWithTracks(albumId: String): AlbumWithTracksCombo? = albumDao.getAlbumWithTracks(albumId)
 
     suspend fun getAlbumWithTracksByPlaylistId(playlistId: String) = albumDao.getAlbumWithTracksByPlaylistId(playlistId)
-
-    suspend fun getFullImage(uri: Uri?): ImageBitmap? = uri?.getCachedFullBitmap(context)?.asImageBitmap()
-
-    suspend fun getFullImage(album: Album): ImageBitmap? =
-        album.albumArt?.fullUri?.getCachedThumbnailBitmap(context)?.asImageBitmap()
 
     suspend fun insertTags(tags: Collection<Tag>) {
         if (tags.isNotEmpty()) albumDao.insertTags(*tags.toTypedArray())
@@ -89,14 +78,21 @@ class AlbumRepository @Inject constructor(database: Database, @ApplicationContex
 
     suspend fun listAlbumCombos(): List<AlbumCombo> = albumDao.listAlbumCombos()
 
+    suspend fun listAlbumCombos(albumIds: Collection<String>): List<AlbumCombo> =
+        if (albumIds.isNotEmpty()) albumDao.listAlbumCombos(*albumIds.toTypedArray()) else emptyList()
+
     suspend fun listAlbums(): List<Album> = albumDao.listAlbums()
+
+    suspend fun listAlbumsWithTracks(): List<AlbumWithTracksCombo> = albumDao.listAlbumsWithTracks()
 
     suspend fun listAlbumsWithTracks(albumIds: Collection<String>): List<AlbumWithTracksCombo> =
         if (albumIds.isNotEmpty()) albumDao.listAlbumsWithTracks(*albumIds.toTypedArray()) else emptyList()
 
-    suspend fun listDeletionMarkedAlbumCombos(): List<AlbumCombo> = albumDao.listDeletionMarkedAlbumCombos()
+    suspend fun listDeletionMarkedAlbumCombos(): List<AlbumWithTracksCombo> = albumDao.listDeletionMarkedAlbumCombos()
 
     suspend fun listTags(): List<Tag> = albumDao.listTags()
+
+    suspend fun listTags(albumId: String): List<Tag> = albumDao.listTags(albumId)
 
     suspend fun removeAlbumsFromLibrary(albumIds: Collection<String>) =
         albumDao.setIsInLibrary(false, *albumIds.toTypedArray())
@@ -123,6 +119,8 @@ class AlbumRepository @Inject constructor(database: Database, @ApplicationContex
             else it.value += albumId
         }
     }
+
+    suspend fun unhideLocalAlbums() = albumDao.unhideLocalAlbums()
 
     fun unselectAllAlbumIds(selectionKey: String) {
         mutableFlowSelectedAlbumIds(selectionKey).value = emptyList()

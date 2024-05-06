@@ -7,18 +7,14 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.preference.PreferenceManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.AbstractYoutubeClient
-import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.PREF_REGION
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.YoutubeAndroidClient
@@ -34,10 +30,12 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.parseContentRange
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeMetadata
+import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.youtube.getBest
 import us.huseli.thoucylinder.enums.Region
 import us.huseli.thoucylinder.getMutexCache
 import java.io.File
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -46,33 +44,34 @@ import kotlin.math.min
 class YoutubeRepository @Inject constructor(
     private val database: Database,
     @ApplicationContext private val context: Context,
-) : SharedPreferences.OnSharedPreferenceChangeListener {
+) : SharedPreferences.OnSharedPreferenceChangeListener, AbstractScopeHolder() {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
 
-    private val _albumDownloadTasks = MutableStateFlow<ImmutableList<AlbumDownloadTask>>(persistentListOf())
     private val _isSearchingTracks = MutableStateFlow(false)
-    private val region = MutableStateFlow(getRegion())
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val _region = MutableStateFlow(getRegion())
+    private val albumDao = database.albumDao()
     private val youtubeSearchDao = database.youtubeSearchDao()
 
-    val albumDownloadTasks = _albumDownloadTasks.asStateFlow()
+    val importedPlaylistIds: StateFlow<List<String>> =
+        albumDao.flowYoutubePlaylistIds().distinctUntilChanged().stateLazily(emptyList())
     val isSearchingTracks = _isSearchingTracks.asStateFlow()
+    val region = _region.asStateFlow()
 
     private val metadataCache = getMutexCache("YoutubeRepository.metadataCache") { videoId ->
-        YoutubeAndroidTestSuiteClient(region.value).getMetadata(videoId)
+        YoutubeAndroidTestSuiteClient(_region.value).getMetadata(videoId)
     }
 
     init {
         preferences.registerOnSharedPreferenceChangeListener(this)
-        scope.launch { youtubeSearchDao.clearCache() }
+        launchOnIOThread { youtubeSearchDao.clearCache() }
     }
 
-    fun addAlbumDownloadTask(value: AlbumDownloadTask) {
-        _albumDownloadTasks.value = _albumDownloadTasks.value.plus(value).toImmutableList()
-    }
+    suspend fun downloadVideo(video: YoutubeVideo, progressCallback: (Double) -> Unit): File {
+        return withContext(Dispatchers.IO) {
+            val metadata = getBestMetadata(video)
+                ?: throw Exception("Could not get Youtube metadata for video ${video.title} (id=${video.id})")
+            val tempFile = File(context.cacheDir, "${UUID.randomUUID()}.${metadata.fileExtension}")
 
-    suspend fun downloadVideo(url: String, tempFile: File, progressCallback: (Double) -> Unit) {
-        withContext(Dispatchers.IO) {
             tempFile.outputStream().use { outputStream ->
                 var rangeStart = 0
                 var finished = false
@@ -80,7 +79,7 @@ class YoutubeRepository @Inject constructor(
 
                 while (!finished) {
                     val conn = Request(
-                        url = url,
+                        url = metadata.url,
                         headers = mapOf("Range" to "bytes=$rangeStart-${DOWNLOAD_CHUNK_SIZE + rangeStart}"),
                     ).connect()
                     val contentRange = conn.getHeaderField("Content-Range")?.parseContentRange()
@@ -97,6 +96,7 @@ class YoutubeRepository @Inject constructor(
                 }
                 progressCallback(1.0)
             }
+            tempFile
         }
     }
 
@@ -105,15 +105,13 @@ class YoutubeRepository @Inject constructor(
         forceReload: Boolean = false,
         onChanged: suspend (Track) -> Unit = {},
     ): Track {
-        var changed: Boolean
         val youtubeMetadata =
             if (forceReload || track.youtubeVideo?.metadataRefreshNeeded == true) getBestMetadata(track, forceReload)
             else track.youtubeVideo?.metadata
-        changed = youtubeMetadata != track.youtubeVideo?.metadata
         val metadata =
             if (track.metadata == null || forceReload) youtubeMetadata?.toTrackMetadata()
             else track.metadata
-        changed = changed || metadata != track.metadata
+        val changed = youtubeMetadata != track.youtubeVideo?.metadata || metadata != track.metadata
         val updatedTrack = track.copy(
             metadata = metadata ?: track.metadata,
             youtubeVideo = track.youtubeVideo?.copy(
@@ -127,23 +125,19 @@ class YoutubeRepository @Inject constructor(
         return updatedTrack
     }
 
-    suspend fun ensureTrackPlayUriOrNull(
+    suspend fun ensureTrackPlayUri(
         track: Track,
         albumArtists: Collection<AbstractArtistCredit>? = null,
         trackArtists: Collection<AbstractArtistCredit>? = null,
-        matchIfNeeded: Boolean = true,
         onChanged: suspend (Track) -> Unit = {},
-    ): Track? {
-        if (track.localUri != null) return track
-        if (track.youtubeVideo != null) return ensureTrackMetadataOrNull(track, onChanged = onChanged)
-        return if (matchIfNeeded)
-            getBestTrackMatch(
+    ): Track {
+        return track.takeIf { it.playUri != null }
+            ?: track.takeIf { it.youtubeVideo != null }?.let { ensureTrackMetadata(it, onChanged = onChanged) }
+            ?: getBestTrackMatch(
                 track = track,
                 albumArtists = albumArtists,
                 trackArtists = trackArtists,
-                withMetadata = true,
-            )?.also { onChanged(it) }
-        else null
+            )?.also { onChanged(it) } ?: track
     }
 
     suspend fun getBestAlbumMatch(
@@ -163,26 +157,19 @@ class YoutubeRepository @Inject constructor(
     }
 
     suspend fun getBestMetadata(track: Track, forceReload: Boolean = false): YoutubeMetadata? =
-        track.youtubeVideo?.id?.let { videoId ->
-            metadataCache.getOrNull(videoId, retryOnNull = true, forceReload = forceReload)?.getBest()
-        }
+        track.youtubeVideo?.let { getBestMetadata(it, forceReload = forceReload) }
 
-    suspend fun getBestTrackMatch(
-        trackCombo: TrackCombo,
-        maxDistance: Int = 5,
-        withMetadata: Boolean = false,
-    ): TrackCombo? = getBestTrackMatch(
+    suspend fun getBestTrackMatch(trackCombo: TrackCombo, maxDistance: Int = 5): TrackCombo? = getBestTrackMatch(
         track = trackCombo.track,
         albumArtists = trackCombo.albumArtists,
         trackArtists = trackCombo.artists,
         maxDistance = maxDistance,
-        withMetadata = withMetadata,
     )?.let { track -> trackCombo.copy(track = track) }
 
     suspend fun getVideoSearchResult(
         query: String,
         continuationToken: String? = null,
-    ): AbstractYoutubeClient.VideoSearchResult = YoutubeAndroidClient(region.value).getVideoSearchResult(
+    ): AbstractYoutubeClient.VideoSearchResult = YoutubeAndroidClient(_region.value).getVideoSearchResult(
         context = context,
         query = query,
         continuationToken = continuationToken,
@@ -191,7 +178,7 @@ class YoutubeRepository @Inject constructor(
     suspend fun searchPlaylistCombos(
         query: String,
         progressCallback: (Double) -> Unit = {},
-    ): List<YoutubePlaylistCombo> = YoutubeWebClient(region.value).searchPlaylistCombos(
+    ): List<YoutubePlaylistCombo> = YoutubeWebClient(_region.value).searchPlaylistCombos(
         context = context,
         query = query,
         progressCallback = progressCallback,
@@ -214,19 +201,17 @@ class YoutubeRepository @Inject constructor(
 
 
     /** PRIVATE METHODS ******************************************************/
-    private suspend fun ensureTrackMetadataOrNull(
-        track: Track,
-        forceReload: Boolean = false,
-        onChanged: suspend (Track) -> Unit = {},
-    ): Track? = ensureTrackMetadata(track = track, forceReload = forceReload, onChanged = onChanged)
+    private suspend fun ensureTrackMetadataOrNull(track: Track): Track? = ensureTrackMetadata(track = track)
         .takeIf { it.metadata != null && it.youtubeVideo?.metadata != null }
+
+    private suspend fun getBestMetadata(video: YoutubeVideo, forceReload: Boolean = false): YoutubeMetadata? =
+        metadataCache.getOrNull(video.id, retryOnNull = true, forceReload = forceReload)?.getBest()
 
     private suspend fun getBestTrackMatch(
         track: Track,
         albumArtists: Collection<AbstractArtistCredit>? = null,
         trackArtists: Collection<AbstractArtistCredit>? = null,
         maxDistance: Int = 5,
-        withMetadata: Boolean = false,
     ): Track? {
         val artistString = trackArtists?.joined()
         val query = artistString?.let { "$it ${track.title}" } ?: track.title
@@ -242,16 +227,14 @@ class YoutubeRepository @Inject constructor(
             }
             .filter { it.distance <= maxDistance }
             .minByOrNull { it.distance }
-            ?.let { match ->
-                track.copy(youtubeVideo = match.video).let { if (withMetadata) ensureTrackMetadataOrNull(it) else it }
-            }
+            ?.let { ensureTrackMetadataOrNull(track.copy(youtubeVideo = it.video)) }
     }
 
     private fun getRegion() =
         preferences.getString(PREF_REGION, null)?.let { Region.valueOf(it) } ?: Region.SE
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key == PREF_REGION) region.value = getRegion()
+        if (key == PREF_REGION) _region.value = getRegion()
     }
 
     companion object {

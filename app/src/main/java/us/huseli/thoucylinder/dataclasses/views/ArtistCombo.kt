@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.views
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.core.net.toUri
 import androidx.room.DatabaseView
 import androidx.room.Embedded
@@ -25,6 +26,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Artist
     ORDER BY LOWER(Artist_name)
     """
 )
+@Immutable
 data class ArtistCombo(
     @Embedded val artist: Artist,
     val albumCount: Int,

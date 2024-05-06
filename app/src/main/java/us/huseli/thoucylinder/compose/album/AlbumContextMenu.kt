@@ -26,16 +26,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableCollection
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
+import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun AlbumContextMenu(
+    albumId: String,
     albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
@@ -59,7 +60,7 @@ fun AlbumContextMenu(
                 text = { Text(stringResource(R.string.play)) },
                 leadingIcon = { Icon(Icons.Sharp.PlayArrow, null) },
                 onClick = {
-                    onPlayClick()
+                    onPlayClick(albumId)
                     onDismissRequest()
                 }
             )
@@ -70,7 +71,7 @@ fun AlbumContextMenu(
                 text = { Text(stringResource(R.string.enqueue)) },
                 leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
                 onClick = {
-                    onEnqueueClick()
+                    onEnqueueClick(albumId)
                     onDismissRequest()
                 }
             )
@@ -80,7 +81,7 @@ fun AlbumContextMenu(
             text = { Text(stringResource(R.string.start_radio)) },
             leadingIcon = { Icon(Icons.Sharp.Radio, null) },
             onClick = {
-                callbacks.onStartAlbumRadioClick()
+                callbacks.onStartRadioClick(albumId)
                 onDismissRequest()
             }
         )
@@ -89,7 +90,7 @@ fun AlbumContextMenu(
             text = { Text(text = stringResource(R.string.add_to_library)) },
             leadingIcon = { Icon(Icons.Sharp.BookmarkBorder, null) },
             onClick = {
-                callbacks.onAddToLibraryClick()
+                callbacks.onAddToLibraryClick(albumId)
                 onDismissRequest()
             },
         )
@@ -98,7 +99,7 @@ fun AlbumContextMenu(
             text = { Text(text = stringResource(R.string.download)) },
             leadingIcon = { Icon(Icons.Sharp.Download, null) },
             onClick = {
-                callbacks.onDownloadClick()
+                callbacks.onDownloadClick(albumId)
                 onDismissRequest()
             },
         )
@@ -107,7 +108,7 @@ fun AlbumContextMenu(
             text = { Text(text = stringResource(R.string.edit)) },
             leadingIcon = { Icon(Icons.Sharp.Edit, null) },
             onClick = {
-                callbacks.onEditClick()
+                callbacks.onEditClick(albumId)
                 onDismissRequest()
             },
         )
@@ -116,7 +117,7 @@ fun AlbumContextMenu(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
-                callbacks.onAddToPlaylistClick()
+                callbacks.onAddToPlaylistClick(albumId)
                 onDismissRequest()
             }
         )
@@ -164,15 +165,17 @@ fun AlbumContextMenu(
             text = { Text(text = stringResource(R.string.delete_album)) },
             leadingIcon = { Icon(Icons.Sharp.Delete, null) },
             onClick = {
-                callbacks.onDeleteClick()
+                callbacks.onDeleteClick(albumId)
                 onDismissRequest()
             }
         )
     }
 }
 
+
 @Composable
 fun AlbumContextMenuWithButton(
+    albumId: String,
     albumArtists: ImmutableCollection<AbstractArtist>,
     isLocal: Boolean,
     isInLibrary: Boolean,
@@ -190,6 +193,7 @@ fun AlbumContextMenuWithButton(
         onClick = { isMenuShown = !isMenuShown },
         content = {
             AlbumContextMenu(
+                albumId = albumId,
                 albumArtists = albumArtists,
                 isLocal = isLocal,
                 isInLibrary = isInLibrary,

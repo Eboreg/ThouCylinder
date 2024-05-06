@@ -7,15 +7,18 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.AddCircle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +40,7 @@ import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.compose.utils.SmallButton
 import us.huseli.thoucylinder.dataclasses.entities.Tag
+import us.huseli.thoucylinder.dataclasses.uistates.EditAlbumUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 
@@ -49,31 +52,40 @@ data class TagUI(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditAlbumInfoDialog(
-    albumId: String,
+    uiState: EditAlbumUiState,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
     val levenshtein = LevenshteinDistance()
 
-    val albumWithTracks by viewModel.flowAlbumWithTracks(albumId).collectAsStateWithLifecycle(null)
-    val allTags by viewModel.allTags.collectAsStateWithLifecycle(emptyList())
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
 
+    var isLoadingTags by remember { mutableStateOf(true) }
     var updateTrackArtists by rememberSaveable { mutableStateOf(true) }
-    var title by rememberSaveable(albumWithTracks) { mutableStateOf(albumWithTracks?.album?.title ?: "") }
-    var artistNames by rememberSaveable(albumWithTracks) {
-        mutableStateOf(albumWithTracks?.artists?.map { it.name } ?: emptyList())
+    var mutableTitle by rememberSaveable { mutableStateOf(uiState.title) }
+    var mutableArtistNames by rememberSaveable {
+        mutableStateOf(if (uiState.artistNames.isNotEmpty()) uiState.artistNames.toList() else listOf(""))
     }
-    var year by rememberSaveable(albumWithTracks) { mutableStateOf(albumWithTracks?.album?.year) }
-    var tags by rememberSaveable(albumWithTracks) {
-        mutableStateOf(albumWithTracks?.tags?.map { TagUI(it) } ?: emptyList())
-    }
-    val allTagNames by remember(allTags, tags) {
+    var mutableYear by rememberSaveable { mutableStateOf(uiState.year) }
+    var mutableTags by rememberSaveable { mutableStateOf<List<TagUI>>(emptyList()) }
+    val allTagNames by remember(allTags, mutableTags) {
         mutableStateOf(
             allTags.map { it.name }
                 .toSet()
-                .plus(tags.map { it.tag.name })
+                .plus(mutableTags.map { it.tag.name })
         )
+    }
+
+    LaunchedEffect(uiState.albumId) {
+        mutableTags = viewModel.listTags(uiState.albumId).map { TagUI(it) }
+        isLoadingTags = false
+    }
+
+    val onArtistNameChange: (Int, String) -> Unit = { index, name ->
+        mutableArtistNames = mutableArtistNames
+            .toMutableList()
+            .apply { set(index, name) }
     }
 
     AlertDialog(
@@ -84,16 +96,14 @@ fun EditAlbumInfoDialog(
         onDismissRequest = onClose,
         confirmButton = {
             SaveButton {
-                albumWithTracks?.also { combo ->
-                    viewModel.updateAlbumCombo(
-                        combo = combo,
-                        title = title,
-                        year = year,
-                        artistNames = artistNames,
-                        tags = tags.map { it.tag },
-                        updateMatchingTrackArtists = updateTrackArtists,
-                    )
-                }
+                viewModel.updateAlbum(
+                    albumId = uiState.albumId,
+                    title = mutableTitle,
+                    year = mutableYear,
+                    tags = mutableTags.map { it.tag },
+                    artistNames = mutableArtistNames,
+                    updateMatchingTrackArtists = updateTrackArtists,
+                )
                 onClose()
             }
         },
@@ -101,30 +111,26 @@ fun EditAlbumInfoDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
+                    value = mutableTitle,
+                    onValueChange = { mutableTitle = it },
                     label = { OutlinedTextFieldLabel(text = stringResource(R.string.album_title)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(modifier = Modifier.fillMaxWidth(0.7f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        artistNames.fastForEachIndexed { index, artistName ->
-                            val onTextChange: (String) -> Unit = {
-                                artistNames = artistNames.toMutableList().apply { set(index, it) }
-                            }
-
+                        mutableArtistNames.forEachIndexed { index, artistName ->
                             AutocompleteTextField(
                                 initial = artistName,
                                 getSuggestions = { name -> viewModel.getArtistNameSuggestions(name) },
-                                onSelect = onTextChange,
-                                onTextChange = onTextChange,
+                                onSelect = { onArtistNameChange(index, it) },
+                                onTextChange = { onArtistNameChange(index, it) },
                             ) { OutlinedTextFieldLabel(text = stringResource(R.string.album_artist)) }
                         }
                     }
                     OutlinedTextField(
-                        value = year?.toString() ?: "",
-                        onValueChange = { year = it.toIntOrNull() },
+                        value = mutableYear?.toString() ?: "",
+                        onValueChange = { mutableYear = it.toIntOrNull() },
                         label = { OutlinedTextFieldLabel(text = stringResource(R.string.year)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
@@ -134,6 +140,7 @@ fun EditAlbumInfoDialog(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 10.dp),
                 ) {
                     Text(
                         stringResource(R.string.also_update_matching_track_artists),
@@ -147,17 +154,18 @@ fun EditAlbumInfoDialog(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    tags.forEachIndexed { index, tagUI ->
+                    if (isLoadingTags) CircularProgressIndicator(modifier = Modifier.width(28.dp))
+                    mutableTags.forEachIndexed { index, tagUI ->
                         AutocompleteChip(
                             originalText = tagUI.tag.name,
                             onSave = {
-                                tags = tags.toMutableList().apply {
+                                mutableTags = mutableTags.toMutableList().apply {
                                     val tagUi = removeAt(index)
                                     if (it.isNotEmpty()) add(index, tagUi.copy(tag = tagUi.tag.copy(name = it.trim())))
                                 }
                             },
                             onDelete = {
-                                tags = tags.toMutableList().apply { removeAt(index) }
+                                mutableTags = mutableTags.toMutableList().apply { removeAt(index) }
                             },
                             getSuggestions = { tagName ->
                                 allTagNames.filter { it.contains(tagName, true) }
@@ -168,7 +176,7 @@ fun EditAlbumInfoDialog(
                     }
                     SmallButton(
                         onClick = {
-                            tags = tags.toMutableList().apply { add(TagUI(Tag(name = ""), true)) }
+                            mutableTags = mutableTags.toMutableList().apply { add(TagUI(Tag(name = ""), true)) }
                         },
                         text = stringResource(R.string.add_new),
                         leadingIcon = Icons.Sharp.AddCircle,

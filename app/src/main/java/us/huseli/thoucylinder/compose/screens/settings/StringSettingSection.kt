@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 fun StringSettingSection(
     title: String,
     description: String,
-    currentValue: String,
+    currentValue: String?,
     onClick: () -> Unit,
 ) {
     SettingSection(onClick = onClick) {
@@ -24,11 +24,13 @@ fun StringSettingSection(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text(
-                text = currentValue,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            currentValue?.also {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }

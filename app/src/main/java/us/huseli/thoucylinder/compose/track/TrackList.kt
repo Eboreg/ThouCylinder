@@ -20,15 +20,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import kotlinx.collections.immutable.ImmutableList
 import us.huseli.retaintheme.compose.ListWithNumericBar
-import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
@@ -74,11 +73,10 @@ fun TrackList(
 
 
 @Composable
-fun <T : AbstractTrackCombo> TrackList(
-    trackCombos: LazyPagingItems<out T>,
+fun TrackList(
+    uiStates: LazyPagingItems<TrackUiState>,
+    trackCallbacks: (Int, TrackUiState) -> TrackCallbacks,
     selectedTrackIds: ImmutableList<String>,
-    downloadStates: ImmutableList<TrackDownloadTask.ViewState>,
-    trackCallbacks: (Int, Track.ViewState) -> TrackCallbacks,
     trackSelectionCallbacks: TrackSelectionCallbacks,
     modifier: Modifier = Modifier,
     imageViewModel: ImageViewModel = hiltViewModel(),
@@ -86,16 +84,16 @@ fun <T : AbstractTrackCombo> TrackList(
     showArtist: Boolean = true,
     showAlbum: Boolean = false,
     progressIndicatorText: String? = null,
-    ensureTrackMetadata: (Track) -> Unit,
-    extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
-    onEmpty: (@Composable () -> Unit)? = null,
+    ensureTrackMetadata: (TrackUiState) -> Unit,
+    extraTrackSelectionButtons: @Composable (() -> Unit)? = null,
+    onEmpty: @Composable (() -> Unit)? = null,
 ) {
     Box {
         progressIndicatorText?.also {
             ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
         }
         TrackList(
-            itemCount = trackCombos.itemCount,
+            itemCount = uiStates.itemCount,
             selectedTrackIds = selectedTrackIds,
             trackSelectionCallbacks = trackSelectionCallbacks,
             listState = listState,
@@ -103,26 +101,25 @@ fun <T : AbstractTrackCombo> TrackList(
             extraTrackSelectionButtons = extraTrackSelectionButtons,
             onEmpty = onEmpty,
         ) {
-            items(count = trackCombos.itemCount) { index ->
-                trackCombos[index]?.also { combo ->
+            items(count = uiStates.itemCount) { index ->
+                uiStates[index]?.also { state ->
                     var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
+                    val downloadState = state.downloadState.collectAsStateWithLifecycle()
 
-                    LaunchedEffect(combo.track.image, combo.album?.albumArt) {
-                        thumbnail = imageViewModel.getTrackThumbnail(combo.track.image?.thumbnailUri)
-                            ?: imageViewModel.getAlbumThumbnail(combo.album?.albumArt?.thumbnailUri)
-                        ensureTrackMetadata(combo.track)
-                        // thumbnail = viewModel.getTrackComboThumbnail(combo)
-                        // viewModel.ensureTrackMetadata(combo.track)
+                    LaunchedEffect(state.trackThumbnailUri, state.albumThumbnailUri) {
+                        thumbnail = imageViewModel.getThumbnailImageBitmap(state.trackThumbnailUri)
+                            ?: imageViewModel.getThumbnailImageBitmap(state.albumThumbnailUri)
+                        ensureTrackMetadata(state)
                     }
 
                     TrackListRow(
-                        combo = combo,
                         showArtist = showArtist,
-                        isSelected = selectedTrackIds.contains(combo.track.trackId),
-                        callbacks = remember { trackCallbacks(index, combo.getViewState()) },
+                        isSelected = selectedTrackIds.contains(state.trackId),
                         thumbnail = { thumbnail },
                         showAlbum = showAlbum,
-                        downloadState = downloadStates.find { it.trackId == combo.track.trackId },
+                        downloadState = downloadState,
+                        callbacks = remember { trackCallbacks(index, state) },
+                        state = state,
                     )
                 }
             }

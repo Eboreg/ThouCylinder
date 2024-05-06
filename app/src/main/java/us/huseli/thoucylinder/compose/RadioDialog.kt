@@ -24,41 +24,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.enums.RadioType
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.viewmodels.RadioViewModel
 import kotlin.math.roundToInt
 
 @Composable
 fun RadioDialog(
-    activeRadio: RadioCombo?,
-    activeTrackCombo: AbstractTrackCombo?,
-    activeAlbumCombo: AbstractAlbumCombo?,
-    activeArtist: Artist?,
-    libraryRadioNovelty: Float,
-    onDeactivateClick: () -> Unit,
-    onStartLibraryRadioClick: () -> Unit,
-    onStartArtistRadioClick: (String) -> Unit,
-    onStartAlbumRadioClick: (String) -> Unit,
-    onStartTrackRadioClick: (String) -> Unit,
     onDismissRequest: () -> Unit,
-    onLibraryRadioNoveltyChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: RadioViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val artists = setOfNotNull(
-        activeArtist,
-        *(activeTrackCombo?.artists ?: emptyList()).toTypedArray(),
-        *(activeAlbumCombo?.artists ?: emptyList()).toTypedArray(),
-    ).filter { activeRadio?.artist != it }
-    val albums = setOfNotNull(activeAlbumCombo?.album, activeTrackCombo?.album)
-        .filter { activeRadio?.album != it }
-    var localLibraryRadioNovelty by rememberSaveable(libraryRadioNovelty) { mutableFloatStateOf(libraryRadioNovelty) }
+    val state by viewModel.radioDialogUiState.collectAsStateWithLifecycle()
+    var localLibraryRadioNovelty by rememberSaveable(state.libraryRadioNovelty) {
+        mutableFloatStateOf(state.libraryRadioNovelty)
+    }
 
     AlertDialog(
         modifier = modifier.padding(10.dp),
@@ -77,18 +62,18 @@ fun RadioDialog(
                 Text(stringResource(R.string.radio_dialog_help_1))
                 Text(stringResource(R.string.radio_dialog_help_2))
 
-                if (activeRadio != null) {
+                state.activeRadio?.also { activeRadio ->
                     Text(stringResource(R.string.now_active_x, activeRadio.getFullTitle(context)))
                     OutlinedButton(
-                        onClick = onDeactivateClick,
+                        onClick = { viewModel.deactivate() },
                         content = { Text(stringResource(R.string.deactivate_radio), textAlign = TextAlign.Center) },
                         shape = MaterialTheme.shapes.extraSmall,
                     )
                 }
 
-                for (artist in artists.take(5)) {
+                for (artist in state.artists.take(5)) {
                     OutlinedButton(
-                        onClick = { onStartArtistRadioClick(artist.artistId) },
+                        onClick = { viewModel.startArtistRadio(artist.artistId) },
                         content = {
                             Text(
                                 stringResource(
@@ -103,9 +88,9 @@ fun RadioDialog(
                     )
                 }
 
-                for (album in albums) {
+                for (album in state.albums) {
                     OutlinedButton(
-                        onClick = { onStartAlbumRadioClick(album.albumId) },
+                        onClick = { viewModel.startAlbumRadio(album.albumId) },
                         content = {
                             Text(
                                 stringResource(
@@ -120,14 +105,14 @@ fun RadioDialog(
                     )
                 }
 
-                if (activeTrackCombo != null) {
+                state.activeTrack?.also { activeTrack ->
                     OutlinedButton(
-                        onClick = { onStartTrackRadioClick(activeTrackCombo.track.trackId) },
+                        onClick = { viewModel.startTrackRadio(activeTrack.trackId) },
                         content = {
                             Text(
                                 stringResource(
                                     R.string.start_x_x_radio,
-                                    activeTrackCombo.track.title,
+                                    activeTrack.title,
                                     stringResource(R.string.track).lowercase(),
                                 ),
                                 textAlign = TextAlign.Center,
@@ -137,9 +122,9 @@ fun RadioDialog(
                     )
                 }
 
-                if (activeRadio?.type != RadioType.LIBRARY) {
+                if (state.activeRadio?.type != RadioType.LIBRARY) {
                     OutlinedButton(
-                        onClick = onStartLibraryRadioClick,
+                        onClick = { viewModel.startLibraryRadio() },
                         content = { Text(stringResource(R.string.start_library_radio), textAlign = TextAlign.Center) },
                         shape = MaterialTheme.shapes.extraSmall,
                     )
@@ -155,7 +140,7 @@ fun RadioDialog(
                         Slider(
                             value = localLibraryRadioNovelty,
                             onValueChange = { localLibraryRadioNovelty = it },
-                            onValueChangeFinished = { onLibraryRadioNoveltyChange(localLibraryRadioNovelty) },
+                            onValueChangeFinished = { viewModel.setLibraryRadioNovelty(localLibraryRadioNovelty) },
                             modifier = Modifier.weight(1f),
                         )
                     }

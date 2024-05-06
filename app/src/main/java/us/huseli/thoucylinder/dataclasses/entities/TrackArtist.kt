@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -25,6 +26,7 @@ import androidx.room.Index
         ),
     ],
 )
+@Immutable
 data class TrackArtist(
     @ColumnInfo("TrackArtist_trackId") val trackId: String,
     @ColumnInfo("TrackArtist_artistId") val artistId: String,

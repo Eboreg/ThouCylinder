@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -28,24 +29,26 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import us.huseli.retaintheme.ui.theme.LocalBasicColors
 import us.huseli.thoucylinder.ThouCylinderTheme
-import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.YoutubeAndroidClient
 import us.huseli.thoucylinder.YoutubeAndroidEmbeddedClient
-import us.huseli.thoucylinder.YoutubeAndroidUnpluggedClient
 import us.huseli.thoucylinder.YoutubeAndroidTestSuiteClient
+import us.huseli.thoucylinder.YoutubeAndroidUnpluggedClient
 import us.huseli.thoucylinder.YoutubeIOSClient
 import us.huseli.thoucylinder.YoutubeWebClient
-import us.huseli.thoucylinder.viewmodels.AppViewModel
+import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.viewmodels.DebugViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppViewModel = hiltViewModel()) {
+fun DebugScreen(viewModel: DebugViewModel = hiltViewModel()) {
     val density = LocalDensity.current
     val context = LocalContext.current
+
     val region by viewModel.region.collectAsStateWithLifecycle()
     val continuationTokens by viewModel.continuationTokens.collectAsStateWithLifecycle()
+
     val clients = remember(region) {
         mutableStateListOf(
             YoutubeAndroidTestSuiteClient(region),
@@ -63,7 +66,7 @@ fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppVi
             content = { Text("Clear DB") }
         )
         Button(
-            onClick = { appViewModel.doStartupTasks(context) },
+            onClick = { viewModel.doStartupTasks() },
             content = { Text("Do startup tasks") }
         )
 
@@ -94,79 +97,84 @@ fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppVi
         Text("1 px = ${with(density) { 1.toDp() }} dp")
 
         Row {
-            ColorSample(Modifier.weight(0.5f), "background", MaterialTheme.colorScheme.background)
-            ColorSample(Modifier.weight(0.5f), "error", MaterialTheme.colorScheme.error)
+            ColorSample("background", MaterialTheme.colorScheme.background)
+            ColorSample("error", MaterialTheme.colorScheme.error)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "errorContainer", MaterialTheme.colorScheme.errorContainer)
-            ColorSample(Modifier.weight(0.5f), "inverseOnSurface", MaterialTheme.colorScheme.inverseOnSurface)
+            ColorSample("errorContainer", MaterialTheme.colorScheme.errorContainer)
+            ColorSample("inverseOnSurface", MaterialTheme.colorScheme.inverseOnSurface)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "inversePrimary", MaterialTheme.colorScheme.inversePrimary)
-            ColorSample(Modifier.weight(0.5f), "inverseSurface", MaterialTheme.colorScheme.inverseSurface)
+            ColorSample("inversePrimary", MaterialTheme.colorScheme.inversePrimary)
+            ColorSample("inverseSurface", MaterialTheme.colorScheme.inverseSurface)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "onBackground", MaterialTheme.colorScheme.onBackground)
-            ColorSample(Modifier.weight(0.5f), "onError", MaterialTheme.colorScheme.onError)
+            ColorSample("onBackground", MaterialTheme.colorScheme.onBackground)
+            ColorSample("onError", MaterialTheme.colorScheme.onError)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "onErrorContainer", MaterialTheme.colorScheme.onErrorContainer)
-            ColorSample(Modifier.weight(0.5f), "onPrimary", MaterialTheme.colorScheme.onPrimary)
+            ColorSample("onErrorContainer", MaterialTheme.colorScheme.onErrorContainer)
+            ColorSample("onPrimary", MaterialTheme.colorScheme.onPrimary)
         }
         Row {
-            ColorSample(
-                Modifier.weight(0.5f),
-                "onPrimaryContainer",
-                MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            ColorSample(Modifier.weight(0.5f), "onSecondary", MaterialTheme.colorScheme.onSecondary)
+            ColorSample("onPrimaryContainer", MaterialTheme.colorScheme.onPrimaryContainer)
+            ColorSample("onSecondary", MaterialTheme.colorScheme.onSecondary)
         }
         Row {
-            ColorSample(
-                Modifier.weight(0.5f),
-                "onSecondaryContainer",
-                MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            ColorSample(Modifier.weight(0.5f), "onSurface", MaterialTheme.colorScheme.onSurface)
+            ColorSample("onSecondaryContainer", MaterialTheme.colorScheme.onSecondaryContainer)
+            ColorSample("onSurface", MaterialTheme.colorScheme.onSurface)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "onSurfaceVariant", MaterialTheme.colorScheme.onSurfaceVariant)
-            ColorSample(Modifier.weight(0.5f), "onTertiary", MaterialTheme.colorScheme.onTertiary)
+            ColorSample("onSurfaceVariant", MaterialTheme.colorScheme.onSurfaceVariant)
+            ColorSample("onTertiary", MaterialTheme.colorScheme.onTertiary)
         }
         Row {
-            ColorSample(
-                Modifier.weight(0.5f),
-                "onTertiaryContainer",
-                MaterialTheme.colorScheme.onTertiaryContainer
-            )
-            ColorSample(Modifier.weight(0.5f), "outline", MaterialTheme.colorScheme.outline)
+            ColorSample("onTertiaryContainer", MaterialTheme.colorScheme.onTertiaryContainer)
+            ColorSample("outline", MaterialTheme.colorScheme.outline)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "outlineVariant", MaterialTheme.colorScheme.outlineVariant)
-            ColorSample(Modifier.weight(0.5f), "primary", MaterialTheme.colorScheme.primary)
+            ColorSample("outlineVariant", MaterialTheme.colorScheme.outlineVariant)
+            ColorSample("primary", MaterialTheme.colorScheme.primary)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "primaryContainer", MaterialTheme.colorScheme.primaryContainer)
-            ColorSample(Modifier.weight(0.5f), "scrim", MaterialTheme.colorScheme.scrim)
+            ColorSample("primaryContainer", MaterialTheme.colorScheme.primaryContainer)
+            ColorSample("scrim", MaterialTheme.colorScheme.scrim)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "secondary", MaterialTheme.colorScheme.secondary)
-            ColorSample(
-                Modifier.weight(0.5f),
-                "secondaryContainer",
-                MaterialTheme.colorScheme.secondaryContainer
-            )
+            ColorSample("secondary", MaterialTheme.colorScheme.secondary)
+            ColorSample("secondaryContainer", MaterialTheme.colorScheme.secondaryContainer)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "surface", MaterialTheme.colorScheme.surface)
-            ColorSample(Modifier.weight(0.5f), "surfaceTint", MaterialTheme.colorScheme.surfaceTint)
+            ColorSample("surface", MaterialTheme.colorScheme.surface)
+            ColorSample("surfaceTint", MaterialTheme.colorScheme.surfaceTint)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "surfaceVariant", MaterialTheme.colorScheme.surfaceVariant)
-            ColorSample(Modifier.weight(0.5f), "tertiary", MaterialTheme.colorScheme.tertiary)
+            ColorSample("surfaceVariant", MaterialTheme.colorScheme.surfaceVariant)
+            ColorSample("tertiary", MaterialTheme.colorScheme.tertiary)
         }
         Row {
-            ColorSample(Modifier.weight(0.5f), "tertiaryContainer", MaterialTheme.colorScheme.tertiaryContainer)
+            ColorSample("tertiaryContainer", MaterialTheme.colorScheme.tertiaryContainer)
+            ColorSample("Blue", LocalBasicColors.current.Blue)
+        }
+        Row {
+            ColorSample("Brown", LocalBasicColors.current.Brown)
+            ColorSample("Gray", LocalBasicColors.current.Gray)
+        }
+        Row {
+            ColorSample("Green", LocalBasicColors.current.Green)
+            ColorSample("Orange", LocalBasicColors.current.Orange)
+        }
+        Row {
+            ColorSample("Cerulean", LocalBasicColors.current.Cerulean)
+            ColorSample("Pink", LocalBasicColors.current.Pink)
+        }
+        Row {
+            ColorSample("Purple", LocalBasicColors.current.Purple)
+            ColorSample("Red", LocalBasicColors.current.Red)
+        }
+        Row {
+            ColorSample("Teal", LocalBasicColors.current.Teal)
+            ColorSample("Yellow", LocalBasicColors.current.Yellow)
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -215,10 +223,10 @@ fun DebugScreen(viewModel: DebugViewModel = hiltViewModel(), appViewModel: AppVi
 }
 
 @Composable
-fun ColorSample(modifier: Modifier = Modifier, name: String, color: Color) {
+fun RowScope.ColorSample(name: String, color: Color, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
+        modifier = modifier.weight(0.5f),
     ) {
         Box(modifier = Modifier.height(40.dp).width(40.dp).border(1.dp, Color.Black).background(color))
         Text(name, style = MaterialTheme.typography.labelSmall)

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.ILogger
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
@@ -28,6 +27,7 @@ import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.dataclasses.views.RadioCombo
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.util.concurrent.Executors
 
 @androidx.room.Database(
@@ -59,7 +59,7 @@ import java.util.concurrent.Executors
         ArtistCombo::class,
     ],
     exportSchema = false,
-    version = 101,
+    version = 110,
 )
 abstract class Database : RoomDatabase() {
     abstract fun artistDao(): ArtistDao

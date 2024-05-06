@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.views
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.DatabaseView
 import androidx.room.Embedded
@@ -22,6 +23,7 @@ import java.util.UUID
     ORDER BY AlbumArtist_position
     """
 )
+@Immutable
 data class AlbumArtistCredit(
     @ColumnInfo("AlbumArtist_albumId") val albumId: String,
     @ColumnInfo("AlbumArtist_artistId") override val artistId: String = UUID.randomUUID().toString(),

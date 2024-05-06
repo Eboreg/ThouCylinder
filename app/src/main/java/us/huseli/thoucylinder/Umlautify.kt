@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder
 
+import android.content.Context
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -53,14 +54,12 @@ object Umlautify {
     }
 }
 
-
 @Composable
 @ReadOnlyComposable
 fun stringResource(@StringRes id: Int, vararg formatArgs: Any): String {
     val string = LocalContext.current.resources.getString(id, *formatArgs)
     return if (Umlautify.isEnabled) string.umlautify(force = true) else string
 }
-
 
 @Composable
 @ReadOnlyComposable
@@ -69,12 +68,10 @@ fun stringResource(@StringRes id: Int): String {
     return if (Umlautify.isEnabled) string.umlautify(force = true) else string
 }
 
-
 @Composable
 @ReadOnlyComposable
 fun umlautStringResource(@StringRes id: Int): String =
     LocalContext.current.resources.getString(id).umlautify(force = true)
-
 
 @Composable
 @ReadOnlyComposable
@@ -83,5 +80,6 @@ fun pluralStringResource(@PluralsRes id: Int, count: Int, vararg formatArgs: Any
     return if (Umlautify.isEnabled) string.umlautify(force = true) else string
 }
 
-
 fun String.umlautify(force: Boolean = false): String = Umlautify.transform(string = this, force = force)
+
+fun Context.getUmlautifiedString(@StringRes resId: Int) = getString(resId).umlautify()

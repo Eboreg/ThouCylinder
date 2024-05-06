@@ -1,7 +1,9 @@
 package us.huseli.thoucylinder.dataclasses.views
 
+import androidx.compose.runtime.Immutable
 import androidx.room.DatabaseView
 import androidx.room.Embedded
+import androidx.room.Ignore
 import androidx.room.Relation
 import us.huseli.retaintheme.extensions.stripCommonFixes
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
@@ -16,6 +18,7 @@ import us.huseli.thoucylinder.dataclasses.entities.Track
     ORDER BY Track_discNumber, Track_albumPosition, Track_title
     """
 )
+@Immutable
 data class TrackCombo(
     @Embedded override val track: Track,
     @Embedded override val album: Album? = null,
@@ -23,7 +26,15 @@ data class TrackCombo(
     override val artists: List<TrackArtistCredit> = emptyList(),
     @Relation(parentColumn = "Track_albumId", entityColumn = "AlbumArtist_albumId")
     override val albumArtists: List<AlbumArtistCredit> = emptyList(),
+    @Ignore val localPath: String? = null,
 ) : AbstractTrackCombo() {
+    constructor(
+        track: Track,
+        album: Album? = null,
+        artists: List<TrackArtistCredit> = emptyList(),
+        albumArtists: List<AlbumArtistCredit> = emptyList(),
+    ) : this(track, album, artists, albumArtists, null)
+
     fun toQueueTrackCombo(): QueueTrackCombo? = track.playUri?.let { uri ->
         QueueTrackCombo(
             track = track,

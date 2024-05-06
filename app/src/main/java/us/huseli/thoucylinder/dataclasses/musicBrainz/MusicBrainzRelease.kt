@@ -1,16 +1,16 @@
 package us.huseli.thoucylinder.dataclasses.musicBrainz
 
-import android.content.Context
-import androidx.compose.ui.graphics.ImageBitmap
 import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @Suppress("unused")
 enum class MusicBrainzReleaseStatus {
@@ -89,17 +89,38 @@ data class MusicBrainzRelease(
     override val artistName: String
         get() = artist
 
-    override suspend fun getThumbnailImageBitmap(context: Context): ImageBitmap? = null
+    override val duration: Duration
+        get() = media.sumOf { medium -> medium.tracks.sumOf { it.length } }.milliseconds
 
-    val year: Int?
+    override val playCount: Int?
+        get() = null
+
+    override val thumbnailUrl: String?
+        get() = null
+
+    override val trackCount: Int
+        get() = media.sumOf { it.trackCount }
+
+    override val year: Int?
         get() = releaseGroup.year ?: date
             ?.substringBefore('-')
             ?.takeIf { it.matches(Regex("^\\d{4}$")) }
             ?.toInt()
 
+    override suspend fun toAlbumWithTracks(
+        isLocal: Boolean,
+        isInLibrary: Boolean,
+        getArtist: suspend (UnsavedArtist) -> Artist,
+    ): AlbumWithTracksCombo = toAlbumWithTracks(
+        isInLibrary = isInLibrary,
+        isLocal = isLocal,
+        albumArt = null,
+        getArtist = getArtist,
+    )
+
     suspend fun toAlbumWithTracks(
         isInLibrary: Boolean,
-        isLocal: Boolean = false,
+        isLocal: Boolean,
         albumArt: MediaStoreImage? = null,
         getArtist: suspend (UnsavedArtist) -> Artist,
     ): AlbumWithTracksCombo {
@@ -133,18 +154,17 @@ data class MusicBrainzRelease(
         album: Album? = null,
         getArtist: suspend (UnsavedArtist) -> Artist,
     ): List<TrackCombo> = flatMap { medium ->
-        medium.tracks.map {
+        medium.tracks.map { mbTrack ->
             val track = Track(
-                title = it.title,
+                title = mbTrack.title,
                 isInLibrary = isInLibrary,
-                albumPosition = it.position,
+                albumPosition = mbTrack.position,
                 discNumber = medium.position,
-                year = it.year,
-                musicBrainzId = it.id,
+                year = mbTrack.year,
+                musicBrainzId = mbTrack.id,
                 albumId = album?.albumId,
-                durationMs = it.length.toLong(),
             )
-            val artists = it.artistCredit.mapIndexed { index, trackArtist ->
+            val artists = mbTrack.artistCredit.mapIndexed { index, trackArtist ->
                 trackArtist.toNativeTrackArtist(
                     artist = getArtist(UnsavedArtist(name = trackArtist.name, musicBrainzId = trackArtist.artist.id)),
                     trackId = track.trackId,

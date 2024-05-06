@@ -5,7 +5,6 @@
     <string name="add_playlist">Add playlist</string>
     <string name="add_to_library">Add to library</string>
     <string name="add_to_playlist">Add to playlist</string>
-    <string name="added_x_to_the_library">Added %1$s to the library.</string>
     <string name="after_enabling_this_authorize_app_with_last_fm">After enabling this, you will get to authorize this app with Last.fm if needed.</string>
     <string name="album">Album</string>
     <string name="album_artist">Album artist</string>
@@ -17,9 +16,9 @@
     <string name="albums">Albums</string>
     <string name="algeria">Algeria</string>
     <string name="all">All</string>
+    <string name="all_local_albums_have_been_unhidden">All local albums have been unhidden.</string>
     <string name="also_update_matching_track_artists">Also update matching track artists</string>
     <string name="app_name">ThouCylinder</string>
-    <string name="apply">Apply</string>
     <string name="argentina">Argentina</string>
     <string name="artist">Artist</string>
     <string name="artist_order">Artist order</string>
@@ -48,6 +47,7 @@
     <string name="close">Close</string>
     <string name="colombia">Colombia</string>
     <string name="converting">Converting</string>
+    <string name="converting_and_tagging">Converting/tagging</string>
     <string name="cost_money">Cost money</string>
     <string name="could_not_open_the_selected_image">Could not open the selected image.</string>
     <string name="could_not_start_radio">Could not start radio: Failed to get recommendations.</string>
@@ -105,6 +105,7 @@
     <string name="if_you_have_chosen_to_auto_import_local_music">Also, if you have chosen to auto import local music, this is where it will be looked for.</string>
     <string name="if_you_want_to_auto_import_local_music">If you want to auto import local music, select your local music directory here.</string>
     <string name="import_and_match_with_youtube">Import and match with Youtube</string>
+    <string name="import_finished">Import finished</string>
     <string name="import_from_lastfm">Import from Last.fm</string>
     <string name="import_from_spotify">Import from Spotify</string>
     <string name="import_method_description_1">We can either import the selected albums and try to match them to Youtube playlists, or just import them without matching, and do the matching on demand later on.</string>
@@ -114,14 +115,9 @@
     <string name="import_without_matching">Import without matching</string>
     <string name="imported">Imported</string>
     <string name="importing">Importing</string>
-    <string name="importing_album_artists">Importing album artists</string>
-    <string name="importing_albums">Importing albums</string>
-    <string name="importing_artists">Importing artists</string>
     <string name="importing_local_albums">Importing local albums ...</string>
     <string name="importing_local_artists">Importing local artists ...</string>
     <string name="importing_local_tracks">Importing local tracks ...</string>
-    <string name="importing_track_artists">Importing track artists</string>
-    <string name="importing_tracks">Importing tracks</string>
     <string name="importing_x">Importing %1$s</string>
     <string name="india">India</string>
     <string name="indonesia">Indonesia</string>
@@ -152,7 +148,6 @@
     <string name="loading">Loading ...</string>
     <string name="loading_albums">Loading albums ...</string>
     <string name="loading_artists">Loading artists ...</string>
-    <string name="loading_fraction_scream">LOADING (%1$s/%2$s)!!!</string>
     <string name="loading_playlists">Loading playlists ...</string>
     <string name="loading_scream">LOADING!!!</string>
     <string name="loading_tracks">Loading tracks ...</string>
@@ -166,8 +161,8 @@
     <string name="match_your_saved_albums_on_spotify_and_play_download_them_from_youtube">Match your saved albums on Spotify and play/download them from Youtube</string>
     <string name="match_your_top_albums_on_last_fm_and_play_download_them_from_youtube">Match your top albums on Last.fm and play/download them from Youtube</string>
     <string name="matching">Matching</string>
-    <string name="matching_albums">Matching albums</string>
     <string name="matching_x">Matching %1$s</string>
+    <string name="may_not_be_able_to_delete_local_files">Note: Depending on file access permissions, this app may not be able to delete local files.</string>
     <string name="menu">Menu</string>
     <string name="mexico">Mexico</string>
     <string name="mime_type">MIME type</string>
@@ -193,7 +188,6 @@
     <string name="now_active_x">Now active: %1$s</string>
     <string name="ok">OK</string>
     <string name="oman">Oman</string>
-    <string name="only_delete_files">Only delete files</string>
     <string name="only_local">Only local</string>
     <string name="only_playable">Only playable</string>
     <string name="only_show_artists_with_albums">Only show artists with albums</string>
@@ -260,7 +254,7 @@
     <string name="start_library_radio">Start library radio</string>
     <string name="start_radio">Start radio</string>
     <string name="start_x_x_radio">Start <b>%1$s</b> %2$s radio</string>
-    <string name="stop_radio">Stop radio</string>
+    <string name="successfully_imported">Successfully imported</string>
     <string name="sweden">Sweden</string>
     <string name="switzerland">Switzerland</string>
     <string name="tagging">Tagging</string>
@@ -268,7 +262,6 @@
     <string name="taiwan">Taiwan</string>
     <string name="tanzania">Tanzania</string>
     <string name="thailand">Thailand</string>
-    <string name="the_album_was_enqueued_next">The album was enqueued next.</string>
     <string name="the_playlist_was_removed">The playlist was removed.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
     <string name="the_queue_is_empty">The queue is empty.</string>
@@ -290,6 +283,8 @@
     <string name="umlautify">Umlautify</string>
     <string name="undelete_album">Undelete album</string>
     <string name="undo">Undo</string>
+    <string name="unhide_all_local_albums">Unhide all local albums</string>
+    <string name="unhide_all_local_albums_description">Click here to unhide all local albums that have previously been hidden.</string>
     <string name="united_arab_emirates">United Arab Emirates</string>
     <string name="united_kingdom">United Kingdom</string>
     <string name="united_states">United States</string>
@@ -305,6 +300,7 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="what_it_can_do">What it can do:</string>
     <string name="what_it_will_not_do">What it will NOT do:</string>
+    <string name="x_was_enqueued_next"><b>%1$s</b> was enqueued next.</string>
     <string name="x_x_radio"><b>%1$s</b> %2$s radio</string>
     <string name="year">Year</string>
     <string name="yemen">Yemen</string>
@@ -313,31 +309,37 @@
     <string name="you_need_to_select_your_local_music_root_folder">You need to select your local music root folder.</string>
     <string name="youtube">Youtube</string>
     <string name="zimbabwe">Zimbabwe</string>
-    <string name="import_finished">Import finished</string>
-    <string name="successfully_imported">Successfully imported</string>
+    <string name="local_import_help">This lets you do a one-time import any locally stored audio into the library. If you want to auto import local albums on every app start, you need to configure this in the settings instead.</string>
+    <string name="youtube_import_help">Here you can add albums from Youtube to the library. To just do some ad hoc Youtube playing, use the search page instead.</string>
+    <string name="go_to_search">Go to search</string>
+    <string name="rename_playlist">Rename playlist</string>
+    <plurals name="delete_local_files_keep_album">
+        <item quantity="one">Delete local files, keep album</item>
+        <item quantity="other">Delete local files, keep albums</item>
+    </plurals>
     <plurals name="deleted_local_album_files">
-        <item quantity="one">Deleted the local files of one album.</item>
+        <item quantity="one">Deleted the local files of <i>%2$s</i>.</item>
         <item quantity="other">Deleted the local files of %1$d albums.</item>
     </plurals>
     <plurals name="delete_x_albums">
         <item quantity="one">Delete album?</item>
         <item quantity="other">Delete %1$d albums?</item>
     </plurals>
-    <plurals name="only_remove_album">
-        <item quantity="one">Only remove album</item>
-        <item quantity="other">Only remove albums</item>
+    <plurals name="hid_x_albums_from_library">
+        <item quantity="one">Hid <i>%2$s</i> from the library.</item>
+        <item quantity="other">Hid %1$d albums from the library.</item>
+    </plurals>
+    <plurals name="hide_album_keep_local_files">
+        <item quantity="one">Hide album, keep local files</item>
+        <item quantity="other">Hide albums, keep local files</item>
     </plurals>
     <plurals name="remove_album_and_delete_files">
         <item quantity="one">Remove album and delete files</item>
         <item quantity="other">Remove albums and delete files</item>
     </plurals>
     <plurals name="removed_x_albums_and_local_files">
-        <item quantity="one">Removed one album from the library and deleted any local files.</item>
+        <item quantity="one">Removed <i>%2$s</i> from the library and deleted any local files.</item>
         <item quantity="other">Removed %1$d albums from the library and deleted any local files.</item>
-    </plurals>
-    <plurals name="removed_x_albums_from_library">
-        <item quantity="one">Removed one album from the library.</item>
-        <item quantity="other">Removed %1$d albums from the library.</item>
     </plurals>
     <plurals name="x_album_tracks_unplayable">
         <item quantity="one">One track has neither a local file nor a Youtube URL associated with it. Before it can be played, it needs to be matched with a Youtube video.</item>
@@ -346,18 +348,6 @@
     <plurals name="x_albums">
         <item quantity="one">1 album</item>
         <item quantity="other">%1$d albums</item>
-    </plurals>
-    <plurals name="x_albums_enqueued_next">
-        <item quantity="one">One album was enqueued next.</item>
-        <item quantity="other">%1$d albums were enqueued next.</item>
-    </plurals>
-    <plurals name="x_albums_imported">
-        <item quantity="one">One album was imported.</item>
-        <item quantity="other">%1$d albums were imported.</item>
-    </plurals>
-    <plurals name="x_albums_not_found">
-        <item quantity="one">One album could not be found.</item>
-        <item quantity="other">%1$d albums could not be found.</item>
     </plurals>
     <plurals name="x_selected_tracks_already_in_playlist">
         <item quantity="one">One selected track is already in the playlist.</item>

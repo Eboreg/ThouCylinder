@@ -16,10 +16,9 @@ import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_OAUTH2_TOKEN_CC
 import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_OAUTH2_TOKEN_PKCE
 import us.huseli.thoucylinder.dataclasses.OAuth2Token
 import us.huseli.thoucylinder.dataclasses.RefreshableOAuth2Token
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.security.MessageDigest
 import java.util.Base64
-
-enum class AuthorizationStatus { AUTHORIZED, UNAUTHORIZED, UNKNOWN }
 
 abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: String, context: Context) : ILogger {
     protected val preferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
@@ -27,10 +26,7 @@ abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: 
         preferences.getString(tokenPrefKey, null)?.let { jsonToToken(it) }
     )
 
-    val authorizationStatus: Flow<AuthorizationStatus> = token.map { token ->
-        if (token == null) AuthorizationStatus.UNAUTHORIZED
-        else AuthorizationStatus.AUTHORIZED
-    }
+    val isAuthorized: Flow<Boolean> = token.map { it != null }
 
     abstract fun baseJsonToToken(json: String): T
     abstract suspend fun getAccessToken(): String?

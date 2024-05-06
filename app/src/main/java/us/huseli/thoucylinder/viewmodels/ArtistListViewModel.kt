@@ -1,11 +1,11 @@
 package us.huseli.thoucylinder.viewmodels
 
-import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
@@ -16,14 +16,14 @@ import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
-class ArtistListViewModel @Inject constructor(repos: Repositories) : ViewModel() {
+class ArtistListViewModel @Inject constructor(repos: Repositories) : AbstractBaseViewModel() {
     private val _isLoading = MutableStateFlow(true)
     private val _onlyShowArtistsWithAlbums = MutableStateFlow(false)
     private val _searchTerm = MutableStateFlow("")
     private val _sortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _sortParameter = MutableStateFlow(ArtistSortParameter.NAME)
 
-    val artistCombos: Flow<ImmutableList<ArtistCombo>> = combine(
+    val artistCombos: StateFlow<ImmutableList<ArtistCombo>> = combine(
         repos.artist.artistCombos,
         _searchTerm,
         _sortParameter,
@@ -42,7 +42,9 @@ class ArtistListViewModel @Inject constructor(repos: Repositories) : ViewModel()
             }
             .let { if (sortOrder == SortOrder.DESCENDING) it.reversed() else it }
             .toImmutableList()
-    }.onEach { _isLoading.value = false }
+    }
+        .onEach { _isLoading.value = false }
+        .stateLazily(persistentListOf())
 
     val isLoading = _isLoading.asStateFlow()
     val onlyShowArtistsWithAlbums = _onlyShowArtistsWithAlbums.asStateFlow()

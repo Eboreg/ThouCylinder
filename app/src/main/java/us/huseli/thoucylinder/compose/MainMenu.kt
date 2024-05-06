@@ -64,20 +64,20 @@ open class ThouCylinderMenuItem<MI : Enum<MI>>(
     ) : this(id, { Icon(painter, null) }, description, showInMainMenu, showInDrawer, debugOnly)
 
     @Composable
-    open fun DrawerItem(activeItemId: MenuItemId?, onClick: () -> Unit) {
+    open fun DrawerItem(isActive: () -> Boolean, onClick: () -> Unit) {
         NavigationDrawerItem(
             shape = RectangleShape,
             label = { description?.also { Text(it.umlautify()) } },
-            selected = activeItemId == id,
+            selected = isActive(),
             onClick = onClick,
             icon = icon,
         )
     }
 
     @Composable
-    open fun RailItem(activeItemId: MenuItemId?, onClick: () -> Unit) {
+    open fun RailItem(isActive: () -> Boolean, onClick: () -> Unit) {
         NavigationRailItem(
-            selected = activeItemId == id,
+            selected = isActive(),
             onClick = onClick,
             icon = icon,
         )

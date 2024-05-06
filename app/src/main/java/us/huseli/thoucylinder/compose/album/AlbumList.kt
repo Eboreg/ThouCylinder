@@ -25,10 +25,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.extensions.nullIfBlank
-import us.huseli.thoucylinder.AlbumDownloadTask
+import us.huseli.retaintheme.extensions.sensibleFormat
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemList
@@ -36,53 +36,52 @@ import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
 import us.huseli.thoucylinder.pluralStringResource
-import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun AlbumList(
-    states: ImmutableList<Album.ViewState>,
-    callbacks: (Album.ViewState) -> AlbumCallbacks,
+    states: () -> ImmutableList<AlbumUiState>,
+    callbacks: AlbumCallbacks,
     selectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbumIds: ImmutableList<String>,
-    downloadStates: ImmutableList<AlbumDownloadTask.ViewState>,
     modifier: Modifier = Modifier,
     imageViewModel: ImageViewModel = hiltViewModel(),
     showArtist: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
-    progressIndicatorStringRes: Int? = null,
+    progressIndicatorText: () -> String? = { null },
     onEmpty: @Composable (() -> Unit)? = null,
 ) {
-    val isSelected = { state: Album.ViewState -> selectedAlbumIds.contains(state.album.albumId) }
+    val isSelected =
+        remember(selectedAlbumIds) { { state: AlbumUiState -> selectedAlbumIds.contains(state.albumId) } }
 
     Column {
         SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = selectionCallbacks)
 
         ItemList(
             modifier = modifier,
-            things = states,
+            things = states(),
             isSelected = isSelected,
-            onClick = { _, combo -> callbacks(combo).onAlbumClick?.invoke() },
-            onLongClick = { _, combo -> callbacks(combo).onAlbumLongClick?.invoke() },
+            onClick = { _, state -> callbacks.onAlbumClick?.invoke(state.albumId) },
+            onLongClick = { _, state -> callbacks.onAlbumLongClick?.invoke(state.albumId) },
             onEmpty = onEmpty,
             listState = listState,
             cardHeight = 70.dp,
-            progressIndicatorText = progressIndicatorStringRes?.let { stringResource(it) },
+            progressIndicatorText = progressIndicatorText,
         ) { _, state ->
             var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
             val thirdRow = listOfNotNull(
                 pluralStringResource(R.plurals.x_tracks, state.trackCount, state.trackCount),
                 state.yearString,
+                state.duration?.sensibleFormat(),
             ).joinToString(" • ").nullIfBlank()
-            val albumCallbacks = remember(state) { callbacks(state) }
-            val downloadState = downloadStates.find { it.albumId == state.album.albumId }
+            val downloadState by state.downloadState.collectAsStateWithLifecycle()
             val artistString = remember(state) { state.artists.joined() }
 
-            LaunchedEffect(state.album.albumArt) {
-                imageBitmap = imageViewModel.getAlbumThumbnail(state.album.albumArt?.thumbnailUri)
+            LaunchedEffect(state.thumbnailUri) {
+                imageBitmap = imageViewModel.getThumbnailImageBitmap(state.thumbnailUri)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -104,7 +103,7 @@ fun AlbumList(
                             verticalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             Text(
-                                text = state.album.title.umlautify(),
+                                text = state.title.umlautify(),
                                 maxLines = if (artistString != null && showArtist) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -129,26 +128,27 @@ fun AlbumList(
                             modifier = Modifier.fillMaxHeight(),
                             content = {
                                 AlbumSmallIcons(
-                                    isLocal = state.album.isLocal,
-                                    isOnYoutube = state.album.isOnYoutube,
+                                    isLocal = state.isLocal,
+                                    isOnYoutube = state.isOnYoutube,
                                 )
                             },
                         )
 
                         AlbumContextMenuWithButton(
-                            isLocal = state.album.isLocal,
-                            isInLibrary = state.album.isInLibrary,
+                            albumId = state.albumId,
+                            albumArtists = state.artists,
+                            isLocal = state.isLocal,
+                            isInLibrary = state.isInLibrary,
                             isPartiallyDownloaded = state.isPartiallyDownloaded,
-                            callbacks = albumCallbacks,
-                            albumArtists = state.artists.toImmutableList(),
-                            youtubeWebUrl = state.album.youtubeWebUrl,
-                            spotifyWebUrl = state.album.spotifyWebUrl,
+                            callbacks = callbacks,
+                            spotifyWebUrl = state.spotifyWebUrl,
+                            youtubeWebUrl = state.youtubeWebUrl,
                         )
                     }
 
-                    if (downloadState?.isActive == true) {
-                        LinearProgressIndicator(
-                            progress = { downloadState.progress },
+                    downloadState?.also {
+                        if (it.isActive) LinearProgressIndicator(
+                            progress = { it.progress },
                             modifier = Modifier.fillMaxWidth().height(2.dp),
                         )
                     }

@@ -1,37 +1,39 @@
 package us.huseli.thoucylinder.dataclasses.youtube
 
 import android.os.Parcelable
+import androidx.compose.runtime.Immutable
 import androidx.core.net.toUri
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
+import androidx.room.Ignore
 import kotlinx.parcelize.Parcelize
+import us.huseli.thoucylinder.ContainerFormat
 import us.huseli.thoucylinder.dataclasses.TrackMetadata
 
 @Parcelize
+@Immutable
 data class YoutubeMetadata(
     val mimeType: String,
-    val codecs: String,
     val bitrate: Int,
     val sampleRate: Int,
     val url: String,
-    val size: Int? = null,
+    val size: Int,
     val channels: Int? = null,
     val loudnessDb: Double? = null,
     val durationMs: Long? = null,
+    val lofiUrl: String? = null,
+    @Ignore val containerFormat: ContainerFormat = ContainerFormat(mimeType),
 ) : Parcelable {
     constructor(
         mimeType: String,
         bitrate: Int,
         sampleRate: Int,
         url: String,
-        size: Int? = null,
-        channels: Int? = null,
-        loudnessDb: Double? = null,
-        durationMs: Long? = null,
+        size: Int,
+        channels: Int?,
+        loudnessDb: Double?,
+        durationMs: Long?,
+        lofiUrl: String?,
     ) : this(
-        mimeType = extractMimeType(mimeType),
-        codecs = extractCodecs(mimeType),
+        mimeType = mimeType,
         bitrate = bitrate,
         sampleRate = sampleRate,
         url = url,
@@ -39,60 +41,45 @@ data class YoutubeMetadata(
         channels = channels,
         loudnessDb = loudnessDb,
         durationMs = durationMs,
+        lofiUrl = lofiUrl,
+        containerFormat = ContainerFormat(mimeType),
     )
 
-    private val codecList: List<String>
-        get() = gson.fromJson(codecs, listType)
-
-    private val expiresAt: Long?
-        get() = url.toUri().getQueryParameter("expire")?.toLong()?.times(1000)
-
     val fileExtension: String
-        get() = (codecList.getOrNull(0) ?: mimeType.split('/').last()).split('.').first()
+        get() = mimeType.split(";").first().split('/').last()
 
-    val isOld: Boolean
-        get() = expiresAt?.let { it < System.currentTimeMillis() } ?: false
+    val urlIsOld: Boolean
+        get() = urlIsOld(url)
+
+    val lofiUrlIsOld: Boolean
+        get() = urlIsOld(lofiUrl)
 
     val quality: Long
         get() = bitrate.toLong() * sampleRate.toLong()
 
-    fun toTrackMetadata() = TrackMetadata(
-        durationMs = durationMs ?: 0L,
-        extension = fileExtension,
-        mimeType = mimeType,
-        bitrate = bitrate,
-        channels = channels,
-        loudnessDb = loudnessDb,
-        sampleRate = sampleRate,
-        size = size?.toLong(),
-    )
+    fun toTrackMetadata(): TrackMetadata {
+        return TrackMetadata(
+            durationMs = durationMs ?: 0L,
+            mimeType = containerFormat.audioMimeType,
+            bitrate = bitrate,
+            channels = channels,
+            loudnessDb = loudnessDb,
+            sampleRate = sampleRate,
+        )
+    }
+
+    private fun urlExpiresAt(url: String?): Long? = url?.toUri()?.getQueryParameter("expire")?.toLong()?.times(1000)
+
+    private fun urlIsOld(url: String?): Boolean = urlExpiresAt(url)?.let { it < System.currentTimeMillis() } ?: false
 
     companion object {
         val VIDEO_MIMETYPE_FILTER = Regex("^audio/.*$")
         val VIDEO_MIMETYPE_EXCLUDE = null
-        val VIDEO_MIMETYPE_PREFERRED = listOf("audio/opus") // most preferred first
+        val VIDEO_MIMETYPE_PREFERRED = listOf(
+            // most preferred first
+            Regex("^audio/webm.*codecs=\".*opus.*\"$"),
+        )
         // val VIDEO_MIMETYPE_EXCLUDE = Regex("^audio/mp4; codecs=\"mp4a\\.40.*")
-        private val gson: Gson = GsonBuilder().create()
-        private val listType = object : TypeToken<List<String>>() {}
-
-        private fun extractCodecs(mimeType: String): String {
-            val codecList = Regex("^.*codecs=\"?([^\"]*)\"?$")
-                .find(mimeType)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?.split(",")
-                ?: emptyList()
-
-            return gson.toJson(codecList)
-        }
-
-        private fun extractMimeType(value: String): String {
-            val mimeType = value.split(";").first()
-            val codecs = extractCodecs(value)
-
-            return if (mimeType == "audio/webm" && codecs.isNotEmpty()) "audio/${codecs.first()}"
-            else mimeType
-        }
     }
 }
 
@@ -100,14 +87,17 @@ data class YoutubeMetadata(
 fun Iterable<YoutubeMetadata>.getBest(
     mimeTypeFilter: Regex? = YoutubeMetadata.VIDEO_MIMETYPE_FILTER,
     mimeTypeExclude: Regex? = YoutubeMetadata.VIDEO_MIMETYPE_EXCLUDE,
-    preferredMimetypes: List<String> = YoutubeMetadata.VIDEO_MIMETYPE_PREFERRED,
+    preferredMimetypes: List<Regex> = YoutubeMetadata.VIDEO_MIMETYPE_PREFERRED,
 ): YoutubeMetadata? {
-    // First run through the preferred MIME types, returning the best metadata if found.
+    val lofiUrl = filter { mimeTypeFilter?.matches(it.mimeType) ?: true }.minByOrNull { it.size }?.url
+
+    // Run through the preferred MIME types, returning the best metadata if found:
     for (mimeType in preferredMimetypes) {
-        filter { it.mimeType == mimeType }.maxByOrNull { it.quality }?.also { return it }
+        filter { mimeType.matches(it.mimeType) }.maxByOrNull { it.quality }?.also { return it.copy(lofiUrl = lofiUrl) }
     }
-    // If no metadata with preferred MIME type found, go through them all.
+    // If no metadata with preferred MIME type found, go through them all:
     return filter { mimeTypeFilter?.matches(it.mimeType) ?: true }
         .filter { mimeTypeExclude == null || !mimeTypeExclude.matches(it.mimeType) }
         .maxByOrNull { it.quality }
+        ?.copy(lofiUrl = lofiUrl)
 }

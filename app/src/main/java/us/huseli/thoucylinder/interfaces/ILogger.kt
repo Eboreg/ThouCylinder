@@ -1,6 +1,7 @@
-package us.huseli.thoucylinder
+package us.huseli.thoucylinder.interfaces
 
 import android.util.Log
+import us.huseli.thoucylinder.BuildConfig
 
 interface ILogger {
     fun log(priority: Int, tag: String, message: String) {

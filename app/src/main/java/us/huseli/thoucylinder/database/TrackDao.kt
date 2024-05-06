@@ -15,10 +15,6 @@ import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.enums.AvailabilityFilter
-import us.huseli.thoucylinder.enums.SortOrder
-import us.huseli.thoucylinder.enums.TrackSortParameter
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
 import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
@@ -26,6 +22,10 @@ import us.huseli.thoucylinder.dataclasses.entities.Tag
 import us.huseli.thoucylinder.dataclasses.entities.Track
 import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
 import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.enums.AvailabilityFilter
+import us.huseli.thoucylinder.enums.SortOrder
+import us.huseli.thoucylinder.enums.TrackSortParameter
 
 @Dao
 abstract class TrackDao {
@@ -61,8 +61,8 @@ abstract class TrackDao {
     fun flowTagPojos(availabilityFilter: AvailabilityFilter): Flow<List<TagPojo>> {
         val availabilityQuery = when (availabilityFilter) {
             AvailabilityFilter.ALL -> ""
-            AvailabilityFilter.ONLY_PLAYABLE -> "WHERE Album_isLocal = 1 OR Album_youtubePlaylist_id IS NOT NULL"
-            AvailabilityFilter.ONLY_LOCAL -> "WHERE Album_isLocal = 1"
+            AvailabilityFilter.ONLY_PLAYABLE -> "AND (Track_localUri IS NOT NULL OR Track_youtubeVideo_id IS NOT NULL)"
+            AvailabilityFilter.ONLY_LOCAL -> "AND Track_localUri IS NOT NULL"
         }
 
         return _flowTagPojos(
@@ -70,8 +70,8 @@ abstract class TrackDao {
                 """
                 SELECT Tag_name AS name, COUNT(*) AS itemCount
                 FROM Tag JOIN AlbumTag ON Tag_name = AlbumTag_tagName
-                JOIN Album ON Album_albumId = AlbumTag_albumId
-                JOIN Track ON Track_albumId = Album_albumId
+                JOIN Track ON Track_albumId = AlbumTag_albumId
+                WHERE Track_isInLibrary = 1
                 $availabilityQuery
                 GROUP BY Tag_name
                 ORDER BY itemCount DESC, Tag_name ASC
@@ -80,14 +80,28 @@ abstract class TrackDao {
         )
     }
 
+    @Transaction
+    @Query("SELECT * FROM TrackCombo WHERE Track_albumId = :albumId")
+    abstract fun flowTrackCombosByAlbumId(albumId: String): Flow<List<TrackCombo>>
+
+    @Query("SELECT Track_albumId FROM Track WHERE Track_trackId = :trackId")
+    abstract suspend fun getAlbumIdByTrackId(trackId: String): String?
+
     @Query("SELECT COUNT(*) FROM Track WHERE Track_isInLibrary = 1")
     abstract suspend fun getLibraryTrackCount(): Int
 
-    @Query("SELECT * FROM Track WHERE Track_isInLibrary = 1")
-    abstract suspend fun listLibraryTracks(): List<Track>
+    @Query("SELECT * FROM Track WHERE Track_trackId = :trackId")
+    abstract suspend fun getTrackById(trackId: String): Track?
+
+    @Transaction
+    @Query("SELECT * FROM TrackCombo WHERE Track_trackId = :trackId")
+    abstract suspend fun getTrackComboById(trackId: String): TrackCombo?
 
     @Query("SELECT Track_localUri FROM Track WHERE Track_localUri IS NOT NULL")
     abstract suspend fun listLocalUris(): List<String>
+
+    @Query("SELECT * FROM Track WHERE Track_albumId IS NULL")
+    abstract suspend fun listNonLocalTracks(): List<Track>
 
     @Transaction
     @Query(
@@ -104,8 +118,8 @@ abstract class TrackDao {
     ): List<TrackCombo>
 
     @Transaction
-    @Query("SELECT * FROM TrackCombo WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun listTrackCombosByAlbumId(vararg albumIds: String): List<TrackCombo>
+    @Query("SELECT * FROM TrackCombo WHERE Track_albumId = :albumId ORDER BY Track_discNumber, Track_albumPosition")
+    abstract suspend fun listTrackCombosByAlbumId(albumId: String): List<TrackCombo>
 
     @Transaction
     @Query(
@@ -126,12 +140,12 @@ abstract class TrackDao {
     @Query("SELECT * FROM TrackCombo WHERE Track_trackId IN (:trackIds)")
     abstract suspend fun listTrackCombosById(vararg trackIds: String): List<TrackCombo>
 
-    @Query("SELECT * FROM Track WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun listTracksByAlbumId(vararg albumIds: String): List<Track>
+    @Query("SELECT Track_trackId FROM Track WHERE Track_albumId IN (:albumIds)")
+    abstract suspend fun listTrackIdsByAlbumId(vararg albumIds: String): List<String>
 
     @Query(
         """
-        SELECT Track.* FROM Track
+        SELECT Track_trackId FROM Track
             LEFT JOIN TrackArtistCredit ON Track_trackId = TrackArtist_trackId
             LEFT JOIN AlbumArtistCredit ON Track_albumId = AlbumArtist_albumId
         WHERE (
@@ -141,7 +155,10 @@ abstract class TrackDao {
         GROUP BY Track_trackId
         """
     )
-    abstract suspend fun listTracksByArtistId(artistId: String): List<Track>
+    abstract suspend fun listTrackIdsByArtistId(artistId: String): List<String>
+
+    @Query("SELECT * FROM Track WHERE Track_albumId = :albumId")
+    abstract suspend fun listTracksByAlbumId(albumId: String): List<Track>
 
     @Query("SELECT * FROM Track WHERE Track_trackId IN (:trackIds) ORDER BY Track_discNumber, Track_albumPosition")
     abstract suspend fun listTracksById(vararg trackIds: String): List<Track>
@@ -213,11 +230,14 @@ abstract class TrackDao {
         if (tracks.isNotEmpty()) upsertTracks(*tracks.toTypedArray())
     }
 
+    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
+    abstract suspend fun setIsInLibrary(isInLibrary: Boolean, vararg trackIds: String)
+
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId IN (:albumIds)")
     abstract suspend fun setIsInLibraryByAlbumId(isInLibrary: Boolean, vararg albumIds: String)
 
-    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
-    abstract suspend fun setIsInLibrary(trackIds: Collection<String>, isInLibrary: Boolean)
+    @Query("UPDATE Track SET Track_amplitudes = :amplitudes WHERE Track_trackId = :trackId")
+    abstract suspend fun setTrackAmplitudes(trackId: String, amplitudes: String)
 
     @Query("UPDATE Track SET Track_spotifyId = :spotifyId WHERE Track_trackId = :trackId")
     abstract suspend fun setTrackSpotifyId(trackId: String, spotifyId: String)

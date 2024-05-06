@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
 import kotlinx.collections.immutable.ImmutableCollection
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -66,7 +65,7 @@ fun EditIndividualAlbumTrackSection(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Top) {
                     Column(modifier = Modifier.weight(0.7f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        currentArtistNames.fastForEachIndexed { index, artistName ->
+                        currentArtistNames.forEachIndexed { index, artistName ->
                             val onTextChange: (String) -> Unit = {
                                 currentArtistNames = currentArtistNames.toMutableList().apply { set(index, it) }
                             }

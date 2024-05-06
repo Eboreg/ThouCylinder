@@ -24,7 +24,7 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.stringResource
 
 @Composable
-fun SearchForm(
+fun YoutubeSearchForm(
     modifier: Modifier = Modifier,
     isSearching: Boolean,
     initialQuery: String,

@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -26,6 +27,7 @@ import java.util.UUID
     ],
     indices = [Index("PlaylistTrack_trackId"), Index("PlaylistTrack_position"), Index("PlaylistTrack_playlistId")],
 )
+@Immutable
 data class PlaylistTrack(
     @PrimaryKey @ColumnInfo("PlaylistTrack_id") val id: String = UUID.randomUUID().toString(),
     @ColumnInfo("PlaylistTrack_playlistId") val playlistId: String,

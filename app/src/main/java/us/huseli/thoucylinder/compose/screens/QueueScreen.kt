@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,12 +35,12 @@ import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import us.huseli.retaintheme.compose.ListWithNumericBar
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.track.TrackListRow
 import us.huseli.thoucylinder.compose.utils.SmallOutlinedButton
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.QueueViewModel
 
@@ -50,13 +49,12 @@ fun QueueScreen(
     modifier: Modifier = Modifier,
     viewModel: QueueViewModel = hiltViewModel(),
     appCallbacks: AppCallbacks,
+    trackCallbacks: TrackCallbacks,
 ) {
-    val context = LocalContext.current
-    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle(emptyList())
-    val queue by viewModel.queue.collectAsStateWithLifecycle()
-    val trackDownloadStates by viewModel.trackDownloadStates.collectAsStateWithLifecycle()
-    val playerCurrentCombo by viewModel.currentCombo.collectAsStateWithLifecycle(null)
-    val radioPojo by viewModel.radioPojo.collectAsStateWithLifecycle(null)
+    val selectedTrackIds by viewModel.selectedTrackIds.collectAsStateWithLifecycle()
+    val playerCurrentComboId by viewModel.currentComboId.collectAsStateWithLifecycle()
+    val radioPojo by viewModel.radioPojo.collectAsStateWithLifecycle()
+    val uiStates by viewModel.trackUiStates.collectAsStateWithLifecycle()
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -98,7 +96,7 @@ fun QueueScreen(
 
         SelectedTracksButtons(
             trackCount = selectedTrackIds.size,
-            callbacks = viewModel.getTrackSelectionCallbacks(appCallbacks, context),
+            callbacks = viewModel.getTrackSelectionCallbacks(appCallbacks),
             extraButtons = {
                 SmallOutlinedButton(
                     onClick = { viewModel.removeSelectedTracksFromQueue() },
@@ -107,13 +105,13 @@ fun QueueScreen(
             },
         )
 
-        if (queue.isEmpty()) {
+        if (uiStates.isEmpty()) {
             Text(text = stringResource(R.string.the_queue_is_empty), modifier = Modifier.padding(10.dp))
         }
 
         ListWithNumericBar(
             listState = reorderableState.listState,
-            listSize = queue.size,
+            listSize = uiStates.size,
             itemHeight = 55.dp,
             minItems = 50,
         ) {
@@ -123,40 +121,39 @@ fun QueueScreen(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 contentPadding = PaddingValues(10.dp),
             ) {
-                itemsIndexed(queue, key = { _, combo -> combo.queueTrackId }) { comboIdx, combo ->
+                itemsIndexed(uiStates, key = { _, state -> state.id }) { idx, state ->
                     var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
+                    val downloadState = state.downloadState.collectAsStateWithLifecycle()
 
-                    LaunchedEffect(combo.track.image, combo.album?.albumArt) {
-                        thumbnail = viewModel.getTrackComboThumbnail(combo)
-                        viewModel.ensureTrackMetadata(combo.track)
+                    LaunchedEffect(state.trackThumbnailUri, state.albumThumbnailUri) {
+                        thumbnail = viewModel.getTrackUiStateThumbnail(state)
+                        viewModel.ensureTrackMetadata(state)
                     }
 
-                    ReorderableItem(reorderableState = reorderableState, key = combo.queueTrackId) { isDragging ->
-                        val isSelected = selectedTrackIds.contains(combo.queueTrackId)
+                    ReorderableItem(reorderableState = reorderableState, key = state.id) { isDragging ->
+                        val isSelected = selectedTrackIds.contains(state.id)
                         val containerColor =
                             if (isDragging) MaterialTheme.colorScheme.tertiaryContainer
-                            else if (!isSelected && playerCurrentCombo == combo)
+                            else if (!isSelected && playerCurrentComboId == state.id)
                                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                             else null
 
                         TrackListRow(
-                            combo = combo,
+                            state = state,
                             showArtist = true,
                             showAlbum = false,
                             thumbnail = { thumbnail },
                             isSelected = isSelected,
-                            downloadState = trackDownloadStates.find { it.trackId == combo.track.trackId },
-                            callbacks = TrackCallbacks(
-                                state = combo.getViewState(),
-                                appCallbacks = appCallbacks,
+                            downloadState = downloadState,
+                            callbacks = trackCallbacks.copy(
                                 onTrackClick = {
-                                    if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(combo.queueTrackId)
-                                    else viewModel.skipTo(comboIdx)
+                                    if (selectedTrackIds.isNotEmpty()) viewModel.toggleTrackSelected(state.id)
+                                    else viewModel.skipTo(idx)
                                 },
                                 onLongClick = {
                                     viewModel.selectTracksFromLastSelected(
-                                        to = combo.queueTrackId,
-                                        allTrackIds = queue.map { it.queueTrackId },
+                                        to = state.id,
+                                        allTrackIds = uiStates.map { it.id },
                                     )
                                 },
                             ),
@@ -164,7 +161,7 @@ fun QueueScreen(
                                 DropdownMenuItem(
                                     text = { Text(text = stringResource(R.string.remove_from_queue)) },
                                     leadingIcon = { Icon(Icons.Sharp.Delete, null) },
-                                    onClick = { viewModel.removeFromQueue(combo.queueTrackId) },
+                                    onClick = { viewModel.removeFromQueue(state.id) },
                                 )
                             },
                             containerColor = containerColor,

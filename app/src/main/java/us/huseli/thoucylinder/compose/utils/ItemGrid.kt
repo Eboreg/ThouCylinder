@@ -29,14 +29,14 @@ fun <T> ItemGrid(
     onLongClick: ((Int, T) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
     isSelected: (T) -> Boolean = { false },
-    progressIndicatorText: String? = null,
+    progressIndicatorText: () -> String? = { null },
     onEmpty: (@Composable () -> Unit)? = null,
     cardContent: @Composable ColumnScope.(Int, T) -> Unit,
 ) {
     if (things.isEmpty()) onEmpty?.invoke()
 
     Box {
-        progressIndicatorText?.also {
+        progressIndicatorText()?.also {
             ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
         }
 

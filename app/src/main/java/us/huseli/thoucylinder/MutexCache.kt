@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import us.huseli.thoucylinder.interfaces.ILogger
 
 data class CachedValue<V>(val value: V?, val timestamp: Long = System.currentTimeMillis())
 
@@ -42,7 +43,7 @@ open class MutexCache<I, K, V>(
     suspend fun getOrNull(item: I, forceReload: Boolean = false, retryOnNull: Boolean = false): V? = try {
         getValueSync(item = item, forceReload = forceReload, retryOnNull = retryOnNull)
     } catch (e: Exception) {
-        logError(e.toString(), e)
+        logError("item=$item, error=$e", e)
         null
     }
 

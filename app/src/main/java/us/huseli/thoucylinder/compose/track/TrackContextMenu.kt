@@ -29,40 +29,41 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableCollection
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
+import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
 import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 import us.huseli.thoucylinder.stringResource
 
 @Composable
-inline fun TrackContextMenu(
-    trackArtists: ImmutableCollection<AbstractArtistCredit>,
+fun TrackContextMenu(
+    trackId: String,
+    artists: ImmutableCollection<AbstractArtist>,
     isShown: Boolean,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
+    isPlayable: Boolean,
     callbacks: TrackCallbacks,
-    crossinline onDismissRequest: () -> Unit,
+    onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
     youtubeWebUrl: String? = null,
     spotifyWebUrl: String? = null,
-    crossinline extraItems: @Composable () -> Unit = {},
+    extraItems: @Composable () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
 
     DropdownMenu(
         modifier = modifier,
         expanded = isShown,
-        onDismissRequest = { onDismissRequest() },
+        onDismissRequest = onDismissRequest,
         offset = offset,
     ) {
-        callbacks.onEnqueueClick?.also { onEnqueueClick ->
+        if (isPlayable) {
             DropdownMenuItem(
                 text = { Text(text = stringResource(R.string.enqueue)) },
                 leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistPlay, null) },
                 onClick = {
-                    onEnqueueClick()
+                    callbacks.onEnqueueClick(trackId)
                     onDismissRequest()
                 }
             )
@@ -72,7 +73,7 @@ inline fun TrackContextMenu(
             text = { Text(stringResource(R.string.start_radio)) },
             leadingIcon = { Icon(Icons.Sharp.Radio, null) },
             onClick = {
-                callbacks.onStartTrackRadioClick()
+                callbacks.onStartRadioClick(trackId)
                 onDismissRequest()
             },
         )
@@ -82,7 +83,7 @@ inline fun TrackContextMenu(
                 text = { Text(text = stringResource(id = R.string.download)) },
                 leadingIcon = { Icon(Icons.Sharp.Download, null) },
                 onClick = {
-                    callbacks.onDownloadClick()
+                    callbacks.onDownloadClick(trackId)
                     onDismissRequest()
                 },
             )
@@ -92,12 +93,12 @@ inline fun TrackContextMenu(
             text = { Text(text = stringResource(R.string.add_to_playlist)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Sharp.PlaylistAdd, null) },
             onClick = {
-                callbacks.onAddToPlaylistClick()
+                callbacks.onAddToPlaylistClick(trackId)
                 onDismissRequest()
             }
         )
 
-        trackArtists.forEach { trackArtist ->
+        artists.forEach { trackArtist ->
             DropdownMenuItem(
                 text = {
                     Text(
@@ -108,7 +109,7 @@ inline fun TrackContextMenu(
                 },
                 leadingIcon = { Icon(Icons.Sharp.InterpreterMode, null) },
                 onClick = {
-                    callbacks.onArtistClick(trackArtist.artistId)
+                    callbacks.onGotoArtistClick(trackArtist.artistId)
                     onDismissRequest()
                 },
             )
@@ -137,23 +138,21 @@ inline fun TrackContextMenu(
         }
 
         if (!hideAlbum) {
-            callbacks.onAlbumClick?.also { onAlbumClick ->
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.go_to_album)) },
-                    leadingIcon = { Icon(Icons.Sharp.Album, null) },
-                    onClick = {
-                        onAlbumClick()
-                        onDismissRequest()
-                    },
-                )
-            }
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.go_to_album)) },
+                leadingIcon = { Icon(Icons.Sharp.Album, null) },
+                onClick = {
+                    callbacks.onGotoAlbumClick(trackId)
+                    onDismissRequest()
+                },
+            )
         }
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.track_information)) },
             leadingIcon = { Icon(Icons.Sharp.Info, null) },
             onClick = {
-                callbacks.onShowInfoClick()
+                callbacks.onShowInfoClick(trackId)
                 onDismissRequest()
             },
         )
@@ -163,7 +162,7 @@ inline fun TrackContextMenu(
                 text = { Text(text = stringResource(R.string.edit_track)) },
                 leadingIcon = { Icon(Icons.Sharp.Edit, null) },
                 onClick = {
-                    callbacks.onEditTrackClick()
+                    callbacks.onEditClick(trackId)
                     onDismissRequest()
                 },
             )
@@ -173,19 +172,20 @@ inline fun TrackContextMenu(
     }
 }
 
-
 @Composable
-inline fun TrackContextButtonWithMenu(
-    trackArtists: ImmutableCollection<TrackArtistCredit>,
+fun TrackContextButtonWithMenu(
+    trackId: String,
+    artists: ImmutableCollection<AbstractArtist>,
     isDownloadable: Boolean,
     isInLibrary: Boolean,
+    isPlayable: Boolean,
     callbacks: TrackCallbacks,
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     hideAlbum: Boolean = false,
     youtubeWebUrl: String? = null,
     spotifyWebUrl: String? = null,
-    crossinline extraItems: @Composable () -> Unit = {},
+    extraItems: @Composable () -> Unit = {},
 ) {
     var isMenuShown by rememberSaveable { mutableStateOf(false) }
 
@@ -195,7 +195,7 @@ inline fun TrackContextButtonWithMenu(
         content = {
             Icon(Icons.Sharp.MoreVert, null)
             TrackContextMenu(
-                trackArtists = trackArtists,
+                artists = artists,
                 callbacks = callbacks,
                 onDismissRequest = { isMenuShown = false },
                 isShown = isMenuShown,
@@ -206,6 +206,8 @@ inline fun TrackContextButtonWithMenu(
                 isInLibrary = isInLibrary,
                 youtubeWebUrl = youtubeWebUrl,
                 spotifyWebUrl = spotifyWebUrl,
+                trackId = trackId,
+                isPlayable = isPlayable,
             )
         }
     )

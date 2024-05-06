@@ -70,7 +70,7 @@ fun ObnoxiousProgressIndicator(
         modifier = modifier.padding(padding).fillMaxWidth(),
     ) {
         var offset by remember { mutableStateOf(IntOffset(0, 0)) }
-        var annotatedText by remember(text) { mutableStateOf(annotateString(0)) }
+        var annotatedText by remember { mutableStateOf(annotateString(0)) }
 
         LaunchedEffect(text) {
             var colorOffset = 0

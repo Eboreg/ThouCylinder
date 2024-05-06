@@ -4,12 +4,12 @@ import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.interfaces.IExternalTrack
 import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.interfaces.IExternalTrack
 import kotlin.math.absoluteValue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -57,14 +57,15 @@ abstract class AbstractSpotifyTrack<AT : AbstractSpotifyArtist> : AbstractSpotif
             track = track,
             album = album,
             artists = artists.mapIndexed { index, artist ->
-                val unsavedArtist = UnsavedArtist(name = artist.name, spotifyId = artist.id)
-                TrackArtistCredit(artist = getArtist(unsavedArtist), trackId = track.trackId)
-                    .copy(spotifyId = artist.id, position = index)
+                TrackArtistCredit(
+                    artist = getArtist(UnsavedArtist(name = artist.name, spotifyId = artist.id)),
+                    trackId = track.trackId,
+                ).copy(spotifyId = artist.id, position = index)
             },
         )
     }
 
-    open fun toTrack(albumId: String?, isInLibrary: Boolean) = Track(
+    open suspend fun toTrack(albumId: String?, isInLibrary: Boolean) = Track(
         albumId = albumId,
         albumPosition = trackNumber,
         discNumber = discNumber,
@@ -129,7 +130,7 @@ data class SpotifyTrack(
         return distance
     }
 
-    override fun toTrack(albumId: String?, isInLibrary: Boolean): Track =
+    override suspend fun toTrack(albumId: String?, isInLibrary: Boolean): Track =
         super.toTrack(albumId = albumId, isInLibrary = isInLibrary).copy(image = album.images.toMediaStoreImage())
 
     override suspend fun toTrackCombo(

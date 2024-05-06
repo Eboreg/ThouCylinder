@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.collections.immutable.ImmutableList
-import us.huseli.retaintheme.compose.ListWithNumericBar
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -40,10 +39,10 @@ fun <T> ItemList(
     onClick: ((Int, T) -> Unit)? = null,
     onLongClick: ((Int, T) -> Unit)? = null,
     cardModifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    padding: PaddingValues = PaddingValues(horizontal = 10.dp),
+    contentPadding: () -> PaddingValues = { PaddingValues(vertical = 10.dp) },
+    padding: () -> PaddingValues = { PaddingValues(horizontal = 10.dp) },
     showNumericBarAtItemCount: Int = 50,
-    progressIndicatorText: String? = null,
+    progressIndicatorText: () -> String? = { null },
     onEmpty: (@Composable () -> Unit)? = null,
     leadingItem: (@Composable LazyItemScope.() -> Unit)? = null,
     trailingItem: (@Composable LazyItemScope.() -> Unit)? = null,
@@ -53,21 +52,21 @@ fun <T> ItemList(
     if (things.isEmpty() && onEmpty != null) onEmpty()
 
     Box {
-        progressIndicatorText?.also {
+        progressIndicatorText()?.also {
             ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
         }
 
-        ListWithNumericBar(
+        ListWithNumericBar2(
             listState = listState,
             listSize = things.size,
             minItems = showNumericBarAtItemCount,
-            modifier = modifier.padding(padding),
+            modifier = modifier.padding(padding()),
             itemHeight = cardHeight + gap,
         ) {
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(gap),
-                contentPadding = contentPadding,
+                contentPadding = contentPadding(),
             ) {
                 leadingItem?.also { item { it() } }
                 stickyHeaderContent?.also { stickyHeader { it() } }

@@ -2,28 +2,34 @@ package us.huseli.thoucylinder.viewmodels
 
 import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTopArtistMatch
 import us.huseli.thoucylinder.dataclasses.spotify.getThumbnailImageBitmap
-import us.huseli.thoucylinder.launchOnIOThread
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
-class RecommendationsViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel(repos) {
+class RecommendationsViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel() {
     private val _spotifyRelatedArtistMatches = MutableStateFlow<List<SpotifyTopArtistMatch>>(emptyList())
     private val existingArtists = MutableStateFlow<List<Artist>>(emptyList())
     private var existingArtistsFetched = false
 
-    val spotifyRelatedArtistMatches =
-        _spotifyRelatedArtistMatches.map { matches -> matches.sortedByDescending { it.score }.toImmutableList() }
+    val spotifyRelatedArtistMatches: StateFlow<ImmutableList<SpotifyTopArtistMatch>> = _spotifyRelatedArtistMatches
+        .map { matches -> matches.sortedByDescending { it.score }.toImmutableList() }
+        .distinctUntilChanged()
+        .stateLazily(persistentListOf())
 
     init {
         launchOnIOThread {
@@ -34,17 +40,21 @@ class RecommendationsViewModel @Inject constructor(private val repos: Repositori
         }
     }
 
-    fun getLastFmRelatedArtists() = launchOnIOThread {
-        for (lastFmArtist in repos.lastFm.getTopArtists(10)) {
-            repos.spotify.matchArtist(lastFmArtist.name)?.also {
-                getRelatedArtists(it.id, lastFmArtist.name, lastFmArtist.playcount.toInt())
+    fun getLastFmRelatedArtists() {
+        launchOnIOThread {
+            for (lastFmArtist in repos.lastFm.getTopArtists(10)) {
+                repos.spotify.matchArtist(lastFmArtist.name)?.also {
+                    getRelatedArtists(it.id, lastFmArtist.name, lastFmArtist.playcount.toInt())
+                }
             }
         }
     }
 
-    fun getLocalRelatedArtists() = launchOnIOThread {
-        for (localArtist in repos.artist.listTopSpotifyArtists()) {
-            getRelatedArtists(localArtist.spotifyId, localArtist.name, localArtist.trackCount)
+    fun getLocalRelatedArtists() {
+        launchOnIOThread {
+            for (localArtist in repos.artist.listTopSpotifyArtists()) {
+                getRelatedArtists(localArtist.spotifyId, localArtist.name, localArtist.trackCount)
+            }
         }
     }
 

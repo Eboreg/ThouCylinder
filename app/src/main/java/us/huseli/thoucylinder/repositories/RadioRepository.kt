@@ -3,12 +3,9 @@ package us.huseli.thoucylinder.repositories
 import android.content.Context
 import androidx.preference.PreferenceManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.Constants.PREF_ACTIVE_RADIO_ID
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.entities.Radio
@@ -17,16 +14,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class RadioRepository @Inject constructor(database: Database, @ApplicationContext context: Context) {
+class RadioRepository @Inject constructor(database: Database, @ApplicationContext context: Context) :
+    AbstractScopeHolder() {
     private val radioDao = database.radioDao()
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _activeRadio = MutableStateFlow<RadioCombo?>(null)
 
     val activeRadio = _activeRadio.asStateFlow()
 
     init {
-        scope.launch {
+        launchOnIOThread {
             preferences.getString(PREF_ACTIVE_RADIO_ID, null)?.also {
                 _activeRadio.value = radioDao.getRadioCombo(it)
             }
@@ -36,7 +33,7 @@ class RadioRepository @Inject constructor(database: Database, @ApplicationContex
     fun deactivateRadio() {
         _activeRadio.value = null
         preferences.edit().putString(PREF_ACTIVE_RADIO_ID, null).apply()
-        scope.launch { radioDao.clearRadios() }
+        launchOnIOThread { radioDao.clearRadios() }
     }
 
     suspend fun setActiveRadio(radio: Radio) {

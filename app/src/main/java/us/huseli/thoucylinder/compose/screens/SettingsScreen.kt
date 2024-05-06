@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.BottomAppBarDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.isInLandscapeMode
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.Constants.LASTFM_AUTH_URL
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.screens.settings.BooleanSettingSection
@@ -35,7 +37,7 @@ import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
 import us.huseli.thoucylinder.compose.screens.settings.RegionSettingDialog
 import us.huseli.thoucylinder.compose.screens.settings.SingleStringSettingDialog
 import us.huseli.thoucylinder.compose.screens.settings.StringSettingSection
-import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
+import us.huseli.thoucylinder.getUmlautifiedString
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautStringResource
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
@@ -43,11 +45,11 @@ import us.huseli.thoucylinder.viewmodels.SettingsViewModel
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    appCallbacks: AppCallbacks,
+    onBackClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
 
     val autoImportLocalMusic by viewModel.autoImportLocalMusic.collectAsStateWithLifecycle()
     val lastFmIsAuthenticated by viewModel.lastFmIsAuthenticated.collectAsStateWithLifecycle(false)
@@ -79,7 +81,7 @@ fun SettingsScreen(
             onSave = { uri ->
                 viewModel.setLocalMusicUri(uri)
                 showLocalMusicUriDialog = false
-                if (autoImportLocalMusic == true) viewModel.importNewLocalAlbumsAsync(context)
+                if (autoImportLocalMusic == true) viewModel.importNewLocalAlbums()
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -119,10 +121,12 @@ fun SettingsScreen(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
-                modifier = Modifier.padding(bottom = 5.dp, top = if (isInLandscapeMode()) 5.dp else 0.dp),
+                modifier = Modifier
+                    .padding(bottom = 5.dp, top = if (isInLandscapeMode()) 5.dp else 0.dp)
+                    .padding(horizontal = 5.dp),
             ) {
                 IconButton(
-                    onClick = appCallbacks.onBackClick,
+                    onClick = onBackClick,
                     content = { Icon(Icons.AutoMirrored.Sharp.ArrowBack, stringResource(R.string.go_back)) },
                 )
                 Text(
@@ -146,9 +150,24 @@ fun SettingsScreen(
                 checked = autoImportLocalMusic == true,
                 onCheckedChange = {
                     viewModel.setAutoImportLocalMusic(it)
-                    if (it) viewModel.importNewLocalAlbumsAsync(context)
+                    if (it) viewModel.importNewLocalAlbums()
                 },
             )
+
+            StringSettingSection(
+                title = stringResource(R.string.unhide_all_local_albums),
+                description = stringResource(R.string.unhide_all_local_albums_description),
+                currentValue = null,
+                onClick = {
+                    viewModel.unhideLocalAlbums {
+                        SnackbarEngine.addInfo(
+                            context.getUmlautifiedString(R.string.all_local_albums_have_been_unhidden)
+                        )
+                    }
+                },
+            )
+
+            HorizontalDivider()
 
             BooleanSettingSection(
                 title = stringResource(R.string.scrobble_to_last_fm),
@@ -168,6 +187,8 @@ fun SettingsScreen(
                 currentValue = lastFmUsername ?: stringResource(R.string.none),
                 onClick = { showLastFmUsernameDialog = true },
             )
+
+            HorizontalDivider()
 
             StringSettingSection(
                 title = stringResource(R.string.region),

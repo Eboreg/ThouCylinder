@@ -6,10 +6,18 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -18,7 +26,8 @@ import java.util.zip.GZIPInputStream
 import kotlin.math.roundToInt
 import kotlin.text.Charsets.UTF_8
 
-class HTTPResponseError(val code: Int, message: String?) : Exception("HTTP $code: ${message ?: "No message"}")
+class HTTPResponseError(val url: String, method: Request.Method, val code: Int, message: String?) :
+    Exception("HTTP $code: ${message ?: "No message"} ($method $url)")
 
 data class Request(
     private val url: String,
@@ -60,7 +69,7 @@ data class Request(
                 outputStream.write(binaryBody, 0, binaryBody.size)
             }
             responseCode.also {
-                if (it >= 400) throw HTTPResponseError(it, responseMessage)
+                if (it >= 400) throw HTTPResponseError(this@Request.url, method, it, responseMessage)
             }
         }
     }
@@ -142,28 +151,63 @@ data class Request(
 }
 
 abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false) {
-    /** Stalls until it gets unlocked. */
+    private val onFinishedListeners = mutableListOf<(String?) -> Unit>()
+
     val created = System.currentTimeMillis()
     val lock = Mutex(true)
     var isStarted = false
         private set
 
+    abstract suspend fun request(): String?
+
+    fun addOnFinishedListener(value: (String?) -> Unit) {
+        onFinishedListeners.add(value)
+    }
+
     suspend fun run(): String? {
+        /**
+         * This method will suspend until `lock` is unlocked, which needs to be done by some outside stateholder when
+         * it determines it's this job's time to run.
+         */
         return lock.withLock {
             isStarted = true
-            before()
-            request().also { after(it) }
+            request().also { response ->
+                onFinishedListeners.forEach { it.invoke(response) }
+            }
         }
     }
 
-    open fun after(result: String?) {}
-    open fun before() {}
-    abstract suspend fun request(): String?
     override fun equals(other: Any?) = other is DeferredRequestJob && other.url == url
     override fun hashCode() = url.hashCode()
     override fun toString() = "<${javaClass.simpleName} $url>"
 }
 
-fun Collection<DeferredRequestJob>.getNext(): DeferredRequestJob? =
-    filter { !it.isStarted && !it.lowPrio }.minByOrNull { it.created }
-        ?: filter { !it.isStarted }.minByOrNull { it.created }
+abstract class DeferredRequestJobManager<T : DeferredRequestJob>(
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+) {
+    private val queue = MutableStateFlow<List<T>>(emptyList())
+    private val nextJob = queue.map { it.getNext() }.filterNotNull().distinctUntilChanged()
+
+    init {
+        scope.launch {
+            nextJob.collect { job ->
+                waitBeforeUnlocking()
+                if (job.lock.isLocked) job.lock.unlock()
+            }
+        }
+    }
+
+    abstract fun onJobFinished(job: T, response: String?, timestamp: Long)
+    abstract suspend fun waitBeforeUnlocking()
+
+    suspend fun runJob(job: T): String? {
+        job.addOnFinishedListener { queue.value -= job }
+        job.addOnFinishedListener { onJobFinished(job, it, System.currentTimeMillis()) }
+        queue.value += job
+        return job.run()
+    }
+}
+
+fun <T : DeferredRequestJob> Collection<T>.getNext(): T? =
+    filter { !it.isStarted && !it.lowPrio && it.lock.isLocked }.minByOrNull { it.created }
+        ?: filter { !it.isStarted && it.lock.isLocked }.minByOrNull { it.created }

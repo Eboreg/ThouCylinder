@@ -10,12 +10,11 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
 import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Playlist
 import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
+import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
 import java.time.Instant
 
 @Dao
@@ -43,7 +42,8 @@ abstract class PlaylistDao {
 
     @Query(
         """
-        SELECT Playlist.*, COUNT(PlaylistTrack_trackId) AS trackCount, SUM(Track_metadata_durationMs) AS totalDurationMs
+        SELECT Playlist_playlistId, Playlist_name, COUNT(PlaylistTrack_trackId) AS trackCount,
+            SUM(Track_metadata_durationMs) AS totalDurationMs
         FROM Playlist 
             LEFT JOIN PlaylistTrack ON Playlist_playlistId = PlaylistTrack_playlistId 
             LEFT JOIN Track ON PlaylistTrack_trackId = Track_trackId
@@ -59,6 +59,12 @@ abstract class PlaylistDao {
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
     abstract fun flowTrackCombosByPlaylistId(playlistId: String): Flow<List<PlaylistTrackCombo>>
+
+    @Query("SELECT * FROM Playlist WHERE Playlist_playlistId = :playlistId")
+    abstract suspend fun getPlaylist(playlistId: String): Playlist?
+
+    @Query("SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack_trackId IN (:trackIds) AND PlaylistTrack_playlistId = :playlistId")
+    abstract suspend fun getDuplicateTrackCount(playlistId: String, trackIds: Collection<String>): Int
 
     @Insert
     abstract suspend fun insertPlaylists(vararg playlists: Playlist)
@@ -77,6 +83,9 @@ abstract class PlaylistDao {
     )
     abstract suspend fun listAlbums(playlistId: String): List<Album>
 
+    @Query("SELECT PlaylistTrack_trackId FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
+    abstract suspend fun listPlaylistTrackIds(playlistId: String): List<String>
+
     @Query("SELECT * FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
     abstract suspend fun listPlaylistTracks(playlistId: String): List<PlaylistTrack>
 
@@ -88,9 +97,6 @@ abstract class PlaylistDao {
     @Query("SELECT * FROM PlaylistTrackCombo WHERE PlaylistTrack_id IN (:ids)")
     abstract suspend fun listTrackCombosByPlaylistTrackId(vararg ids: String): List<PlaylistTrackCombo>
 
-    @Query("SELECT Track.* FROM PlaylistTrack JOIN Track ON Track_trackId = PlaylistTrack_trackId WHERE PlaylistTrack_playlistId = :playlistId")
-    abstract suspend fun listTracks(playlistId: String): List<Track>
-
     @Transaction
     open suspend fun moveTrack(playlistId: String, from: Int, to: Int) {
         val tracks = _listPlaylistTracks(playlistId)
@@ -99,8 +105,14 @@ abstract class PlaylistDao {
             .apply { add(to, removeAt(from)) }
             .mapIndexed { index, track -> track.copy(position = index) }
 
-        if (updatedTracks.isNotEmpty()) _updateTracks(*updatedTracks.filter { !tracks.contains(it) }.toTypedArray())
+        if (updatedTracks.isNotEmpty()) {
+            _updateTracks(*updatedTracks.filter { !tracks.contains(it) }.toTypedArray())
+            touchPlaylist(playlistId)
+        }
     }
+
+    @Query("UPDATE Playlist SET Playlist_name = :newName, Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")
+    abstract suspend fun renamePlaylist(playlistId: String, newName: String, updated: String = Instant.now().toString())
 
     @Query("UPDATE Playlist SET Playlist_updated = :updated WHERE Playlist_playlistId = :playlistId")
     abstract suspend fun touchPlaylist(playlistId: String, updated: String = Instant.now().toString())

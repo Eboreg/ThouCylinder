@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.entities
 
 import android.os.Parcelable
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -8,6 +9,7 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @Entity
+@Immutable
 data class Tag(
     @ColumnInfo("Tag_name") @PrimaryKey val name: String,
     @ColumnInfo("Tag_isMusicBrainzGenre") val isMusicBrainzGenre: Boolean = false,

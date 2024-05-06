@@ -4,154 +4,92 @@ import android.content.Context
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.retaintheme.extensions.listItemsBetween
-import us.huseli.retaintheme.snackbar.SnackbarEngine
-import us.huseli.thoucylinder.AlbumDownloadTask
-import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.Selection
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
 import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
 import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.launchOnIOThread
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
+import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
-import us.huseli.thoucylinder.umlautify
 
 abstract class AbstractAlbumListViewModel(
     private val selectionKey: String,
     private val repos: Repositories,
-) : AbstractTrackListViewModel(selectionKey, repos) {
-    private val _albumDownloadStates = MutableStateFlow<ImmutableList<AlbumDownloadTask.ViewState>>(persistentListOf())
+    private val managers: Managers,
+) : AbstractTrackListViewModel(selectionKey, repos, managers) {
+    private val selectModeEnabled: StateFlow<Boolean>
+        get() = filteredSelectedAlbumIds.map { it.isNotEmpty() }.distinctUntilChanged().stateEagerly(false)
+
     protected val selectedAlbumIds: StateFlow<List<String>> = repos.album.flowSelectedAlbumIds(selectionKey)
 
-    abstract val albumViewStates: Flow<ImmutableList<Album.ViewState>>
+    abstract val albumUiStates: StateFlow<ImmutableList<AlbumUiState>>
 
-    val albumDownloadStates = _albumDownloadStates.asStateFlow()
-    val filteredSelectedAlbumIds: Flow<ImmutableList<String>>
-        get() = combine(albumViewStates, selectedAlbumIds) { states, albumIds ->
-            albumIds.filter { albumId -> states.map { it.album.albumId }.contains(albumId) }.toImmutableList()
-        }
+    val filteredSelectedAlbumIds: StateFlow<ImmutableList<String>>
+        get() = combine(albumUiStates, selectedAlbumIds) { states, albumIds ->
+            albumIds.filter { albumId -> states.map { it.albumId }.contains(albumId) }.toImmutableList()
+        }.stateEagerly(persistentListOf())
 
-    init {
+    fun onAlbumClick(albumId: String, default: ((String) -> Unit)? = null) {
+        if (selectModeEnabled.value) toggleAlbumSelected(albumId)
+        else default?.invoke(albumId)
+    }
+
+    fun onAlbumLongClick(albumId: String) {
         launchOnIOThread {
-            repos.youtube.albumDownloadTasks.collect { tasks ->
-                tasks.forEach { task ->
-                    task.viewState.filterNotNull().collect { state ->
-                        _albumDownloadStates.value = _albumDownloadStates.value.toMutableList().run {
-                            removeIf { it.albumId == state.albumId }
-                            add(state)
-                            toImmutableList()
-                        }
-                    }
+            val albumIds = filteredSelectedAlbumIds.value.lastOrNull()
+                ?.let { id ->
+                    albumUiStates.value.map { it.albumId }
+                        .listItemsBetween(id, albumId)
+                        .plus(albumId)
                 }
-            }
+                ?: listOf(albumId)
+
+            repos.album.selectAlbumIds(selectionKey, albumIds)
         }
     }
 
     open fun onAllAlbumIds(callback: (Collection<String>) -> Unit) {
-        launchOnIOThread { callback(albumViewStates.first().map { it.album.albumId }) }
+        callback(albumUiStates.value.map { it.albumId })
     }
 
     open fun onSelectedAlbumsWithTracks(callback: (Collection<AlbumWithTracksCombo>) -> Unit) {
-        launchOnIOThread {
-            callback(repos.album.listAlbumsWithTracks(filteredSelectedAlbumIds.first()))
-        }
+        launchOnIOThread { callback(repos.album.listAlbumsWithTracks(filteredSelectedAlbumIds.value)) }
     }
 
     open fun onSelectedAlbumTracks(callback: (Collection<Track>) -> Unit) {
         launchOnIOThread {
             callback(
-                repos.album.listAlbumsWithTracks(filteredSelectedAlbumIds.first())
+                repos.album.listAlbumsWithTracks(filteredSelectedAlbumIds.value)
                     .flatMap { combo -> combo.trackCombos.map { it.track } }
                     .toImmutableList()
             )
         }
     }
 
-    fun enqueueAlbum(albumId: String, context: Context) = launchOnIOThread {
-        val queueTrackCombos = getQueueTrackCombos(repos.track.listTrackCombosByAlbumId(albumId))
-
-        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
-            repos.player.insertNext(queueTrackCombos)
-            SnackbarEngine.addInfo(context.getString(R.string.the_album_was_enqueued_next).umlautify())
-        }
-    }
-
     open fun getAlbumSelectionCallbacks(appCallbacks: AppCallbacks, context: Context) = AlbumSelectionCallbacks(
-        onAddToPlaylistClick = {
-            onSelectedAlbumTracks { appCallbacks.onAddToPlaylistClick(Selection(tracks = it.toImmutableList())) }
-        },
-        onPlayClick = { onSelectedAlbumsWithTracks { playAlbums(it) } },
-        onEnqueueClick = { onSelectedAlbumsWithTracks { enqueueAlbums(it, context) } },
+        onAddToPlaylistClick = { appCallbacks.onAddAlbumsToPlaylistClick(filteredSelectedAlbumIds.value) },
+        onPlayClick = { managers.player.playAlbums(filteredSelectedAlbumIds.value) },
+        onEnqueueClick = { managers.player.enqueueAlbums(filteredSelectedAlbumIds.value) },
         onUnselectAllClick = { repos.album.unselectAllAlbumIds(selectionKey) },
         onSelectAllClick = { onAllAlbumIds { repos.album.selectAlbumIds(selectionKey, it) } },
-        onDeleteClick = { onSelectedAlbums { appCallbacks.onDeleteAlbumsClick(it) } },
+        onDeleteClick = { appCallbacks.onDeleteAlbumsClick(filteredSelectedAlbumIds.value) },
     )
 
-    fun onAlbumTracks(albumId: String, callback: (ImmutableList<Track>) -> Unit) {
-        launchOnIOThread { callback(repos.track.listTracksByAlbumId(albumId)) }
-    }
+    fun selectAlbumsFromLastSelected(to: String) {
+        launchOnIOThread {
+            val albumIds = filteredSelectedAlbumIds.value.lastOrNull()
+                ?.let { id -> albumUiStates.value.map { it.albumId }.listItemsBetween(id, to).plus(to) }
+                ?: listOf(to)
 
-    fun playAlbum(albumId: String) = launchOnIOThread {
-        val queueTrackCombos = getQueueTrackCombos(repos.track.listTrackCombosByAlbumId(albumId))
-
-        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
-            repos.player.replaceAndPlay(queueTrackCombos)
+            repos.album.selectAlbumIds(selectionKey, albumIds)
         }
-    }
-
-    fun selectAlbumsFromLastSelected(to: String, allAlbumIds: List<String>) = launchOnIOThread {
-        val albumIds = filteredSelectedAlbumIds.first().lastOrNull()
-            ?.let { allAlbumIds.listItemsBetween(it, to).plus(to) }
-            ?: listOf(to)
-
-        repos.album.selectAlbumIds(selectionKey, albumIds)
     }
 
     fun toggleAlbumSelected(albumId: String) = repos.album.toggleAlbumIdSelected(selectionKey, albumId)
-
-
-    /** PRIVATE METHODS *******************************************************/
-    private fun enqueueAlbums(albumCombos: Collection<AlbumWithTracksCombo>, context: Context) = launchOnIOThread {
-        val queueTrackCombos = getQueueTrackCombos(albumCombos.flatMap { it.trackCombos })
-
-        if (queueTrackCombos.isNotEmpty()) {
-            withContext(Dispatchers.Main) { repos.player.insertNext(queueTrackCombos) }
-
-            SnackbarEngine.addInfo(
-                context.resources
-                    .getQuantityString(
-                        R.plurals.x_albums_enqueued_next,
-                        albumCombos.size,
-                        albumCombos.size,
-                    )
-                    .umlautify()
-            )
-        }
-    }
-
-    private fun onSelectedAlbums(callback: (Collection<Album.ViewState>) -> Unit) {
-        launchOnIOThread {
-            val selectedAlbumIds = filteredSelectedAlbumIds.first()
-            callback(albumViewStates.first().filter { selectedAlbumIds.contains(it.album.albumId) })
-        }
-    }
-
-    private fun playAlbums(albumCombos: Collection<AlbumWithTracksCombo>) = launchOnIOThread {
-        val queueTrackCombos = getQueueTrackCombos(albumCombos.flatMap { it.trackCombos })
-
-        if (queueTrackCombos.isNotEmpty()) withContext(Dispatchers.Main) {
-            repos.player.replaceAndPlay(queueTrackCombos)
-        }
-    }
 }

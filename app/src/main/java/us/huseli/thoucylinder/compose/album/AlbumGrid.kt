@@ -29,58 +29,59 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
-import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.ThouCylinderTheme
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun AlbumGrid(
-    states: ImmutableList<Album.ViewState>,
-    callbacks: (Album.ViewState) -> AlbumCallbacks,
+    states: () -> ImmutableList<AlbumUiState>,
+    callbacks: AlbumCallbacks,
     selectionCallbacks: AlbumSelectionCallbacks,
     selectedAlbumIds: ImmutableList<String>,
     modifier: Modifier = Modifier,
     imageViewModel: ImageViewModel = hiltViewModel(),
     showArtist: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    downloadStates: ImmutableList<AlbumDownloadTask.ViewState>,
-    progressIndicatorStringRes: Int? = null,
+    progressIndicatorText: () -> String? = { null },
     onEmpty: @Composable () -> Unit,
 ) {
-    val isSelected: (Album.ViewState) -> Boolean = { selectedAlbumIds.contains(it.album.albumId) }
+    val isSelected: (AlbumUiState) -> Boolean = { selectedAlbumIds.contains(it.albumId) }
 
     SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = selectionCallbacks)
 
     ItemGrid(
         modifier = modifier,
-        things = states,
-        onClick = { _, state -> callbacks(state).onAlbumClick?.invoke() },
-        onLongClick = { _, state -> callbacks(state).onAlbumLongClick?.invoke() },
+        things = states(),
+        onClick = { _, state ->
+            callbacks.onAlbumClick?.invoke(state.albumId)
+        },
+        onLongClick = { _, state ->
+            callbacks.onAlbumLongClick?.invoke(state.albumId)
+        },
         contentPadding = contentPadding,
         onEmpty = onEmpty,
         isSelected = isSelected,
-        progressIndicatorText = progressIndicatorStringRes?.let { stringResource(it) },
+        progressIndicatorText = progressIndicatorText,
     ) { _, state ->
-        val albumCallbacks = callbacks(state)
         val artistString = state.artists.joined()
-        val downloadState = downloadStates.find { it.albumId == state.album.albumId }
+        val downloadState by state.downloadState.collectAsStateWithLifecycle()
 
         Box(modifier = Modifier.aspectRatio(1f)) {
-            var imageBitmap by remember(state.album.albumArt) { mutableStateOf<ImageBitmap?>(null) }
+            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(state.album.albumArt) {
-                imageBitmap = imageViewModel.getAlbumFullImage(state.album.albumArt?.fullUri)
+            LaunchedEffect(state.fullImageUri) {
+                imageBitmap = imageViewModel.getFullImageBitmap(state.fullImageUri)
             }
 
             Thumbnail(
@@ -99,9 +100,9 @@ fun AlbumGrid(
             }
         }
 
-        if (downloadState?.isActive == true) {
-            LinearProgressIndicator(
-                progress = { downloadState.progress },
+        downloadState?.also {
+            if (it.isActive) LinearProgressIndicator(
+                progress = { it.progress },
                 modifier = Modifier.fillMaxWidth().height(2.dp),
             )
         }
@@ -122,7 +123,7 @@ fun AlbumGrid(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = state.album.title.umlautify(),
+                    text = state.title.umlautify(),
                     maxLines = if (artistString != null && showArtist) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     style = ThouCylinderTheme.typographyExtended.listNormalHeader,
@@ -134,18 +135,19 @@ fun AlbumGrid(
                     style = ThouCylinderTheme.typographyExtended.listSmallTitle,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AlbumSmallIcons(isLocal = state.album.isLocal, isOnYoutube = state.album.isOnYoutube)
+                    AlbumSmallIcons(isLocal = state.isLocal, isOnYoutube = state.isOnYoutube)
                 }
             }
 
             AlbumContextMenuWithButton(
-                isLocal = state.album.isLocal,
-                isInLibrary = state.album.isInLibrary,
-                isPartiallyDownloaded = state.isPartiallyDownloaded,
-                callbacks = albumCallbacks,
+                albumId = state.albumId,
                 albumArtists = state.artists.toImmutableList(),
-                youtubeWebUrl = state.album.youtubeWebUrl,
-                spotifyWebUrl = state.album.spotifyWebUrl,
+                isLocal = state.isLocal,
+                isInLibrary = state.isInLibrary,
+                isPartiallyDownloaded = state.isPartiallyDownloaded,
+                callbacks = callbacks,
+                spotifyWebUrl = state.spotifyWebUrl,
+                youtubeWebUrl = state.youtubeWebUrl,
             )
         }
     }

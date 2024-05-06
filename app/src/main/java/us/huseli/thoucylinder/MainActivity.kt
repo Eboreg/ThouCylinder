@@ -6,21 +6,16 @@ import android.os.StrictMode
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
+import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.compose.App
 import us.huseli.thoucylinder.viewmodels.AppViewModel
-import us.huseli.thoucylinder.viewmodels.LastFmViewModel
-import us.huseli.thoucylinder.viewmodels.SpotifyImportViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val spotifyImportViewModel by viewModels<SpotifyImportViewModel>()
-    private val lastFmViewModel by viewModels<LastFmViewModel>()
-    private val appViewModel by viewModels<AppViewModel>()
+    private val viewModel by viewModels<AppViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (BuildConfig.DEBUG) {
@@ -38,8 +33,6 @@ class MainActivity : ComponentActivity() {
 
         val startDestination: String = intent?.let { handleIntent(it) } ?: LibraryDestination.route
 
-        appViewModel.doStartupTasks(this)
-
         /**
          * Recomposition of the below happens at app start for unknown reasons ... hopefully, it only happens when run
          * from the IDE, in the emulator? Does not seem to happen on device.
@@ -47,24 +40,28 @@ class MainActivity : ComponentActivity() {
          */
         setContent {
             ThouCylinderTheme {
-                App(startDestination = remember { startDestination }, modifier = Modifier.safeDrawingPadding())
+                App(startDestination = remember { startDestination })
             }
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent?.also { handleIntent(it) }
+        handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent): String? {
         intent.data?.pathSegments?.also { pathSegments ->
             if (pathSegments.getOrNull(0) == "spotify" && pathSegments.getOrNull(1) == "import-albums") {
-                spotifyImportViewModel.handleIntent(intent, this)
+                viewModel.handleSpotifyIntent(intent) { exception ->
+                    SnackbarEngine.addError(getString(R.string.spotify_authorization_failed, exception).umlautify())
+                }
                 return ImportDestination.route
             }
             if (pathSegments.getOrNull(0) == "lastfm" && pathSegments.getOrNull(1) == "auth") {
-                lastFmViewModel.handleIntent(intent, this)
+                viewModel.handleLastFmIntent(intent) { exception ->
+                    SnackbarEngine.addError(getString(R.string.last_fm_authorization_failed, exception).umlautify())
+                }
                 return SettingsDestination.route
             }
         }

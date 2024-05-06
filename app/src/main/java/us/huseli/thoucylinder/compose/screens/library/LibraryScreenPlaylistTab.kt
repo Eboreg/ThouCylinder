@@ -29,8 +29,8 @@ import us.huseli.thoucylinder.viewmodels.LibraryViewModel
 @Composable
 fun LibraryScreenPlaylistTab(
     appCallbacks: AppCallbacks,
-    showToolbars: Boolean,
     modifier: Modifier = Modifier,
+    showToolbars: () -> Boolean = { true },
     viewModel: LibraryViewModel = hiltViewModel(),
     listModifier: Modifier = Modifier,
 ) {
@@ -40,12 +40,12 @@ fun LibraryScreenPlaylistTab(
             listType = ListType.PLAYLISTS,
             onDisplayTypeChange = { viewModel.setDisplayType(it) },
             onListTypeChange = { viewModel.setListType(it) },
-            availableDisplayTypes = listOf(DisplayType.LIST),
+            availableDisplayTypes = persistentListOf(DisplayType.LIST),
         )
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        val playlists by viewModel.playlists.collectAsStateWithLifecycle(persistentListOf())
+        val playlists by viewModel.playlists.collectAsStateWithLifecycle()
         val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsStateWithLifecycle()
 
         PlaylistList(

@@ -1,6 +1,10 @@
 package us.huseli.thoucylinder.dataclasses.combos
 
+import androidx.compose.runtime.Immutable
 import kotlinx.collections.immutable.ImmutableList
+import us.huseli.retaintheme.extensions.sum
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
+import us.huseli.thoucylinder.dataclasses.UnsavedArtist
 import us.huseli.thoucylinder.dataclasses.abstr.joined
 import us.huseli.thoucylinder.dataclasses.entities.Artist
 import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
@@ -8,37 +12,70 @@ import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.dataclasses.youtube.stripTitleCommons
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import kotlin.math.max
+import kotlin.time.Duration
 
-data class YoutubePlaylistCombo(val playlist: YoutubePlaylist, val videos: ImmutableList<YoutubeVideo>) {
+@Immutable
+data class YoutubePlaylistCombo(val playlist: YoutubePlaylist, val videos: ImmutableList<YoutubeVideo>) :
+    IExternalAlbum {
     data class AlbumMatch(
         val distance: Double,
         val albumCombo: AlbumWithTracksCombo,
         val playlistCombo: YoutubePlaylistCombo,
     )
 
-    fun matchAlbumWithTracks(combo: AlbumWithTracksCombo): AlbumMatch =
-        AlbumMatch(distance = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
+    override val id: String
+        get() = playlist.id
 
-    suspend fun toAlbumCombo(isInLibrary: Boolean, getArtist: suspend (String) -> Artist): AlbumWithTracksCombo {
-        val album = playlist.toAlbum(isInLibrary = isInLibrary)
-        val albumArtist = playlist.artist?.let { getArtist(it) }
-            ?.let { AlbumArtistCredit(artist = it, albumId = album.albumId) }
-        val albumArtists = albumArtist?.let { listOf(it) } ?: emptyList()
+    override val title: String
+        get() = playlist.title
+
+    override val artistName: String?
+        get() = playlist.artist
+
+    override val thumbnailUrl: String?
+        get() = playlist.thumbnailUrl
+
+    override val trackCount: Int
+        get() = videos.size
+
+    override val year: Int?
+        get() = null
+
+    override val duration: Duration
+        get() = videos.mapNotNull { it.duration }.sum()
+
+    override val playCount: Int?
+        get() = null
+
+    override suspend fun getMediaStoreImage(): MediaStoreImage? = playlist.getMediaStoreImage()
+
+    override suspend fun toAlbumWithTracks(
+        isLocal: Boolean,
+        isInLibrary: Boolean,
+        getArtist: suspend (UnsavedArtist) -> Artist,
+    ): AlbumWithTracksCombo {
+        val album = playlist.toAlbum(isInLibrary = isInLibrary, isLocal = isLocal)
+        val artist = playlist.artist?.let { getArtist(UnsavedArtist(name = it)) }
+        val albumArtist = artist?.let { AlbumArtistCredit(artist = it, albumId = album.albumId) }
 
         return AlbumWithTracksCombo(
             album = album,
-            artists = albumArtists,
+            artists = albumArtist?.let { listOf(it) } ?: emptyList(),
             trackCombos = videos.mapIndexed { index, video ->
                 video.toTrackCombo(
                     isInLibrary = isInLibrary,
-                    artist = playlist.artist,
+                    albumArtist = artist,
                     album = album,
                     albumPosition = index + 1,
                 )
             }.stripTitleCommons(),
         )
     }
+
+    fun matchAlbumWithTracks(combo: AlbumWithTracksCombo): AlbumMatch =
+        AlbumMatch(distance = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
 
     private fun getAlbumDistance(combo: AlbumWithTracksCombo): Double {
         /**

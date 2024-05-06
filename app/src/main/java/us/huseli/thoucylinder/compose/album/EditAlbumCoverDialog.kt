@@ -19,10 +19,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import us.huseli.thoucylinder.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,6 +33,7 @@ import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.compose.utils.WarningButton
+import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 
@@ -46,16 +47,17 @@ fun EditAlbumCoverDialog(
     val context = LocalContext.current
     val albumArts by viewModel.flowAlbumArt(albumId, context).collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoadingAlbumArt.collectAsStateWithLifecycle()
-    val close: () -> Unit = {
-        viewModel.cancelAlbumArtFetch(albumId)
-        onClose()
+    val close: () -> Unit = remember {
+        {
+            viewModel.cancelAlbumArtFetch(albumId)
+            onClose()
+        }
     }
     val selectFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             viewModel.saveAlbumArtFromUri(
                 albumId = albumId,
                 uri = uri,
-                context = context,
                 onSuccess = {
                     close()
                     SnackbarEngine.addInfo(context.getString(R.string.updated_album_cover).umlautify())
@@ -76,7 +78,7 @@ fun EditAlbumCoverDialog(
         dismissButton = {
             CancelButton(onClick = close)
             WarningButton(text = stringResource(R.string.clear)) {
-                viewModel.saveAlbumArt(albumId, null, context)
+                viewModel.clearAlbumArt(albumId)
                 close()
             }
             SaveButton(
@@ -94,7 +96,7 @@ fun EditAlbumCoverDialog(
                 items(albumArts.toList()) { albumArt ->
                     Column(
                         modifier = Modifier.fillMaxSize().clickable {
-                            viewModel.saveAlbumArt(albumId, albumArt, context)
+                            viewModel.saveAlbumArt(albumId, albumArt.mediaStoreImage)
                             close()
                         },
                         horizontalAlignment = Alignment.CenterHorizontally,

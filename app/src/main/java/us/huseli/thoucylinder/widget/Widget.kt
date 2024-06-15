@@ -1,12 +1,9 @@
 package us.huseli.thoucylinder.widget
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,32 +34,25 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import us.huseli.thoucylinder.MainActivity
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.managers.ImageManager
-import us.huseli.thoucylinder.repositories.PlayerRepository
-import us.huseli.thoucylinder.umlautify
+import us.huseli.thoucylinder.getUmlautifiedString
+import us.huseli.thoucylinder.managers.WidgetManager
 
 @SuppressLint("RestrictedApi")
 @Composable
-fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
+fun Widget(manager: WidgetManager) {
     val context = LocalContext.current
-    val canGotoNext by playerRepo.canGotoNext.collectAsState()
-    val canPlay by playerRepo.canPlay.collectAsState(false)
-    val currentCombo by playerRepo.currentCombo.collectAsState()
-    val isPlaying by playerRepo.isPlaying.collectAsState(false)
-    val isShuffleEnabled by playerRepo.isShuffleEnabled.collectAsState()
-    val isRepeatEnabled by playerRepo.isRepeatEnabled.collectAsState()
+    val defaultBackgroundColor = GlanceTheme.colors.background
 
-    val bitmap = remember { mutableStateOf<Bitmap?>(null) }
-    val backgroundColor =
-        if (bitmap.value != null) ColorProvider(R.color.widget_background) else GlanceTheme.colors.background
-    val currentTrackString = currentCombo
-        ?.let { listOfNotNull(it.artists.joined(), it.track.title) }
-        ?.joinToString(" • ")
-        ?: context.getString(R.string.no_track_playing).umlautify()
+    val canGotoNext by manager.canGotoNext.collectAsState()
+    val canPlay by manager.canPlay.collectAsState()
+    val currentBitmap by manager.currentBitmap.collectAsState()
+    val currentTrackString by manager.currentTrackString.collectAsState()
+    val isPlaying by manager.isPlaying.collectAsState()
+    val isShuffleEnabled by manager.isShuffleEnabled.collectAsState()
+    val isRepeatEnabled by manager.isRepeatEnabled.collectAsState()
 
-    LaunchedEffect(currentCombo) {
-        bitmap.value = currentCombo?.let { imageManager.getTrackComboFullBitmap(it) }
+    val backgroundColor = remember(currentBitmap) {
+        if (currentBitmap != null) ColorProvider(R.color.widget_background) else defaultBackgroundColor
     }
 
     Box(
@@ -71,7 +61,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
             .cornerRadius(8.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        bitmap.value?.also {
+        currentBitmap?.also {
             Image(
                 provider = ImageProvider(it),
                 contentDescription = null,
@@ -88,7 +78,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
             ) {
                 Text(
-                    text = currentTrackString.umlautify(),
+                    text = (currentTrackString ?: context.getUmlautifiedString(R.string.no_track_playing)),
                     style = TextStyle(
                         color = GlanceTheme.colors.onBackground,
                         textAlign = TextAlign.Center,
@@ -108,7 +98,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                     ),
                     modifier = GlanceModifier.defaultWeight()
                         .height(24.dp)
-                        .clickable { playerRepo.toggleShuffle() },
+                        .clickable { manager.toggleShuffle() },
                 )
                 Image(
                     provider = ImageProvider(R.drawable.media3_notification_seek_to_previous),
@@ -116,7 +106,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                     colorFilter = ColorFilter.tint(GlanceTheme.colors.onBackground),
                     modifier = GlanceModifier.defaultWeight()
                         .height(36.dp)
-                        .clickable { playerRepo.skipToStartOrPrevious() },
+                        .clickable { manager.skipToStartOrPrevious() },
                 )
                 if (isPlaying) {
                     Image(
@@ -125,7 +115,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onBackground),
                         modifier = GlanceModifier.defaultWeight()
                             .height(36.dp)
-                            .clickable { playerRepo.playOrPauseCurrent() },
+                            .clickable { manager.playOrPauseCurrent() },
                     )
                 } else {
                     Image(
@@ -136,7 +126,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                         ),
                         modifier = GlanceModifier.defaultWeight()
                             .height(36.dp)
-                            .clickable { playerRepo.playOrPauseCurrent() },
+                            .clickable { manager.playOrPauseCurrent() },
                     )
                 }
                 Image(
@@ -147,7 +137,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                     ),
                     modifier = GlanceModifier.defaultWeight()
                         .height(36.dp)
-                        .clickable { playerRepo.skipToNext() },
+                        .clickable { manager.skipToNext() },
                 )
                 Image(
                     provider = ImageProvider(R.drawable.repeat),
@@ -157,7 +147,7 @@ fun Widget(playerRepo: PlayerRepository, imageManager: ImageManager) {
                     ),
                     modifier = GlanceModifier.defaultWeight()
                         .height(24.dp)
-                        .clickable { playerRepo.toggleRepeat() },
+                        .clickable { manager.toggleRepeat() },
                 )
             }
         }

@@ -1,14 +1,27 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-    id("com.android.application") version "8.3.1" apply false
-    id("com.google.dagger.hilt.android") version "2.50" apply false
-    id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.dagger.hilt.android) apply false
+    alias(libs.plugins.devtools.ksp) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.kapt) apply false
+    alias(libs.plugins.compose.compiler) apply false
+    alias(libs.plugins.sentry) apply false
 }
 
 subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            val buildDir = project.layout.buildDirectory.asFile.get().absolutePath
+
+            freeCompilerArgs.addAll(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${buildDir}/compose_compiler",
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${buildDir}/compose_compiler",
+            )
+        }
+        /*
         kotlinOptions {
             val buildDir = project.layout.buildDirectory.asFile.get().absolutePath
 
@@ -21,5 +34,6 @@ subprojects {
                 "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${buildDir}/compose_compiler",
             )
         }
+         */
     }
 }

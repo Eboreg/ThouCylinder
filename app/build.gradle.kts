@@ -9,12 +9,14 @@ keystoreProperties.load(FileInputStream(rootProject.file("keystore.properties"))
 secretsProperties.load(FileInputStream(rootProject.file("secrets.properties")))
 
 plugins {
-    id("com.android.application")
-    id("com.google.dagger.hilt.android")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.dagger.hilt.android)
+    alias(libs.plugins.devtools.ksp)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.sentry)
     id("kotlin-parcelize")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.kapt")
 }
 
 kotlin {
@@ -37,9 +39,9 @@ android {
                     Action {
                         val inDir = outputFile.parentFile
                         val outDir =
-                            File("${inDir.parentFile.path}/$variantName-$versionName").apply { mkdirs() }
+                            File("${inDir?.parentFile?.path}/$variantName-$versionName").apply { mkdirs() }
 
-                        inDir.listFiles()?.filter { it.isFile && it.name.contains(versionName) }?.forEach { file ->
+                        inDir?.listFiles()?.filter { it.isFile && it.name.contains(versionName) }?.forEach { file ->
                             file.copyTo(File(outDir, file.name), overwrite = true)
                         }
                     }
@@ -61,7 +63,7 @@ android {
     }
 
     defaultConfig {
-        manifestPlaceholders += mapOf()
+        manifestPlaceholders += mapOf("redirectSchemeName" to "klaatu")
         val youtubeApiKey = secretsProperties["youtubeApiKey"] as String
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
@@ -73,10 +75,9 @@ android {
         applicationId = "us.huseli.thoucylinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "0.5.0"
+        versionCode = 17
+        versionName = "0.6.0"
 
-        manifestPlaceholders["redirectSchemeName"] = "klaatu"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -128,97 +129,102 @@ android {
         compose = true
         buildConfig = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
 }
 
-val lifecycleVersion = "2.7.0"
-val roomVersion = "2.6.1"
-val daggerVersion = "2.51.1"
-val media3Version = "1.3.1"
-val pagingVersion = "3.3.0-rc01"
+composeCompiler {
+    enableStrongSkippingMode = true
+}
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.preference.ktx)
 
     // Compose:
-    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
+    implementation(platform(libs.androidx.compose.bom))
 
     // Material:
-    implementation("androidx.compose.material:material:1.6.7") // for swipeable
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.material3)
+    implementation(libs.material.icons.extended)
 
     // Compose related:
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-    implementation("androidx.paging:paging-compose-android:$pagingVersion")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     // Lifecycle:
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     // Hilt:
-    implementation("com.google.dagger:hilt-android:$daggerVersion")
-    kapt("com.google.dagger:hilt-compiler:$daggerVersion")
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
 
     // Media3:
-    implementation("androidx.media3:media3-common:$media3Version")
-    implementation("androidx.media3:media3-exoplayer:$media3Version")
-    implementation("androidx.media3:media3-session:$media3Version")
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
 
     // Room:
-    implementation("androidx.room:room-runtime:$roomVersion")
-    ksp("androidx.room:room-compiler:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
 
     // Gson:
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.gson)
 
     // Theme etc:
-    implementation("com.github.Eboreg:RetainTheme:4.4.0")
+    implementation(libs.retain.theme)
 
     // FFMPEG:
     implementation(files("ffmpeg-kit.aar"))
     // implementation("com.arthenica:ffmpeg-kit-audio:6.0-2")
-    implementation("com.arthenica:smart-exception-java:0.2.1")
+    implementation(libs.smart.exception.java)
 
     // Splashscreen:
-    implementation("androidx.core:core-splashscreen:1.0.1")
-
-    // Paging:
-    // https://developer.android.com/topic/libraries/architecture/paging/v3-overview
-    implementation("androidx.paging:paging-common-ktx:$pagingVersion")
-    implementation("androidx.room:room-paging:$roomVersion")
+    implementation(libs.androidx.core.splashscreen)
 
     // Reorder:
-    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
+    implementation(libs.reorderable)
 
     // Levenshtein string distance:
-    implementation("org.apache.commons:commons-text:1.12.0")
+    implementation(libs.commons.text)
 
     // SimpleStorage for easier file handling:
-    implementation("com.anggrayudi:storage:1.5.5")
+    implementation(libs.storage)
 
     // XStream to parse XML:
-    implementation("com.thoughtworks.xstream:xstream:1.4.20")
+    implementation(libs.xstream)
 
     // Glance for widget:
-    implementation("androidx.glance:glance-appwidget:1.0.0")
-    implementation("androidx.glance:glance-material3:1.0.0")
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 
     // Trying out "immutable collection":
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.7")
+    implementation(libs.kotlinx.collections.immutable)
 
     // Track amplitude waveform shit:
-    implementation("com.github.lincollincol:amplituda:2.2.2")
-    implementation("com.github.lincollincol:compose-audiowaveform:1.1.2")
+    implementation(libs.amplituda)
+    implementation(libs.compose.audiowaveform)
 
     // Compose tracing for debugging/optimization:
-    implementation("androidx.compose.runtime:runtime-tracing:1.0.0-beta01")
+    implementation(libs.androidx.runtime.tracing)
+
+    // Coil for async image loading:
+    // implementation(libs.coil.base)
+    implementation(libs.coil.compose)
+
+    // Sentry
+    implementation(libs.sentry)
+    implementation(libs.sentry.compose)
+}
+
+
+sentry {
+    org.set("huselius")
+    projectName.set("thoucylinder")
+
+    // this will upload your source code to Sentry to show it as part of the stack traces
+    // disable if you don't want to expose your sources
+    includeSourceContext.set(true)
 }

@@ -1,9 +1,5 @@
 package us.huseli.thoucylinder.viewmodels
 
-import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
-import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -15,161 +11,130 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flattenMerge
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.compose.DisplayType
 import us.huseli.thoucylinder.compose.ListType
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
-import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.album.AlbumUiState
+import us.huseli.thoucylinder.dataclasses.tag.TagPojo
+import us.huseli.thoucylinder.dataclasses.track.TrackCombo
+import us.huseli.thoucylinder.dataclasses.track.toUiStates
 import us.huseli.thoucylinder.enums.AlbumSortParameter
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.enums.TrackSortParameter
-import us.huseli.thoucylinder.getAlbumUiStateFlow
-import us.huseli.thoucylinder.getTrackUiStateFlow
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 open class LibraryViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
-) : AbstractAlbumListViewModel("LibraryViewModel", repos, managers) {
-    private val _displayType = MutableStateFlow(DisplayType.LIST)
+) : AbstractAlbumListViewModel<AlbumUiState>("LibraryViewModel", repos, managers) {
     private val _isLoadingAlbums = MutableStateFlow(true)
-    private val _isLoadingPlaylists = MutableStateFlow(true)
     private val _isLoadingTracks = MutableStateFlow(true)
-    private val _listType = MutableStateFlow(ListType.ALBUMS)
-    private val _albumSortParameter = MutableStateFlow(AlbumSortParameter.ARTIST)
-    private val _albumSortOrder = MutableStateFlow(SortOrder.ASCENDING)
-    private val _trackSortParameter = MutableStateFlow(TrackSortParameter.TITLE)
-    private val _trackSortOrder = MutableStateFlow(SortOrder.ASCENDING)
-    private val _albumSearchTerm = MutableStateFlow("")
-    private val _trackSearchTerm = MutableStateFlow("")
-    private val _selectedAlbumTagPojos = MutableStateFlow<ImmutableList<TagPojo>>(persistentListOf())
-    private val _selectedTrackTagPojos = MutableStateFlow<ImmutableList<TagPojo>>(persistentListOf())
-    private val _availabilityFilter = MutableStateFlow(AvailabilityFilter.ALL)
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val _pagingTrackCombos: Flow<PagingData<TrackCombo>> =
-        combine(
-            _trackSortParameter,
-            _trackSortOrder,
-            _trackSearchTerm,
-            _selectedTrackTagPojos,
-            _availabilityFilter,
-        ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
-            repos.track.flowTrackComboPager(
-                sortParameter = sortParameter,
-                sortOrder = sortOrder,
-                searchTerm = searchTerm,
-                tagNames = tagPojos.map { it.name },
-                availabilityFilter = availability,
-            ).flow.cachedIn(viewModelScope)
-        }.flattenMerge().onEach { _isLoadingTracks.value = false }.distinctUntilChanged()
+    private val _trackCombos: Flow<List<TrackCombo>> = combine(
+        repos.settings.trackSortParameter,
+        repos.settings.trackSortOrder,
+        repos.settings.trackSearchTerm,
+        repos.settings.libraryTrackTagFilter,
+        repos.settings.libraryAvailabilityFilter,
+    ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
+        repos.track.flowTrackCombos(
+            sortParameter = sortParameter,
+            sortOrder = sortOrder,
+            searchTerm = searchTerm,
+            tagNames = tagPojos.map { it.name },
+            availabilityFilter = availability,
+        )
+    }.flattenMerge().onEach { _isLoadingTracks.value = false }.distinctUntilChanged()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     private val _albumUiStates = combine(
-        _albumSortParameter,
-        _albumSortOrder,
-        _albumSearchTerm,
-        _selectedAlbumTagPojos,
-        _availabilityFilter,
+        repos.settings.albumSortParameter,
+        repos.settings.albumSortOrder,
+        repos.settings.albumSearchTerm,
+        repos.settings.libraryAlbumTagFilter,
+        repos.settings.libraryAvailabilityFilter,
     ) { sortParameter, sortOrder, searchTerm, tagPojos, availability ->
         repos.album.flowAlbumCombos(sortParameter, sortOrder, searchTerm, tagPojos.map { it.name }, availability)
-            .map { combos -> combos.map { AlbumUiState.fromAlbumCombo(it) }.toImmutableList() }
+            .map { combos -> combos.map { it.toUiState() }.toImmutableList() }
     }.flattenMerge().onEach { _isLoadingAlbums.value = false }
 
-    override val albumUiStates: StateFlow<ImmutableList<AlbumUiState>> = combine(
-        _albumUiStates,
-        managers.library.albumDownloadTasks,
-    ) { uiStates, tasks ->
-        uiStates.map { uiState -> uiState.copy(downloadState = tasks.getAlbumUiStateFlow(uiState.albumId)) }
-            .toImmutableList()
-    }.distinctUntilChanged().stateLazily(persistentListOf())
+    override val baseAlbumUiStates: StateFlow<ImmutableList<AlbumUiState>> =
+        _albumUiStates.stateLazily(persistentListOf())
 
-    val pagingTrackUiStates: Flow<PagingData<TrackUiState>> =
-        combine(_pagingTrackCombos, managers.library.trackDownloadTasks) { pagingData, tasks ->
-            pagingData.map { combo ->
-                TrackUiState.fromTrackCombo(combo).copy(
-                    downloadState = tasks.getTrackUiStateFlow(combo.track.trackId),
-                )
-            }
-        }
-
-    val albumSearchTerm = _albumSearchTerm.asStateFlow()
-    val albumSortOrder = _albumSortOrder.asStateFlow()
-    val albumSortParameter = _albumSortParameter.asStateFlow()
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val albumTagPojos = _availabilityFilter.flatMapMerge { repos.album.flowTagPojos(it) }
+    val albumSearchTerm = repos.settings.albumSearchTerm
+    val albumSortOrder = repos.settings.albumSortOrder
+    val albumSortParameter = repos.settings.albumSortParameter
+    val albumTagPojos = repos.settings.libraryAvailabilityFilter.flatMapLatest { repos.album.flowTagPojos(it) }
         .map { it.toImmutableList() }
         .stateLazily(persistentListOf())
-    val availabilityFilter = _availabilityFilter.asStateFlow()
-    val displayType = _displayType.asStateFlow()
+    val availabilityFilter = repos.settings.libraryAvailabilityFilter
+    val displayType = repos.settings.libraryDisplayType
+    val isAlbumsEmpty: StateFlow<Boolean> = combine(
+        _albumUiStates,
+        _isLoadingAlbums,
+        repos.localMedia.isImportingLocalMedia,
+    ) { states, isLoading, isImporting ->
+        states.isEmpty() && !isLoading && !isImporting
+    }.stateLazily(false)
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
     val isLoadingAlbums = _isLoadingAlbums.asStateFlow()
-    val isLoadingPlaylists = _isLoadingPlaylists.asStateFlow()
     val isLoadingTracks = _isLoadingTracks.asStateFlow()
-    val listType = _listType.asStateFlow()
-    val playlists: StateFlow<ImmutableList<PlaylistPojo>> = repos.playlist.playlistsPojos
-        .onStart { _isLoadingPlaylists.value = true }
-        .onEach { _isLoadingPlaylists.value = false }
-        .stateLazily(persistentListOf())
-    val selectedAlbumTagPojos = _selectedAlbumTagPojos.asStateFlow()
-    val selectedTrackTagPojos = _selectedTrackTagPojos.asStateFlow()
-    val trackSearchTerm = _trackSearchTerm.asStateFlow()
-    val trackSortOrder = _trackSortOrder.asStateFlow()
-    val trackSortParameter = _trackSortParameter.asStateFlow()
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val trackTagPojos = _availabilityFilter.flatMapMerge { repos.track.flowTagPojos(it) }
-        .distinctUntilChanged()
+    val isLocalMediaDirConfigured: StateFlow<Boolean> =
+        repos.settings.localMusicUri.map { it != null }.stateLazily(false)
+    val isTracksEmpty: StateFlow<Boolean> = combine(
+        _trackCombos,
+        _isLoadingTracks,
+        repos.localMedia.isImportingLocalMedia,
+    ) { combos, isLoading, isImporting ->
+        combos.isEmpty() && !isLoading && !isImporting
+    }.stateLazily(false)
+    val listType = repos.settings.libraryListType
+    val selectedAlbumTagPojos = repos.settings.libraryAlbumTagFilter
+    val selectedTrackTagPojos = repos.settings.libraryTrackTagFilter
+    val trackSearchTerm = repos.settings.trackSearchTerm
+    val trackSortOrder = repos.settings.trackSortOrder
+    val trackSortParameter = repos.settings.trackSortParameter
+    val trackTagPojos = repos.settings.libraryAvailabilityFilter.flatMapLatest { repos.track.flowTagPojos(it) }
         .map { it.toImmutableList() }
         .stateLazily(persistentListOf())
 
-    fun ensureTrackMetadataAsync(uiState: TrackUiState) = managers.library.ensureTrackMetadataAsync(uiState.trackId)
+    override val baseTrackUiStates = _trackCombos.map { it.toUiStates() }.stateEagerly(persistentListOf())
 
-    fun setAlbumSearchTerm(value: String) {
-        _albumSearchTerm.value = value
+    fun getAlbumDownloadUiStateFlow(albumId: String) =
+        managers.library.getAlbumDownloadUiStateFlow(albumId).stateLazily()
+
+    fun getTrackDownloadUiStateFlow(trackId: String) =
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+
+    fun importNewLocalAlbums() {
+        launchOnIOThread { managers.library.importNewLocalAlbums() }
     }
 
-    fun setAlbumSorting(sortParameter: AlbumSortParameter, sortOrder: SortOrder) {
-        _albumSortParameter.value = sortParameter
-        _albumSortOrder.value = sortOrder
-    }
+    fun setAlbumSearchTerm(value: String) = repos.settings.setAlbumSearchTerm(value)
 
-    fun setAvailabilityFilter(value: AvailabilityFilter) {
-        _availabilityFilter.value = value
-    }
+    fun setAlbumSorting(sortParameter: AlbumSortParameter, sortOrder: SortOrder) =
+        repos.settings.setAlbumSorting(sortParameter, sortOrder)
 
-    fun setDisplayType(value: DisplayType) {
-        _displayType.value = value
-    }
+    fun setAvailabilityFilter(value: AvailabilityFilter) = repos.settings.setLibraryAvailabilityFilter(value)
 
-    fun setListType(value: ListType) {
-        _listType.value = value
-    }
+    fun setDisplayType(value: DisplayType) = repos.settings.setLibraryDisplayType(value)
 
-    fun setSelectedAlbumTagPojos(value: List<TagPojo>) {
-        _selectedAlbumTagPojos.value = value.toImmutableList()
-    }
+    fun setListType(value: ListType) = repos.settings.setLibraryListType(value)
 
-    fun setSelectedTrackTagPojos(value: List<TagPojo>) {
-        _selectedTrackTagPojos.value = value.toImmutableList()
-    }
+    fun setSelectedAlbumTagPojos(value: List<TagPojo>) = repos.settings.setLibraryAlbumTagFilter(value)
 
-    fun setTrackSearchTerm(value: String) {
-        _trackSearchTerm.value = value
-    }
+    fun setSelectedTrackTagPojos(value: List<TagPojo>) = repos.settings.setLibraryTrackTagFilter(value)
 
-    fun setTrackSorting(sortParameter: TrackSortParameter, sortOrder: SortOrder) {
-        _trackSortParameter.value = sortParameter
-        _trackSortOrder.value = sortOrder
-    }
+    fun setTrackSearchTerm(value: String) = repos.settings.setTrackSearchTerm(value)
+
+    fun setTrackSorting(sortParameter: TrackSortParameter, sortOrder: SortOrder) =
+        repos.settings.setTrackSorting(sortParameter, sortOrder)
 }

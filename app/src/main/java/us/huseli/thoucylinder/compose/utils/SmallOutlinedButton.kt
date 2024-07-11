@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.compose.FistopyTheme
 
 @Composable
 fun SmallOutlinedButton(
@@ -45,7 +46,7 @@ fun SmallOutlinedButton(
     onClick: () -> Unit,
     text: String,
     enabled: Boolean = true,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge,
+    textStyle: TextStyle = FistopyTheme.typography.labelLarge,
 ) {
     SmallOutlinedButton(
         onClick = onClick,

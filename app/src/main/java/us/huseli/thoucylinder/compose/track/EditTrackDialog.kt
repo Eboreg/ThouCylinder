@@ -26,7 +26,7 @@ import us.huseli.thoucylinder.compose.utils.AutocompleteTextField
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.SaveButton
-import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
+import us.huseli.thoucylinder.dataclasses.track.TrackUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.EditTrackViewModel
 
@@ -39,7 +39,7 @@ fun EditTrackDialog(
 ) {
     var title by rememberSaveable { mutableStateOf(state.title) }
     var artistNames by rememberSaveable {
-        mutableStateOf(state.trackArtists.map { it.name }.takeIf { it.isNotEmpty() } ?: listOf(""))
+        mutableStateOf(state.artists.map { it.name }.takeIf { it.isNotEmpty() } ?: listOf(""))
     }
     var albumPosition by rememberSaveable { mutableStateOf(state.albumPosition?.toString() ?: "") }
     var discNumber by rememberSaveable { mutableStateOf(state.discNumber?.toString() ?: "") }
@@ -55,7 +55,7 @@ fun EditTrackDialog(
             SaveButton(
                 onClick = {
                     viewModel.updateTrack(
-                        state = state,
+                        trackId = state.trackId,
                         title = title,
                         year = year.toIntOrNull(),
                         albumPosition = albumPosition.toIntOrNull(),

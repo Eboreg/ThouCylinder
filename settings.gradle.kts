@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ThouCylinder"
+rootProject.name = "Fistopy"
 include(":app")

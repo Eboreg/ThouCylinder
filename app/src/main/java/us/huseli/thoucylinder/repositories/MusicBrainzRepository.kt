@@ -3,6 +3,7 @@ package us.huseli.thoucylinder.repositories
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,17 +15,21 @@ import us.huseli.thoucylinder.MutexCache
 import us.huseli.thoucylinder.Request
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveImage
 import us.huseli.thoucylinder.dataclasses.CoverArtArchiveResponse
-import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.combos.TrackMergeStrategy
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzArtistSearch
-import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzRelease
-import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseGroup
-import us.huseli.thoucylinder.dataclasses.musicBrainz.MusicBrainzReleaseSearch
-import us.huseli.thoucylinder.getMutexCache
+import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.album.TrackMergeStrategy
+import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.artist.Artist
+import us.huseli.thoucylinder.dataclasses.artist.joined
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzArtistSearch
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzRecordingSearch
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzRelease
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroup
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroupSearch
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseSearch
+import us.huseli.thoucylinder.enums.ListUpdateStrategy
+import us.huseli.thoucylinder.externalcontent.SearchParams
 import us.huseli.thoucylinder.interfaces.ILogger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,7 +48,6 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
             val timeSinceLast = lastJobFinished?.let { System.currentTimeMillis() - it }
 
             if (timeSinceLast != null && timeSinceLast < MIN_REQUEST_INTERVAL_MS) {
-                log("timeSinceLast == $timeSinceLast, will delay for ${MIN_REQUEST_INTERVAL_MS - timeSinceLast} ms")
                 delay(MIN_REQUEST_INTERVAL_MS - timeSinceLast)
             }
         }
@@ -59,28 +63,15 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
         fetchMethod = { RequestJobManager.runJob(it) },
         debugLabel = "MusicBrainzRepository.apiResponseCache",
     )
-    private val coverArtArchiveCache =
-        getMutexCache<String, CoverArtArchiveResponse>("MusicBrainzRepository.coverArtArchiveCache") { releaseId ->
-            Request(
-                url = "$COVERARTARCHIVE_API_ROOT/$releaseId",
-                headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
-            ).getObject<CoverArtArchiveResponse>()
-        }
     private var matchArtistsJob: Job? = null
-
-    suspend fun getAllCoverArtArchiveImages(releaseId: String): List<CoverArtArchiveImage> =
-        coverArtArchiveCache.getOrNull(releaseId)?.images?.filter { it.front } ?: emptyList()
 
     suspend fun getRelease(id: String): MusicBrainzRelease? = gson.fromJson(
         request("release/$id", mapOf("inc" to "recordings artist-credits genres release-groups")),
         MusicBrainzRelease::class.java,
     )?.copy(id = id)
 
-    suspend fun getReleaseCoverArt(releaseId: String): MediaStoreImage? = getRelease(releaseId)
-        ?.let { getCoverArtArchiveImage(it)?.toMediaStoreImage() }
-
     suspend fun getReleaseId(combo: AlbumWithTracksCombo): String? = combo.album.musicBrainzReleaseId
-        ?: getReleaseId(artist = combo.artists.joined(), album = combo.album.title, trackCount = combo.trackCount)
+        ?: getReleaseId(artist = combo.artists.joined(), album = combo.album.title, trackCount = combo.tracks.size)
 
     suspend fun getSiblingReleaseIds(releaseId: String): List<String> =
         getRelease(releaseId)?.releaseGroup?.id?.let { getReleaseGroup(it) }?.releases?.map { it.id } ?: emptyList()
@@ -92,32 +83,121 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
         return Request(url = url, headers = headers).getString().split('\n').toSet()
     }
 
+    suspend fun listAllReleaseCoverArt(releaseId: String): List<CoverArtArchiveImage>? = Request(
+        url = "https://coverartarchive.org/release/$releaseId",
+        headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
+    ).getObjectOrNull<CoverArtArchiveResponse>()?.images?.filter { it.front }
+
     suspend fun matchAlbumWithTracks(
-        combo: AlbumWithTracksCombo,
+        combo: IAlbumWithTracksCombo<IAlbum>,
         maxDistance: Double = MAX_ALBUM_MATCH_DISTANCE,
-        strategy: TrackMergeStrategy = TrackMergeStrategy.KEEP_LEAST,
-        getArtist: suspend (UnsavedArtist) -> Artist,
-    ): AlbumWithTracksCombo? {
+        trackMergeStrategy: TrackMergeStrategy = TrackMergeStrategy.KEEP_LEAST,
+        albumArtistUpdateStrategy: ListUpdateStrategy = ListUpdateStrategy.REPLACE,
+        trackArtistUpdateStrategy: ListUpdateStrategy = ListUpdateStrategy.REPLACE,
+        tagUpdateStrategy: ListUpdateStrategy = ListUpdateStrategy.MERGE,
+    ): UnsavedAlbumWithTracksCombo? {
         val params = mutableMapOf(
             "release" to combo.album.title,
             "tracks" to combo.trackCombos.size.toString(),
         )
         combo.artists.joined()?.also { params["artist"] = it }
-        val releaseIds =
-            gson.fromJson(search("release", params), MusicBrainzReleaseSearch::class.java)?.releaseIds
+
+        val releases = gson.fromJson(
+            search(resource = "release", queryParams = params),
+            MusicBrainzReleaseSearch::class.java,
+        )?.releases
+        val releaseIds = releases?.map { it.id }
         val matches = releaseIds?.mapNotNull { releaseId ->
             getRelease(releaseId)?.toAlbumWithTracks(
                 isLocal = combo.album.isLocal,
-                getArtist = getArtist,
                 isInLibrary = combo.album.isInLibrary,
             )?.match(combo)
         }
-
-        return matches?.filter { it.distance <= maxDistance }
+        val updatedCombo = matches?.filter { it.distance <= maxDistance }
             ?.minByOrNull { it.distance }
             ?.albumCombo
-            ?.let { combo.updateWith(it, strategy) }
+            ?.let {
+                combo.updateWith(
+                    other = it,
+                    trackMergeStrategy = trackMergeStrategy,
+                    albumArtistUpdateStrategy = albumArtistUpdateStrategy,
+                    trackArtistUpdateStrategy = trackArtistUpdateStrategy,
+                    tagUpdateStrategy = tagUpdateStrategy,
+                )
+            }
+        val albumArt = updatedCombo?.album?.albumArt ?: getCoverArtArchiveImage(
+            releaseId = updatedCombo?.album?.musicBrainzReleaseId,
+            releaseGroupId = updatedCombo?.album?.musicBrainzReleaseGroupId,
+        )?.toMediaStoreImage()
+
+        return updatedCombo?.copy(album = updatedCombo.album.withAlbumArt(albumArt = albumArt))
     }
+
+    fun recordingSearchChannel(searchParams: SearchParams) =
+        Channel<MusicBrainzRecordingSearch.Recording>().also { channel ->
+            launchOnIOThread {
+                val params = mutableMapOf<String, String>()
+                var total: Int?
+                var offset = 0
+
+                if (!searchParams.track.isNullOrEmpty()) params["title"] = searchParams.track
+                if (!searchParams.artist.isNullOrEmpty()) params["artist"] = searchParams.artist
+                if (!searchParams.album.isNullOrEmpty()) params["release"] = searchParams.album
+
+                if (params.isNotEmpty() || !searchParams.freeText.isNullOrEmpty()) {
+                    do {
+                        val response = gson.fromJson(
+                            search(
+                                resource = "recording",
+                                freeText = searchParams.freeText,
+                                limit = 100,
+                                queryParams = params,
+                                offset = offset,
+                            ),
+                            MusicBrainzRecordingSearch::class.java,
+                        )
+
+                        total = response?.count
+                        offset += 100
+                        response?.recordings?.forEach { channel.send(it) }
+                    } while (total != null && total > (offset + 1) * 100)
+                }
+                channel.close()
+            }
+        }
+
+    fun releaseGroupSearchChannel(searchParams: SearchParams) =
+        Channel<MusicBrainzReleaseGroupSearch.ReleaseGroup>().also { channel ->
+            launchOnIOThread {
+                val params = mutableMapOf<String, String>()
+
+                if (!searchParams.artist.isNullOrEmpty()) params["artist"] = searchParams.artist
+                if (!searchParams.album.isNullOrEmpty()) params["release"] = searchParams.album
+
+                if (params.isNotEmpty() || !searchParams.freeText.isNullOrEmpty()) {
+                    var total: Int?
+                    var offset = 0
+
+                    do {
+                        val response = gson.fromJson(
+                            search(
+                                resource = "release-group",
+                                freeText = searchParams.freeText,
+                                limit = 100,
+                                queryParams = params,
+                                offset = offset,
+                            ),
+                            MusicBrainzReleaseGroupSearch::class.java,
+                        )
+
+                        total = response?.count
+                        offset += 100
+                        response?.releaseGroups?.forEach { channel.send(it) }
+                    } while (total != null && total > (offset + 1) * 100)
+                }
+                channel.close()
+            }
+        }
 
     fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String) -> Unit) {
         if (matchArtistsJob == null) matchArtistsJob = launchOnIOThread {
@@ -127,7 +207,7 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
                 .map { artists -> artists.filter { it.musicBrainzId == null && !previousIds.contains(it.artistId) } }
                 .collect { artists ->
                     for (artist in artists) {
-                        val matchedId = search("artist", artist.name, true)
+                        val matchedId = search(resource = "artist", query = artist.name, lowPrio = true)
                             ?.let { gson.fromJson(it, MusicBrainzArtistSearch::class.java) }
                             ?.artists
                             ?.firstOrNull { it.matches(artist.name) }
@@ -145,12 +225,16 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
 
     private fun escapeString(string: String): String =
         string.replace(Regex("([+\\-&|!(){}\\[\\]^\"~*?:\\\\/])"), "\\\\$1")
+            .let { if (it.contains(' ')) "\"$it\"" else it }
 
-    private suspend fun getCoverArtArchiveImage(release: MusicBrainzRelease): CoverArtArchiveImage? =
-        getAllCoverArtArchiveImages(release.id).firstOrNull()
-            ?: getReleaseGroup(release.releaseGroup.id)
-                ?.releases
-                ?.firstNotNullOfOrNull { getAllCoverArtArchiveImages(it.id).firstOrNull() }
+    private suspend fun getAllReleaseGroupCoverArt(releaseGroupId: String): List<CoverArtArchiveImage>? = Request(
+        url = "https://coverartarchive.org/release-group/$releaseGroupId",
+        headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
+    ).getObjectOrNull<CoverArtArchiveResponse>()?.images?.filter { it.front }
+
+    suspend fun getCoverArtArchiveImage(releaseId: String?, releaseGroupId: String?): CoverArtArchiveImage? =
+        releaseId?.let { listAllReleaseCoverArt(it)?.firstOrNull() }
+            ?: releaseGroupId?.let { getAllReleaseGroupCoverArt(it)?.firstOrNull() }
 
     private suspend fun getReleaseGroup(id: String): MusicBrainzReleaseGroup? = gson.fromJson(
         request("release-group/$id", mapOf("inc" to "artist-credits genres releases")),
@@ -163,7 +247,8 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
             "tracks" to trackCount.toString(),
         )
         if (artist != null) params["artist"] = artist
-        val response = gson.fromJson(search("release", params), MusicBrainzReleaseSearch::class.java)
+        val response =
+            gson.fromJson(search(resource = "release", queryParams = params), MusicBrainzReleaseSearch::class.java)
 
         return response?.releases?.firstOrNull { release -> release.matches(artist, album) }?.id
     }
@@ -180,15 +265,22 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
 
     private suspend fun search(
         resource: String,
+        freeText: String? = null,
         queryParams: Map<String, String> = emptyMap(),
         lowPrio: Boolean = false,
         limit: Int = 10,
+        offset: Int = 0,
     ): String? {
         val query = queryParams
             .map { (key, value) -> "$key:${escapeString(value)}" }
+            .let { if (freeText != null) it.plus(escapeString(freeText)) else it }
             .joinToString(" AND ")
 
-        return request(resource, mapOf("query" to query, "limit" to limit.toString()), lowPrio)
+        return request(
+            path = resource,
+            params = mapOf("query" to query, "limit" to limit.toString(), "offset" to offset.toString()),
+            lowPrio = lowPrio,
+        )
     }
 
     private suspend fun search(resource: String, query: String, lowPrio: Boolean = false, limit: Int = 10): String? {
@@ -197,8 +289,8 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
 
     companion object {
         const val MUSICBRAINZ_API_ROOT = "https://musicbrainz.org/ws/2"
-        const val COVERARTARCHIVE_API_ROOT = "https://coverartarchive.org/release"
         const val MAX_ALBUM_MATCH_DISTANCE = 1.0
+
         // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
         const val MIN_REQUEST_INTERVAL_MS = 1000L
     }

@@ -3,7 +3,6 @@ package us.huseli.thoucylinder.compose.album
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,140 +14,116 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
 import androidx.compose.material.icons.sharp.CheckCircle
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.StateFlow
 import us.huseli.retaintheme.ui.theme.LocalBasicColors
-import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.AlbumDownloadTask
+import us.huseli.thoucylinder.compose.FistopyTheme
+import us.huseli.thoucylinder.compose.scrollbar.ScrollbarGridState
+import us.huseli.thoucylinder.compose.scrollbar.rememberScrollbarGridState
+import us.huseli.thoucylinder.compose.utils.DownloadStateProgressIndicator
 import us.huseli.thoucylinder.compose.utils.ItemGrid
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.callbacks.AlbumCallbacks
-import us.huseli.thoucylinder.dataclasses.callbacks.AlbumSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
+import us.huseli.thoucylinder.dataclasses.album.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.album.IAlbumUiState
 import us.huseli.thoucylinder.umlautify
-import us.huseli.thoucylinder.viewmodels.ImageViewModel
 
 @Composable
 fun AlbumGrid(
-    states: () -> ImmutableList<AlbumUiState>,
-    callbacks: AlbumCallbacks,
+    states: () -> ImmutableList<IAlbumUiState>,
+    downloadStateFlow: (String) -> StateFlow<AlbumDownloadTask.UiState?>,
+    onClick: (String) -> Unit,
+    onLongClick: (String) -> Unit,
+    selectedAlbumCount: () -> Int,
     selectionCallbacks: AlbumSelectionCallbacks,
-    selectedAlbumIds: ImmutableList<String>,
     modifier: Modifier = Modifier,
-    imageViewModel: ImageViewModel = hiltViewModel(),
+    isLoading: Boolean = false,
+    scrollbarState: ScrollbarGridState = rememberScrollbarGridState(),
     showArtist: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(vertical = 10.dp),
-    progressIndicatorText: () -> String? = { null },
-    onEmpty: @Composable () -> Unit,
+    onEmpty: @Composable () -> Unit = {},
 ) {
-    val isSelected: (AlbumUiState) -> Boolean = { selectedAlbumIds.contains(it.albumId) }
-
-    SelectedAlbumsButtons(albumCount = selectedAlbumIds.size, callbacks = selectionCallbacks)
+    SelectedAlbumsButtons(albumCount = selectedAlbumCount, callbacks = selectionCallbacks)
 
     ItemGrid(
+        things = states,
         modifier = modifier,
-        things = states(),
-        onClick = { _, state ->
-            callbacks.onAlbumClick?.invoke(state.albumId)
-        },
-        onLongClick = { _, state ->
-            callbacks.onAlbumLongClick?.invoke(state.albumId)
-        },
-        contentPadding = contentPadding,
+        onClick = { onClick(it.albumId) },
+        onLongClick = { onLongClick(it.albumId) },
+        isSelected = { it.isSelected },
+        isLoading = isLoading,
+        key = { it.albumId },
+        scrollbarState = scrollbarState,
         onEmpty = onEmpty,
-        isSelected = isSelected,
-        progressIndicatorText = progressIndicatorText,
-    ) { _, state ->
-        val artistString = state.artists.joined()
-        val downloadState by state.downloadState.collectAsStateWithLifecycle()
+    ) { state ->
+        AlbumGridCell(
+            state = state,
+            downloadStateFlow = { downloadStateFlow(state.albumId) },
+            showArtist = showArtist,
+        )
+    }
+}
 
-        Box(modifier = Modifier.aspectRatio(1f)) {
-            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+@Composable
+fun AlbumGridCell(
+    state: IAlbumUiState,
+    downloadStateFlow: () -> StateFlow<AlbumDownloadTask.UiState?>,
+    showArtist: Boolean = true,
+) {
+    val downloadState by downloadStateFlow().collectAsStateWithLifecycle()
 
-            LaunchedEffect(state.fullImageUri) {
-                imageBitmap = imageViewModel.getFullImageBitmap(state.fullImageUri)
-            }
+    Box(modifier = Modifier.aspectRatio(1f)) {
+        Thumbnail(
+            model = state,
+            placeholderIcon = Icons.Sharp.Album,
+            borderWidth = null,
+            shape = RectangleShape,
+        )
 
-            Thumbnail(
-                imageBitmap = { imageBitmap },
-                borderWidth = null,
-                placeholderIcon = Icons.Sharp.Album,
-            )
-
-            if (isSelected(state)) {
-                Icon(
-                    imageVector = Icons.Sharp.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().padding(10.dp),
-                    tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
-                )
-            }
-        }
-
-        downloadState?.also {
-            if (it.isActive) LinearProgressIndicator(
-                progress = { it.progress },
-                modifier = Modifier.fillMaxWidth().height(2.dp),
+        if (state.isSelected) {
+            Icon(
+                imageVector = Icons.Sharp.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().padding(10.dp),
+                tint = LocalBasicColors.current.Green.copy(alpha = 0.7f),
             )
         }
+    }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = if (downloadState?.isActive == true) 3.dp else 5.dp,
-                    bottom = 5.dp,
-                    start = 5.dp,
-                )
-                .height(62.dp),
+    downloadState?.also { DownloadStateProgressIndicator(it) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(10.dp).height(56.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Column(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
+            Text(
+                text = state.title.umlautify(),
+                maxLines = if (state.artistString != null && showArtist) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+                style = FistopyTheme.bodyStyles.primaryBold,
+            )
+            if (showArtist) state.artistString?.also {
                 Text(
-                    text = state.title.umlautify(),
-                    maxLines = if (artistString != null && showArtist) 1 else 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listNormalHeader,
-                )
-                if (showArtist && artistString != null) Text(
-                    text = artistString.umlautify(),
+                    text = it.umlautify(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                    style = FistopyTheme.bodyStyles.primarySmall,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AlbumSmallIcons(isLocal = state.isLocal, isOnYoutube = state.isOnYoutube)
-                }
             }
-
-            AlbumContextMenuWithButton(
-                albumId = state.albumId,
-                albumArtists = state.artists.toImmutableList(),
-                isLocal = state.isLocal,
-                isInLibrary = state.isInLibrary,
-                isPartiallyDownloaded = state.isPartiallyDownloaded,
-                callbacks = callbacks,
-                spotifyWebUrl = state.spotifyWebUrl,
-                youtubeWebUrl = state.youtubeWebUrl,
-            )
         }
+
+        AlbumBottomSheetWithButton(uiState = state)
     }
 }

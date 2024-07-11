@@ -4,195 +4,223 @@ import android.content.Context
 import android.net.Uri
 import androidx.annotation.WorkerThread
 import androidx.core.net.toUri
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import com.anggrayudi.storage.extension.openInputStream
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import linc.com.amplituda.Amplituda
 import linc.com.amplituda.Compress
 import us.huseli.retaintheme.extensions.pruneOrPad
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.tag.TagPojo
+import us.huseli.thoucylinder.dataclasses.track.Track
+import us.huseli.thoucylinder.dataclasses.track.TrackCombo
 import us.huseli.thoucylinder.deleteWithEmptyParentDirs
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.enums.TrackSortParameter
 import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.isRemote
+import us.huseli.thoucylinder.waveList
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.ceil
 
 @Singleton
-class TrackRepository @Inject constructor(database: Database, @ApplicationContext private val context: Context) :
-    ILogger {
+class TrackRepository @Inject constructor(
+    database: Database,
+    @ApplicationContext private val context: Context,
+) : ILogger, AbstractScopeHolder() {
     private val trackDao = database.trackDao()
-    private val selectedTrackIds = mutableMapOf<String, MutableStateFlow<List<String>>>()
+    private val selectedTrackStateIds = mutableMapOf<String, MutableStateFlow<Set<String>>>()
 
-    suspend fun addToLibrary(trackIds: Collection<String>) = trackDao.setIsInLibrary(true, *trackIds.toTypedArray())
+    suspend fun addToLibrary(trackIds: Collection<String>) =
+        onIOThread { trackDao.setIsInLibrary(true, *trackIds.toTypedArray()) }
 
     suspend fun addToLibraryByAlbumId(albumIds: Collection<String>) =
-        trackDao.setIsInLibraryByAlbumId(true, *albumIds.toTypedArray())
+        onIOThread { trackDao.setIsInLibraryByAlbumId(true, *albumIds.toTypedArray()) }
 
     suspend fun clearLocalUris(trackIds: Collection<String>) {
-        if (trackIds.isNotEmpty()) trackDao.clearLocalUris(trackIds)
+        if (trackIds.isNotEmpty()) onIOThread { trackDao.clearLocalUris(trackIds) }
     }
 
-    suspend fun clearTracks() = trackDao.clearTracks()
+    suspend fun clearTracks() = onIOThread { trackDao.clearTracks() }
 
-    suspend fun deleteTempTracks() = trackDao.deleteTempTracks()
+    suspend fun deleteTempTracks() = onIOThread { trackDao.deleteTempTracks() }
 
     @WorkerThread
     fun deleteTrackFiles(tracks: Collection<Track>) = tracks
         .mapNotNull { it.getDocumentFile(context) }
         .forEach { it.deleteWithEmptyParentDirs(context) }
 
-    suspend fun deleteTracks(tracks: Collection<Track>) {
-        if (tracks.isNotEmpty()) trackDao.deleteTracks(*tracks.toTypedArray())
+    suspend fun deleteTracksById(trackIds: Collection<String>) {
+        if (trackIds.isNotEmpty()) onIOThread { trackDao.deleteTracksById(*trackIds.toTypedArray()) }
     }
 
-    suspend fun deleteTracksByAlbumId(albumIds: Collection<String>) {
-        if (albumIds.isNotEmpty()) trackDao.deleteTracksByAlbumId(*albumIds.toTypedArray())
+    fun flowAmplitudes(trackId: String): Flow<ImmutableList<Int>> = channelFlow {
+        val track = trackDao.getTrackById(trackId)
+        val amplitudeList = track?.amplitudeList
+        val url = track?.lofiUri
+
+        if (amplitudeList != null) send(amplitudeList)
+        else {
+            val waitingJob = launchOnIOThread {
+                var offset = 0
+
+                while (true) {
+                    send(waveList(100, 0, 12, 3, offset).toImmutableList())
+                    offset++
+                    delay(200L)
+                }
+            }
+
+            if (url != null) {
+                val amplituda = Amplituda(context)
+                val samplesPerSecond =
+                    track.durationMs?.div(1000)?.let { if (it < 100) ceil(100.0 / it).toInt() else 1 } ?: 1
+                val comp = Compress.withParams(Compress.PEEK, samplesPerSecond)
+                val output = onIOThread {
+                    url.toUri().takeIf { !it.isRemote }?.let { uri ->
+                        uri.openInputStream(context)?.use { amplituda.processAudio(it, comp) }
+                    } ?: amplituda.processAudio(url, comp)
+                }
+                var amplitudes: ImmutableList<Int>? = null
+
+                output.get(
+                    { result -> amplitudes = result.amplitudesAsList().pruneOrPad(100).toImmutableList() },
+                    { exception -> logError("amplitudes $url", exception) },
+                )
+                waitingJob.cancel()
+                amplitudes?.also {
+                    send(it)
+                    launchOnIOThread {
+                        trackDao.setTrackAmplitudes(trackId, it.joinToString(","))
+                    }
+                }
+            }
+        }
     }
 
-    fun flowSelectedTrackIds(viewModelClass: String): StateFlow<List<String>> =
-        mutableFlowSelectedTrackIds(viewModelClass).asStateFlow()
+    fun flowSelectedTrackStateIds(viewModelClass: String): StateFlow<Set<String>> =
+        mutableFlowSelectedTrackStateIds(viewModelClass).asStateFlow()
 
-    fun flowTagPojos(availabilityFilter: AvailabilityFilter) = trackDao.flowTagPojos(availabilityFilter)
+    fun flowTagPojos(availabilityFilter: AvailabilityFilter): Flow<List<TagPojo>> =
+        trackDao.flowTagPojos(availabilityFilter)
 
-    fun flowTrackComboPager(
+    fun flowTrackCombos(
         sortParameter: TrackSortParameter,
         sortOrder: SortOrder,
         searchTerm: String,
         tagNames: List<String>,
         availabilityFilter: AvailabilityFilter,
-    ) = Pager(config = PagingConfig(pageSize = 100)) {
-        trackDao.pageTrackCombos(sortParameter, sortOrder, searchTerm, tagNames, availabilityFilter)
-    }
+    ): Flow<List<TrackCombo>> =
+        trackDao.flowTrackCombos(sortParameter, sortOrder, searchTerm, tagNames, availabilityFilter)
 
-    fun flowTrackCombosByAlbumId(albumId: String) = trackDao.flowTrackCombosByAlbumId(albumId)
+    fun flowTrackCombosByAlbumId(albumId: String): Flow<List<TrackCombo>> = trackDao.flowTrackCombosByAlbumId(albumId)
 
-    suspend fun getAlbumIdByTrackId(trackId: String): String? = trackDao.getAlbumIdByTrackId(trackId)
+    fun flowTrackCombosByArtist(artistId: String): Flow<List<TrackCombo>> =
+        trackDao.flowTrackCombosByArtist(artistId)
 
-    suspend fun getAmplitudes(track: Track): ImmutableList<Int>? {
-        track.amplitudeList?.also { return it }
-
-        val lofiUri = track.lofiUri ?: return null
-        val amplituda = Amplituda(context)
-        val samplesPerSecond = track.durationMs?.div(1000)?.let { if (it < 100) ceil(100.0 / it).toInt() else 1 } ?: 1
-        val comp = Compress.withParams(Compress.PEEK, samplesPerSecond)
-        val output = lofiUri.toUri().takeIf { !it.isRemote }?.let { uri ->
-            uri.openInputStream(context)?.use { amplituda.processAudio(it, comp) }
-        } ?: amplituda.processAudio(lofiUri, comp)
-        var amplitudes: ImmutableList<Int>? = null
-
-        output.get(
-            { result -> amplitudes = result.amplitudesAsList().pruneOrPad(100).toImmutableList() },
-            { exception -> logError("amplitudes $lofiUri", exception) },
-        )
-
-        return amplitudes?.also {
-            log("Got amplitudes for $track: max=${it.max()}, avg=${it.average()}")
-            trackDao.setTrackAmplitudes(track.trackId, it.joinToString(","))
-        }
-    }
-
-    suspend fun getLibraryTrackCount(): Int = trackDao.getLibraryTrackCount()
+    suspend fun getLibraryTrackCount(): Int = onIOThread { trackDao.getLibraryTrackCount() }
 
     fun getLocalAbsolutePath(track: Track): String? = track.getLocalAbsolutePath(context)
 
-    suspend fun getTrackById(trackId: String): Track? = trackDao.getTrackById(trackId)
+    suspend fun getTrackById(trackId: String): Track? = onIOThread { trackDao.getTrackById(trackId) }
 
-    suspend fun getTrackComboById(trackId: String): TrackCombo? = trackDao.getTrackComboById(trackId)
+    suspend fun getTrackComboById(trackId: String): TrackCombo? = onIOThread { trackDao.getTrackComboById(trackId) }
 
-    suspend fun listNonAlbumTracks() = trackDao.listNonLocalTracks()
+    suspend fun listNonAlbumTracks() = onIOThread { trackDao.listNonAlbumTracks() }
 
     suspend fun listRandomLibraryTrackCombos(
         limit: Int,
-        exceptTrackIds: Collection<String>? = null,
-        exceptSpotifyTrackIds: Collection<String>? = null,
-    ): List<TrackCombo> = trackDao.listRandomLibraryTrackCombos(
-        limit = limit,
-        exceptTrackIds = exceptTrackIds ?: emptyList(),
-        exceptSpotifyTrackIds = exceptSpotifyTrackIds ?: emptyList(),
-    )
+        exceptTrackIds: List<String> = emptyList(),
+        exceptSpotifyTrackIds: List<String> = emptyList(),
+    ): List<TrackCombo> = onIOThread {
+        trackDao.listRandomLibraryTrackCombos(
+            limit = limit,
+            exceptTrackIds = exceptTrackIds,
+            exceptSpotifyTrackIds = exceptSpotifyTrackIds,
+        )
+    }
 
-    suspend fun listTrackCombosByAlbumId(albumId: String) = trackDao.listTrackCombosByAlbumId(albumId)
+    suspend fun listTrackCombosByAlbumId(vararg albumIds: String): List<TrackCombo> =
+        onIOThread { trackDao.listTrackCombosByAlbumId(*albumIds) }
 
-    suspend fun listTrackCombosByArtistId(artistId: String) = trackDao.listTrackCombosByArtistId(artistId)
+    suspend fun listTrackCombosByArtistId(artistId: String): List<TrackCombo> =
+        onIOThread { trackDao.listTrackCombosByArtistId(artistId) }
 
-    suspend fun listTrackCombosById(trackIds: Collection<String>) =
-        if (trackIds.isNotEmpty()) trackDao.listTrackCombosById(*trackIds.toTypedArray()) else emptyList()
+    suspend fun listTrackCombosById(trackIds: Collection<String>): List<TrackCombo> =
+        if (trackIds.isNotEmpty()) onIOThread { trackDao.listTrackCombosById(*trackIds.toTypedArray()) }
+        else emptyList()
 
-    suspend fun listTrackIdsByAlbumId(albumIds: Collection<String>) =
-        trackDao.listTrackIdsByAlbumId(*albumIds.toTypedArray()).toImmutableList()
+    suspend fun listTrackIds(): List<String> = onIOThread { trackDao.listTrackIds() }
 
-    suspend fun listTrackLocalUris(): List<Uri> = trackDao.listLocalUris().map { it.toUri() }
+    suspend fun listTrackIdsByAlbumId(albumIds: Collection<String>): ImmutableList<String> =
+        onIOThread { trackDao.listTrackIdsByAlbumId(*albumIds.toTypedArray()).toImmutableList() }
 
-    suspend fun listTrackIdsByArtistId(artistId: String): List<String> = trackDao.listTrackIdsByArtistId(artistId)
+    suspend fun listTrackLocalUris(): List<Uri> = onIOThread { trackDao.listLocalUris().map { it.toUri() } }
 
-    suspend fun listTracksByAlbumId(albumId: String): List<Track> = trackDao.listTracksByAlbumId(albumId)
+    suspend fun listTrackIdsByArtistId(artistId: String): ImmutableList<String> =
+        onIOThread { trackDao.listTrackIdsByArtistId(artistId).toImmutableList() }
 
-    suspend fun listTracksById(trackIds: Collection<String>) =
-        if (trackIds.isNotEmpty()) trackDao.listTracksById(*trackIds.toTypedArray()) else emptyList()
+    suspend fun listTracksByAlbumId(albumId: String): List<Track> = onIOThread { trackDao.listTracksByAlbumId(albumId) }
 
-    fun pageTrackCombosByArtist(artistId: String): Pager<Int, TrackCombo> =
-        Pager(config = PagingConfig(pageSize = 100)) { trackDao.pageTrackCombosByArtist(artistId) }
-
-    suspend fun removeFromLibraryByAlbumId(albumIds: Collection<String>) =
-        trackDao.setIsInLibraryByAlbumId(false, *albumIds.toTypedArray())
-
-    fun selectTrackIds(selectionKey: String, trackIds: Iterable<String>) {
-        mutableFlowSelectedTrackIds(selectionKey).also {
-            val currentIds = it.value
-            it.value += trackIds.filter { trackId -> !currentIds.contains(trackId) }
+    fun selectTracks(selectionKey: String, stateIds: Iterable<String>) {
+        mutableFlowSelectedTrackStateIds(selectionKey).also { flow ->
+            flow.value += stateIds.filter { id -> !flow.value.contains(id) }
         }
     }
 
-    suspend fun setAlbumTracks(albumId: String, tracks: Collection<Track>) = trackDao.setAlbumTracks(albumId, tracks)
+    suspend fun setAlbumComboTracks(combo: IAlbumWithTracksCombo<IAlbum>) = onIOThread {
+        trackDao.setAlbumTracks(combo.album.albumId, combo.tracks)
+    }
 
-    suspend fun setTrackSpotifyId(trackId: String, spotifyId: String) = trackDao.setTrackSpotifyId(trackId, spotifyId)
+    suspend fun setPlayCounts(trackId: String, localPlayCount: Int, lastFmPlayCount: Int?) =
+        onIOThread { trackDao.setPlayCounts(trackId, localPlayCount, lastFmPlayCount) }
 
-    fun toggleTrackIdSelected(selectionKey: String, trackId: String): Boolean {
-        return mutableFlowSelectedTrackIds(selectionKey).let {
-            if (it.value.contains(trackId)) {
-                it.value -= trackId
+    suspend fun setTrackSpotifyId(trackId: String, spotifyId: String) =
+        onIOThread { trackDao.setTrackSpotifyId(trackId, spotifyId) }
+
+    fun toggleTrackSelected(selectionKey: String, stateId: String): Boolean {
+        return mutableFlowSelectedTrackStateIds(selectionKey).let { flow ->
+            if (flow.value.contains(stateId)) {
+                flow.value -= stateId
                 false
             } else {
-                it.value += trackId
+                flow.value += stateId
                 true
             }
         }
     }
 
-    fun unselectAllTrackIds(selectionKey: String) {
-        mutableFlowSelectedTrackIds(selectionKey).value = emptyList()
+    fun unselectAllTracks(selectionKey: String) {
+        mutableFlowSelectedTrackStateIds(selectionKey).value = emptySet()
     }
 
-    fun unselectTrackIds(selectionKey: String, trackIds: Collection<String>) {
-        mutableFlowSelectedTrackIds(selectionKey).value -= trackIds
+    fun unselectTracks(selectionKey: String, ids: Collection<String>) {
+        mutableFlowSelectedTrackStateIds(selectionKey).value -= ids
     }
 
-    suspend fun updateTrack(track: Track) = trackDao.updateTracks(track)
-
-    suspend fun updateTracks(tracks: Collection<Track>) = trackDao.updateTracks(*tracks.toTypedArray())
-
-    suspend fun upsertTrack(track: Track) = trackDao.upsertTracks(track)
+    suspend fun upsertTrack(track: Track) = onIOThread { trackDao.upsertTracks(track) }
 
     suspend fun upsertTracks(tracks: Collection<Track>) {
-        if (tracks.isNotEmpty()) trackDao.upsertTracks(*tracks.toTypedArray())
+        if (tracks.isNotEmpty()) onIOThread { trackDao.upsertTracks(*tracks.toTypedArray()) }
     }
 
 
-    /** PRIVATE METHODS *******************************************************/
-    private fun mutableFlowSelectedTrackIds(viewModelClass: String): MutableStateFlow<List<String>> =
-        selectedTrackIds[viewModelClass] ?: MutableStateFlow<List<String>>(emptyList()).also {
-            selectedTrackIds[viewModelClass] = it
+    /** PRIVATE METHODS ***********************************************************************************************/
+
+    private fun mutableFlowSelectedTrackStateIds(viewModelClass: String): MutableStateFlow<Set<String>> =
+        selectedTrackStateIds[viewModelClass] ?: MutableStateFlow<Set<String>>(emptySet()).also {
+            selectedTrackStateIds[viewModelClass] = it
         }
 }

@@ -1,98 +1,73 @@
 package us.huseli.thoucylinder.compose.utils
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import kotlinx.collections.immutable.ImmutableList
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.ReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
+import us.huseli.thoucylinder.compose.scrollbar.ScrollbarList
+import us.huseli.thoucylinder.compose.scrollbar.ScrollbarListState
+import us.huseli.thoucylinder.compose.scrollbar.rememberScrollbarListState
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> ItemList(
-    things: ImmutableList<T>,
+    things: () -> ImmutableList<T>,
+    key: (T) -> Any,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
-    cardHeight: Dp = 70.dp,
-    gap: Dp = 8.dp,
-    key: ((index: Int, item: T) -> Any)? = null,
-    border: BorderStroke? = null,
-    isSelected: (T) -> Boolean = { false },
-    onClick: ((Int, T) -> Unit)? = null,
-    onLongClick: ((Int, T) -> Unit)? = null,
-    cardModifier: Modifier = Modifier,
-    contentPadding: () -> PaddingValues = { PaddingValues(vertical = 10.dp) },
-    padding: () -> PaddingValues = { PaddingValues(horizontal = 10.dp) },
-    showNumericBarAtItemCount: Int = 50,
-    progressIndicatorText: () -> String? = { null },
-    onEmpty: (@Composable () -> Unit)? = null,
-    leadingItem: (@Composable LazyItemScope.() -> Unit)? = null,
-    trailingItem: (@Composable LazyItemScope.() -> Unit)? = null,
-    stickyHeaderContent: (@Composable LazyItemScope.() -> Unit)? = null,
-    cardContent: @Composable ColumnScope.(Int, T) -> Unit,
+    contentType: String? = null,
+    scrollbarState: ScrollbarListState = rememberScrollbarListState(),
+    isLoading: Boolean = false,
+    onEmpty: @Composable () -> Unit = {},
+    trailingContent: @Composable (() -> Unit)? = null,
+    itemContent: @Composable LazyItemScope.(T) -> Unit,
 ) {
-    if (things.isEmpty() && onEmpty != null) onEmpty()
+    if (isLoading) IsLoadingProgressIndicator()
 
-    Box {
-        progressIndicatorText()?.also {
-            ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
+    ScrollbarList(
+        state = scrollbarState,
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(10.dp),
+        contentType = contentType,
+    ) {
+        if (things().isEmpty() && !isLoading) item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = { onEmpty() })
         }
+        items(things(), key = key, itemContent = itemContent, contentType = { contentType })
+        trailingContent?.also { item { it() } }
+    }
+}
 
-        ListWithNumericBar2(
-            listState = listState,
-            listSize = things.size,
-            minItems = showNumericBarAtItemCount,
-            modifier = modifier.padding(padding()),
-            itemHeight = cardHeight + gap,
-        ) {
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(gap),
-                contentPadding = contentPadding(),
-            ) {
-                leadingItem?.also { item { it() } }
-                stickyHeaderContent?.also { stickyHeader { it() } }
-
-                itemsIndexed(things, key = key) { index, thing ->
-                    val containerColor =
-                        if (isSelected(thing)) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surface
-
-                    Card(
-                        border = border,
-                        colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
-                        shape = MaterialTheme.shapes.extraSmall,
-                        modifier = cardModifier.fillMaxWidth().height(cardHeight)
-                            .let {
-                                if (onClick != null || onLongClick != null) it.combinedClickable(
-                                    onClick = { onClick?.invoke(index, thing) },
-                                    onLongClick = onLongClick?.let { { it(index, thing) } },
-                                ) else it
-                            },
-                        content = { cardContent(index, thing) },
-                    )
-                }
-
-                trailingItem?.also { item { it() } }
-            }
+@Composable
+fun <T> ItemListReorderable(
+    things: () -> ImmutableList<T>,
+    key: (T) -> Any,
+    reorderableState: ReorderableLazyListState,
+    modifier: Modifier = Modifier,
+    scrollbarState: ScrollbarListState = rememberScrollbarListState(listState = reorderableState.listState),
+    contentType: String? = null,
+    isLoading: Boolean = false,
+    onEmpty: @Composable () -> Unit = {},
+    itemContent: @Composable LazyItemScope.(T, Boolean) -> Unit,
+) {
+    ItemList(
+        things = things,
+        key = key,
+        scrollbarState = scrollbarState,
+        isLoading = isLoading,
+        onEmpty = onEmpty,
+        modifier = modifier.reorderable(reorderableState),
+        contentType = contentType,
+    ) { thing ->
+        ReorderableItem(state = reorderableState, key = key(thing)) { isDragging ->
+            itemContent(thing, isDragging)
         }
     }
 }

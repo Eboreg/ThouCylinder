@@ -3,30 +3,29 @@ package us.huseli.thoucylinder.database
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import us.huseli.thoucylinder.BuildConfig
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
-import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
-import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.entities.QueueTrack
-import us.huseli.thoucylinder.dataclasses.entities.Radio
-import us.huseli.thoucylinder.dataclasses.entities.RadioTrack
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
-import us.huseli.thoucylinder.dataclasses.entities.YoutubeQueryTrack
-import us.huseli.thoucylinder.dataclasses.entities.YoutubeSearchToken
+import us.huseli.thoucylinder.dataclasses.album.Album
+import us.huseli.thoucylinder.dataclasses.album.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.artist.AlbumArtist
+import us.huseli.thoucylinder.dataclasses.artist.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.Artist
+import us.huseli.thoucylinder.dataclasses.artist.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.artist.TrackArtist
+import us.huseli.thoucylinder.dataclasses.artist.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.playlist.Playlist
+import us.huseli.thoucylinder.dataclasses.radio.Radio
+import us.huseli.thoucylinder.dataclasses.radio.RadioCombo
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackAudioFeatures
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
-import us.huseli.thoucylinder.dataclasses.views.RadioCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.tag.AlbumTag
+import us.huseli.thoucylinder.dataclasses.tag.Tag
+import us.huseli.thoucylinder.dataclasses.track.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.track.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.track.QueueTrack
+import us.huseli.thoucylinder.dataclasses.track.QueueTrackCombo
+import us.huseli.thoucylinder.dataclasses.track.RadioTrack
+import us.huseli.thoucylinder.dataclasses.track.Track
+import us.huseli.thoucylinder.dataclasses.track.TrackCombo
 import us.huseli.thoucylinder.interfaces.ILogger
 import java.util.concurrent.Executors
 
@@ -37,8 +36,6 @@ import java.util.concurrent.Executors
         Album::class,
         Playlist::class,
         PlaylistTrack::class,
-        YoutubeSearchToken::class,
-        YoutubeQueryTrack::class,
         QueueTrack::class,
         AlbumTag::class,
         Artist::class,
@@ -59,14 +56,14 @@ import java.util.concurrent.Executors
         ArtistCombo::class,
     ],
     exportSchema = false,
-    version = 110,
+    version = 126,
 )
+@TypeConverters(Converters::class)
 abstract class Database : RoomDatabase() {
     abstract fun artistDao(): ArtistDao
     abstract fun trackDao(): TrackDao
     abstract fun albumDao(): AlbumDao
     abstract fun playlistDao(): PlaylistDao
-    abstract fun youtubeSearchDao(): YoutubeSearchDao
     abstract fun queueDao(): QueueDao
     abstract fun radioDao(): RadioDao
     abstract fun spotifyDao(): SpotifyDao

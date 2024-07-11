@@ -22,19 +22,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.compose.utils.Thumbnail
 import us.huseli.thoucylinder.compose.utils.WarningButton
 import us.huseli.thoucylinder.stringResource
-import us.huseli.thoucylinder.umlautify
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 
 @Composable
@@ -44,8 +41,7 @@ fun EditAlbumCoverDialog(
     modifier: Modifier = Modifier,
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
-    val albumArts by viewModel.flowAlbumArt(albumId, context).collectAsStateWithLifecycle()
+    val albumArts by viewModel.flowAlbumArt(albumId).collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoadingAlbumArt.collectAsStateWithLifecycle()
     val close: () -> Unit = remember {
         {
@@ -54,19 +50,7 @@ fun EditAlbumCoverDialog(
         }
     }
     val selectFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            viewModel.saveAlbumArtFromUri(
-                albumId = albumId,
-                uri = uri,
-                onSuccess = {
-                    close()
-                    SnackbarEngine.addInfo(context.getString(R.string.updated_album_cover).umlautify())
-                },
-                onFail = {
-                    SnackbarEngine.addError(context.getString(R.string.could_not_open_the_selected_image).umlautify())
-                },
-            )
-        }
+        if (uri != null) viewModel.saveAlbumArtFromUri(albumId = albumId, uri = uri, onSuccess = close)
     }
 
     AlertDialog(
@@ -93,7 +77,7 @@ fun EditAlbumCoverDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(albumArts.toList()) { albumArt ->
+                items(albumArts.toList(), key = { it.mediaStoreImage.fullUriString }) { albumArt ->
                     Column(
                         modifier = Modifier.fillMaxSize().clickable {
                             viewModel.saveAlbumArt(albumId, albumArt.mediaStoreImage)
@@ -102,12 +86,11 @@ fun EditAlbumCoverDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Thumbnail(
-                            imageBitmap = { albumArt.imageBitmap },
-                            shape = MaterialTheme.shapes.extraSmall,
+                            model = albumArt.bitmap,
                             borderWidth = if (albumArt.isCurrent) 4.dp else 1.dp,
                             borderColor = if (albumArt.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                         )
-                        Text(text = "${albumArt.imageBitmap.width}x${albumArt.imageBitmap.height}")
+                        Text(text = "${albumArt.bitmap.width}x${albumArt.bitmap.height}")
                     }
                 }
                 if (isLoading) {
@@ -116,7 +99,7 @@ fun EditAlbumCoverDialog(
                             onClick = {},
                             enabled = false,
                             modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                            shape = MaterialTheme.shapes.extraSmall,
+                            shape = MaterialTheme.shapes.small,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             contentPadding = PaddingValues(10.dp),
                             content = { Text(stringResource(R.string.loading)) },

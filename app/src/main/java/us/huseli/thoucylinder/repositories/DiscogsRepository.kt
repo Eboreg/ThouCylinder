@@ -2,6 +2,7 @@ package us.huseli.thoucylinder.repositories
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.BuildConfig
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
 import us.huseli.thoucylinder.Request
@@ -12,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DiscogsRepository @Inject constructor() {
+class DiscogsRepository @Inject constructor() : AbstractScopeHolder() {
     /**
      * Possible DiscogsMasterTrack.position formats:
      *  - "<discno>-<trackno>" (e.g. "2-12")
@@ -28,9 +29,11 @@ class DiscogsRepository @Inject constructor() {
             "Authorization" to "Discogs key=$apiKey, secret=$apiSecret",
         )
 
-        Request(url = url, headers = headers)
-            .getString()
-            .replace(Regex("^data\\((.*)\\)$"), "$1")
+        onIOThread {
+            Request(url = url, headers = headers)
+                .getString()
+                .replace(Regex("^data\\((.*)\\)$"), "$1")
+        }
     }
 
     suspend fun getMaster(masterId: Int): DiscogsMaster? =

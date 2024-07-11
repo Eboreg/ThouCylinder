@@ -4,15 +4,24 @@ import android.content.Context
 import androidx.annotation.StringRes
 import us.huseli.thoucylinder.R
 
+enum class AlbumType(@StringRes val stringRes: Int) {
+    ALBUM(R.string.album),
+    EP(R.string.ep),
+    SINGLE(R.string.single),
+    COMPILATION(R.string.compilation),
+}
+
 enum class AvailabilityFilter(@StringRes val stringRes: Int) {
     ALL(R.string.all),
     ONLY_PLAYABLE(R.string.only_playable),
     ONLY_LOCAL(R.string.only_local),
 }
 
+enum class ListUpdateStrategy { MERGE, REPLACE }
+
 enum class PlaybackState { STOPPED, PLAYING, PAUSED }
 
-enum class RadioState { INACTIVE, LOADING, LOADED_FIRST, LOADED }
+enum class RadioStatus { INACTIVE, LOADING, LOADING_MORE, LOADED }
 
 enum class RadioType(@StringRes val stringRes: Int) {
     LIBRARY(R.string.library),
@@ -21,7 +30,6 @@ enum class RadioType(@StringRes val stringRes: Int) {
     TRACK(R.string.track),
 }
 
-@Suppress("unused")
 enum class Region(@StringRes val stringRes: Int) {
     DZ(R.string.algeria),
     AR(R.string.argentina),

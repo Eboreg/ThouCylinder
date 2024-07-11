@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.interfaces
 
 import androidx.media3.common.PlaybackException
+import us.huseli.thoucylinder.dataclasses.track.QueueTrackCombo
 import us.huseli.thoucylinder.enums.PlaybackState
-import us.huseli.thoucylinder.dataclasses.views.QueueTrackCombo
 import us.huseli.thoucylinder.repositories.PlayerRepository
 
 interface PlayerRepositoryListener {
@@ -13,7 +13,7 @@ interface PlayerRepositoryListener {
     ) {
     }
 
-    suspend fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {}
+    fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {}
 
-    suspend fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {}
+    fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {}
 }

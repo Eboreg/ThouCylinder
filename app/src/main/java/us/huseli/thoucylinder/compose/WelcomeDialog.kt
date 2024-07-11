@@ -27,8 +27,6 @@ import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun WelcomeDialog(modifier: Modifier = Modifier, onCancel: () -> Unit) {
-    val colors = LocalBasicColors.current
-
     AlertDialog(
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
@@ -43,35 +41,17 @@ fun WelcomeDialog(modifier: Modifier = Modifier, onCancel: () -> Unit) {
                 Text(stringResource(R.string.hi_this_is_a_music_player_app))
                 Text(stringResource(R.string.what_it_can_do))
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    WelcomeDialogListRow(Icons.Sharp.Check, R.string.play_local_music_files, colors.Green)
-                    WelcomeDialogListRow(
-                        Icons.Sharp.Check,
-                        R.string.search_and_play_songs_and_albums_on_youtube,
-                        colors.Green,
-                    )
-                    WelcomeDialogListRow(
-                        Icons.Sharp.Check,
-                        R.string.download_music_from_youtube_to_local_drive,
-                        colors.Green,
-                    )
-                    WelcomeDialogListRow(
-                        Icons.Sharp.Check,
-                        R.string.match_your_saved_albums_on_spotify_and_play_download_them_from_youtube,
-                        colors.Green,
-                    )
-                    WelcomeDialogListRow(
-                        Icons.Sharp.Check,
-                        R.string.match_your_top_albums_on_last_fm_and_play_download_them_from_youtube,
-                        colors.Green,
-                    )
-                    WelcomeDialogListRow(Icons.Sharp.Check, R.string.scrobble_to_last_fm, colors.Green)
+                    WelcomeDialogListRowPositive(R.string.play_local_music_files)
+                    WelcomeDialogListRowPositive(R.string.search_and_play_songs_and_albums_on_youtube)
+                    WelcomeDialogListRowPositive(R.string.match_your_albums_and_play_download)
+                    WelcomeDialogListRowPositive(R.string.scrobble_to_last_fm)
                 }
                 Text(stringResource(R.string.what_it_will_not_do))
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    WelcomeDialogListRow(Icons.Sharp.Close, R.string.identify_you_with_google, colors.Red)
-                    WelcomeDialogListRow(Icons.Sharp.Close, R.string.cost_money, colors.Red)
-                    WelcomeDialogListRow(Icons.Sharp.Close, R.string.display_ads, colors.Red)
-                    WelcomeDialogListRow(Icons.Sharp.Close, R.string.harvest_your_personal_data, colors.Red)
+                    WelcomeDialogListRowNegative(R.string.identify_you_with_google)
+                    WelcomeDialogListRowNegative(R.string.cost_money)
+                    WelcomeDialogListRowNegative(R.string.display_ads)
+                    WelcomeDialogListRowNegative(R.string.harvest_your_personal_data)
                 }
             }
         },
@@ -84,4 +64,14 @@ fun WelcomeDialogListRow(icon: ImageVector, stringRes: Int, iconColor: Color = L
         Icon(icon, null, modifier = Modifier.padding(end = 5.dp).size(20.dp), tint = iconColor)
         Text(stringResource(stringRes))
     }
+}
+
+@Composable
+fun WelcomeDialogListRowPositive(stringRes: Int) {
+    WelcomeDialogListRow(icon = Icons.Sharp.Check, stringRes = stringRes, iconColor = LocalBasicColors.current.Green)
+}
+
+@Composable
+fun WelcomeDialogListRowNegative(stringRes: Int) {
+    WelcomeDialogListRow(icon = Icons.Sharp.Close, stringRes = stringRes, iconColor = LocalBasicColors.current.Red)
 }

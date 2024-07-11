@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.viewmodels
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import us.huseli.retaintheme.extensions.launchOnIOThread
-import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -16,7 +15,7 @@ class EditTrackViewModel @Inject constructor(
         repos.artist.getArtistNameSuggestions(name, limit)
 
     fun updateTrack(
-        state: TrackUiState,
+        trackId: String,
         title: String,
         year: Int?,
         albumPosition: Int?,
@@ -25,7 +24,7 @@ class EditTrackViewModel @Inject constructor(
     ) {
         launchOnIOThread {
             managers.library.updateTrack(
-                uiState = state,
+                trackId = trackId,
                 title = title,
                 year = year,
                 albumPosition = albumPosition,

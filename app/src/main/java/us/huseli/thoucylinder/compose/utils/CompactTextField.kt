@@ -34,40 +34,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.compose.FistopyTheme
 
 @Composable
 fun CompactTextField(
-    value: TextFieldValue,
+    value: () -> String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     continuousUpdate: Boolean = false,
     color: Color = MaterialTheme.colorScheme.onSurface,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge.copy(color = color),
+    textStyle: TextStyle = FistopyTheme.typography.labelLarge.copy(color = color),
     placeholderText: String? = null,
     showClearIcon: Boolean = true,
+    height: Dp = 40.dp,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     focusRequester: FocusRequester = remember { FocusRequester() },
-    trailingIcon: @Composable (TextFieldValue) -> Unit = {},
-    onValueChange: (TextFieldValue) -> Unit = {},
-    onImeAction: (TextFieldValue) -> Unit = {},
+    trailingIcon: @Composable (String) -> Unit = {},
+    onValueChange: (String) -> Unit = {},
+    onImeAction: (String) -> Unit = {},
     onFocusChange: (FocusState) -> Unit = {},
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    var textFieldValue by remember(value) { mutableStateOf(value) }
+    var mutableValue by remember(value) { mutableStateOf(value()) }
 
     BasicTextField(
-        value = textFieldValue,
+        value = mutableValue,
         interactionSource = interactionSource,
         onValueChange = {
-            textFieldValue = it
+            mutableValue = it
             onValueChange(it)
             if (continuousUpdate) onImeAction(it)
         },
         modifier = modifier
-            .height(32.dp)
+            .height(height)
             .padding(0.dp)
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -80,10 +82,10 @@ fun CompactTextField(
         cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
         keyboardOptions = keyboardOptions,
         keyboardActions = KeyboardActions(
-            onSearch = { onImeAction(textFieldValue) },
-            onSend = { onImeAction(textFieldValue) },
-            onDone = { onImeAction(textFieldValue) },
-            onGo = { onImeAction(textFieldValue) },
+            onSearch = { onImeAction(mutableValue) },
+            onSend = { onImeAction(mutableValue) },
+            onDone = { onImeAction(mutableValue) },
+            onGo = { onImeAction(mutableValue) },
         ),
         decorationBox = { innerTextField ->
             Column {
@@ -93,23 +95,22 @@ fun CompactTextField(
                 ) {
                     Box(modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
                         innerTextField()
-                        if (!isFocused && textFieldValue.text.isEmpty() && placeholderText != null) {
+                        if (!isFocused && mutableValue.isEmpty() && placeholderText != null) {
                             Text(placeholderText, style = textStyle, color = color.copy(alpha = 0.5f))
                         }
                     }
-                    if (textFieldValue.text.isNotEmpty() && showClearIcon) {
+                    if (mutableValue.isNotEmpty() && showClearIcon) {
                         Icon(
                             imageVector = Icons.Sharp.Clear,
                             contentDescription = null,
                             modifier = Modifier.size(30.dp).padding(start = 5.dp).clickable {
-                                textFieldValue = TextFieldValue("")
-                                onValueChange(textFieldValue)
-                                onImeAction(textFieldValue)
+                                mutableValue = ""
+                                onValueChange(mutableValue)
                             },
                             tint = MaterialTheme.colorScheme.outline,
                         )
                     }
-                    trailingIcon(textFieldValue)
+                    trailingIcon(mutableValue)
                 }
                 HorizontalDivider(
                     modifier = Modifier.fillMaxWidth(),
@@ -121,50 +122,13 @@ fun CompactTextField(
 }
 
 @Composable
-fun CompactTextField(
-    value: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    continuousUpdate: Boolean = false,
-    color: Color = MaterialTheme.colorScheme.onSurface,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge.copy(color = color),
-    placeholderText: String? = null,
-    showClearIcon: Boolean = true,
-    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    focusRequester: FocusRequester = remember { FocusRequester() },
-    trailingIcon: @Composable (String) -> Unit = {},
-    onValueChange: (String) -> Unit = {},
-    onImeAction: (String) -> Unit = {},
-    onFocusChanged: (FocusState) -> Unit = {},
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),
-) {
-    CompactTextField(
-        value = TextFieldValue(value),
-        modifier = modifier,
-        enabled = enabled,
-        continuousUpdate = continuousUpdate,
-        color = color,
-        textStyle = textStyle,
-        placeholderText = placeholderText,
-        showClearIcon = showClearIcon,
-        interactionSource = interactionSource,
-        focusRequester = focusRequester,
-        trailingIcon = { trailingIcon(it.text) },
-        onValueChange = { onValueChange(it.text) },
-        onImeAction = { onImeAction(it.text) },
-        onFocusChange = onFocusChanged,
-        keyboardOptions = keyboardOptions,
-    )
-}
-
-@Composable
 fun CompactSearchTextField(
-    value: String,
+    value: () -> String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     continuousSearch: Boolean = false,
     color: Color = MaterialTheme.colorScheme.onSurface,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge.copy(color = color),
+    textStyle: TextStyle = FistopyTheme.typography.labelLarge.copy(color = color),
     placeholderText: String? = null,
     onFocusChanged: (FocusState) -> Unit = {},
     onChange: (String) -> Unit = {},
@@ -172,21 +136,21 @@ fun CompactSearchTextField(
 ) {
     CompactTextField(
         value = value,
-        onValueChange = onChange,
-        onImeAction = onSearch,
         continuousUpdate = continuousSearch,
         color = color,
-        textStyle = textStyle,
-        placeholderText = placeholderText,
-        onFocusChanged = onFocusChanged,
-        modifier = modifier,
         enabled = enabled,
+        textStyle = textStyle,
         keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-        trailingIcon = { searchTerm ->
+        placeholderText = placeholderText,
+        onFocusChange = onFocusChanged,
+        onValueChange = onChange,
+        onImeAction = onSearch,
+        modifier = modifier,
+        trailingIcon = {
             Icon(
                 imageVector = Icons.Sharp.Search,
                 contentDescription = null,
-                modifier = Modifier.size(30.dp).padding(start = 5.dp).clickable { onSearch(searchTerm) },
+                modifier = Modifier.size(30.dp).padding(start = 5.dp).clickable { onSearch(it) },
                 tint = MaterialTheme.colorScheme.outline,
             )
         },

@@ -24,16 +24,14 @@ import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyFrom
 import us.huseli.thoucylinder.copyTo
-import us.huseli.thoucylinder.dataclasses.ArtistTitlePair
 import us.huseli.thoucylinder.dataclasses.ID3Data
-import us.huseli.thoucylinder.dataclasses.LocalImportableAlbum
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.entities.listCoverImages
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.album.LocalImportableAlbum
+import us.huseli.thoucylinder.dataclasses.artist.ArtistTitlePair
+import us.huseli.thoucylinder.dataclasses.artist.IArtistCredit
 import us.huseli.thoucylinder.dataclasses.extractID3Data
-import us.huseli.thoucylinder.dataclasses.extractTrackMetadata
+import us.huseli.thoucylinder.dataclasses.track.Track
+import us.huseli.thoucylinder.dataclasses.track.extractTrackMetadata
 import us.huseli.thoucylinder.escapeQuotes
 import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.File
@@ -54,9 +52,9 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         tmpInFile: File,
         extension: String,
         track: Track,
-        trackArtists: List<AbstractArtistCredit>,
-        album: Album? = null,
-        albumArtists: List<AbstractArtistCredit>? = null,
+        trackArtists: List<IArtistCredit>,
+        album: IAlbum? = null,
+        albumArtists: List<IArtistCredit>? = null,
     ): File {
         val tmpOutFile = File(context.cacheDir, "${UUID.randomUUID()}.$extension")
         val tagCommands = ID3Data.fromTrack(
@@ -101,16 +99,6 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
             }
         }
         return documentFile
-    }
-
-    fun deleteLocalAlbumArt(albumCombo: AlbumWithTracksCombo, albumDirectory: DocumentFile?) {
-        val tracks = albumCombo.trackCombos.map { it.track }
-
-        albumCombo.album.albumArt?.deleteInternalFiles()
-        if (albumDirectory != null) albumCombo.album.albumArt?.deleteDirectoryFiles(context, albumDirectory)
-        tracks.listCoverImages(context, includeThumbnails = true).forEach { documentFile ->
-            if (documentFile.isFile && documentFile.canWrite()) documentFile.delete()
-        }
     }
 
     fun flowImportableAlbums(
@@ -170,35 +158,42 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
             }
         }
 
+        // Group the tracks by distinct musicBrainzReleaseId tags and treat each group as an album. In the absence of
+        // such tags, we will work under the assumption "1 directory == 1 album" for now.
         val coverImage = imageFiles
             .sortedByDescending { it.length() }
             .maxByOrNull { it.name?.startsWith("cover.") == true }
+        val tracksWithoutMbid = tracks.filter { it.id3.musicBrainzReleaseId == null }
+        val tracksWithMbid = tracks.filter { it.id3.musicBrainzReleaseId != null }
+        val albumTrackLists =
+            if (tracksWithMbid.isNotEmpty()) tracksWithMbid
+                .combineEquals { a, b -> a.id3.musicBrainzReleaseId == b.id3.musicBrainzReleaseId }
+                .toMutableList()
+                .also { it[0] += tracksWithoutMbid }
+            else if (tracksWithoutMbid.isNotEmpty()) listOf(tracksWithoutMbid)
+            else listOf()
 
-        // Group the tracks by distinct musicBrainzReleaseId tags and treat each group as an album. In the absence of
-        // such tags, we will work under the assumption "1 directory == 1 album" for now.
-        tracks.combineEquals { a, b -> a.id3.musicBrainzReleaseId == b.id3.musicBrainzReleaseId }
-            .forEach { albumTracks ->
-                val albumTitle = albumTracks.mapNotNull { it.id3.album }.mostCommonValue()
-                    ?: pathData.title
-                    ?: context.getString(R.string.unknown_album)
-                val albumArtist = albumTracks.mapNotNull { it.id3.albumArtist }.mostCommonValue()
-                    ?: albumTracks.mapNotNull { it.id3.artist }.mostCommonValue()
-                    ?: pathData.artist
+        for (albumTracks in albumTrackLists) {
+            val albumTitle = albumTracks.mapNotNull { it.id3.album }.mostCommonValue()
+                ?: pathData.title
+                ?: context.getString(R.string.unknown_album)
+            val albumArtist = albumTracks.mapNotNull { it.id3.albumArtist }.mostCommonValue()
+                ?: albumTracks.mapNotNull { it.id3.artist }.mostCommonValue()
+                ?: pathData.artist
 
-                emit(
-                    LocalImportableAlbum(
-                        title = albumTitle,
-                        artistName = albumArtist,
-                        trackCount = albumTracks.size,
-                        year = albumTracks.mapNotNull { it.id3.year }.toSet().takeIf { it.size == 1 }?.first(),
-                        musicBrainzReleaseId = albumTracks.map { it.id3.musicBrainzReleaseId }.first(),
-                        musicBrainzReleaseGroupId = albumTracks.firstNotNullOfOrNull { it.id3.musicBrainzReleaseGroupId },
-                        tracks = albumTracks,
-                        duration = albumTracks.sumOf { it.metadata.durationMs }.milliseconds,
-                        thumbnailUrl = coverImage?.uri?.toString(),
-                    )
+            emit(
+                LocalImportableAlbum(
+                    title = albumTitle,
+                    artistName = albumArtist,
+                    year = albumTracks.mapNotNull { it.id3.year }.toSet().takeIf { it.size == 1 }?.first(),
+                    musicBrainzReleaseId = albumTracks.map { it.id3.musicBrainzReleaseId }.firstOrNull(),
+                    musicBrainzReleaseGroupId = albumTracks.firstNotNullOfOrNull { it.id3.musicBrainzReleaseGroupId },
+                    tracks = albumTracks,
+                    duration = albumTracks.sumOf { it.metadata.durationMs }.milliseconds,
+                    thumbnailUrl = coverImage?.uri?.toString(),
                 )
-            }
+            )
+        }
     }
 
     fun listTracksWithBrokenLocalUris(allTracks: Collection<Track>): List<Track> {
@@ -215,9 +210,9 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
     @WorkerThread
     fun tagTrack(
         track: Track,
-        trackArtists: List<AbstractArtistCredit>,
-        album: Album? = null,
-        albumArtists: List<AbstractArtistCredit>? = null,
+        trackArtists: List<IArtistCredit>,
+        album: IAlbum? = null,
+        albumArtists: Collection<IArtistCredit>? = null,
     ) {
         val documentFile = track.getDocumentFile(context)
 

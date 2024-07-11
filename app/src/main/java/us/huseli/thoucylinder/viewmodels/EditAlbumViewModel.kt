@@ -1,36 +1,35 @@
 package us.huseli.thoucylinder.viewmodels
 
-import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
-import androidx.compose.ui.graphics.ImageBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import us.huseli.retaintheme.extensions.launchOnIOThread
-import us.huseli.thoucylinder.dataclasses.uistates.EditAlbumUiState
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.abstr.toArtists
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.entities.toAlbumArtistCredits
-import us.huseli.thoucylinder.dataclasses.entities.toAlbumArtists
-import us.huseli.thoucylinder.dataclasses.entities.toTrackArtistCredits
+import us.huseli.thoucylinder.dataclasses.album.EditAlbumUiState
+import us.huseli.thoucylinder.dataclasses.artist.UnsavedAlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.UnsavedTrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.joined
+import us.huseli.thoucylinder.dataclasses.tag.Tag
 import us.huseli.thoucylinder.dataclasses.toMediaStoreImage
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
-import us.huseli.thoucylinder.dataclasses.views.toTrackArtists
+import us.huseli.thoucylinder.dataclasses.track.TrackUiState
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class EditAlbumViewModel @Inject constructor(
     private val repos: Repositories,
@@ -38,51 +37,77 @@ class EditAlbumViewModel @Inject constructor(
 ) : AbstractBaseViewModel() {
     data class AlbumArt(
         val mediaStoreImage: MediaStoreImage,
-        val imageBitmap: ImageBitmap,
+        val bitmap: Bitmap,
         val isCurrent: Boolean = false,
     ) {
         override fun equals(other: Any?) = other is AlbumArt && other.mediaStoreImage == mediaStoreImage
         override fun hashCode() = mediaStoreImage.hashCode()
     }
 
+    private val _albumId = MutableStateFlow<String?>(null)
     private val _isLoadingAlbumArt = MutableStateFlow(false)
-    private val albumArtMutex = Mutex()
     private val albumArtFetchJobs = mutableMapOf<String, List<Job>>()
 
     val allTags = repos.album.flowTags().stateLazily(emptyList())
     val isLoadingAlbumArt = _isLoadingAlbumArt.asStateFlow()
+
+    val uiState2: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().flatMapMerge { albumId ->
+        repos.album.flowAlbumCombo(albumId)
+    }.filterNotNull().map { combo ->
+        EditAlbumUiState(
+            albumId = combo.album.albumId,
+            title = combo.album.title,
+            artistNames = combo.artists.map { it.name }.toImmutableList(),
+            year = combo.album.year,
+            artistString = combo.artists.joined(),
+        )
+    }.stateLazily()
+
+    val uiState: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().map { albumId ->
+        repos.album.getAlbumCombo(albumId)?.let { combo ->
+            EditAlbumUiState(
+                albumId = combo.album.albumId,
+                title = combo.album.title,
+                artistNames = combo.artists.map { it.name }.toImmutableList(),
+                year = combo.album.year,
+                artistString = combo.artists.joined(),
+            )
+        }
+    }.stateLazily()
+
+    val trackUiStates: StateFlow<ImmutableList<TrackUiState>> = _albumId.filterNotNull().map { albumId ->
+        repos.track.listTrackCombosByAlbumId(albumId).map { it.toUiState() }.toImmutableList()
+    }.stateLazily(persistentListOf())
 
     fun cancelAlbumArtFetch(albumId: String) {
         albumArtFetchJobs.remove(albumId)?.forEach { it.cancel() }
     }
 
     fun clearAlbumArt(albumId: String) {
-        launchOnIOThread { managers.image.clearAlbumArt(albumId) }
+        launchOnIOThread { repos.album.clearAlbumArt(albumId) }
     }
 
-    fun flowAlbumArt(albumId: String, context: Context) =
-        MutableStateFlow<Set<AlbumArt>>(emptySet()).also { flow ->
+    fun flowAlbumArt(albumId: String): StateFlow<List<AlbumArt>> =
+        MutableStateFlow<Set<AlbumArt?>>(emptySet()).also { flow ->
             _isLoadingAlbumArt.value = true
 
             launchOnIOThread {
                 repos.album.getAlbumWithTracks(albumId)?.also { combo ->
-                    combo.album.albumArt?.also { addAlbumArt(it, flow, true) }
+                    combo.album.albumArt?.also { flow.value += getAlbumArt(it, true) }
 
                     val jobs = listOf(
                         launch {
-                            repos.spotify.searchAlbumArt(
-                                combo = combo,
-                                getArtist = { repos.artist.artistCache.get(it) }
-                            ).forEach { addAlbumArt(it, flow) }
+                            repos.spotify.searchAlbumArt(combo.album, combo.artists.joined())
+                                .forEach { flow.value += getAlbumArt(it) }
                         },
                         launch {
                             combo.album.youtubePlaylist?.fullImage?.url?.toMediaStoreImage()?.also {
-                                addAlbumArt(it, flow)
+                                flow.value += getAlbumArt(it)
                             }
                         },
                         launch {
-                            managers.image.collectNewLocalAlbumArtUris(combo).forEach { uri ->
-                                uri.toMediaStoreImage(context)?.also { addAlbumArt(it, flow) }
+                            repos.image.collectNewLocalAlbumArtUris(combo).forEach { uri ->
+                                flow.value += getAlbumArt(uri.toMediaStoreImage())
                             }
                         },
                         launch {
@@ -94,18 +119,16 @@ class EditAlbumViewModel @Inject constructor(
                             response?.data?.results?.forEach { item ->
                                 repos.discogs.getMaster(item.id)?.data?.images
                                     ?.filter { image -> image.type == "primary" }
-                                    ?.forEach { image ->
-                                        image.uri.toMediaStoreImage()?.also { addAlbumArt(it, flow) }
-                                    }
+                                    ?.forEach { image -> flow.value += getAlbumArt(image.uri.toMediaStoreImage()) }
                             }
                         },
                         launch {
-                            repos.musicBrainz.getReleaseId(combo)?.also { releaseId ->
+                            val releaseId = combo.album.musicBrainzReleaseId ?: repos.musicBrainz.getReleaseId(combo)
+
+                            if (releaseId != null) {
                                 repos.musicBrainz.getSiblingReleaseIds(releaseId).forEach { siblingId ->
-                                    repos.musicBrainz.getAllCoverArtArchiveImages(siblingId).forEach { image ->
-                                        image.image.toMediaStoreImage()?.also {
-                                            addAlbumArt(it, flow)
-                                        }
+                                    repos.musicBrainz.listAllReleaseCoverArt(siblingId)?.forEach { image ->
+                                        flow.value += getAlbumArt(image.image.toMediaStoreImage())
                                     }
                                 }
                             }
@@ -118,33 +141,34 @@ class EditAlbumViewModel @Inject constructor(
                     albumArtFetchJobs.remove(combo.album.albumId)
                 }
             }
-        }.asStateFlow()
-
-    fun flowAlbumWithTracks(albumId: String) =
-        repos.album.flowAlbumWithTracks(albumId).distinctUntilChanged().stateLazily()
+        }.map { it.filterNotNull() }.stateLazily(emptyList())
 
     fun getArtistNameSuggestions(name: String, limit: Int = 10) =
         repos.artist.getArtistNameSuggestions(name, limit)
 
-    suspend fun getUiState(albumId: String): EditAlbumUiState {
-        val combo = repos.album.getAlbumCombo(albumId) ?: throw Exception("Album $albumId not found")
-
-        return EditAlbumUiState(
-            albumId = albumId,
-            title = combo.album.title,
-            artistNames = combo.artists.map { it.name }.toImmutableList(),
-            year = combo.album.year,
-        )
-    }
-
     suspend fun listTags(albumId: String): ImmutableList<Tag> = repos.album.listTags(albumId).toImmutableList()
 
-    fun saveAlbumArtFromUri(albumId: String, uri: Uri, onSuccess: () -> Unit, onFail: () -> Unit) {
-        launchOnIOThread { managers.image.saveAlbumArtFromUri(albumId, uri, onSuccess, onFail) }
+    fun saveAlbumArt(albumId: String, albumArt: MediaStoreImage) {
+        launchOnIOThread { repos.album.updateAlbumArt(albumId, albumArt) }
     }
 
-    fun saveAlbumArt(albumId: String, albumArt: MediaStoreImage) {
-        launchOnIOThread { managers.image.saveAlbumArt(albumId, albumArt) }
+    fun saveAlbumArtFromUri(albumId: String, uri: Uri, onSuccess: () -> Unit) {
+        launchOnIOThread {
+            try {
+                val albumArt = uri.toMediaStoreImage()
+
+                repos.image.getFullBitmap(uri) // Just to test so it doesn't fail.
+                repos.album.updateAlbumArt(albumId, albumArt)
+                repos.message.onSaveAlbumArtFromUri(true)
+                onSuccess()
+            } catch (e: Throwable) {
+                repos.message.onSaveAlbumArtFromUri(false)
+            }
+        }
+    }
+
+    fun setAlbumId(value: String) {
+        _albumId.value = value
     }
 
     fun updateAlbum(
@@ -157,22 +181,29 @@ class EditAlbumViewModel @Inject constructor(
     ) {
         launchOnIOThread {
             val combo = repos.album.getAlbumWithTracks(albumId) ?: throw Exception("Album $albumId not found")
-            val artists = artistNames.filter { it.isNotEmpty() }.map { repos.artist.artistCache.getByName(it) }
             val album = combo.album.copy(title = title, year = year)
-            val albumArtists = artists.toAlbumArtistCredits(album.albumId)
+            val albumArtists = artistNames
+                .filter { it.isNotEmpty() }
+                .mapIndexed { index, name ->
+                    UnsavedAlbumArtistCredit(name = name, albumId = albumId, position = index)
+                }
 
-            repos.artist.setAlbumArtists(album.albumId, artists.toAlbumArtists(album.albumId))
-            repos.album.updateAlbum(album)
+            repos.artist.setAlbumArtists(album.albumId, albumArtists)
+            repos.album.upsertAlbum(album)
             repos.album.setAlbumTags(combo.album.albumId, tags)
 
             if (updateMatchingTrackArtists) {
                 for (trackCombo in combo.trackCombos) {
                     val trackArtists =
-                        if (trackCombo.artists.toArtists() == combo.artists.toArtists())
-                            artists.toTrackArtistCredits(trackCombo.track.trackId).also {
-                                repos.artist.setTrackArtists(trackCombo.track.trackId, it.toTrackArtists())
-                            }
-                        else trackCombo.artists
+                        if (trackCombo.trackArtists.map { it.name } == combo.artists.map { it.name }) {
+                            albumArtists.map {
+                                UnsavedTrackArtistCredit(
+                                    name = it.name,
+                                    trackId = trackCombo.track.trackId,
+                                    position = it.position,
+                                )
+                            }.also { repos.artist.setTrackArtists(trackCombo.track.trackId, it) }
+                        } else trackCombo.trackArtists
 
                     repos.localMedia.tagTrack(
                         track = managers.library.ensureTrackMetadata(trackCombo.track),
@@ -185,32 +216,26 @@ class EditAlbumViewModel @Inject constructor(
         }
     }
 
-    fun updateTrackCombo(
-        combo: TrackCombo,
+    fun updateTrack(
+        trackId: String,
         title: String,
         year: Int?,
         artistNames: Collection<String>,
-        albumCombo: AbstractAlbumCombo,
     ) {
         launchOnIOThread {
             managers.library.updateTrack(
-                track = combo.track,
-                trackArtists = combo.artists,
+                trackId = trackId,
                 title = title,
                 year = year,
                 artistNames = artistNames,
-                albumCombo = albumCombo,
             )
         }
     }
 
-    private suspend fun addAlbumArt(
+    private suspend fun getAlbumArt(
         mediaStoreImage: MediaStoreImage,
-        flow: MutableStateFlow<Set<AlbumArt>>,
         isCurrent: Boolean = false,
-    ) {
-        managers.image.getFullImageBitmap(mediaStoreImage.fullUri)?.also {
-            albumArtMutex.withLock { flow.value += AlbumArt(mediaStoreImage, it, isCurrent) }
-        }
+    ) = repos.image.getFullBitmap(mediaStoreImage.fullUri)?.let {
+        AlbumArt(mediaStoreImage, it, isCurrent)
     }
 }

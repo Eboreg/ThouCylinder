@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import us.huseli.retaintheme.extensions.launchOnIOThread
-import us.huseli.thoucylinder.dataclasses.uistates.AlbumUiState
+import us.huseli.thoucylinder.dataclasses.album.AlbumUiState
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -22,42 +22,52 @@ class DeleteAlbumsViewModel @Inject constructor(
     private val _albumIds = MutableStateFlow<List<String>>(emptyList())
 
     val albumUiStates: StateFlow<ImmutableList<AlbumUiState>> = _albumIds.map { albumIds ->
-        repos.album.listAlbumCombos(albumIds).map { AlbumUiState.fromAlbumCombo(it) }.toImmutableList()
+        repos.album.listAlbumCombos(albumIds).map { it.toUiState() }.toImmutableList()
     }.distinctUntilChanged().stateLazily(persistentListOf())
+    val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
 
-    fun deleteLocalAlbumFiles(onFinish: () -> Unit = {}) {
+    fun deleteLocalAlbumFiles() {
         launchOnIOThread {
+            val firstTitle = albumUiStates.value.first().title
+
             managers.library.deleteLocalAlbumFiles(_albumIds.value)
-            onFinish()
+            repos.message.onDeleteLocalAlbumFiles(
+                albumCount = _albumIds.value.size,
+                firstTitle = firstTitle,
+            )
         }
     }
 
-    fun hideAlbums(onFinish: () -> Unit = {}) {
+    fun hideAlbums(
+        onGotoLibraryClick: (() -> Unit)? = null,
+        onGotoAlbumClick: ((String) -> Unit)? = null,
+    ) {
         launchOnIOThread {
+            val firstTitle = albumUiStates.value.first().title
+
             repos.album.setAlbumsIsHidden(_albumIds.value, true)
-            onFinish()
+            repos.message.onHideAlbums(
+                albumCount = _albumIds.value.size,
+                firstTitle = firstTitle,
+                onUndoClick = { reAddAlbumsToLibrary(onGotoLibraryClick, onGotoAlbumClick) },
+            )
         }
     }
 
-    fun hideAlbumsAndDeleteFiles(onFinish: () -> Unit = {}) {
+    fun hideAlbumsAndDeleteFiles(
+        onGotoLibraryClick: (() -> Unit)? = null,
+        onGotoAlbumClick: ((String) -> Unit)? = null,
+    ) {
         launchOnIOThread {
+            val firstTitle = albumUiStates.value.first().title
+
             repos.album.setAlbumsIsHidden(_albumIds.value, true)
-            deleteLocalAlbumFiles(onFinish)
-        }
-    }
-
-    fun reAddAlbumsToLibrary() {
-        launchOnIOThread {
-            repos.album.addAlbumsToLibrary(_albumIds.value)
-            repos.track.addToLibraryByAlbumId(_albumIds.value)
-        }
-    }
-
-    fun removeAlbumsFromLibrary(onFinish: () -> Unit = {}) {
-        launchOnIOThread {
-            repos.album.removeAlbumsFromLibrary(_albumIds.value)
-            repos.track.removeFromLibraryByAlbumId(_albumIds.value)
-            onFinish()
+            managers.library.deleteLocalAlbumFiles(_albumIds.value)
+            repos.message.onHideAlbumsAndDeleteFiles(
+                albumCount = _albumIds.value.size,
+                firstTitle = firstTitle,
+                onUndoClick = { reAddAlbumsToLibrary(onGotoLibraryClick, onGotoAlbumClick) },
+            )
         }
     }
 
@@ -65,7 +75,16 @@ class DeleteAlbumsViewModel @Inject constructor(
         _albumIds.value = albumIds.toList()
     }
 
-    fun unhideAlbums() {
-        launchOnIOThread { repos.album.setAlbumsIsHidden(_albumIds.value, false) }
+    private fun reAddAlbumsToLibrary(
+        onGotoLibraryClick: (() -> Unit)? = null,
+        onGotoAlbumClick: ((String) -> Unit)? = null,
+    ) {
+        launchOnIOThread {
+            managers.library.addAlbumsToLibrary(
+                albumIds = _albumIds.value,
+                onGotoLibraryClick = onGotoLibraryClick,
+                onGotoAlbumClick = onGotoAlbumClick,
+            )
+        }
     }
 }

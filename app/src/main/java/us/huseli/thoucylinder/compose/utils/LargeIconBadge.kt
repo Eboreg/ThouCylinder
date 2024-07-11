@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import us.huseli.thoucylinder.ThouCylinderTheme
+import us.huseli.thoucylinder.compose.FistopyTheme
 
 @Composable
 fun LargeIconBadge(
@@ -24,7 +24,7 @@ fun LargeIconBadge(
         tonalElevation = 3.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        ProvideTextStyle(ThouCylinderTheme.typographyExtended.listNormalHeader) {
+        ProvideTextStyle(FistopyTheme.bodyStyles.primaryBold) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

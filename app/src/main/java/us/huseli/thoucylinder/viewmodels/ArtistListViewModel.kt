@@ -8,31 +8,28 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onEach
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.artist.ArtistUiState
 import us.huseli.thoucylinder.enums.ArtistSortParameter
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
 
 @HiltViewModel
-class ArtistListViewModel @Inject constructor(repos: Repositories) : AbstractBaseViewModel() {
+class ArtistListViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel() {
     private val _isLoading = MutableStateFlow(true)
-    private val _onlyShowArtistsWithAlbums = MutableStateFlow(false)
-    private val _searchTerm = MutableStateFlow("")
-    private val _sortOrder = MutableStateFlow(SortOrder.ASCENDING)
-    private val _sortParameter = MutableStateFlow(ArtistSortParameter.NAME)
 
-    val artistCombos: StateFlow<ImmutableList<ArtistCombo>> = combine(
+    val artistUiStates: StateFlow<ImmutableList<ArtistUiState>> = combine(
         repos.artist.artistCombos,
-        _searchTerm,
-        _sortParameter,
-        _sortOrder,
-        _onlyShowArtistsWithAlbums,
-    ) { artistCombos, searchTerm, sortParameter, sortOrder, onlyWithAlbums ->
+        repos.settings.artistSearchTerm,
+        repos.settings.artistSortParameter,
+        repos.settings.artistSortOrder,
+        repos.settings.showArtistsWithoutAlbums,
+    ) { artistCombos, searchTerm, sortParameter, sortOrder, showWithoutAlbums ->
         artistCombos
             .filter { it.artist.name.contains(searchTerm, true) }
-            .filter { if (onlyWithAlbums) it.albumCount > 0 else true }
+            .filter { if (!showWithoutAlbums) it.albumCount > 0 else true }
             .let { combos ->
                 when (sortParameter) {
                     ArtistSortParameter.NAME -> combos.sortedBy { it.artist.name.lowercase() }
@@ -41,27 +38,27 @@ class ArtistListViewModel @Inject constructor(repos: Repositories) : AbstractBas
                 }
             }
             .let { if (sortOrder == SortOrder.DESCENDING) it.reversed() else it }
+            .map { combo -> combo.toUiState() }
             .toImmutableList()
     }
         .onEach { _isLoading.value = false }
         .stateLazily(persistentListOf())
 
+    val isEmpty: StateFlow<Boolean> =
+        combine(artistUiStates, _isLoading, repos.localMedia.isImportingLocalMedia) { combos, isLoading, isImporting ->
+            combos.isEmpty() && !isLoading && !isImporting
+        }.distinctUntilChanged().stateLazily(false)
+
     val isLoading = _isLoading.asStateFlow()
-    val onlyShowArtistsWithAlbums = _onlyShowArtistsWithAlbums.asStateFlow()
-    val searchTerm = _searchTerm.asStateFlow()
-    val sortOrder = _sortOrder.asStateFlow()
-    val sortParameter = _sortParameter.asStateFlow()
+    val searchTerm = repos.settings.artistSearchTerm
+    val showArtistsWithoutAlbums = repos.settings.showArtistsWithoutAlbums
+    val sortOrder = repos.settings.artistSortOrder
+    val sortParameter = repos.settings.artistSortParameter
 
-    fun setOnlyShowArtistsWithAlbums(value: Boolean) {
-        _onlyShowArtistsWithAlbums.value = value
-    }
+    fun setSearchTerm(value: String) = repos.settings.setArtistSearchTerm(value)
 
-    fun setSearchTerm(value: String) {
-        _searchTerm.value = value
-    }
+    fun setShowArtistsWithoutAlbums(value: Boolean) = repos.settings.setShowArtistsWithoutAlbums(value)
 
-    fun setSorting(sortParameter: ArtistSortParameter, sortOrder: SortOrder) {
-        _sortParameter.value = sortParameter
-        _sortOrder.value = sortOrder
-    }
+    fun setSorting(sortParameter: ArtistSortParameter, sortOrder: SortOrder) =
+        repos.settings.setArtistSorting(sortParameter, sortOrder)
 }

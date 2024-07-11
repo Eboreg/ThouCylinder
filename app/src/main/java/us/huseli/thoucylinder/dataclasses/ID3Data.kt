@@ -3,10 +3,10 @@ package us.huseli.thoucylinder.dataclasses
 import androidx.compose.runtime.Immutable
 import com.arthenica.ffmpegkit.MediaInformation
 import us.huseli.retaintheme.extensions.filterValuesNotNull
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtistCredit
-import us.huseli.thoucylinder.dataclasses.abstr.joined
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.artist.IArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.joined
+import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.getIntOrNull
 import us.huseli.thoucylinder.getStringOrNull
 
@@ -43,9 +43,9 @@ data class ID3Data(
     companion object {
         fun fromTrack(
             track: Track,
-            trackArtists: List<AbstractArtistCredit>,
-            album: Album?,
-            albumArtists: List<AbstractArtistCredit>? = null,
+            trackArtists: Collection<IArtistCredit>,
+            album: IAlbum?,
+            albumArtists: Collection<IArtistCredit>? = null,
         ) = ID3Data(
             album = album?.title,
             albumArtist = albumArtists?.joined(),

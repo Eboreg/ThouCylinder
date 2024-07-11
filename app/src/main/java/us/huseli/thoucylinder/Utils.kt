@@ -1,14 +1,24 @@
 package us.huseli.thoucylinder
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaFormat
 import android.net.Uri
 import androidx.annotation.WorkerThread
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.extension.openInputStream
@@ -20,9 +30,11 @@ import com.anggrayudi.storage.file.openOutputStream
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import us.huseli.retaintheme.extensions.formattedString
 import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.pow
 import us.huseli.retaintheme.extensions.scaleToMaxSize
@@ -30,11 +42,16 @@ import us.huseli.retaintheme.extensions.square
 import us.huseli.retaintheme.extensions.toBitmap
 import us.huseli.thoucylinder.Constants.IMAGE_FULL_MAX_WIDTH_DP
 import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_DP
+import us.huseli.thoucylinder.dataclasses.artist.IArtist
+import us.huseli.thoucylinder.dataclasses.artist.IArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.ISavedArtist
 import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.Locale
+import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -90,22 +107,169 @@ fun <T> Map<*, *>.yquery(keys: String, failSilently: Boolean = true): T? {
 val Context.imageCacheDir: File
     get() = File(cacheDir, "images").apply { mkdirs() }
 
+fun <T> List<T>.offset(offset: Int): List<T> {
+    val startIdx =
+        if (offset < 0) lastIndex - ((offset.absoluteValue - 1) % size)
+        else offset % size
+
+    return subList(startIdx, size) + subList(0, startIdx)
+}
+
+fun waveList(length: Int, min: Int, max: Int, repeatEach: Int = 1, offset: Int = 0): List<Int> {
+    if (min >= max) throw Exception("waveList: min ($min) >= max ($max)")
+
+    val list = mutableListOf<Int>()
+    val range = ((min until max) + (max downTo min + 1)).offset(offset)
+
+    while (list.size < length) {
+        for (value in range) {
+            for (rep in 1..repeatEach) {
+                list.add(value)
+                if (list.size == length) break
+            }
+            if (list.size == length) break
+        }
+    }
+
+    return list.toList()
+}
+
+fun Float.formattedString(maxDecimals: Int, locale: Locale = Locale.getDefault()): String =
+    toDouble().formattedString(maxDecimals, locale)
+
+
+inline fun AnnotatedString.Builder.addClickableArtist(
+    artist: IArtist,
+    crossinline onArtistClick: (String) -> Unit,
+    spanStyle: SpanStyle = SpanStyle(),
+    prefix: String? = null,
+    postfix: String? = null,
+) {
+    val artistId = if (artist is ISavedArtist) artist.artistId else null
+
+    if (prefix != null) append(prefix.umlautify())
+    if (artistId != null) appendLink(
+        text = artist.name,
+        spanStyle = spanStyle,
+        onClick = { onArtistClick(artistId) },
+    )
+    else withStyle(spanStyle) { append(artist.name.umlautify()) }
+    if (postfix != null) append(postfix.umlautify())
+}
+
+
+inline fun AnnotatedString.Builder.appendLink(
+    text: String,
+    spanStyle: SpanStyle = SpanStyle(fontWeight = FontWeight.Bold),
+    crossinline onClick: () -> Unit,
+) {
+    pushLink(
+        LinkAnnotation.Clickable(
+            tag = text,
+            linkInteractionListener = { onClick() },
+        )
+    )
+    withStyle(spanStyle) { append(text.umlautify()) }
+    pop()
+}
+
+
+inline fun getClickableArtist(
+    artist: IArtist,
+    crossinline onArtistClick: (String) -> Unit,
+    spanStyle: SpanStyle = SpanStyle(),
+    prefix: String? = null,
+    postfix: String? = null,
+): AnnotatedString = buildAnnotatedString {
+    addClickableArtist(
+        artist = artist,
+        onArtistClick = onArtistClick,
+        prefix = prefix,
+        postfix = postfix,
+        spanStyle = spanStyle,
+    )
+}
+
+
+inline fun getClickableArtists(
+    artists: ImmutableList<IArtistCredit>,
+    spanStyle: SpanStyle = SpanStyle(),
+    crossinline onArtistClick: (String) -> Unit,
+): AnnotatedString = buildAnnotatedString {
+    artists.sortedBy { it.position }.forEachIndexed { index, artist ->
+        addClickableArtist(
+            artist = artist,
+            onArtistClick = onArtistClick,
+            postfix = if (index < artists.size - 1) artist.joinPhrase else null,
+            spanStyle = spanStyle,
+        )
+    }
+}
+
+inline fun <T, K> Iterable<T>.sortedLike(other: Iterable<T>, crossinline key: (T) -> K): List<T> =
+    sortedBy { item -> other.indexOfFirst { key(it) == key(item) } }
+
+fun <T> Iterable<T>.sortedLike(other: Iterable<T>) = sortedLike(other, key = { it })
+
+@Composable
+fun isInLandscapeMode(): Boolean {
+    val configuration = LocalConfiguration.current
+
+    return remember { configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+}
+
+inline fun <T> List<T>.listItemsBetween(item1: T, item2: T, key: (T) -> Any?): List<T> {
+    /** from & to are both exclusive */
+    val keyList = map { key(it) }
+    val item1Index = keyList.indexOf(key(item1))
+    val item2Index = keyList.indexOf(key(item2))
+    val fromIndex = min(item1Index, item2Index)
+    val toIndex = max(item1Index, item2Index)
+
+    return when {
+        fromIndex == -1 || toIndex == -1 -> emptyList()
+        toIndex - fromIndex < 2 -> emptyList()
+        else -> subList(fromIndex + 1, toIndex)
+    }
+}
+
+fun <T> List<T>.listItemsBetween(item1: T, item2: T): List<T> =
+    listItemsBetween(item1 = item1, item2 = item2, key = { it })
+
+fun <T> List<T>.nextOrFirst(current: T): T {
+    val currentIdx = indexOf(current)
+
+    if (isEmpty()) throw Exception("nextOrFirst() needs at least 1 element")
+    if (currentIdx == -1 || currentIdx == lastIndex) return this[0]
+    return this[currentIdx + 1]
+}
+
+fun Collection<String>.stripCommonFixes(): Collection<String> {
+    /** Strip prefixes and suffixes that are shared among all the strings. */
+    if (size < 2) return this
+
+    val firstString = first()
+    val firstReversed = firstString.reversed()
+    var prefix = ""
+    var suffix = ""
+
+    for (charPos in firstString.indices) {
+        if (all { it.getOrNull(charPos) == firstString[charPos] }) prefix += firstString[charPos]
+        else break
+    }
+    for (charPos in firstReversed.indices) {
+        if (all { it.reversed().getOrNull(charPos) == firstReversed[charPos] }) suffix = firstReversed[charPos] + suffix
+        else break
+    }
+    return map { it.removePrefix(prefix).removeSuffix(suffix) }
+}
+
+fun <K, V> Map<out K, V>.take(limit: Int): Map<K, V> = toList().take(limit).toMap()
+
 
 /** STRING ************************************************************************************************************/
 
 fun String.escapeQuotes() = replace("\"", "\\\"")
-
-suspend fun String.getBitmapByUrl(): Bitmap? = withContext(Dispatchers.IO) {
-    try {
-        Request(this@getBitmapByUrl).getBitmap()
-    } catch (e: HTTPResponseError) {
-        Logger.logError("String", "getBitmapByUrl: $e", e)
-        null
-    } catch (e: IOException) {
-        Logger.logError("String", "getBitmapByUrl: $e", e)
-        null
-    }
-}
 
 val gson: Gson = GsonBuilder().create()
 
@@ -210,32 +374,25 @@ val Uri.isRemote: Boolean
     // Very primitive and incomplete check, but should be good enough for us.
     get() = scheme?.matches(Regex("^(https?)|(ftps?)$", RegexOption.IGNORE_CASE)) == true
 
-private suspend fun Uri.getCachedBitmap(context: Context, thumbnail: Boolean): Bitmap? {
-    return withContext(Dispatchers.IO) {
-        val size = if (thumbnail) IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp else IMAGE_FULL_MAX_WIDTH_DP.dp
+private suspend fun Uri.getBitmap(context: Context, thumbnail: Boolean, saveToCache: Boolean): Bitmap? {
+    val size = if (thumbnail) IMAGE_THUMBNAIL_MAX_WIDTH_DP.dp else IMAGE_FULL_MAX_WIDTH_DP.dp
+    val cacheFilename = hashCode().toString() + (if (thumbnail) "-thumbnail.jpg" else "-full.jpg")
+    val cacheFile = File(context.imageCacheDir, cacheFilename)
 
-        if (isRemote) {
-            val cacheFilename =
-                this@getCachedBitmap.hashCode().toString() + (if (thumbnail) "-thumbnail.jpg" else "-full.jpg")
-            val cacheFile = File(context.imageCacheDir, cacheFilename)
+    if (isRemote && cacheFile.exists()) {
+        cacheFile.toBitmap()?.also { return it }
+        cacheFile.delete()
+    }
 
-            if (!cacheFile.exists()) {
-                getBitmap(context)?.square()?.scaleToMaxSize(size, context)?.also { bitmap ->
-                    cacheFile.outputStream().use { outputStream ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                    }
-                }
-            }
-            cacheFile.toBitmap()
-        } else {
-            getBitmap(context)?.square()?.scaleToMaxSize(size, context)
+    return getBitmap(context)?.square()?.scaleToMaxSize(size, context)?.also { bitmap ->
+        if (saveToCache && isRemote) cacheFile.outputStream().use { outputStream ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
         }
     }
 }
 
-suspend fun Uri.getCachedFullBitmap(context: Context) = getCachedBitmap(context, false)
-
-suspend fun Uri.getCachedThumbnailBitmap(context: Context) = getCachedBitmap(context, true)
+suspend fun Uri.getFullBitmap(context: Context, saveToCache: Boolean): Bitmap? =
+    getBitmap(context, false, saveToCache)
 
 
 /** DOCUMENTFILE ******************************************************************************************************/
@@ -265,9 +422,9 @@ fun DocumentFile.matchFiles(filename: Regex, mimeType: Regex? = null): List<Docu
     } else emptyList()
 }
 
-@Suppress("unused")
 @WorkerThread
 fun DocumentFile.matchFilesRecursive(filename: Regex, mimeType: Regex? = null): List<DocumentFile> {
+    // TODO Was used for finding cover.* I think, maybe want to to that again.
     val matches = mutableListOf<DocumentFile>()
 
     if (isDirectory) {

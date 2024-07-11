@@ -12,7 +12,7 @@ import us.huseli.thoucylinder.compose.MenuItemId
 abstract class Destination(override val menuItemId: MenuItemId) :
     AbstractSimpleDestination<MenuItemId>(menuItemId.route, menuItemId)
 
-object SearchDestination : Destination(MenuItemId.SEARCH_YOUTUBE)
+object SearchDestination : Destination(MenuItemId.SEARCH)
 
 object LibraryDestination : Destination(MenuItemId.LIBRARY)
 
@@ -25,8 +25,6 @@ object ImportDestination : Destination(MenuItemId.IMPORT)
 object DownloadsDestination : Destination(MenuItemId.DOWNLOADS)
 
 object SettingsDestination : Destination(MenuItemId.SETTINGS)
-
-object RecommendationsDestination : Destination(MenuItemId.RECOMMENDATIONS)
 
 object AlbumDestination : AbstractDestination<MenuItemId>() {
     override val routeTemplate = "album/{$NAV_ARG_ALBUM}"

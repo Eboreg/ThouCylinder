@@ -18,6 +18,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.compose.FistopyTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +46,7 @@ fun AutocompleteChip(
 ) {
     var savedText by remember(originalText) { mutableStateOf(originalText) }
     var currentText by remember(savedText) { mutableStateOf(savedText) }
-    val suggestions by remember(currentText) { mutableStateOf(getSuggestions(currentText)) }
+    val suggestions = remember(currentText) { getSuggestions(currentText) }
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     var isTextFieldClicked by remember { mutableStateOf(false) }
@@ -63,7 +65,7 @@ fun AutocompleteChip(
         },
     ) {
         InputChip(
-            modifier = modifier.menuAnchor(),
+            modifier = modifier.menuAnchor(MenuAnchorType.PrimaryEditable),
             selected = isFocused,
             onClick = { focusRequester.requestFocus() },
             label = {
@@ -72,7 +74,7 @@ fun AutocompleteChip(
                     onValueChange = { currentText = it },
                     modifier = Modifier.width(IntrinsicSize.Min).focusRequester(focusRequester),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                    textStyle = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    textStyle = FistopyTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     interactionSource = interactionSource,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Go),

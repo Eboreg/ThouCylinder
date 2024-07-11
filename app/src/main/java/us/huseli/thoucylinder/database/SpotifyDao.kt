@@ -13,12 +13,16 @@ import us.huseli.thoucylinder.dataclasses.spotify.SpotifyTrackIdPair
 
 @Dao
 abstract class SpotifyDao {
-    @Query("SELECT Track_spotifyId AS spotifyTrackId, Track_trackId AS trackId FROM Track WHERE Track_spotifyId IN (:spotifyTrackIds)")
-    protected abstract suspend fun _listTrackIdPairs(spotifyTrackIds: List<String>): List<SpotifyTrackIdPair>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     protected abstract suspend fun _insertAudioFeatures(audioFeatures: List<SpotifyTrackAudioFeatures>)
 
+    @Query("SELECT Track_spotifyId AS spotifyTrackId, Track_trackId AS trackId FROM Track WHERE Track_spotifyId IN (:spotifyTrackIds)")
+    protected abstract suspend fun _listTrackIdPairs(spotifyTrackIds: List<String>): List<SpotifyTrackIdPair>
+
+    @Query("SELECT * FROM SpotifyTrackAudioFeatures WHERE spotifyTrackId = :spotifyTrackId")
+    abstract fun flowAudioFeatures(spotifyTrackId: String): Flow<SpotifyTrackAudioFeatures?>
+
+    @Transaction
     @Query(
         """
         SELECT Track_spotifyId FROM Track

@@ -1,128 +1,129 @@
 package us.huseli.thoucylinder.compose.track
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.DragHandle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.paging.compose.LazyPagingItems
 import kotlinx.collections.immutable.ImmutableList
-import us.huseli.retaintheme.compose.ListWithNumericBar
-import us.huseli.thoucylinder.compose.utils.ObnoxiousProgressIndicator
-import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
-import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
-import us.huseli.thoucylinder.viewmodels.ImageViewModel
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.flow.StateFlow
+import org.burnoutcrew.reorderable.ReorderableLazyListState
+import org.burnoutcrew.reorderable.detectReorder
+import us.huseli.thoucylinder.TrackDownloadTask
+import us.huseli.thoucylinder.compose.scrollbar.ScrollbarListState
+import us.huseli.thoucylinder.compose.scrollbar.rememberScrollbarListState
+import us.huseli.thoucylinder.compose.utils.ItemList
+import us.huseli.thoucylinder.compose.utils.ItemListReorderable
+import us.huseli.thoucylinder.compose.utils.SelectionAction
+import us.huseli.thoucylinder.dataclasses.track.TrackSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.track.TrackUiState
 
 @Composable
 fun TrackList(
-    itemCount: Int,
+    states: () -> ImmutableList<TrackUiState>,
+    getDownloadStateFlow: (String) -> StateFlow<TrackDownloadTask.UiState?>,
+    onClick: (TrackUiState) -> Unit,
+    onLongClick: (TrackUiState) -> Unit,
+    selectedTrackCount: () -> Int,
+    trackSelectionCallbacks: TrackSelectionCallbacks,
     modifier: Modifier = Modifier,
-    padding: PaddingValues = PaddingValues(horizontal = 10.dp),
-    trackSelectionCallbacks: TrackSelectionCallbacks? = null,
-    selectedTrackIds: List<String> = emptyList(),
-    listState: LazyListState = rememberLazyListState(),
-    extraTrackSelectionButtons: (@Composable () -> Unit)? = null,
-    onEmpty: (@Composable () -> Unit)? = null,
-    content: LazyListScope.() -> Unit,
+    isLoading: Boolean = false,
+    scrollbarState: ScrollbarListState = rememberScrollbarListState(),
+    showAlbum: Boolean = false,
+    showArtist: Boolean = true,
+    onEmpty: @Composable () -> Unit = {},
+    trailingContent: @Composable (() -> Unit)? = null,
 ) {
-    Column {
-        trackSelectionCallbacks?.also { callbacks ->
-            SelectedTracksButtons(
-                trackCount = selectedTrackIds.size,
-                callbacks = callbacks,
-                extraButtons = extraTrackSelectionButtons,
-            )
-        }
+    SelectedTracksButtons(
+        trackCount = selectedTrackCount,
+        callbacks = trackSelectionCallbacks,
+    )
 
-        if (itemCount == 0 && onEmpty != null) onEmpty()
-
-        ListWithNumericBar(
-            listState = listState,
-            listSize = itemCount,
-            modifier = Modifier.padding(padding),
-            itemHeight = 55.dp,
-            minItems = 50,
-        ) {
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-                contentPadding = PaddingValues(vertical = 10.dp),
-                modifier = modifier,
-                content = content,
-            )
-        }
+    ItemList(
+        things = states,
+        key = { it.id },
+        modifier = modifier,
+        scrollbarState = scrollbarState,
+        isLoading = isLoading,
+        onEmpty = onEmpty,
+        trailingContent = trailingContent,
+        contentType = "TrackUiState",
+    ) { state ->
+        TrackListCard(
+            state = state,
+            downloadStateFlow = remember { getDownloadStateFlow(state.trackId) },
+            showAlbum = showAlbum,
+            showArtist = showArtist,
+            onClick = { onClick(state) },
+            onLongClick = { onLongClick(state) },
+        )
     }
 }
 
-
 @Composable
-fun TrackList(
-    uiStates: LazyPagingItems<TrackUiState>,
-    trackCallbacks: (Int, TrackUiState) -> TrackCallbacks,
-    selectedTrackIds: ImmutableList<String>,
+fun TrackListReorderable(
+    states: () -> ImmutableList<TrackUiState>,
+    getDownloadStateFlow: (String) -> StateFlow<TrackDownloadTask.UiState?>,
+    onClick: (TrackUiState) -> Unit,
+    onLongClick: (TrackUiState) -> Unit,
+    selectedTrackCount: () -> Int,
     trackSelectionCallbacks: TrackSelectionCallbacks,
+    reorderableState: ReorderableLazyListState,
     modifier: Modifier = Modifier,
-    imageViewModel: ImageViewModel = hiltViewModel(),
-    listState: LazyListState = rememberLazyListState(),
-    showArtist: Boolean = true,
+    scrollbarState: ScrollbarListState = rememberScrollbarListState(listState = reorderableState.listState),
+    isLoading: Boolean = false,
     showAlbum: Boolean = false,
-    progressIndicatorText: String? = null,
-    ensureTrackMetadata: (TrackUiState) -> Unit,
-    extraTrackSelectionButtons: @Composable (() -> Unit)? = null,
-    onEmpty: @Composable (() -> Unit)? = null,
+    showArtist: Boolean = true,
+    extraBottomSheetItems: @Composable (TrackUiState) -> Unit = {},
+    extraSelectionActions: ImmutableList<SelectionAction> = persistentListOf(),
+    onEmpty: @Composable () -> Unit = {},
+    containerColor: @Composable ((TrackUiState, Boolean) -> Color)? = null,
 ) {
-    Box {
-        progressIndicatorText?.also {
-            ObnoxiousProgressIndicator(text = it, modifier = Modifier.zIndex(1f))
-        }
-        TrackList(
-            itemCount = uiStates.itemCount,
-            selectedTrackIds = selectedTrackIds,
-            trackSelectionCallbacks = trackSelectionCallbacks,
-            listState = listState,
-            modifier = modifier,
-            extraTrackSelectionButtons = extraTrackSelectionButtons,
-            onEmpty = onEmpty,
-        ) {
-            items(count = uiStates.itemCount) { index ->
-                uiStates[index]?.also { state ->
-                    var thumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
-                    val downloadState = state.downloadState.collectAsStateWithLifecycle()
+    SelectedTracksButtons(
+        trackCount = selectedTrackCount,
+        callbacks = trackSelectionCallbacks,
+        extraActions = extraSelectionActions,
+    )
 
-                    LaunchedEffect(state.trackThumbnailUri, state.albumThumbnailUri) {
-                        thumbnail = imageViewModel.getThumbnailImageBitmap(state.trackThumbnailUri)
-                            ?: imageViewModel.getThumbnailImageBitmap(state.albumThumbnailUri)
-                        ensureTrackMetadata(state)
-                    }
-
-                    TrackListRow(
-                        showArtist = showArtist,
-                        isSelected = selectedTrackIds.contains(state.trackId),
-                        thumbnail = { thumbnail },
-                        showAlbum = showAlbum,
-                        downloadState = downloadState,
-                        callbacks = remember { trackCallbacks(index, state) },
-                        state = state,
-                    )
-                }
-            }
-        }
+    ItemListReorderable(
+        things = states,
+        key = { it.id },
+        reorderableState = reorderableState,
+        scrollbarState = scrollbarState,
+        modifier = modifier.fillMaxHeight(),
+        isLoading = isLoading,
+        onEmpty = onEmpty,
+        contentType = "TrackUiState",
+    ) { state, isDragging ->
+        TrackListCard(
+            state = state,
+            downloadStateFlow = remember { getDownloadStateFlow(state.trackId) },
+            showAlbum = showAlbum,
+            showArtist = showArtist,
+            onClick = { onClick(state) },
+            onLongClick = { onLongClick(state) },
+            extraIcons = {
+                Icon(
+                    Icons.Sharp.DragHandle,
+                    null,
+                    modifier = Modifier.detectReorder(reorderableState).height(18.dp).padding(end = 10.dp),
+                )
+            },
+            extraBottomSheetItems = { extraBottomSheetItems(state) },
+            containerColor = when {
+                containerColor != null -> containerColor(state, isDragging)
+                isDragging -> MaterialTheme.colorScheme.surface
+                state.isSelected -> MaterialTheme.colorScheme.primaryContainer
+                else -> Color.Unspecified
+            },
+        )
     }
 }

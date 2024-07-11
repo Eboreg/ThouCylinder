@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.Constants.PREF_SPOTIFY_CODE_VERIFIER
@@ -20,25 +21,27 @@ import us.huseli.thoucylinder.interfaces.ILogger
 import java.security.MessageDigest
 import java.util.Base64
 
+@Suppress("PropertyName")
 abstract class AbstractSpotifyOAuth2<T : OAuth2Token>(private val tokenPrefKey: String, context: Context) : ILogger {
     protected val preferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
-    protected val token: MutableStateFlow<T?> = MutableStateFlow(
+    protected val _token: MutableStateFlow<T?> = MutableStateFlow(
         preferences.getString(tokenPrefKey, null)?.let { jsonToToken(it) }
     )
 
-    val isAuthorized: Flow<Boolean> = token.map { it != null }
+    val isAuthorized: Flow<Boolean> = _token.map { it != null }
+    val token = _token.asStateFlow()
 
     abstract fun baseJsonToToken(json: String): T
     abstract suspend fun getAccessToken(): String?
     abstract fun jsonToToken(json: String): T?
 
     fun clearToken() {
-        token.value = null
+        _token.value = null
         preferences.edit().remove(tokenPrefKey).apply()
     }
 
     protected fun saveToken(json: String): T = baseJsonToToken(json).also {
-        token.value = it
+        _token.value = it
         preferences.edit().putString(tokenPrefKey, it.toJson()).apply()
     }
 
@@ -52,7 +55,7 @@ class SpotifyOAuth2ClientCredentials(context: Context) :
     AbstractSpotifyOAuth2<OAuth2Token>(PREF_SPOTIFY_OAUTH2_TOKEN_CC, context) {
     override fun baseJsonToToken(json: String): OAuth2Token = OAuth2Token.fromBaseJson(json)
 
-    override suspend fun getAccessToken(): String? = token.value.let { token ->
+    override suspend fun getAccessToken(): String? = _token.value.let { token ->
         if (token == null || token.isExpired()) fetchToken()?.accessToken
         else token.accessToken
     }
@@ -72,7 +75,7 @@ class SpotifyOAuth2ClientCredentials(context: Context) :
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
         logError(e)
-        token.value = null
+        _token.value = null
         null
     }
 }
@@ -112,7 +115,7 @@ class SpotifyOAuth2PKCE(context: Context) :
 
     override fun baseJsonToToken(json: String): RefreshableOAuth2Token = RefreshableOAuth2Token.fromBaseJson(json)
 
-    override suspend fun getAccessToken(): String? = token.value?.let { token ->
+    override suspend fun getAccessToken(): String? = _token.value?.let { token ->
         if (token.isExpired()) refreshToken(token)?.accessToken
         else {
             if (token.expiresSoon()) scope.launch { refreshToken(token) }
@@ -139,7 +142,7 @@ class SpotifyOAuth2PKCE(context: Context) :
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
         logError(e)
-        token.value = null
+        _token.value = null
         null
     }
 
@@ -171,7 +174,7 @@ class SpotifyOAuth2PKCE(context: Context) :
         saveToken(response.getString())
     } catch (e: HTTPResponseError) {
         logError(e)
-        this.token.value = null
+        this._token.value = null
         null
     }
 

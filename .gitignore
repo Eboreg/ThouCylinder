@@ -16,3 +16,5 @@ local.properties
 secrets.properties
 notes.txt
 keystore.properties
+# Sentry Config File
+sentry.properties

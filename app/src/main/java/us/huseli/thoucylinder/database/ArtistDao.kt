@@ -9,16 +9,21 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.retaintheme.extensions.combineEquals
-import us.huseli.thoucylinder.dataclasses.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.TrackArtist
-import us.huseli.thoucylinder.dataclasses.pojos.TopLocalSpotifyArtistPojo
+import us.huseli.thoucylinder.dataclasses.artist.AlbumArtist
+import us.huseli.thoucylinder.dataclasses.artist.AlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.Artist
+import us.huseli.thoucylinder.dataclasses.artist.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.artist.ArtistWithCounts
+import us.huseli.thoucylinder.dataclasses.artist.IAlbumArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.IArtist
+import us.huseli.thoucylinder.dataclasses.artist.ISavedArtist
+import us.huseli.thoucylinder.dataclasses.artist.ITrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.TrackArtist
+import us.huseli.thoucylinder.dataclasses.artist.TrackArtistCredit
+import us.huseli.thoucylinder.dataclasses.artist.toAlbumArtists
+import us.huseli.thoucylinder.dataclasses.artist.toTrackArtists
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
 
 @Dao
 abstract class ArtistDao {
@@ -29,7 +34,7 @@ abstract class ArtistDao {
     protected abstract suspend fun _clearTrackArtists(trackId: String)
 
     @Query("SELECT * FROM Artist WHERE LOWER(Artist_name) = LOWER(:name) LIMIT 1")
-    protected abstract suspend fun _getArtistByName(name: String): Artist?
+    protected abstract suspend fun _getArtistByLowerCaseName(name: String): Artist?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     protected abstract suspend fun _insertAlbumArtists(vararg albumArtists: AlbumArtist)
@@ -40,6 +45,46 @@ abstract class ArtistDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     protected abstract suspend fun _insertTrackArtists(vararg trackArtists: TrackArtist)
 
+    @Query("SELECT * FROM Artist WHERE Artist_id IN (:artistIds)")
+    protected abstract suspend fun _listArtistsById(vararg artistIds: String): List<Artist>
+
+    @Query("SELECT * FROM Artist WHERE LOWER(Artist_name) IN (:names)")
+    protected abstract suspend fun _listArtistsByLowerCaseName(vararg names: String): List<Artist>
+
+    private suspend fun _saveArtists(artists: Collection<IArtist>): List<Artist> {
+        val savedArtists = artists.filterIsInstance<Artist>()
+        val unsavedArtists = artists.filter { it !is Artist }
+        val changedArtists = mutableListOf<Artist>()
+        val result = mutableListOf<Artist>()
+
+        if (unsavedArtists.isNotEmpty()) {
+            val dbArtists =
+                _listArtistsByLowerCaseName(*unsavedArtists.map { it.name.lowercase() }.toSet().toTypedArray())
+            val existingArtists = unsavedArtists.mapNotNull { unsaved ->
+                dbArtists
+                    .find { it.name.lowercase() == unsaved.name.lowercase() }
+                    ?.updateWith(unsaved)
+            }.toSet()
+            val newArtists = unsavedArtists
+                .filter { a1 -> a1.name.lowercase() !in existingArtists.map { a2 -> a2.name.lowercase() } }
+                .map { it.toSaveableArtist() }
+
+            if (newArtists.isNotEmpty()) _insertArtists(*newArtists.toTypedArray())
+            result.addAll(newArtists)
+            result.addAll(existingArtists)
+            changedArtists.addAll(existingArtists.filter { it !in dbArtists })
+        }
+
+        if (savedArtists.isNotEmpty()) {
+            val dbArtists = _listArtistsById(*savedArtists.map { it.artistId }.toTypedArray())
+            changedArtists.addAll(savedArtists.filter { it !in dbArtists })
+            result.addAll(savedArtists)
+        }
+        if (changedArtists.isNotEmpty()) _updateArtists(*changedArtists.toTypedArray())
+
+        return result.toList()
+    }
+
     @Update
     protected abstract suspend fun _updateArtists(vararg artists: Artist)
 
@@ -49,14 +94,37 @@ abstract class ArtistDao {
     @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId IN (:trackIds)")
     abstract suspend fun clearTrackArtists(vararg trackIds: String)
 
-    @Query("SELECT * FROM Artist WHERE Artist_id = :id")
-    abstract fun flowArtistById(id: String): Flow<Artist?>
+    @Query(
+        """
+        DELETE FROM Artist WHERE Artist_id NOT IN
+        (SELECT TrackArtist_artistId FROM TrackArtist UNION SELECT AlbumArtist_artistId FROM AlbumArtist)
+        """
+    )
+    abstract suspend fun deleteOrphanArtists()
 
-    @Query("SELECT * FROM ArtistCombo")
+    @Query("SELECT * FROM ArtistCombo WHERE Artist_id = :id")
+    abstract fun flowArtistComboById(id: String): Flow<ArtistCombo?>
+
+    @Query("SELECT * FROM ArtistCombo WHERE ArtistCombo_trackCount > 0 OR ArtistCombo_albumCount > 0")
     abstract fun flowArtistCombos(): Flow<List<ArtistCombo>>
 
     @Query("SELECT * FROM Artist ORDER BY Artist_name")
     abstract fun flowArtists(): Flow<List<Artist>>
+
+    @Query(
+        """
+        SELECT Artist.*, COUNT(DISTINCT Track_trackId) AS trackCount, COUNT(DISTINCT Album_albumId) AS albumCount
+        FROM Artist
+            LEFT JOIN AlbumArtist ON AlbumArtist_artistId = Artist_id
+            LEFT JOIN Album ON Album_albumId = AlbumArtist_albumId AND Album_albumId = :albumId
+            LEFT JOIN TrackArtist ON TrackArtist_artistId = Artist_id
+            LEFT JOIN Track ON Track_trackId = TrackArtist_trackId AND Track_albumId = :albumId
+        WHERE Album_albumId = :albumId OR Track_albumId = :albumId
+        GROUP BY Artist_id
+        ORDER BY albumCount DESC, trackCount DESC
+        """
+    )
+    abstract fun flowArtistsByAlbumId(albumId: String): Flow<List<ArtistWithCounts>>
 
     @Query(
         """
@@ -73,59 +141,41 @@ abstract class ArtistDao {
     abstract suspend fun getArtist(id: String): Artist?
 
     @Transaction
-    open suspend fun createOrUpdateArtist(unsavedArtist: UnsavedArtist): Artist {
-        return _getArtistByName(unsavedArtist.name)?.let { artist ->
-            if (
-                (unsavedArtist.image != null && unsavedArtist.image != artist.image) ||
-                (unsavedArtist.musicBrainzId != null && unsavedArtist.musicBrainzId != artist.musicBrainzId) ||
-                (unsavedArtist.spotifyId != null && unsavedArtist.spotifyId != artist.spotifyId)
-            ) {
-                artist.copy(
-                    image = unsavedArtist.image ?: artist.image,
-                    musicBrainzId = unsavedArtist.musicBrainzId ?: artist.musicBrainzId,
-                    spotifyId = unsavedArtist.spotifyId ?: artist.spotifyId,
-                ).also { _updateArtists(it) }
-            } else artist
-        } ?: Artist.fromBase(unsavedArtist).also { _insertArtists(it) }
+    open suspend fun insertAlbumArtists(artistCredits: Collection<IAlbumArtistCredit>): List<AlbumArtistCredit> {
+        val artists = _saveArtists(artistCredits)
+        val albumArtistCredits = artistCredits.mapNotNull { artistCredit ->
+            artists
+                .find { it.name == artistCredit.name }
+                ?.let { artistCredit.withArtistId(it.artistId) }
+        }
+
+        _insertAlbumArtists(*albumArtistCredits.toAlbumArtists().toTypedArray())
+        return albumArtistCredits
     }
 
-    suspend fun insertAlbumArtists(albumArtists: Collection<AlbumArtist>) {
-        _insertAlbumArtists(
-            *albumArtists.combineEquals { a, b -> a.albumId == b.albumId }
-                .flatMap { it.mapIndexed { index, albumArtist -> albumArtist.copy(position = index) } }
-                .toTypedArray()
-        )
+    @Transaction
+    open suspend fun insertTrackArtists(artistCredits: Collection<ITrackArtistCredit>): List<TrackArtistCredit> {
+        val artists = _saveArtists(artistCredits)
+        val trackArtistCredits = artistCredits.mapNotNull { artistCredit ->
+            artists
+                .find { it.name.lowercase() == artistCredit.name.lowercase() }
+                ?.let { artistCredit.withArtistId(it.artistId) }
+        }
+
+        _insertTrackArtists(*trackArtistCredits.toTrackArtists().toTypedArray())
+        return trackArtistCredits
     }
 
-    suspend fun insertTrackArtists(trackArtists: Collection<TrackArtist>) {
-        _insertTrackArtists(
-            *trackArtists.combineEquals { a, b -> a.trackId == b.trackId }
-                .flatMap { it.mapIndexed { index, trackArtist -> trackArtist.copy(position = index) } }
-                .toTypedArray()
-        )
-    }
+    @Query("SELECT Artist.* FROM Artist JOIN TrackArtist ON Artist_id = TrackArtist_artistId WHERE TrackArtist_trackId = :trackId")
+    abstract suspend fun listArtistsByTrackId(trackId: String): List<Artist>
 
-    @Query(
-        """
-        SELECT Artist_id, Artist_name, Artist_spotifyId, COUNT(DISTINCT Track_trackId) AS trackCount
-        FROM Artist 
-            LEFT JOIN TrackArtist ON Artist_id = TrackArtist_artistId
-            LEFT JOIN AlbumArtist ON Artist_id = AlbumArtist_artistId
-            LEFT JOIN Track ON Track_trackId = TrackArtist_trackId OR Track_albumId = AlbumArtist_albumId
-        WHERE Artist_spotifyId IS NOT NULL AND Artist_spotifyId != ""
-        GROUP BY Artist_id
-        ORDER BY trackCount DESC
-        LIMIT :limit
-        """
-    )
-    abstract suspend fun listTopSpotifyArtists(limit: Int): List<TopLocalSpotifyArtistPojo>
-
-    @Query("SELECT * FROM TrackArtistCredit WHERE TrackArtist_trackId = :trackId ORDER BY TrackArtist_position")
-    abstract suspend fun listTrackArtistCredits(trackId: String): List<TrackArtistCredit>
-
-    suspend fun setAlbumArtists(albumId: String, albumArtists: Collection<AlbumArtist>) {
+    @Transaction
+    open suspend fun setAlbumArtists(
+        albumId: String,
+        albumArtists: Collection<IAlbumArtistCredit>,
+    ): List<AlbumArtistCredit> {
         _clearAlbumArtists(albumId)
-        insertAlbumArtists(albumArtists)
+        return insertAlbumArtists(albumArtists)
     }
 
     @Query("UPDATE Artist SET Artist_musicBrainzId = :musicBrainzId WHERE Artist_id = :artistId")
@@ -136,8 +186,7 @@ abstract class ArtistDao {
         UPDATE Artist
         SET Artist_spotifyId = :spotifyId,
             Artist_image_fullUriString = :imageUri,
-            Artist_image_thumbnailUriString = :imageThumbnailUri,
-            Artist_image_hash = :imageHash
+            Artist_image_thumbnailUriString = :imageThumbnailUri
         WHERE Artist_id = :artistId
         """
     )
@@ -146,19 +195,31 @@ abstract class ArtistDao {
         spotifyId: String,
         imageUri: String?,
         imageThumbnailUri: String?,
-        imageHash: Int?,
     )
 
-    @Query("UPDATE Artist SET Artist_spotifyId = :spotifyId WHERE Artist_id = :artistId")
-    abstract suspend fun setSpotifyId(artistId: String, spotifyId: String)
-
-    suspend fun setTrackArtists(trackId: String, trackArtists: Collection<TrackArtist>) {
+    @Transaction
+    open suspend fun setTrackArtists(trackId: String, trackArtists: Collection<ITrackArtistCredit>) {
         _clearTrackArtists(trackId)
         insertTrackArtists(trackArtists)
     }
 
-    suspend fun upsertSpotifyArtist(spotifyArtist: SpotifyArtist) {
-        val artist = _getArtistByName(spotifyArtist.name)
+    @Transaction
+    open suspend fun upsertArtist(artist: IArtist): Artist {
+        val existingArtist =
+            if (artist is ISavedArtist) getArtist(artist.artistId)
+            else _getArtistByLowerCaseName(artist.name.lowercase())
+
+        return existingArtist?.copy(
+            name = artist.name,
+            spotifyId = artist.spotifyId ?: existingArtist.spotifyId,
+            musicBrainzId = artist.musicBrainzId ?: existingArtist.musicBrainzId,
+            image = artist.image ?: existingArtist.image,
+        )?.also { _updateArtists(it) } ?: artist.toSaveableArtist().also { _insertArtists(it) }
+    }
+
+    @Transaction
+    open suspend fun upsertSpotifyArtist(spotifyArtist: SpotifyArtist) {
+        val artist = _getArtistByLowerCaseName(spotifyArtist.name.lowercase())
         val image = spotifyArtist.images.toMediaStoreImage()
 
         if (artist != null) setSpotifyData(
@@ -166,7 +227,6 @@ abstract class ArtistDao {
             spotifyId = spotifyArtist.id,
             imageUri = image?.fullUriString,
             imageThumbnailUri = image?.thumbnailUriString,
-            imageHash = image?.hash,
         )
         else _insertArtists(Artist(name = spotifyArtist.name, spotifyId = spotifyArtist.id, image = image))
     }

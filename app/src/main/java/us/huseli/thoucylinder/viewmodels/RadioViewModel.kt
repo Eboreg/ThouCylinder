@@ -4,8 +4,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import us.huseli.thoucylinder.dataclasses.uistates.RadioDialogUiState
+import kotlinx.coroutines.flow.map
+import us.huseli.thoucylinder.dataclasses.radio.RadioDialogUiState
+import us.huseli.thoucylinder.dataclasses.radio.RadioUiState
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -17,40 +18,43 @@ class RadioViewModel @Inject constructor(
 ) : AbstractBaseViewModel() {
     private val _activeAlbumId = MutableStateFlow<String?>(null)
     private val _activeArtistId = MutableStateFlow<String?>(null)
+    private val _activeAlbumCombo = _activeAlbumId.map { albumId -> albumId?.let { repos.album.getAlbumCombo(it) } }
+    private val _activeArtist = _activeArtistId.map { artistId -> artistId?.let { repos.artist.getArtist(artistId) } }
 
     val radioDialogUiState = combine(
-        _activeAlbumId,
-        _activeArtistId,
-        repos.radio.activeRadio,
+        _activeAlbumCombo,
+        _activeArtist,
+        managers.radio.activeRadioCombo,
         repos.player.currentCombo,
         repos.settings.libraryRadioNovelty,
-    ) { albumId, artistId, radio, trackCombo, novelty ->
-        val albumCombo = albumId?.let { repos.album.getAlbumCombo(it) }
-        val artist = artistId?.let { repos.artist.getArtist(it) }
-
+    ) { albumCombo, artist, radio, trackCombo, novelty ->
         RadioDialogUiState(
-            activeRadio = radio,
-            activeAlbum = albumCombo?.let {
+            activeRadio = radio?.let { RadioUiState(type = it.type, title = it.title) },
+            activeAlbum = albumCombo?.takeIf { it.album.albumId != radio?.album?.albumId }?.let { combo ->
                 RadioDialogUiState.Album(
-                    albumId = it.album.albumId,
-                    title = it.album.title,
-                    artists = it.artists.toImmutableList(),
+                    albumId = combo.album.albumId,
+                    title = combo.album.title,
+                    artists = combo.artists
+                        .filter { it.name != radio?.artist?.name }
+                        .toImmutableList(),
                 )
             },
-            activeArtist = artist,
-            activeTrack = trackCombo?.let { combo ->
+            activeArtist = artist?.takeIf { it.artistId != radio?.artist?.artistId },
+            activeTrack = trackCombo?.takeIf { it.track.trackId != radio?.track?.trackId }?.let { combo ->
                 RadioDialogUiState.Track(
                     trackId = combo.track.trackId,
                     title = combo.track.title,
-                    artists = combo.artists.toImmutableList(),
-                    album = combo.album?.let { RadioDialogUiState.Album(albumId = it.albumId, title = it.title) },
+                    artists = combo.trackArtists
+                        .filter { it.name != radio?.artist?.name }
+                        .toImmutableList(),
+                    album = combo.album
+                        ?.takeIf { it.albumId != radio?.album?.albumId }
+                        ?.let { RadioDialogUiState.Album(albumId = it.albumId, title = it.title) },
                 )
             },
             libraryRadioNovelty = novelty,
         )
-    }
-        .distinctUntilChanged()
-        .stateLazily(RadioDialogUiState(libraryRadioNovelty = repos.settings.libraryRadioNovelty.value))
+    }.stateLazily(RadioDialogUiState(libraryRadioNovelty = repos.settings.libraryRadioNovelty.value))
 
     fun deactivate() = managers.radio.deactivateRadio()
 

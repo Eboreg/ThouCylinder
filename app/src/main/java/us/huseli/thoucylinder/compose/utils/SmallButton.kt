@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import us.huseli.thoucylinder.compose.FistopyTheme
 
 @Composable
 fun SmallButton(
@@ -25,7 +26,7 @@ fun SmallButton(
     leadingIcon: ImageVector? = null,
     text: String,
     height: Dp = 32.dp,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge,
+    textStyle: TextStyle = FistopyTheme.typography.labelLarge,
     enabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
     shape: Shape = MaterialTheme.shapes.small,

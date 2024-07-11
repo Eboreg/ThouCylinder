@@ -11,6 +11,7 @@ import androidx.compose.material.icons.sharp.ArrowDownward
 import androidx.compose.material.icons.sharp.ArrowUpward
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import kotlinx.collections.immutable.ImmutableMap
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.stringResource
+import us.huseli.thoucylinder.umlautify
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -39,6 +41,7 @@ fun <SortParameter : Enum<SortParameter>> ListSortDialog(
 ) {
     var sortParameter by rememberSaveable(initialSortParameter) { mutableStateOf(initialSortParameter) }
     var sortOrder by rememberSaveable(initialSortOrder) { mutableStateOf(initialSortOrder) }
+    val filterChipColors = FilterChipDefaults.filterChipColors(iconColor = MaterialTheme.colorScheme.onSurfaceVariant)
 
     AlertDialog(
         shape = MaterialTheme.shapes.small,
@@ -62,7 +65,8 @@ fun <SortParameter : Enum<SortParameter>> ListSortDialog(
                         FilterChip(
                             selected = param == sortParameter,
                             onClick = { sortParameter = param },
-                            label = { Text(text = label) },
+                            label = { Text(text = label.umlautify()) },
+                            colors = filterChipColors,
                         )
                     }
                 }
@@ -77,6 +81,7 @@ fun <SortParameter : Enum<SortParameter>> ListSortDialog(
                         leadingIcon = {
                             Icon(Icons.Sharp.ArrowDownward, null, modifier = Modifier.size(20.dp))
                         },
+                        colors = filterChipColors,
                     )
                     FilterChip(
                         selected = sortOrder == SortOrder.DESCENDING,
@@ -85,6 +90,7 @@ fun <SortParameter : Enum<SortParameter>> ListSortDialog(
                         leadingIcon = {
                             Icon(Icons.Sharp.ArrowUpward, null, modifier = Modifier.size(20.dp))
                         },
+                        colors = filterChipColors,
                     )
                 }
             }

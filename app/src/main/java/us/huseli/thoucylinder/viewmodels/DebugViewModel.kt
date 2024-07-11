@@ -1,14 +1,13 @@
 package us.huseli.thoucylinder.viewmodels
 
-import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.AbstractYoutubeClient
-import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.dataclasses.youtube.getBest
-import us.huseli.retaintheme.extensions.launchOnIOThread
+import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -28,7 +27,7 @@ class DebugViewModel @Inject constructor(
         launchOnIOThread {
             val albums = repos.album.listAlbums()
             val spotifyAlbumIds = albums.mapNotNull { it.spotifyId }.take(20)
-            val spotifyAlbums = repos.spotify.getSpotifyAlbums(spotifyAlbumIds)
+            val spotifyAlbums = repos.spotify.getAlbums(spotifyAlbumIds)
 
             spotifyAlbums
                 ?.flatMap { album -> album.artists.map { it.id } }
@@ -61,14 +60,10 @@ class DebugViewModel @Inject constructor(
         }
     }
 
-    fun getVideoSearchResultContinued(
-        context: Context,
-        client: AbstractYoutubeClient,
-        token: String,
-    ) {
+    fun getVideoSearchResultContinued(client: AbstractYoutubeClient, token: String) {
         launchOnIOThread {
             try {
-                val result = client.getVideoSearchResult(context, "roy harper hors d'oeuvres", token)
+                val result = client.getVideoSearchResult("roy harper hors d'oeuvres", token)
                 log("getVideoSearchResultContinued(${client.clientName}): $result")
             } catch (e: Exception) {
                 logError(e)
@@ -76,10 +71,10 @@ class DebugViewModel @Inject constructor(
         }
     }
 
-    fun getVideoSearchResult(context: Context, client: AbstractYoutubeClient) {
+    fun getVideoSearchResult(client: AbstractYoutubeClient) {
         launchOnIOThread {
             try {
-                val result = client.getVideoSearchResult(context, "roy harper hors d'oeuvres")
+                val result = client.getVideoSearchResult("roy harper hors d'oeuvres")
                 log("getVideoSearchResult(${client.clientName}): $result")
                 result.nextToken?.also { _continuationTokens.value += client.clientName to it }
             } catch (e: Exception) {
@@ -88,10 +83,10 @@ class DebugViewModel @Inject constructor(
         }
     }
 
-    fun searchPlaylistCombos(context: Context, client: AbstractYoutubeClient) {
+    fun searchPlaylistCombos(client: AbstractYoutubeClient) {
         launchOnIOThread {
             try {
-                val combos = client.searchPlaylistCombos(context, "roy harper stormcock")
+                val combos = client.searchPlaylistCombos("roy harper stormcock")
                 log("searchPlaylistCombos(${client.clientName}): $combos")
             } catch (e: Exception) {
                 logError(e)

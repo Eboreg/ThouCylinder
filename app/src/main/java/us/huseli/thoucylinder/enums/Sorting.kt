@@ -4,10 +4,10 @@ import android.content.Context
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.views.ArtistCombo
-import us.huseli.thoucylinder.umlautify
+import us.huseli.thoucylinder.dataclasses.album.Album
+import us.huseli.thoucylinder.dataclasses.artist.ArtistCombo
+import us.huseli.thoucylinder.dataclasses.track.ITrackCombo
+import us.huseli.thoucylinder.getUmlautifiedString
 
 interface SortParameter<T> {
     val stringRes: Int
@@ -26,12 +26,12 @@ enum class AlbumSortParameter : SortParameter<Album> {
     },
     YEAR {
         override val stringRes = R.string.year
-        override fun sql(sortOrder: SortOrder): String = "COALESCE(Album_year, minYear) ${sortOrder.sql}"
+        override fun sql(sortOrder: SortOrder): String = "COALESCE(Album_year, AlbumCombo_minYear) ${sortOrder.sql}"
     };
 
     companion object {
         fun withLabels(context: Context): ImmutableMap<AlbumSortParameter, String> =
-            entries.associateWith { context.getString(it.stringRes).umlautify() }.toImmutableMap()
+            entries.associateWith { context.getUmlautifiedString(it.stringRes) }.toImmutableMap()
     }
 }
 
@@ -51,13 +51,13 @@ enum class ArtistSortParameter : SortParameter<ArtistCombo> {
 
     companion object {
         fun withLabels(context: Context): ImmutableMap<ArtistSortParameter, String> =
-            entries.associateWith { context.getString(it.stringRes).umlautify() }.toImmutableMap()
+            entries.associateWith { context.getUmlautifiedString(it.stringRes) }.toImmutableMap()
     }
 }
 
 enum class SortOrder(val sql: String) { ASCENDING("ASC"), DESCENDING("DESC") }
 
-enum class TrackSortParameter : SortParameter<AbstractTrackCombo> {
+enum class TrackSortParameter : SortParameter<ITrackCombo> {
     TITLE {
         override val stringRes = R.string.title
         override fun sql(sortOrder: SortOrder): String = "LOWER(Track_title) ${sortOrder.sql}"
@@ -87,6 +87,6 @@ enum class TrackSortParameter : SortParameter<AbstractTrackCombo> {
 
     companion object {
         fun withLabels(context: Context): ImmutableMap<TrackSortParameter, String> =
-            entries.associateWith { context.getString(it.stringRes).umlautify() }.toImmutableMap()
+            entries.associateWith { context.getUmlautifiedString(it.stringRes) }.toImmutableMap()
     }
 }

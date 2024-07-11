@@ -6,11 +6,14 @@ import android.os.StrictMode
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import us.huseli.retaintheme.snackbar.SnackbarEngine
 import us.huseli.thoucylinder.compose.App
+import us.huseli.thoucylinder.compose.FistopyTheme
 import us.huseli.thoucylinder.viewmodels.AppViewModel
 
 @AndroidEntryPoint
@@ -39,8 +42,12 @@ class MainActivity : ComponentActivity() {
          * Some hints: https://stackoverflow.com/questions/72301445/why-is-setcontent-being-called-twice
          */
         setContent {
-            ThouCylinderTheme {
-                App(startDestination = remember { startDestination })
+            val umlautifier by viewModel.umlautifier.collectAsStateWithLifecycle()
+
+            CompositionLocalProvider(LocalUmlautifier provides umlautifier) {
+                FistopyTheme {
+                    App(startDestination = remember { startDestination })
+                }
             }
         }
     }
@@ -53,15 +60,11 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent): String? {
         intent.data?.pathSegments?.also { pathSegments ->
             if (pathSegments.getOrNull(0) == "spotify" && pathSegments.getOrNull(1) == "import-albums") {
-                viewModel.handleSpotifyIntent(intent) { exception ->
-                    SnackbarEngine.addError(getString(R.string.spotify_authorization_failed, exception).umlautify())
-                }
+                viewModel.handleSpotifyIntent(intent)
                 return ImportDestination.route
             }
             if (pathSegments.getOrNull(0) == "lastfm" && pathSegments.getOrNull(1) == "auth") {
-                viewModel.handleLastFmIntent(intent) { exception ->
-                    SnackbarEngine.addError(getString(R.string.last_fm_authorization_failed, exception).umlautify())
-                }
+                viewModel.handleLastFmIntent(intent)
                 return SettingsDestination.route
             }
         }

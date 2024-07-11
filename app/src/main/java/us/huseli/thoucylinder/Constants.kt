@@ -1,7 +1,7 @@
 package us.huseli.thoucylinder
 
 object Constants {
-    const val CUSTOM_USER_AGENT = "ThouCylinder/${BuildConfig.VERSION_NAME} ( https://github.com/Eboreg/ThouCylinder )"
+    const val CUSTOM_USER_AGENT = "Fistopy/${BuildConfig.VERSION_NAME} ( https://github.com/Eboreg/ThouCylinder )"
     const val IMAGE_FULL_MAX_WIDTH_DP = 300
     const val IMAGE_THUMBNAIL_MAX_WIDTH_DP = 80
     const val IMAGE_THUMBNAIL_MAX_WIDTH_PX = 280
@@ -12,7 +12,6 @@ object Constants {
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
     const val NAV_ARG_PLAYLIST = "playlist"
-    const val PREF_ACTIVE_RADIO_ID = "activeRadioId"
     const val PREF_AUTO_IMPORT_LOCAL_MUSIC = "autoImportLocalMusic"
     const val PREF_CURRENT_TRACK_POSITION = "currentTrackPosition"
     const val PREF_LASTFM_SCROBBLE = "lastFmScrobble"

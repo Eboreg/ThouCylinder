@@ -9,6 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +32,12 @@ fun <T> AutocompleteTextField(
     onTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     singleLine: Boolean = true,
-    label: @Composable (() -> Unit)? = null,
+    label: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     var currentText by remember(initial) { mutableStateOf(itemToString(initial)) }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val suggestions by remember(currentText) { mutableStateOf(getSuggestions(currentText)) }
+    val suggestions = remember(currentText) { getSuggestions(currentText) }
     val focusManager = LocalFocusManager.current
 
     ExposedDropdownMenuBox(
@@ -52,7 +53,7 @@ fun <T> AutocompleteTextField(
                 currentText = it
                 onTextChange(it)
             },
-            modifier = modifier.menuAnchor(),
+            modifier = modifier.menuAnchor(MenuAnchorType.PrimaryEditable),
         )
         ExposedDropdownMenu(
             expanded = isFocused && suggestions.isNotEmpty(),
@@ -93,7 +94,7 @@ fun AutocompleteTextField(
     onTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     singleLine: Boolean = true,
-    label: @Composable (() -> Unit)? = null,
+    label: @Composable () -> Unit,
 ) {
     AutocompleteTextField(
         initial = initial,

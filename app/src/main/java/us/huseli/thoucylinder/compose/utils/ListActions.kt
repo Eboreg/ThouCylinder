@@ -28,14 +28,14 @@ import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.dataclasses.tag.TagPojo
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
 import us.huseli.thoucylinder.stringResource
 
 @Composable
 fun <SortParameter : Enum<SortParameter>> ListActions(
-    initialSearchTerm: String,
+    searchTerm: () -> String,
     sortParameter: SortParameter,
     sortOrder: SortOrder,
     sortParameters: ImmutableMap<SortParameter, String>,
@@ -125,7 +125,7 @@ fun <SortParameter : Enum<SortParameter>> ListActions(
         extraButtons()
 
         CompactSearchTextField(
-            value = initialSearchTerm,
+            value = searchTerm,
             onSearch = onSearch,
             modifier = Modifier.weight(1f),
             placeholderText = stringResource(R.string.search),

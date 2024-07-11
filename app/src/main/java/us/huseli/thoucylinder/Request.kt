@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import us.huseli.thoucylinder.dataclasses.HTTPContentRange
+import us.huseli.thoucylinder.dataclasses.parseContentRange
 import us.huseli.thoucylinder.interfaces.ILogger
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -26,14 +28,16 @@ import java.util.zip.GZIPInputStream
 import kotlin.math.roundToInt
 import kotlin.text.Charsets.UTF_8
 
-class HTTPResponseError(val url: String, method: Request.Method, val code: Int, message: String?) :
+class HTTPResponseError(val url: String, method: Request.Method, val code: Int?, message: String?) :
     Exception("HTTP $code: ${message ?: "No message"} ($method $url)")
 
 data class Request(
-    private val url: String,
+    val url: String,
     private val headers: Map<String, String> = emptyMap(),
-    private val method: Method = Method.GET,
+    val method: Method = Method.GET,
     private val body: String? = null,
+    private val connectTimeout: Int = DEFAULT_CONNECT_TIMEOUT,
+    private val readTimeout: Int = DEFAULT_READ_TIMEOUT,
 ) : ILogger {
     constructor(
         url: String,
@@ -41,36 +45,60 @@ data class Request(
         params: Map<String, String> = emptyMap(),
         method: Method = Method.GET,
         body: String? = null,
-    ) : this(url = getUrl(url, params), headers = headers, method = method, body = body)
+        connectTimeout: Int = DEFAULT_CONNECT_TIMEOUT,
+        readTimeout: Int = DEFAULT_READ_TIMEOUT,
+    ) : this(
+        url = getUrl(url, params),
+        headers = headers,
+        method = method,
+        body = body,
+        connectTimeout = connectTimeout,
+        readTimeout = readTimeout,
+    )
 
     enum class Method(val value: String) { GET("GET"), POST("POST") }
 
     private var requestStart: Long? = null
 
-    suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
+    var contentRange: HTTPContentRange? = null
+        private set
+    var contentLength: Int? = null
+        private set
+
+    private suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
         requestStart = System.currentTimeMillis()
-        log("Request", "START ${method.value} $url")
+        log(Log.DEBUG, "Request", "START ${method.value} $url")
         if (body != null) log(Log.DEBUG, "Request", "BODY $body")
 
-        (URL(url).openConnection() as HttpURLConnection).apply {
+        (URL(url).openConnection() as HttpURLConnection).also { conn ->
             if (BuildConfig.DEBUG) {
-                connectTimeout = 0
-                readTimeout = 0
+                conn.connectTimeout = 0
+                conn.readTimeout = 0
             } else {
-                connectTimeout = CONNECT_TIMEOUT
-                readTimeout = READ_TIMEOUT
+                conn.connectTimeout = connectTimeout
+                conn.readTimeout = readTimeout
             }
-            requestMethod = method.value
-            headers.forEach { (key, value) -> setRequestProperty(key, value) }
+            conn.requestMethod = method.value
+            headers.forEach { (key, value) -> conn.setRequestProperty(key, value) }
             if (body != null && method == Method.POST) {
                 val binaryBody = body.toByteArray(UTF_8)
-                doOutput = true
-                setFixedLengthStreamingMode(binaryBody.size)
-                outputStream.write(binaryBody, 0, binaryBody.size)
+                conn.doOutput = true
+                conn.setFixedLengthStreamingMode(binaryBody.size)
+                conn.outputStream.write(binaryBody, 0, binaryBody.size)
             }
-            responseCode.also {
-                if (it >= 400) throw HTTPResponseError(this@Request.url, method, it, responseMessage)
+            val responseCode = try {
+                conn.responseCode
+            } catch (e: Throwable) {
+                throw HTTPResponseError(this@Request.url, method, null, e.message)
             }
+            if (responseCode >= 400) throw HTTPResponseError(
+                this@Request.url,
+                method,
+                responseCode,
+                conn.responseMessage,
+            )
+            contentRange = conn.getHeaderField("Content-Range")?.parseContentRange()
+            contentLength = contentRange?.size ?: conn.getHeaderField("Content-Length")?.toInt()
         }
     }
 
@@ -87,23 +115,26 @@ data class Request(
         }
     }
 
-    suspend fun getBitmap(): Bitmap? = withContext(Dispatchers.IO) {
-        getInputStream().use { BitmapFactory.decodeStream(it) }.also { finish() }
-    }
+    suspend fun getBitmap(): Bitmap? = getInputStream().use { BitmapFactory.decodeStream(it) }.also { finish() }
 
-    suspend fun getJson(): Map<String, *> = withContext(Dispatchers.IO) {
-        getInputStream().use {
-            gson.fromJson(it.bufferedReader(), jsonResponseType) ?: emptyMap<String, Any>()
-        }.also { finish() }
-    }
+    suspend fun getJson(): Map<String, *> = getInputStream().use {
+        gson.fromJson(it.bufferedReader(), jsonResponseType) ?: emptyMap<String, Any>()
+    }.also { finish() }
 
-    suspend inline fun <reified T> getObject(): T? = withContext(Dispatchers.IO) {
+    suspend inline fun <reified T> getObject(): T =
         getInputStream().use { gson.fromJson(it.bufferedReader(), T::class.java) }.also { finish() }
+
+    suspend inline fun <reified T> getObjectOrNull(): T? {
+        return try {
+            getInputStream().use { gson.fromJson(it.bufferedReader(), T::class.java) }.also { finish() }
+        } catch (e: Exception) {
+            logError("getObjectOrNull(): $method $url", e)
+            null
+        }
     }
 
-    suspend fun getString(): String = withContext(Dispatchers.IO) {
+    suspend fun getString(): String =
         getInputStream().use { it.bufferedReader().readText() }.also { finish(it.length) }
-    }
 
     suspend fun getInputStream(): InputStream = withContext(Dispatchers.IO) {
         val conn = connect()
@@ -113,8 +144,8 @@ data class Request(
     }
 
     companion object {
-        const val READ_TIMEOUT = 10_000
-        const val CONNECT_TIMEOUT = 4_050
+        const val DEFAULT_READ_TIMEOUT = 10_000
+        const val DEFAULT_CONNECT_TIMEOUT = 4_050
 
         val gson: Gson = GsonBuilder().create()
         val jsonResponseType = object : TypeToken<Map<String, *>>() {}
@@ -151,6 +182,7 @@ data class Request(
 }
 
 abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false) {
+    private val onErrorListeners = mutableListOf<(Throwable) -> Unit>()
     private val onFinishedListeners = mutableListOf<(String?) -> Unit>()
 
     val created = System.currentTimeMillis()
@@ -159,6 +191,10 @@ abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false)
         private set
 
     abstract suspend fun request(): String?
+
+    fun addOnErrorListener(value: (Throwable) -> Unit) {
+        onErrorListeners.add(value)
+    }
 
     fun addOnFinishedListener(value: (String?) -> Unit) {
         onFinishedListeners.add(value)
@@ -171,20 +207,27 @@ abstract class DeferredRequestJob(val url: String, val lowPrio: Boolean = false)
          */
         return lock.withLock {
             isStarted = true
-            request().also { response ->
-                onFinishedListeners.forEach { it.invoke(response) }
+            withContext(Dispatchers.IO) {
+                try {
+                    request().also { response ->
+                        onFinishedListeners.forEach { it.invoke(response) }
+                    }
+                } catch (e: Throwable) {
+                    onErrorListeners.forEach { it.invoke(e) }
+                    null
+                }
             }
         }
     }
 
-    override fun equals(other: Any?) = other is DeferredRequestJob && other.url == url
-    override fun hashCode() = url.hashCode()
+    override fun equals(other: Any?) = other is DeferredRequestJob && other.url == url && other.created == created
     override fun toString() = "<${javaClass.simpleName} $url>"
+    override fun hashCode(): Int = 31 * url.hashCode() + created.hashCode()
 }
 
 abstract class DeferredRequestJobManager<T : DeferredRequestJob>(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-) {
+) : ILogger {
     private val queue = MutableStateFlow<List<T>>(emptyList())
     private val nextJob = queue.map { it.getNext() }.filterNotNull().distinctUntilChanged()
 
@@ -197,12 +240,17 @@ abstract class DeferredRequestJobManager<T : DeferredRequestJob>(
         }
     }
 
+    open fun onJobError(job: T, error: Throwable) {
+        logError(error)
+    }
+
     abstract fun onJobFinished(job: T, response: String?, timestamp: Long)
     abstract suspend fun waitBeforeUnlocking()
 
     suspend fun runJob(job: T): String? {
         job.addOnFinishedListener { queue.value -= job }
         job.addOnFinishedListener { onJobFinished(job, it, System.currentTimeMillis()) }
+        job.addOnErrorListener { onJobError(job, it) }
         queue.value += job
         return job.run()
     }

@@ -9,39 +9,51 @@ import androidx.room.Query
 import androidx.room.Transaction
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import us.huseli.thoucylinder.dataclasses.entities.Radio
-import us.huseli.thoucylinder.dataclasses.entities.RadioTrack
-import us.huseli.thoucylinder.dataclasses.views.RadioCombo
+import kotlinx.coroutines.flow.Flow
+import us.huseli.thoucylinder.dataclasses.radio.Radio
+import us.huseli.thoucylinder.dataclasses.radio.RadioCombo
+import us.huseli.thoucylinder.dataclasses.track.RadioTrack
 
 @Dao
 abstract class RadioDao {
-    @Query("DELETE FROM RadioTrack WHERE RadioTrack_radioId = :radioId")
-    protected abstract suspend fun _clearRadioTracks(radioId: String)
+    @Query("SELECT * FROM Radio WHERE Radio_id = :radioId")
+    protected abstract suspend fun _getRadio(radioId: String): Radio?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun _insertRadio(radio: Radio)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     protected abstract suspend fun _insertRadioTracks(vararg radioTracks: RadioTrack)
 
-    @Query("UPDATE Radio SET Radio_usedSpotifyTrackIds = :spotifyTrackIds, Radio_isInitialized = 1 WHERE Radio_id = :radioId")
-    protected abstract suspend fun _setRadioSpotifyTrackIds(radioId: String, spotifyTrackIds: String)
+    @Query("UPDATE Radio SET Radio_usedSpotifyTrackIds = :spotifyTrackIds WHERE Radio_id = :radioId")
+    protected abstract suspend fun _setRadioSpotifyTrackIds(radioId: String, spotifyTrackIds: List<String>)
+
+    suspend fun addLocalTrackId(radioId: String, trackId: String) {
+        _insertRadioTracks(RadioTrack(radioId = radioId, trackId = trackId))
+    }
+
+    @Transaction
+    open suspend fun addSpotifyTrackId(radioId: String, spotifyTrackId: String) {
+        _getRadio(radioId)?.also { radio ->
+            _setRadioSpotifyTrackIds(radioId, radio.usedSpotifyTrackIds.plus(spotifyTrackId))
+        }
+    }
 
     @Query("DELETE FROM Radio")
     abstract suspend fun clearRadios()
 
     @Transaction
-    @Query("SELECT * FROM RadioCombo WHERE Radio_id = :radioId")
-    abstract suspend fun getRadioCombo(radioId: String): RadioCombo?
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertRadio(radio: Radio)
+    @Query("SELECT * FROM RadioCombo LIMIT 1")
+    abstract fun flowActiveRadio(): Flow<RadioCombo?>
 
     @Transaction
-    open suspend fun setLocalTrackIds(radioId: String, trackIds: Iterable<String>) {
-        _clearRadioTracks(radioId)
-        _insertRadioTracks(*trackIds.map { RadioTrack(radioId = radioId, trackId = it) }.toTypedArray())
+    open suspend fun setActiveRadio(radio: Radio) {
+        clearRadios()
+        _insertRadio(radio)
     }
 
-    open suspend fun setRadioSpotifyTrackIds(radioId: String, spotifyTrackIds: List<String>) =
-        _setRadioSpotifyTrackIds(radioId, gson.toJson(spotifyTrackIds))
+    @Query("UPDATE Radio SET Radio_isInitialized = 1 WHERE Radio_id = :radioId")
+    abstract suspend fun setIsInitialized(radioId: String)
 
     companion object {
         val gson: Gson = GsonBuilder().create()

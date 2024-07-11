@@ -1,24 +1,43 @@
 package us.huseli.thoucylinder.dataclasses.spotify
 
+import androidx.annotation.StringRes
 import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
+import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractAlbumCombo
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.musicBrainz.capitalizeGenreName
-import us.huseli.thoucylinder.dataclasses.views.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.views.stripTitleCommons
+import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbum
+import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumCombo
+import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.musicbrainz.capitalizeGenreName
+import us.huseli.thoucylinder.dataclasses.tag.Tag
+import us.huseli.thoucylinder.dataclasses.track.stripTitleCommons
+import us.huseli.thoucylinder.enums.AlbumType
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
+import us.huseli.thoucylinder.interfaces.IExternalAlbumWithTracks
+import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-abstract class AbstractSpotifyAlbum : AbstractSpotifyItem() {
-    abstract val albumType: String?
+enum class SpotifyAlbumType(@StringRes val stringRes: Int) {
+    @SerializedName("album")
+    ALBUM(R.string.album),
+
+    @SerializedName("single")
+    SINGLE(R.string.single),
+
+    @SerializedName("compilation")
+    COMPILATION(R.string.compilation);
+
+    val nativeAlbumType: AlbumType
+        get() = when (this) {
+            ALBUM -> AlbumType.ALBUM
+            SINGLE -> AlbumType.SINGLE
+            COMPILATION -> AlbumType.COMPILATION
+        }
+}
+
+abstract class AbstractSpotifyAlbum : AbstractSpotifyItem(), IExternalAlbum {
+    abstract val spotifyAlbumType: SpotifyAlbumType?
     abstract val artists: List<SpotifySimplifiedArtist>
     abstract val href: String?
     abstract override val id: String
@@ -26,7 +45,7 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem() {
     abstract val name: String
     abstract val releaseDate: String
     abstract val releaseDatePrecision: String?
-    abstract val totalTracks: Int?
+    abstract val totalTracks: Int
     abstract val uri: String?
 
     data class AlbumMatch(
@@ -34,46 +53,52 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem() {
         val spotifyAlbum: AbstractSpotifyAlbum,
     )
 
-    val artistName: String
+    override val albumType: AlbumType?
+        get() = spotifyAlbumType?.nativeAlbumType
+
+    override val artistName: String
         get() = artists.artistString()
 
-    val year: Int?
+    override val duration: Duration?
+        get() = null
+
+    override val playCount: Int?
+        get() = null
+
+    override val title: String
+        get() = name
+
+    override val thumbnailUrl: String?
+        get() = images.getThumbnailUrl()
+
+    override val trackCount: Int
+        get() = totalTracks
+
+    override val year: Int?
         get() = releaseDate.substringBefore('-').toIntOrNull()
 
-    fun matchAlbumCombo(albumCombo: AbstractAlbumCombo) =
-        AlbumMatch(distance = getAlbumDistance(albumCombo), spotifyAlbum = this)
-
-    suspend fun toAlbum(isLocal: Boolean, isInLibrary: Boolean) = Album(
-        title = name,
-        isInLibrary = isInLibrary,
-        isLocal = isLocal,
-        year = year,
-        spotifyId = id,
-        albumArt = images.toMediaStoreImage(),
+    fun matchAlbumCombo(albumTitle: String, artistNames: Collection<String>) = AlbumMatch(
+        distance = getAlbumDistance(albumTitle, artistNames),
+        spotifyAlbum = this,
     )
 
-    open suspend fun toAlbumCombo(
-        isLocal: Boolean,
-        isInLibrary: Boolean,
-        getArtist: suspend (UnsavedArtist) -> Artist,
-    ): AlbumCombo {
-        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary)
-        val albumArtists = artists.mapIndexed { index, artist ->
-            AlbumArtistCredit(
-                artist = getArtist(UnsavedArtist(name = artist.name, spotifyId = artist.id)),
-                albumId = album.albumId
-            ).copy(spotifyId = artist.id, position = index)
-        }
+    fun toAlbum(isLocal: Boolean, isInLibrary: Boolean, albumId: String? = null) = UnsavedAlbum(
+        albumArt = images.toMediaStoreImage(),
+        albumId = albumId ?: UUID.randomUUID().toString(),
+        albumType = albumType,
+        isInLibrary = isInLibrary,
+        isLocal = isLocal,
+        spotifyId = id,
+        title = name,
+        trackCount = trackCount,
+        year = year,
+    )
 
-        return AlbumCombo(album = album, artists = albumArtists, trackCount = totalTracks ?: 0)
-    }
-
-    private fun getAlbumDistance(albumCombo: AbstractAlbumCombo): Double {
+    private fun getAlbumDistance(albumTitle: String, artistNames: Collection<String>): Double {
         val levenshtein = LevenshteinDistance()
-        var distance = levenshtein.apply(albumCombo.album.title, name).toDouble()
+        var distance = levenshtein.apply(albumTitle, name).toDouble()
 
-        distance += artists.getDistances(albumCombo.artists).minOrNull() ?: 0
-
+        distance += artists.getDistances(artistNames).minOrNull() ?: 0
         return distance
     }
 
@@ -83,7 +108,7 @@ abstract class AbstractSpotifyAlbum : AbstractSpotifyItem() {
 
 data class SpotifySimplifiedAlbum(
     @SerializedName("album_type")
-    override val albumType: String?,
+    override val spotifyAlbumType: SpotifyAlbumType?,
     override val artists: List<SpotifySimplifiedArtist>,
     override val href: String?,
     override val id: String,
@@ -94,14 +119,28 @@ data class SpotifySimplifiedAlbum(
     @SerializedName("release_date_precision")
     override val releaseDatePrecision: String?,
     @SerializedName("total_tracks")
-    override val totalTracks: Int?,
+    override val totalTracks: Int,
     override val uri: String?,
-) : AbstractSpotifyAlbum()
+) : AbstractSpotifyAlbum() {
+    override fun toAlbumCombo(
+        isLocal: Boolean,
+        isInLibrary: Boolean,
+        albumId: String?,
+    ): UnsavedAlbumCombo {
+        val album =
+            toAlbum(isLocal = isLocal, isInLibrary = isInLibrary, albumId = albumId ?: UUID.randomUUID().toString())
+
+        return UnsavedAlbumCombo(
+            album = album,
+            artists = artists.toNativeAlbumArtists(albumId = album.albumId),
+        )
+    }
+}
 
 
 data class SpotifyAlbum(
     @SerializedName("album_type")
-    override val albumType: String?,
+    override val spotifyAlbumType: SpotifyAlbumType?,
     override val artists: List<SpotifySimplifiedArtist>,
     override val href: String?,
     override val id: String,
@@ -112,65 +151,34 @@ data class SpotifyAlbum(
     @SerializedName("release_date_precision")
     override val releaseDatePrecision: String?,
     @SerializedName("total_tracks")
-    override val totalTracks: Int?,
+    override val totalTracks: Int,
     override val uri: String?,
     val genres: List<String>,
     val label: String,
     val popularity: Int,
     val tracks: SpotifyResponse<SpotifySimplifiedTrack>,
-) : AbstractSpotifyAlbum(), IExternalAlbum {
+) : AbstractSpotifyAlbum(), IExternalAlbumWithTracks {
     override val duration: Duration
         get() = tracks.items.sumOf { it.durationMs }.milliseconds
 
-    override val title: String
-        get() = name
+    override fun getMediaStoreImage(): MediaStoreImage? = images.toMediaStoreImage()
 
-    override val playCount: Int?
-        get() = null
-
-    override val thumbnailUrl: String?
-        get() = images.getThumbnailUrl()
-
-    override val trackCount: Int?
-        get() = totalTracks
-
-    override suspend fun getMediaStoreImage(): MediaStoreImage? = images.toMediaStoreImage()
-
-    override suspend fun toAlbumWithTracks(
+    override fun toAlbumWithTracks(
         isLocal: Boolean,
         isInLibrary: Boolean,
-        getArtist: suspend (UnsavedArtist) -> Artist,
-    ): AlbumWithTracksCombo {
-        val albumCombo = toAlbumCombo(
-            getArtist = getArtist,
-            isLocal = isLocal,
-            isInLibrary = isInLibrary,
-        )
+        albumId: String?,
+    ): UnsavedAlbumWithTracksCombo {
+        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary, albumId = albumId)
 
-        return AlbumWithTracksCombo(
-            album = albumCombo.album,
-            artists = albumCombo.artists,
+        return UnsavedAlbumWithTracksCombo(
+            album = album,
+            artists = artists.toNativeAlbumArtists(albumId = album.albumId),
             tags = genres.map { Tag(name = capitalizeGenreName(it)) },
-            trackCombos = tracks.items.map {
-                it.toTrackCombo(
-                    getArtist = getArtist,
-                    album = albumCombo.album,
-                    isLocal = isLocal,
-                    isInLibrary = isInLibrary,
-                )
+            trackCombos = tracks.items.map { track ->
+                track.toTrackCombo(isInLibrary = isInLibrary, album = album)
             }.stripTitleCommons(),
         )
     }
-
-    override suspend fun toAlbumCombo(
-        isLocal: Boolean,
-        isInLibrary: Boolean,
-        getArtist: suspend (UnsavedArtist) -> Artist,
-    ): AlbumCombo = super.toAlbumCombo(
-        getArtist = getArtist,
-        isLocal = isLocal,
-        isInLibrary = isInLibrary,
-    ).copy(trackCount = tracks.total)
 }
 
 

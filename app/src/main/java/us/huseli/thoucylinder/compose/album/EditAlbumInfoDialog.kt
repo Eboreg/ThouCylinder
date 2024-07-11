@@ -33,14 +33,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.compose.FistopyTheme
 import us.huseli.thoucylinder.compose.utils.AutocompleteChip
 import us.huseli.thoucylinder.compose.utils.AutocompleteTextField
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.OutlinedTextFieldLabel
 import us.huseli.thoucylinder.compose.utils.SaveButton
 import us.huseli.thoucylinder.compose.utils.SmallButton
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.uistates.EditAlbumUiState
+import us.huseli.thoucylinder.dataclasses.album.EditAlbumUiState
+import us.huseli.thoucylinder.dataclasses.tag.Tag
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.EditAlbumViewModel
 
@@ -69,12 +70,8 @@ fun EditAlbumInfoDialog(
     }
     var mutableYear by rememberSaveable { mutableStateOf(uiState.year) }
     var mutableTags by rememberSaveable { mutableStateOf<List<TagUI>>(emptyList()) }
-    val allTagNames by remember(allTags, mutableTags) {
-        mutableStateOf(
-            allTags.map { it.name }
-                .toSet()
-                .plus(mutableTags.map { it.tag.name })
-        )
+    val allTagNames = remember(allTags, mutableTags) {
+        allTags.map { it.name }.toSet().plus(mutableTags.map { it.tag.name })
     }
 
     LaunchedEffect(uiState.albumId) {
@@ -149,7 +146,7 @@ fun EditAlbumInfoDialog(
                     Switch(checked = updateTrackArtists, onCheckedChange = { updateTrackArtists = it })
                 }
 
-                Text(stringResource(R.string.genres), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.genres), style = FistopyTheme.typography.titleMedium)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),

@@ -40,7 +40,7 @@ data class CoverArtArchiveImage(
     val thumbnails: CoverArtArchiveImageThumbnails,
     val types: List<CoverArtArchiveImageType>,
 ) {
-    suspend fun toMediaStoreImage(): MediaStoreImage? = image.toMediaStoreImage(thumbnails.thumb250)
+    fun toMediaStoreImage(): MediaStoreImage = image.toMediaStoreImage(thumbnails.thumb250)
 }
 
 data class CoverArtArchiveResponse(

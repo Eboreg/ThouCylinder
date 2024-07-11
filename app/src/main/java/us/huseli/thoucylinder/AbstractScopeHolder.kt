@@ -8,8 +8,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-@Suppress("MemberVisibilityCanBePrivate", "unused")
+@Suppress("MemberVisibilityCanBePrivate")
 abstract class AbstractScopeHolder {
     protected val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -18,6 +19,12 @@ abstract class AbstractScopeHolder {
 
     protected fun launchOnMainThread(block: suspend CoroutineScope.() -> Unit) =
         scope.launch(Dispatchers.Main, block = block)
+
+    protected suspend fun <T> onIOThread(block: suspend CoroutineScope.() -> T) =
+        withContext(context = Dispatchers.IO, block = block)
+
+    protected suspend fun <T> onMainThread(block: suspend CoroutineScope.() -> T) =
+        withContext(context = Dispatchers.Main, block = block)
 
     protected fun <T> Flow<T>.stateEagerly(initialValue: T): StateFlow<T> =
         stateIn(scope, SharingStarted.Eagerly, initialValue)

@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun WarningButton(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = MaterialTheme.shapes.small,
     enabled: Boolean = true,
     borderColor: Color = MaterialTheme.colorScheme.errorContainer,
     textColor: Color = MaterialTheme.colorScheme.error,
@@ -39,7 +39,7 @@ fun WarningButton(
 @Composable
 fun WarningButton(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = MaterialTheme.shapes.small,
     enabled: Boolean = true,
     text: String,
     borderColor: Color = MaterialTheme.colorScheme.errorContainer,

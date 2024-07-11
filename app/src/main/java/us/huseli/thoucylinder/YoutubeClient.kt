@@ -1,95 +1,121 @@
 package us.huseli.thoucylinder
 
-import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import us.huseli.retaintheme.extensions.mergeWith
 import us.huseli.retaintheme.extensions.toDuration
 import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_PX
-import us.huseli.thoucylinder.dataclasses.combos.YoutubePlaylistCombo
-import us.huseli.thoucylinder.dataclasses.entities.Track
+import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeImage
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
+import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylistCombo
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.enums.Region
+import us.huseli.thoucylinder.externalcontent.SearchParams
 import us.huseli.thoucylinder.interfaces.ILogger
 import java.util.regex.Pattern
 import kotlin.math.absoluteValue
 
-class PlaylistSearch(val query: String, private val client: AbstractYoutubeClient) {
-    private var nextToken: String? = null
-    private var primaryDone: Boolean = false
-    private var secondaryDone: Boolean = false
-    private val usedPlaylistIds: MutableList<String> = mutableListOf()
-    private val _hasMore = MutableStateFlow(true)
-
-    val hasMore = _hasMore.asStateFlow()
-
-    fun flowResults(limit: Int = 50): Flow<YoutubePlaylist> = flow {
-        var emitted = 0
-
-        if (!primaryDone) {
-            flowPrimaryResults().collect { playlist ->
-                emit(playlist)
-                emitted++
+fun playlistSearchChannel(
+    params: SearchParams,
+    client: AbstractYoutubeClient,
+    scope: CoroutineScope,
+) = Channel<YoutubePlaylist>().also { channel ->
+    scope.launch {
+        params.freeText?.takeIf { it.isNotEmpty() }?.also { freeText ->
+            for (playlist in playlistSearchChannel(query = freeText, client = client, scope = scope)) {
+                if (playlist != null) channel.send(playlist)
             }
-            primaryDone = true
+        }
+        channel.close()
+    }
+}
+
+fun playlistSearchChannel(
+    query: String,
+    client: AbstractYoutubeClient,
+    scope: CoroutineScope,
+) = Channel<YoutubePlaylist?>().apply {
+    var nextToken: String?
+    val usedPlaylistIds: MutableList<String> = mutableListOf()
+
+    scope.launch {
+        val primaryResult = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = true)
+
+        for (playlist in primaryResult.playlists) {
+            usedPlaylistIds.add(playlist.id)
+            send(playlist)
         }
 
-        if (!secondaryDone && emitted < limit) {
-            flowSecondaryResults().collect { playlist ->
-                emit(playlist)
-                emitted++
+        val secondaryResult = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = false)
+
+        nextToken = secondaryResult.nextToken
+        for (playlist in secondaryResult.playlists) {
+            if (!usedPlaylistIds.contains(playlist.id)) {
+                usedPlaylistIds.add(playlist.id)
+                send(playlist)
             }
-            secondaryDone = true
         }
 
-        while (nextToken != null && emitted < limit) {
-            nextToken?.also {
-                flowContinuationResults(it).collect { playlist ->
-                    emit(playlist)
-                    emitted++
+        while (nextToken != null) {
+            nextToken?.also { token ->
+                val result = client.getNextPlaylistSearchResult(token)
+
+                nextToken = result.nextToken
+                for (playlist in result.playlists) {
+                    if (!usedPlaylistIds.contains(playlist.id)) {
+                        usedPlaylistIds.add(playlist.id)
+                        send(playlist)
+                    }
                 }
             }
         }
     }
+}
 
-    private fun flowPrimaryResults(): Flow<YoutubePlaylist> = flow {
-        getAndEmit(client.getPlaylistSearchResult(query = query, playlistSpecificSearch = true))
-    }
-
-    private fun flowSecondaryResults(): Flow<YoutubePlaylist> = flow {
-        val result = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = false)
-
-        getAndEmit(result)
-        _hasMore.value = result.nextToken != null
-    }
-
-    private fun flowContinuationResults(continuationToken: String): Flow<YoutubePlaylist> = flow {
-        val result = client.getNextPlaylistSearchResult(continuationToken)
-
-        getAndEmit(result)
-        _hasMore.value = result.nextToken != null
-    }
-
-    private suspend fun FlowCollector<YoutubePlaylist>.getAndEmit(result: AbstractYoutubeClient.PlaylistSearchResult) {
-        for (playlist in result.playlists) {
-            if (!usedPlaylistIds.contains(playlist.id)) {
-                usedPlaylistIds.add(playlist.id)
-                emit(playlist)
+fun videoSearchChannel(
+    params: SearchParams,
+    client: AbstractYoutubeClient,
+    scope: CoroutineScope,
+) = Channel<YoutubeVideo>().also { channel ->
+    scope.launch {
+        params.freeText?.takeIf { it.isNotEmpty() }?.also { freeText ->
+            for (video in videoSearchChannel(query = freeText, client = client, scope = scope)) {
+                if (video != null) channel.send(video)
             }
         }
-        nextToken = result.nextToken
+        channel.close()
+    }
+}
+
+fun videoSearchChannel(
+    query: String,
+    client: AbstractYoutubeClient,
+    scope: CoroutineScope,
+) = Channel<YoutubeVideo?>().apply {
+    var firstDone = false
+    var nextToken: String? = null
+
+    scope.launch {
+        while (nextToken != null || !firstDone) {
+            val result = client.getVideoSearchResult(query = query, continuationToken = nextToken)
+
+            firstDone = true
+            nextToken = result.nextToken
+
+            for (video in result.videos) {
+                send(video)
+            }
+        }
+        send(null)
     }
 }
 
@@ -113,7 +139,7 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
         val nextToken: String? = null,
     ) {
         val tracks: List<Track>
-            get() = videos.map { it.toTrack(isInLibrary = false) }
+            get() = videos.map { it.toTrack() }
     }
 
     data class ImageData(
@@ -206,7 +232,8 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     }
 
     open fun getNextContinuationToken(response: Map<String, *>, isContinuationResponse: Boolean): String? {
-        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.continuations")
+        return if (!isContinuationResponse) response
+            .yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.continuations")
             ?.firstNotNullOfOrNull { it.yqueryString("nextContinuationData.continuation") }
         else response.yquery<Collection<Map<*, *>>>("continuationContents.sectionListContinuation.continuations")
             ?.firstNotNullOfOrNull { it.yqueryString("nextContinuationData.continuation") }
@@ -228,7 +255,8 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
 
     open fun getPlaylistRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
         return if (!isContinuationResponse)
-            response.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
+            response
+                .yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
                 ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
                 ?.mapNotNull { it.yquery<Map<*, *>>("playlistRenderer") }
         else response.yquery<Collection<Map<*, *>>>("onResponseReceivedCommands")
@@ -240,7 +268,8 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     }
 
     open fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
-        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
+        return if (!isContinuationResponse) response
+            .yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
             ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
             ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
         else response.yquery<Collection<Map<*, *>>>("continuationContents.sectionListContinuation.contents")
@@ -248,11 +277,7 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
             ?.mapNotNull { it.yquery<Map<*, *>>("compactVideoRenderer") }
     }
 
-    open suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String? = null,
-    ): VideoSearchResult {
+    open suspend fun getVideoSearchResult(query: String, continuationToken: String? = null): VideoSearchResult {
         val json =
             if (continuationToken != null) mapOf("continuation" to continuationToken)
             else mapOf("query" to query)
@@ -269,7 +294,6 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     }
 
     open suspend fun searchPlaylistCombos(
-        context: Context,
         query: String,
         progressCallback: (Double) -> Unit = {},
     ): List<YoutubePlaylistCombo> {
@@ -325,7 +349,8 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
 
         if (ytData != null) {
             val headerRenderers =
-                ytData.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.secondaryContents.secondarySearchContainerRenderer.contents")
+                ytData
+                    .yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.secondaryContents.secondarySearchContainerRenderer.contents")
                     ?.mapNotNull { it.yquery<Map<*, *>>("universalWatchCardRenderer.header.watchCardRichHeaderRenderer") }
             val playlistRenderers = getPlaylistRenderers(ytData, false)
 
@@ -587,7 +612,9 @@ abstract class AbstractYoutubeAndroidClient(region: Region = Region.SE) : Abstra
     open val osName: String = "Android"
     open val userAgent: String = "com.google.android.youtube"
 
-    /** OVERRIDDEN METHODS ****************************************************/
+
+    /** OVERRIDDEN METHODS ********************************************************************************************/
+
     override fun getHeaders(videoId: String?): Map<String, String> = super.getHeaders(videoId).plus(
         mapOf(
             "User-Agent" to "$userAgent/$clientVersion (Linux; U; $osName $osVersion; ${region.name}) gzip",
@@ -617,7 +644,8 @@ abstract class AbstractYoutubeAndroidClient(region: Region = Region.SE) : Abstra
 abstract class AbstractYoutubeAndroidNonStandardClient(region: Region = Region.SE) :
     AbstractYoutubeAndroidClient(region) {
     override fun getNextContinuationToken(response: Map<String, *>, isContinuationResponse: Boolean): String? {
-        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
+        return if (!isContinuationResponse) response
+            .yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
             ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.continuations") ?: emptyList() }
             ?.firstNotNullOfOrNull { it.yqueryString("nextContinuationData.continuation") }
         else response.yquery<Collection<Map<*, *>>>("continuationContents.itemSectionContinuation.continuations")
@@ -640,7 +668,6 @@ class YoutubeAndroidTestSuiteClient(region: Region = Region.SE) : AbstractYoutub
     override val osVersion = "14"
 
     override suspend fun searchPlaylistCombos(
-        context: Context,
         query: String,
         progressCallback: (Double) -> Unit,
     ): List<YoutubePlaylistCombo> {
@@ -701,16 +728,11 @@ class YoutubeAndroidUnpluggedClient(region: Region = Region.SE) : AbstractYoutub
         throw Exception("2024-04-02: Returns no entries for this client.")
     }
 
-    override suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String?,
-    ): VideoSearchResult {
+    override suspend fun getVideoSearchResult(query: String, continuationToken: String?): VideoSearchResult {
         throw Exception("2024-04-02: Returns HTTP 401 for this client.")
     }
 
     override suspend fun searchPlaylistCombos(
-        context: Context,
         query: String,
         progressCallback: (Double) -> Unit,
     ): List<YoutubePlaylistCombo> {
@@ -764,11 +786,7 @@ class YoutubeIOSClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
             ?.mapNotNull { it.yquery<Map<*, *>>("playlistVideoRenderer") }
     }
 
-    override suspend fun getVideoSearchResult(
-        context: Context,
-        query: String,
-        continuationToken: String?,
-    ): VideoSearchResult {
+    override suspend fun getVideoSearchResult(query: String, continuationToken: String?): VideoSearchResult {
         val json =
             if (continuationToken != null) mapOf("continuation" to continuationToken)
             else mapOf("query" to query)
@@ -809,7 +827,8 @@ class YoutubeIOSClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
     }
 
     private fun getVideoDataList(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
-        return if (!isContinuationResponse) response.yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
+        return if (!isContinuationResponse) response
+            .yquery<Collection<Map<*, *>>>("contents.sectionListRenderer.contents")
             ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
             ?.mapNotNull { it.yquery<Map<*, *>>("elementRenderer.newElement.type.componentType.model.compactVideoModel.compactVideoData") }
         else response.yquery<Collection<Map<*, *>>>("continuationContents.sectionListContinuation.contents")
@@ -843,7 +862,8 @@ class YoutubeWebClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
 
     override fun getNextContinuationToken(response: Map<String, *>, isContinuationResponse: Boolean): String? {
         return if (!isContinuationResponse)
-            response.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
+            response
+                .yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
                 ?.firstNotNullOfOrNull { it.yqueryString("continuationItemRenderer.continuationEndpoint.continuationCommand.token") }
         else response.yquery<Collection<Map<*, *>>>("onResponseReceivedCommands")
             ?.flatMap {
@@ -863,7 +883,6 @@ class YoutubeWebClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
     }
 
     override suspend fun searchPlaylistCombos(
-        context: Context,
         query: String,
         progressCallback: (Double) -> Unit,
     ): List<YoutubePlaylistCombo> {
@@ -890,7 +909,8 @@ class YoutubeWebClient(region: Region = Region.SE) : AbstractYoutubeClient(regio
 
     override fun getVideoRenderers(response: Map<String, *>, isContinuationResponse: Boolean): Collection<Map<*, *>>? {
         return if (!isContinuationResponse)
-            response.yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
+            response
+                .yquery<Collection<Map<*, *>>>("contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents")
                 ?.flatMap { it.yquery<Collection<Map<*, *>>>("itemSectionRenderer.contents") ?: emptyList() }
                 ?.mapNotNull { it.yquery<Map<*, *>>("videoRenderer") }
         else response.yquery<Collection<Map<*, *>>>("onResponseReceivedCommands")

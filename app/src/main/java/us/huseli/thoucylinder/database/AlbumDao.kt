@@ -4,32 +4,31 @@ package us.huseli.thoucylinder.database
 
 import android.database.DatabaseUtils
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.Transaction
-import androidx.room.Update
+import androidx.room.Upsert
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
-import us.huseli.thoucylinder.dataclasses.combos.AlbumWithTracksCombo
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.AlbumArtist
-import us.huseli.thoucylinder.dataclasses.entities.AlbumTag
-import us.huseli.thoucylinder.dataclasses.entities.Tag
-import us.huseli.thoucylinder.dataclasses.entities.toAlbumTags
-import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
-import us.huseli.thoucylinder.dataclasses.views.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.album.Album
+import us.huseli.thoucylinder.dataclasses.album.AlbumCombo
+import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.artist.AlbumArtist
+import us.huseli.thoucylinder.dataclasses.tag.AlbumTag
+import us.huseli.thoucylinder.dataclasses.tag.Tag
+import us.huseli.thoucylinder.dataclasses.tag.TagPojo
+import us.huseli.thoucylinder.dataclasses.tag.toAlbumTags
 import us.huseli.thoucylinder.enums.AlbumSortParameter
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
 
 @Dao
 abstract class AlbumDao {
-    /** Protected methods *****************************************************/
     @Query("DELETE FROM AlbumTag WHERE AlbumTag_albumId IN (:albumIds)")
     protected abstract suspend fun _deleteAlbumTags(vararg albumIds: String)
 
@@ -40,24 +39,41 @@ abstract class AlbumDao {
     @RawQuery(observedEntities = [Tag::class, AlbumTag::class, Album::class])
     protected abstract fun _flowTagPojos(query: SupportSQLiteQuery): Flow<List<TagPojo>>
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    protected abstract suspend fun _insertAlbumTags(vararg albumTags: AlbumTag)
+    @Query("SELECT * FROM Album WHERE Album_spotifyId = :spotifyId")
+    protected abstract suspend fun _getAlbumBySpotifyId(spotifyId: String): Album?
+
+    @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_musicBrainzReleaseGroupId IS NOT NULL")
+    protected abstract suspend fun _listMusicBrainzReleaseGroupAlbumCombos(): List<AlbumCombo>
+
+    @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_spotifyId IS NOT NULL")
+    abstract suspend fun _listSpotifyAlbumCombos(): List<AlbumCombo>
+
+    @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_youtubePlaylist_id IS NOT NULL")
+    abstract suspend fun _listYoutubeAlbumCombos(): List<AlbumCombo>
+
+    @Query("UPDATE Album SET Album_spotifyId = :spotifyId WHERE Album_albumId = :albumId")
+    protected abstract suspend fun _setAlbumSpotifyId(albumId: String, spotifyId: String)
 
     @Query(
         """
-        UPDATE Album SET Album_albumArt_fullUriString = :fullUri,
-            Album_albumArt_thumbnailUriString = :thumbnailUri,
-            Album_albumArt_hash = :hash 
+        UPDATE Album SET Album_albumArt_fullUriString = :fullUri, Album_albumArt_thumbnailUriString = :thumbnailUri
         WHERE Album_albumId = :albumId
         """
     )
-    protected abstract suspend fun _updateAlbumArt(albumId: String, fullUri: String, thumbnailUri: String, hash: Int)
+    protected abstract suspend fun _updateAlbumArt(albumId: String, fullUri: String, thumbnailUri: String)
 
-    /** Public methods ********************************************************/
+    @Upsert
+    protected abstract suspend fun _upsertAlbums(vararg albums: Album)
+
+
+    /** PUBLIC METHODS ************************************************************************************************/
+
+    @Query("UPDATE Album SET Album_isInLibrary = 1, Album_isHidden = 0 WHERE Album_albumId IN (:albumIds)")
+    abstract suspend fun addToLibrary(vararg albumIds: String)
+
     @Query(
         """
-        UPDATE Album SET Album_albumArt_fullUriString = NULL, Album_albumArt_thumbnailUriString = NULL,
-            Album_albumArt_hash = NULL
+        UPDATE Album SET Album_albumArt_fullUriString = NULL, Album_albumArt_thumbnailUriString = NULL
         WHERE Album_albumId IN (:albumIds)
         """
     )
@@ -69,10 +85,12 @@ abstract class AlbumDao {
     @Query("DELETE FROM Tag")
     abstract suspend fun clearTags()
 
-    @Delete
-    abstract suspend fun deleteAlbums(vararg albums: Album)
-
-    @Query("DELETE FROM Album WHERE Album_isInLibrary = 0")
+    @Query(
+        """
+        DELETE FROM Album WHERE Album_isInLibrary = 0
+        AND NOT EXISTS(SELECT * FROM QueueTrackCombo WHERE QueueTrackCombo.Album_albumId = Album.Album_albumId)
+        """
+    )
     abstract suspend fun deleteTempAlbums()
 
     @Transaction
@@ -82,12 +100,12 @@ abstract class AlbumDao {
     fun flowAlbumCombos(
         sortParameter: AlbumSortParameter,
         sortOrder: SortOrder,
-        searchTerm: String? = null,
+        searchTerm: String,
         tagNames: Collection<String> = emptyList(),
         availabilityFilter: AvailabilityFilter,
     ): Flow<List<AlbumCombo>> {
         val searchQuery = searchTerm
-            ?.takeIf { it.isNotBlank() }
+            .takeIf { it.isNotBlank() }
             ?.lowercase()
             ?.split(Regex(" +"))
             ?.map { DatabaseUtils.sqlEscapeString("%$it%") }
@@ -113,7 +131,8 @@ abstract class AlbumDao {
             SimpleSQLiteQuery(
                 """
                 SELECT AlbumCombo.* FROM AlbumCombo LEFT JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId $tagJoin
-                WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0 AND Album_isHidden = 0 $searchQuery $availabilityQuery
+                WHERE Album_isInLibrary = 1 AND Album_isHidden = 0 AND Album_trackCount > 0
+                $searchQuery $availabilityQuery
                 GROUP BY Album_albumId
                 ORDER BY ${sortParameter.sql(sortOrder)}
                 """.trimIndent()
@@ -125,7 +144,7 @@ abstract class AlbumDao {
         """
         SELECT AlbumCombo.* FROM AlbumCombo 
         JOIN AlbumArtistCredit ON Album_albumId = AlbumArtist_albumId AND AlbumArtist_artistId = :artistId
-        WHERE Album_isInLibrary = 1
+        WHERE Album_isHidden = 0 AND Album_isInLibrary = 1
         GROUP BY Album_albumId
         ORDER BY LOWER(Album_title)
         """
@@ -137,22 +156,13 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     abstract fun flowAlbumWithTracks(albumId: String): Flow<AlbumWithTracksCombo?>
 
-    @Query(
-        """
-        SELECT Album_spotifyId FROM Album 
-        WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0 AND Album_spotifyId IS NOT NULL
-        """
-    )
-    abstract fun flowSpotifyAlbumIds(): Flow<List<String>>
-
-    @Query("SELECT Album_musicBrainzReleaseId FROM Album WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0 AND Album_musicBrainzReleaseId IS NOT NULL")
-    abstract fun flowMusicBrainzReleaseIds(): Flow<List<String>>
-
     fun flowTagPojos(availabilityFilter: AvailabilityFilter): Flow<List<TagPojo>> {
         val availabilityQuery = when (availabilityFilter) {
             AvailabilityFilter.ALL -> ""
-            AvailabilityFilter.ONLY_PLAYABLE -> "AND (Album_isLocal = 1 OR Album_youtubePlaylist_id IS NOT NULL)"
-            AvailabilityFilter.ONLY_LOCAL -> "AND Album_isLocal = 1"
+            AvailabilityFilter.ONLY_PLAYABLE -> "AND EXISTS(SELECT Track_trackId FROM Track WHERE Track_albumId = " +
+                "Album_albumId AND (Track_localUri IS NOT NULL OR Track_youtubeVideo_id IS NOT NULL))"
+            AvailabilityFilter.ONLY_LOCAL -> "AND EXISTS(SELECT Track_trackId FROM Track WHERE Track_albumId = " +
+                "Album_albumId AND Track_localUri IS NOT NULL)"
         }
 
         return _flowTagPojos(
@@ -161,7 +171,7 @@ abstract class AlbumDao {
                 SELECT Tag_name AS name, COUNT(*) AS itemCount
                 FROM Tag JOIN AlbumTag ON Tag_name = AlbumTag_tagName
                 JOIN Album ON Album_albumId = AlbumTag_albumId
-                WHERE Album_isInLibrary = 1
+                WHERE Album_isInLibrary = 1 AND Album_isHidden = 0
                 $availabilityQuery
                 GROUP BY Tag_name
                 ORDER BY itemCount DESC, Tag_name ASC
@@ -181,14 +191,11 @@ abstract class AlbumDao {
     )
     abstract fun flowTagsByAlbumId(albumId: String): Flow<List<Tag>>
 
-    @Query("SELECT Album_youtubePlaylist_id FROM Album WHERE Album_isInLibrary = 1 AND Album_isDeleted = 0 AND Album_youtubePlaylist_id IS NOT NULL")
-    abstract fun flowYoutubePlaylistIds(): Flow<List<String>>
-
     @Query("SELECT * FROM Album WHERE Album_albumId = :albumId")
     abstract suspend fun getAlbum(albumId: String): Album?
 
-    @Query("SELECT * FROM AlbumCombo WHERE Album_albumId = :albumId")
     @Transaction
+    @Query("SELECT * FROM AlbumCombo WHERE Album_albumId = :albumId")
     abstract suspend fun getAlbumCombo(albumId: String): AlbumCombo?
 
     @Transaction
@@ -199,8 +206,38 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_youtubePlaylist_id = :playlistId")
     abstract suspend fun getAlbumWithTracksByPlaylistId(playlistId: String): AlbumWithTracksCombo?
 
+    @Transaction
+    open suspend fun getOrCreateAlbumBySpotifyId(album: IAlbum, spotifyId: String): Album {
+        /**
+         * If album is already in DB: update its Spotify ID if needed and return it.
+         * Else if another album with this Spotify ID exists in DB: return that one.
+         * Else save as new album and return.
+         */
+        val existingAlbum = album as? Album ?: _getAlbumBySpotifyId(spotifyId)
+
+        val savedAlbum = if (existingAlbum != null) {
+            if (existingAlbum.spotifyId != spotifyId) {
+                _setAlbumSpotifyId(existingAlbum.albumId, spotifyId)
+                existingAlbum.copy(spotifyId = spotifyId)
+            } else existingAlbum
+        } else {
+            album.asSavedAlbum().copy(spotifyId = spotifyId).also { _upsertAlbums(it) }
+        }
+
+        return savedAlbum
+    }
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertAlbumTags(vararg albumTags: AlbumTag)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertTags(vararg tags: Tag)
+
+    @Query("SELECT Album_albumArt_fullUriString FROM Album WHERE Album_albumArt_fullUriString IS NOT NULL")
+    abstract suspend fun listAlbumArtFullUris(): List<String>
+
+    @Query("SELECT Album_albumArt_thumbnailUriString FROM Album WHERE Album_albumArt_thumbnailUriString IS NOT NULL")
+    abstract suspend fun listAlbumArtThumbnailUris(): List<String>
 
     @Transaction
     @Query("SELECT * FROM AlbumCombo")
@@ -221,9 +258,19 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_albumId IN(:albumIds)")
     abstract suspend fun listAlbumsWithTracks(vararg albumIds: String): List<AlbumWithTracksCombo>
 
-    @Transaction
-    @Query("SELECT * FROM Album WHERE Album_isDeleted = 1")
-    abstract suspend fun listDeletionMarkedAlbumCombos(): List<AlbumWithTracksCombo>
+    suspend fun listMusicBrainzReleaseGroupAlbumCombos(): Map<String, AlbumCombo> {
+        return _listMusicBrainzReleaseGroupAlbumCombos().associateBy { it.album.musicBrainzReleaseGroupId!! }
+    }
+
+    @Query("SELECT Album_musicBrainzReleaseId FROM Album WHERE Album_isInLibrary = 1 AND Album_musicBrainzReleaseId IS NOT NULL")
+    abstract suspend fun listMusicBrainzReleaseIds(): List<String>
+
+    suspend fun listSpotifyAlbumCombos(): Map<String, AlbumCombo> {
+        return _listSpotifyAlbumCombos().associateBy { it.album.spotifyId!! }
+    }
+
+    @Query("SELECT Album_spotifyId FROM Album WHERE Album_isInLibrary = 1 AND Album_spotifyId IS NOT NULL")
+    abstract suspend fun listSpotifyAlbumIds(): List<String>
 
     @Query("SELECT * FROM Tag")
     abstract suspend fun listTags(): List<Tag>
@@ -231,20 +278,21 @@ abstract class AlbumDao {
     @Query("SELECT DISTINCT Tag.* FROM Tag JOIN AlbumTag ON Tag_name = AlbumTag_tagName WHERE AlbumTag_albumId = :albumId")
     abstract suspend fun listTags(albumId: String): List<Tag>
 
+    suspend fun listYoutubeAlbumCombos(): Map<String, AlbumCombo> {
+        return _listYoutubeAlbumCombos().associateBy { it.album.youtubePlaylist!!.id }
+    }
+
     @Transaction
     open suspend fun setAlbumTags(albumId: String, tags: Collection<Tag>) {
         _deleteAlbumTags(albumId)
         if (tags.isNotEmpty()) {
             insertTags(*tags.toTypedArray())
-            _insertAlbumTags(*tags.toAlbumTags(albumId).toTypedArray())
+            insertAlbumTags(*tags.toAlbumTags(albumId).toTypedArray())
         }
     }
 
     @Query("UPDATE Album SET Album_isHidden = :isHidden WHERE Album_albumId IN (:albumIds)")
     abstract suspend fun setIsHidden(isHidden: Boolean, vararg albumIds: String)
-
-    @Query("UPDATE Album SET Album_isInLibrary = :isInLibrary WHERE Album_albumId IN (:albumIds)")
-    abstract suspend fun setIsInLibrary(isInLibrary: Boolean, vararg albumIds: String)
 
     @Query("UPDATE Album SET Album_isLocal = :isLocal WHERE Album_albumId IN (:albumIds)")
     abstract suspend fun setIsLocal(isLocal: Boolean, vararg albumIds: String)
@@ -253,25 +301,12 @@ abstract class AlbumDao {
     abstract suspend fun unhideLocalAlbums()
 
     suspend fun updateAlbumArt(albumId: String, albumArt: MediaStoreImage) =
-        _updateAlbumArt(albumId, albumArt.fullUriString, albumArt.thumbnailUriString, albumArt.hash)
+        _updateAlbumArt(albumId, albumArt.fullUriString, albumArt.thumbnailUriString)
 
-    @Update
-    abstract suspend fun updateAlbums(vararg albums: Album)
+    open suspend fun upsertAlbum(album: IAlbum): Album {
+        val savedAlbum = album.asSavedAlbum()
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract suspend fun upsertAlbums(vararg albums: Album)
-
-    @Transaction
-    open suspend fun upsertAlbumsAndTags(combos: Collection<AlbumWithTracksCombo>) {
-        if (combos.isNotEmpty()) {
-            val tags = combos.flatMap { it.tags }
-
-            upsertAlbums(*combos.map { it.album }.toTypedArray())
-            _deleteAlbumTags(*combos.map { it.album.albumId }.toTypedArray())
-            if (tags.isNotEmpty()) {
-                insertTags(*tags.toTypedArray())
-                _insertAlbumTags(*combos.flatMap { it.albumTags }.toTypedArray())
-            }
-        }
+        _upsertAlbums(savedAlbum)
+        return savedAlbum
     }
 }

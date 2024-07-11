@@ -6,7 +6,7 @@ import androidx.core.net.toUri
 import androidx.room.Ignore
 import kotlinx.parcelize.Parcelize
 import us.huseli.thoucylinder.ContainerFormat
-import us.huseli.thoucylinder.dataclasses.TrackMetadata
+import us.huseli.thoucylinder.dataclasses.track.TrackMetadata
 
 @Parcelize
 @Immutable

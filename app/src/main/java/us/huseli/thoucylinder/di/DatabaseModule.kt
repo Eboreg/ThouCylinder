@@ -12,7 +12,6 @@ import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.database.PlaylistDao
 import us.huseli.thoucylinder.database.QueueDao
 import us.huseli.thoucylinder.database.TrackDao
-import us.huseli.thoucylinder.database.YoutubeSearchDao
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
@@ -33,9 +32,6 @@ class DatabaseModule {
 
     @Provides
     fun providePlaylistDao(database: Database): PlaylistDao = database.playlistDao()
-
-    @Provides
-    fun provideYoutubeSearchDao(database: Database): YoutubeSearchDao = database.youtubeSearchDao()
 
     @Provides
     fun provideQueueDao(database: Database): QueueDao = database.queueDao()

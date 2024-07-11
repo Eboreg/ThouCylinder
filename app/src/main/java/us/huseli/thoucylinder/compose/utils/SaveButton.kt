@@ -13,7 +13,7 @@ import us.huseli.thoucylinder.stringResource
 @Composable
 fun SaveButton(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = MaterialTheme.shapes.small,
     enabled: Boolean = true,
     onClick: () -> Unit,
     content: @Composable RowScope.() -> Unit,
@@ -24,7 +24,7 @@ fun SaveButton(
 @Composable
 fun SaveButton(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = MaterialTheme.shapes.small,
     text: String,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -41,7 +41,7 @@ fun SaveButton(
 @Composable
 fun SaveButton(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = MaterialTheme.shapes.small,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {

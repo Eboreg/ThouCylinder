@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.compose
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,84 +13,54 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.nextOrFirst
 import us.huseli.thoucylinder.stringResource
 
 enum class DisplayType { LIST, GRID }
 
-enum class ListType { ALBUMS, TRACKS, ARTISTS, PLAYLISTS }
+enum class ListType(@StringRes val stringRes: Int) {
+    ALBUMS(R.string.albums),
+    TRACKS(R.string.tracks),
+    ARTISTS(R.string.artists),
+    PLAYLISTS(R.string.playlists),
+}
 
 @Composable
 fun ListSettingsRow(
-    displayType: DisplayType,
-    listType: ListType,
+    currentDisplayType: DisplayType,
+    currentListType: ListType,
     onDisplayTypeChange: (DisplayType) -> Unit,
     onListTypeChange: (ListType) -> Unit,
     modifier: Modifier = Modifier,
-    availableDisplayTypes: ImmutableList<DisplayType> = DisplayType.entries.toImmutableList(),
     excludeListTypes: ImmutableList<ListType> = persistentListOf(),
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ListTypeChips(current = listType, onChange = onListTypeChange, exclude = excludeListTypes)
+            for (listType in ListType.entries) {
+                if (!excludeListTypes.contains(listType)) InputChip(
+                    selected = listType == currentListType,
+                    onClick = { onListTypeChange(listType) },
+                    label = { Text(stringResource(listType.stringRes)) },
+                )
+            }
         }
         ListDisplayTypeButton(
-            current = displayType,
+            current = currentDisplayType,
             onChange = onDisplayTypeChange,
-            available = availableDisplayTypes,
-        )
-    }
-}
-
-
-@Composable
-fun ListTypeChips(
-    current: ListType,
-    onChange: (ListType) -> Unit,
-    modifier: Modifier = Modifier,
-    exclude: ImmutableList<ListType> = persistentListOf(),
-) {
-    if (!exclude.contains(ListType.ALBUMS)) {
-        InputChip(
-            modifier = modifier,
-            selected = current == ListType.ALBUMS,
-            onClick = { onChange(ListType.ALBUMS) },
-            label = { Text(text = stringResource(R.string.albums)) },
-        )
-    }
-    if (!exclude.contains(ListType.TRACKS)) {
-        InputChip(
-            modifier = modifier,
-            selected = current == ListType.TRACKS,
-            onClick = { onChange(ListType.TRACKS) },
-            label = { Text(text = stringResource(R.string.tracks)) },
-        )
-    }
-    if (!exclude.contains(ListType.ARTISTS)) {
-        InputChip(
-            modifier = modifier,
-            selected = current == ListType.ARTISTS,
-            onClick = { onChange(ListType.ARTISTS) },
-            label = { Text(text = stringResource(R.string.artists)) },
-        )
-    }
-    if (!exclude.contains(ListType.PLAYLISTS)) {
-        InputChip(
-            modifier = modifier,
-            selected = current == ListType.PLAYLISTS,
-            onClick = { onChange(ListType.PLAYLISTS) },
-            label = { Text(text = stringResource(R.string.playlists)) },
         )
     }
 }
@@ -100,26 +71,21 @@ fun ListDisplayTypeButton(
     current: DisplayType,
     onChange: (DisplayType) -> Unit,
     modifier: Modifier = Modifier,
-    available: ImmutableList<DisplayType> = DisplayType.entries.toImmutableList(),
 ) {
-    val nextDisplayType = { dt: DisplayType ->
-        available.indexOf(dt).let { index ->
-            if (index == available.lastIndex) available[0]
-            else available[index + 1]
-        }
-    }
+    val nextDisplayType = remember(current) { DisplayType.entries.nextOrFirst(current) }
 
     IconButton(
-        modifier = modifier.size(32.dp),
-        onClick = { onChange(nextDisplayType(current)) },
-        enabled = available.size > 1,
+        modifier = modifier,
+        onClick = { onChange(nextDisplayType) },
         content = {
-            val icon = when (current) {
-                DisplayType.LIST -> Icons.Sharp.GridView
-                DisplayType.GRID -> Icons.AutoMirrored.Sharp.ViewList
-            }
-
-            Icon(icon, null, modifier = Modifier.size(24.dp))
+            Icon(
+                imageVector = when (current) {
+                    DisplayType.LIST -> Icons.Sharp.GridView
+                    DisplayType.GRID -> Icons.AutoMirrored.Sharp.ViewList
+                },
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
         }
     )
 }

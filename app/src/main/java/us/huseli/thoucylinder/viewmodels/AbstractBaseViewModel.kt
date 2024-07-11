@@ -2,13 +2,22 @@ package us.huseli.thoucylinder.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withContext
 import us.huseli.thoucylinder.interfaces.ILogger
 
 abstract class AbstractBaseViewModel : ViewModel(), ILogger {
+    protected suspend fun <T> onIOThread(block: suspend CoroutineScope.() -> T) =
+        withContext(context = Dispatchers.IO, block = block)
+
+    protected suspend fun <T> onMainThread(block: suspend CoroutineScope.() -> T) =
+        withContext(context = Dispatchers.Main, block = block)
+
     protected fun <T> Flow<T>.stateWhileSubscribed(initialValue: T): StateFlow<T> =
         stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue)
 

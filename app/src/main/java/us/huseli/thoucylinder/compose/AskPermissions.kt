@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.compose.screens.settings.LocalMusicUriDialog
+import us.huseli.thoucylinder.compose.settings.LocalMusicUriDialog
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.SettingsViewModel
 

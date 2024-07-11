@@ -6,9 +6,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.BottomAppBarDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisallowComposableCalls
@@ -20,13 +21,36 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import us.huseli.retaintheme.isInLandscapeMode
+import us.huseli.thoucylinder.Logger
+
+@Composable
+fun Toolbar(
+    modifier: Modifier = Modifier,
+    tonalElevation: Dp = 2.dp,
+    verticalSpacing: Dp = 5.dp,
+    padding: PaddingValues = PaddingValues(bottom = 5.dp, start = 10.dp, end = 10.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = tonalElevation,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(padding),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+            content = content,
+        )
+    }
+}
 
 @Composable
 fun CollapsibleToolbar(
     show: () -> Boolean,
     modifier: Modifier = Modifier,
     tonalElevation: Dp = 2.dp,
+    verticalSpacing: Dp = 5.dp,
+    padding: PaddingValues = PaddingValues(bottom = 5.dp, start = 10.dp, end = 10.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AnimatedVisibility(
@@ -34,20 +58,13 @@ fun CollapsibleToolbar(
         enter = expandVertically(expandFrom = Alignment.Top),
         exit = shrinkVertically(shrinkTowards = Alignment.Top),
     ) {
-        Surface(
+        Toolbar(
             modifier = modifier,
-            color = BottomAppBarDefaults.containerColor,
             tonalElevation = tonalElevation,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .padding(bottom = 10.dp, top = if (isInLandscapeMode()) 10.dp else 0.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                content = content,
-            )
-        }
+            content = content,
+            verticalSpacing = verticalSpacing,
+            padding = padding,
+        )
     }
 }
 
@@ -57,10 +74,13 @@ inline fun rememberToolbarScrollConnection(
     crossinline onShowToolbarChange: @DisallowComposableCalls (Boolean) -> Unit,
 ) = remember(limit) {
     object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (available.y < -limit) onShowToolbarChange(false)
-            else if (available.y > limit) onShowToolbarChange(true)
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            Logger.log("rememberToolbarScrollConnection", "consumed=$consumed, available=$available")
+            if (consumed.y < -limit) onShowToolbarChange(false)
+            else if (available.y > limit || consumed.y > limit) onShowToolbarChange(true)
             return Offset.Zero
         }
+
+        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = Offset.Zero
     }
 }

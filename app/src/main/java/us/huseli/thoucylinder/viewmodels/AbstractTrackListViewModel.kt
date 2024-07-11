@@ -1,84 +1,99 @@
 package us.huseli.thoucylinder.viewmodels
 
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import us.huseli.retaintheme.extensions.listItemsBetween
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractTrackCombo
-import us.huseli.thoucylinder.dataclasses.callbacks.AppCallbacks
-import us.huseli.thoucylinder.dataclasses.callbacks.TrackSelectionCallbacks
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.uistates.TrackUiState
+import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
+import us.huseli.thoucylinder.dataclasses.track.AbstractTrackUiState
+import us.huseli.thoucylinder.dataclasses.track.TrackSelectionCallbacks
+import us.huseli.thoucylinder.listItemsBetween
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
-import kotlin.math.max
-import kotlin.math.min
+import us.huseli.thoucylinder.sortedLike
 
-abstract class AbstractTrackListViewModel(
+abstract class AbstractTrackListViewModel<T : AbstractTrackUiState>(
     private val selectionKey: String,
     private val repos: Repositories,
     private val managers: Managers,
 ) : AbstractBaseViewModel() {
-    val selectedTrackIds: StateFlow<List<String>> = repos.track.flowSelectedTrackIds(selectionKey)
-    val latestSelectedTrackId: StateFlow<String?> = selectedTrackIds.map { it.lastOrNull() }.stateLazily()
+    abstract val baseTrackUiStates: StateFlow<ImmutableList<T>>
+    protected open val selectedTrackStateIds: StateFlow<Collection<String>> =
+        repos.track.flowSelectedTrackStateIds(selectionKey)
+
+    private val selectedTrackStates: StateFlow<List<T>>
+        get() = combine(baseTrackUiStates, selectedTrackStateIds) { states, selected ->
+            states.filter { selected.contains(it.id) }
+        }.stateEagerly(emptyList())
+
+    val selectedTrackCount: StateFlow<Int>
+        get() = selectedTrackStateIds.map { it.size }.distinctUntilChanged().stateLazily(0)
+
+    val trackUiStates: StateFlow<ImmutableList<T>>
+        get() = combine(baseTrackUiStates, selectedTrackStateIds) { states, selected ->
+            states
+                .map { state -> setTrackStateIsSelected(state, selected.contains(state.id)) }
+                .toImmutableList()
+        }.stateLazily(persistentListOf())
+
+    abstract fun setTrackStateIsSelected(state: T, isSelected: Boolean): T
 
     open fun enqueueSelectedTracks() {
-        managers.player.enqueueTracks(selectedTrackIds.value)
+        managers.player.enqueueTracks(getSortedSelectedTrackStates().map { it.trackId })
     }
 
-    open suspend fun listSelectedTrackCombos(): ImmutableList<AbstractTrackCombo> =
-        repos.track.listTrackCombosById(selectedTrackIds.value).toImmutableList()
-
-    open suspend fun listSelectedTracks(): ImmutableList<Track> =
-        repos.track.listTracksById(selectedTrackIds.value).toImmutableList()
-
-    open fun playSelectedTracks() {
-        managers.player.playTracks(selectedTrackIds.value)
-    }
-
-    fun enqueueTrackCombo(combo: AbstractTrackCombo) = managers.player.enqueueTrackCombo(combo)
-
-    fun enqueueTrackCombos(combos: Collection<AbstractTrackCombo>) = managers.player.enqueueTrackCombos(combos)
-
-    fun enqueueTrack(state: TrackUiState) = managers.player.enqueueTrackUiState(state)
-
-    open fun getTrackSelectionCallbacks(appCallbacks: AppCallbacks) = TrackSelectionCallbacks(
-        onAddToPlaylistClick = { appCallbacks.onAddTracksToPlaylistClick(selectedTrackIds.value) },
-        onPlayClick = { playSelectedTracks() },
+    open fun getTrackSelectionCallbacks(dialogCallbacks: AppDialogCallbacks) = TrackSelectionCallbacks(
+        onAddToPlaylistClick = { dialogCallbacks.onAddTracksToPlaylistClick(getSortedSelectedTrackStates().map { it.trackId }) },
         onEnqueueClick = { enqueueSelectedTracks() },
+        onExportClick = { dialogCallbacks.onExportTracksClick(getSortedSelectedTrackStates().map { it.trackId }) },
+        onPlayClick = { playSelectedTracks() },
+        onSelectAllClick = { repos.track.selectTracks(selectionKey, baseTrackUiStates.value.map { it.id }) },
         onUnselectAllClick = { unselectAllTracks() },
     )
 
-    fun playPlaylist(playlistId: String, startTrackId: String? = null) =
-        managers.player.playPlaylist(playlistId, startTrackId)
-
-    fun playTrack(state: TrackUiState) = managers.player.playTrackUiState(state)
-
-    fun playTrackCombo(combo: AbstractTrackCombo) = managers.player.playTrackCombo(combo)
-
-    fun playTrackCombos(combos: Collection<AbstractTrackCombo>, startIndex: Int = 0) =
-        managers.player.playTrackCombos(combos, startIndex)
-
-    fun selectTracksBetweenIndices(fromIndex: Int?, toIndex: Int, getTrackIdAtIndex: (Int) -> String?) {
-        val trackIds = if (fromIndex != null)
-            (min(fromIndex, toIndex)..max(fromIndex, toIndex)).mapNotNull { getTrackIdAtIndex(it) }
-        else getTrackIdAtIndex(toIndex)?.let { listOf(it) }
-
-        if (trackIds != null) repos.track.selectTrackIds(selectionKey, trackIds)
+    open fun isTrackSelectEnabled(): Boolean {
+        return selectedTrackStateIds.value.isNotEmpty()
     }
 
-    fun selectTracksFromLastSelected(to: String, allTrackIds: List<String>) {
-        val trackIds = selectedTrackIds.value.lastOrNull()
-            ?.let { allTrackIds.listItemsBetween(it, to).plus(to) }
+    open fun onTrackLongClick(trackId: String) {
+        selectTrackStatesFromLastSelected(to = trackId)
+    }
+
+    open fun playSelectedTracks() {
+        managers.player.playTracks(getSortedSelectedTrackStates().map { it.trackId })
+    }
+
+    open fun playTrack(state: AbstractTrackUiState) {
+        if (state.isPlayable) managers.player.playTrack(state.trackId)
+    }
+
+    open fun toggleTrackSelected(trackId: String) {
+        repos.track.toggleTrackSelected(selectionKey, trackId)
+    }
+
+    fun getSortedSelectedTrackStates(): List<T> = selectedTrackStates.value
+        .sortedLike(baseTrackUiStates.value, key = { it.id })
+
+    fun onTrackClick(state: AbstractTrackUiState) {
+        if (isTrackSelectEnabled()) toggleTrackSelected(state.id)
+        else playTrack(state)
+    }
+
+    fun unselectAllTracks() = repos.track.unselectAllTracks(selectionKey)
+
+    private fun selectTrackStatesFromLastSelected(to: String) {
+        val stateIds = selectedTrackStateIds.value.lastOrNull()
+            ?.let { stateId ->
+                baseTrackUiStates.value
+                    .map { it.id }
+                    .listItemsBetween(item1 = stateId, item2 = to)
+                    .plus(to)
+            }
             ?: listOf(to)
 
-        repos.track.selectTrackIds(selectionKey, trackIds)
+        repos.track.selectTracks(selectionKey, stateIds)
     }
-
-    fun toggleTrackSelected(trackId: String) = repos.track.toggleTrackIdSelected(selectionKey, trackId)
-
-    fun unselectAllTracks() = repos.track.unselectAllTrackIds(selectionKey)
-
-    fun unselectTracks(trackIds: Collection<String>) = repos.track.unselectTrackIds(selectionKey, trackIds)
 }

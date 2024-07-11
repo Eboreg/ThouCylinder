@@ -1,8 +1,7 @@
 package us.huseli.thoucylinder.compose.utils
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -32,16 +32,8 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.stringResource
 
 @Composable
-fun ObnoxiousProgressIndicator(
-    modifier: Modifier = Modifier,
-    text: String = stringResource(R.string.loading_scream),
-    textStyle: TextStyle = LocalTextStyle.current,
-    wiggleDp: Dp = 6.dp,
-    tonalElevation: Dp = 5.dp,
-    padding: PaddingValues = PaddingValues(wiggleDp),
-) {
-    val wigglePx = with(LocalDensity.current) { wiggleDp.toPx().toInt() }
-    val colors = listOf(RetainBasicColorsDark, RetainBasicColorsLight).map {
+fun rememberRandomColors() = remember {
+    listOf(RetainBasicColorsDark, RetainBasicColorsLight).map {
         listOf(
             it.Brown,
             it.Blue,
@@ -56,6 +48,19 @@ fun ObnoxiousProgressIndicator(
             it.Yellow,
         )
     }.flatten().shuffled()
+}
+
+@Composable
+fun ObnoxiousProgressIndicator(
+    modifier: Modifier = Modifier,
+    text: String = stringResource(R.string.loading_scream),
+    textStyle: TextStyle = LocalTextStyle.current,
+    wiggleDp: Dp = 6.dp,
+    tonalElevation: Dp = 5.dp,
+    padding: PaddingValues = PaddingValues(wiggleDp),
+) {
+    val wigglePx = with(LocalDensity.current) { wiggleDp.toPx().toInt() }
+    val colors = rememberRandomColors()
     val annotateString: (Int) -> AnnotatedString = { colorOffset ->
         AnnotatedString(
             text = text,
@@ -65,8 +70,8 @@ fun ObnoxiousProgressIndicator(
         )
     }
 
-    Row(
-        horizontalArrangement = Arrangement.Center,
+    Box(
+        contentAlignment = Alignment.TopCenter,
         modifier = modifier.padding(padding).fillMaxWidth(),
     ) {
         var offset by remember { mutableStateOf(IntOffset(0, 0)) }

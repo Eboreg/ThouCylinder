@@ -12,39 +12,41 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.retaintheme.extensions.sensibleFormat
-import us.huseli.thoucylinder.ThouCylinderTheme
-import us.huseli.thoucylinder.dataclasses.uistates.AlbumTrackUiState
-import us.huseli.thoucylinder.compose.track.TrackContextButtonWithMenu
-import us.huseli.thoucylinder.dataclasses.callbacks.TrackCallbacks
+import us.huseli.thoucylinder.TrackDownloadTask
+import us.huseli.thoucylinder.compose.FistopyTheme
+import us.huseli.thoucylinder.compose.track.TrackBottomSheetWithButton
+import us.huseli.thoucylinder.compose.utils.DownloadStateProgressIndicator
+import us.huseli.thoucylinder.dataclasses.track.AlbumTrackUiState
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumTrackRow(
     state: AlbumTrackUiState,
+    downloadState: State<TrackDownloadTask.UiState?>,
     position: String,
-    callbacks: TrackCallbacks,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     positionColumnWidth: Dp = 40.dp,
     showArtist: Boolean = true,
-    isSelected: Boolean = false,
+    containerColor: Color = Color.Transparent,
 ) {
-    val downloadState by state.downloadState.collectAsStateWithLifecycle()
     val textColor =
         if (state.isPlayable) Color.Unspecified
         else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
@@ -54,16 +56,16 @@ fun AlbumTrackRow(
 
     Card(
         colors = CardDefaults.outlinedCardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            containerColor = if (state.isSelected) MaterialTheme.colorScheme.primaryContainer else containerColor,
         ),
         shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 50.dp)
-            .padding(horizontal = 10.dp)
+            .heightIn(min = 55.dp)
+            .clip(MaterialTheme.shapes.extraSmall)
             .combinedClickable(
-                onClick = { callbacks.onTrackClick(state.trackId) },
-                onLongClick = { callbacks.onLongClick(state.trackId) },
+                onClick = onClick,
+                onLongClick = onLongClick,
             ),
     ) {
         Row(
@@ -74,52 +76,42 @@ fun AlbumTrackRow(
             Text(
                 text = position,
                 modifier = Modifier.width(positionColumnWidth),
-                style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                style = FistopyTheme.bodyStyles.secondarySmall,
                 textAlign = TextAlign.End,
                 color = textColor,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = state.title.umlautify(),
-                    maxLines = if (state.trackArtistString == null || !showArtist) 2 else 1,
+                    maxLines = if (state.artistString == null || !showArtist) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = ThouCylinderTheme.typographyExtended.listNormalHeader,
+                    style = FistopyTheme.bodyStyles.primaryBold,
                     color = textColor,
                 )
                 if (showArtist) {
-                    state.trackArtistString?.also { artistString ->
+                    state.artistString?.also { artistString ->
                         Text(
                             text = artistString,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = ThouCylinderTheme.typographyExtended.listSmallTitleSecondary,
+                            style = FistopyTheme.bodyStyles.secondarySmall,
                             color = textColorSecondary,
                         )
                     }
                 }
             }
-            state.duration?.also {
+            state.durationMs?.also {
                 Text(
-                    text = it.sensibleFormat(),
-                    style = ThouCylinderTheme.typographyExtended.listSmallTitle,
+                    text = it.milliseconds.sensibleFormat(),
+                    style = FistopyTheme.bodyStyles.primarySmall,
                     color = textColor,
                 )
             }
 
-            TrackContextButtonWithMenu(
-                trackId = state.trackId,
-                isDownloadable = state.isDownloadable,
-                callbacks = callbacks,
-                hideAlbum = true,
-                isInLibrary = state.isInLibrary,
-                artists = state.trackArtists,
-                youtubeWebUrl = state.youtubeWebUrl,
-                spotifyWebUrl = state.spotifyWebUrl,
-                isPlayable = state.isPlayable,
-            )
+            TrackBottomSheetWithButton(state = state, hideAlbum = true)
         }
 
-        downloadState?.also {
+        downloadState.value?.also {
             if (it.isActive) {
                 val statusText = stringResource(it.status.stringId)
 
@@ -129,13 +121,10 @@ fun AlbumTrackRow(
                 ) {
                     Text(
                         text = "$statusText ...",
-                        style = ThouCylinderTheme.typographyExtended.listExtraSmallTitle,
+                        style = FistopyTheme.bodyStyles.primaryExtraSmall,
                         modifier = Modifier.width(130.dp),
                     )
-                    LinearProgressIndicator(
-                        progress = { it.progress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    DownloadStateProgressIndicator(it)
                 }
             }
         }

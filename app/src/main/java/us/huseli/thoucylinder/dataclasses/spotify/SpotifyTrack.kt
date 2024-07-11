@@ -2,13 +2,10 @@ package us.huseli.thoucylinder.dataclasses.spotify
 
 import com.google.gson.annotations.SerializedName
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.thoucylinder.dataclasses.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.abstr.AbstractArtist
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Artist
-import us.huseli.thoucylinder.dataclasses.entities.Track
-import us.huseli.thoucylinder.dataclasses.views.TrackArtistCredit
-import us.huseli.thoucylinder.dataclasses.views.TrackCombo
+import us.huseli.thoucylinder.dataclasses.album.Album
+import us.huseli.thoucylinder.dataclasses.album.IAlbum
+import us.huseli.thoucylinder.dataclasses.track.Track
+import us.huseli.thoucylinder.dataclasses.track.UnsavedTrackCombo
 import us.huseli.thoucylinder.interfaces.IExternalTrack
 import kotlin.math.absoluteValue
 import kotlin.time.Duration
@@ -33,46 +30,24 @@ abstract class AbstractSpotifyTrack<AT : AbstractSpotifyArtist> : AbstractSpotif
     override val title: String
         get() = name
 
-    fun getTrackDistance(track: Track, artists: List<Artist>): Int {
-        val levenshtein = LevenshteinDistance()
-        var distance = levenshtein.apply(track.title, name)
+    override fun toTrackCombo(isInLibrary: Boolean, album: IAlbum?): UnsavedTrackCombo {
+        val track = toTrack(isInLibrary = isInLibrary, albumId = album?.albumId)
 
-        distance += this.artists.getDistances(artists).minOrNull() ?: 0
-
-        // Add number of seconds diffing:
-        track.duration?.also { distance += duration.minus(it).inWholeSeconds.toInt().absoluteValue }
-
-        return distance
-    }
-
-    open suspend fun toTrackCombo(
-        getArtist: suspend (UnsavedArtist) -> Artist,
-        isLocal: Boolean,
-        isInLibrary: Boolean,
-        album: Album? = null,
-    ): TrackCombo {
-        val track = toTrack(albumId = album?.albumId, isInLibrary = isInLibrary)
-
-        return TrackCombo(
+        return UnsavedTrackCombo(
             track = track,
+            trackArtists = artists.toNativeTrackArtists(trackId = track.trackId),
             album = album,
-            artists = artists.mapIndexed { index, artist ->
-                TrackArtistCredit(
-                    artist = getArtist(UnsavedArtist(name = artist.name, spotifyId = artist.id)),
-                    trackId = track.trackId,
-                ).copy(spotifyId = artist.id, position = index)
-            },
         )
     }
 
-    open suspend fun toTrack(albumId: String?, isInLibrary: Boolean) = Track(
-        albumId = albumId,
+    open fun toTrack(isInLibrary: Boolean, albumId: String? = null) = Track(
         albumPosition = trackNumber,
         discNumber = discNumber,
         spotifyId = id,
         title = name,
         durationMs = durationMs.toLong(),
         isInLibrary = isInLibrary,
+        albumId = albumId,
     )
 }
 
@@ -98,9 +73,12 @@ data class SpotifyTrack(
     override val discNumber: Int,
     @SerializedName("duration_ms")
     override val durationMs: Int,
+    // "A link to the Web API endpoint providing full details of the track":
     override val href: String?,
     override val id: String,
     override val name: String,
+    @SerializedName("preview_url")
+    val previewUrl: String?,
     @SerializedName("track_number")
     override val trackNumber: Int,
     override val uri: String?,
@@ -112,12 +90,12 @@ data class SpotifyTrack(
         val spotifyTrack: SpotifyTrack,
     )
 
-    fun matchTrack(track: Track, album: Album? = null, artists: Collection<AbstractArtist> = emptyList()) =
-        TrackMatch(distance = getTrackDistance(track, album, artists), spotifyTrack = this)
+    fun matchTrack(track: Track, album: Album? = null, artistNames: Collection<String> = emptyList()) =
+        TrackMatch(distance = getTrackDistance(track, album, artistNames), spotifyTrack = this)
 
-    private fun getTrackDistance(track: Track, album: Album?, artists: Collection<AbstractArtist>): Int {
+    private fun getTrackDistance(track: Track, album: Album?, artistNames: Collection<String>): Int {
         val levenshtein = LevenshteinDistance()
-        val artistDistances = this.artists.getDistances(artists).plus(this.album.artists.getDistances(artists))
+        val artistDistances = this.artists.getDistances(artistNames).plus(this.album.artists.getDistances(artistNames))
         var distance = levenshtein.apply(track.title, name)
 
         distance += artistDistances.minOrNull() ?: 0
@@ -130,16 +108,17 @@ data class SpotifyTrack(
         return distance
     }
 
-    override suspend fun toTrack(albumId: String?, isInLibrary: Boolean): Track =
-        super.toTrack(albumId = albumId, isInLibrary = isInLibrary).copy(image = album.images.toMediaStoreImage())
+    override fun toTrack(isInLibrary: Boolean, albumId: String?): Track =
+        super.toTrack(isInLibrary = isInLibrary, albumId = albumId).copy(image = album.images.toMediaStoreImage())
 
-    override suspend fun toTrackCombo(
-        getArtist: suspend (UnsavedArtist) -> Artist,
-        isLocal: Boolean,
-        isInLibrary: Boolean,
-        album: Album?,
-    ) = super.toTrackCombo(getArtist = getArtist, album = album, isLocal = isLocal, isInLibrary = isInLibrary)
-        .copy(album = album ?: this.album.toAlbum(isLocal = isLocal, isInLibrary = isInLibrary))
+    override fun toTrackCombo(isInLibrary: Boolean, album: IAlbum?): UnsavedTrackCombo {
+        val finalAlbum = album ?: this.album.toAlbum(isLocal = false, isInLibrary = isInLibrary)
+        val trackCombo = super.toTrackCombo(isInLibrary, album = finalAlbum)
+
+        return trackCombo.copy(
+            albumArtists = this.album.artists.toNativeAlbumArtists(albumId = finalAlbum.albumId),
+        )
+    }
 }
 
 

@@ -27,9 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.collections.immutable.ImmutableList
-import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.R
-import us.huseli.thoucylinder.dataclasses.pojos.TagPojo
+import us.huseli.thoucylinder.dataclasses.tag.TagPojo
+import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
 
@@ -112,31 +112,29 @@ fun ListFilterDialog(
                                 text = stringResource(R.string.reset),
                             )
                         }
-                        tagPojos.chunked(10).forEach { chunk ->
-                            item {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                                ) {
-                                    chunk.forEach { pojo ->
-                                        FilterChip(
-                                            selected = localSelectedTagPojos.contains(pojo),
-                                            onClick = {
-                                                localSelectedTagPojos = localSelectedTagPojos.toMutableList().apply {
-                                                    if (contains(pojo)) remove(pojo)
-                                                    else add(pojo)
-                                                }.also(onTagsChange)
-                                            },
-                                            label = {
-                                                Text(pojo.name.umlautify())
-                                                Badge(
-                                                    modifier = Modifier.padding(start = 5.dp),
-                                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                    content = { Text(pojo.itemCount.toString()) },
-                                                )
-                                            },
-                                        )
-                                    }
+                        item {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                tagPojos.forEach { pojo ->
+                                    FilterChip(
+                                        selected = localSelectedTagPojos.contains(pojo),
+                                        onClick = {
+                                            localSelectedTagPojos = localSelectedTagPojos.toMutableList().apply {
+                                                if (contains(pojo)) remove(pojo)
+                                                else add(pojo)
+                                            }.also(onTagsChange)
+                                        },
+                                        label = {
+                                            Text(pojo.name.umlautify())
+                                            Badge(
+                                                modifier = Modifier.padding(start = 5.dp),
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                content = { Text(pojo.itemCount.toString()) },
+                                            )
+                                        },
+                                    )
                                 }
                             }
                         }

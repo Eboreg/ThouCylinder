@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Pause
@@ -22,54 +21,92 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.R
+import us.huseli.thoucylinder.dataclasses.ModalCoverBooleans
 import us.huseli.thoucylinder.dataclasses.callbacks.PlaybackCallbacks
 import us.huseli.thoucylinder.stringResource
 
 @Composable
-fun ExpandedContent(
-    endPositionMs: Float,
-    canPlay: State<Boolean>,
-    canGotoNext: State<Boolean>,
-    isPlaying: State<Boolean>,
-    isLoading: State<Boolean>,
-    isRepeatEnabled: State<Boolean>,
-    isShuffleEnabled: State<Boolean>,
-    maxWidthPx: Float,
-    progress: State<Float>,
-    backgroundColor: () -> Color,
-    callbacks: PlaybackCallbacks,
-    modifier: Modifier = Modifier,
-    amplitudes: State<ImmutableList<Int>>,
+fun ExpandedPlayButton(
+    isLoading: Boolean,
+    isPlaying: Boolean,
+    canPlay: Boolean,
+    onClick: () -> Unit,
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        content = {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = contentColor,
+                    modifier = Modifier.size(24.dp),
+                )
+            } else {
+                val description =
+                    if (isPlaying) stringResource(R.string.pause)
+                    else stringResource(R.string.play)
+                Icon(
+                    imageVector = if (isPlaying) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
+                    contentDescription = description,
+                    modifier = Modifier.scale(1.75f),
+                )
+            }
+        },
+        enabled = canPlay,
+        modifier = Modifier.size(80.dp),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+        ),
+    )
+}
+
+@Composable
+fun ExpandedContent(
+    uiBooleans: ModalCoverBooleans,
+    endPositionMs: Float,
+    maxWidthPx: Float,
+    progress: FloatState,
+    backgroundColor: Color,
+    callbacks: PlaybackCallbacks,
+    modifier: Modifier = Modifier,
+    amplitudes: State<List<Int>>,
+    containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.primary,
+    waveFormHeight: Dp = 60.dp,
 ) {
     val toggleButtonColors = IconButtonDefaults.iconToggleButtonColors(
         checkedContentColor = LocalContentColor.current,
         contentColor = LocalContentColor.current.copy(alpha = 0.5f),
     )
 
-    Column(
-        modifier = modifier.padding(top = 15.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        ExpandedWaveForm(
-            amplitudes = amplitudes.value,
-            containerColor = { containerColor },
-            contentColor = { contentColor },
-            maxWidthPx = maxWidthPx,
-            endPositionMs = endPositionMs,
-            backgroundColor = backgroundColor,
-            progress = progress,
-            seekToProgress = callbacks.seekToProgress,
-        )
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExpandedWaveForm(
+                amplitudes = amplitudes,
+                containerColor = containerColor,
+                contentColor = contentColor,
+                maxWidthPx = maxWidthPx,
+                endPositionMs = endPositionMs,
+                backgroundColor = backgroundColor,
+                progress = progress,
+                seekToProgress = callbacks.seekToProgress,
+                height = waveFormHeight,
+            )
+        }
 
         // Large button row:
         Row(
@@ -78,7 +115,7 @@ fun ExpandedContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             IconToggleButton(
-                checked = isShuffleEnabled.value,
+                checked = uiBooleans.isShuffleEnabled,
                 onCheckedChange = { callbacks.toggleShuffle() },
                 content = { Icon(Icons.Sharp.Shuffle, null) },
                 colors = toggleButtonColors,
@@ -94,31 +131,13 @@ fun ExpandedContent(
                 },
                 modifier = Modifier.size(60.dp),
             )
-            FilledTonalIconButton(
+            ExpandedPlayButton(
+                isLoading = uiBooleans.isLoading,
+                isPlaying = uiBooleans.isPlaying,
+                canPlay = uiBooleans.canPlay,
                 onClick = callbacks.playOrPauseCurrent,
-                content = {
-                    if (isLoading.value) {
-                        CircularProgressIndicator(
-                            color = contentColor,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    } else {
-                        val description =
-                            if (isPlaying.value) stringResource(R.string.pause)
-                            else stringResource(R.string.play)
-                        Icon(
-                            imageVector = if (isPlaying.value) Icons.Sharp.Pause else Icons.Sharp.PlayArrow,
-                            contentDescription = description,
-                            modifier = Modifier.scale(1.75f),
-                        )
-                    }
-                },
-                enabled = canPlay.value,
-                modifier = Modifier.size(80.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor,
-                ),
+                contentColor = contentColor,
+                containerColor = containerColor,
             )
             IconButton(
                 onClick = callbacks.skipToNext,
@@ -129,11 +148,11 @@ fun ExpandedContent(
                         modifier = Modifier.scale(1.5f),
                     )
                 },
-                enabled = canGotoNext.value,
+                enabled = uiBooleans.canGotoNext,
                 modifier = Modifier.size(60.dp),
             )
             IconToggleButton(
-                checked = isRepeatEnabled.value,
+                checked = uiBooleans.isRepeatEnabled,
                 onCheckedChange = { callbacks.toggleRepeat() },
                 content = { Icon(Icons.Sharp.Repeat, null) },
                 colors = toggleButtonColors,

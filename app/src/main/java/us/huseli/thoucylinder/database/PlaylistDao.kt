@@ -3,18 +3,16 @@
 package us.huseli.thoucylinder.database
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-import us.huseli.thoucylinder.dataclasses.entities.Album
-import us.huseli.thoucylinder.dataclasses.entities.Playlist
-import us.huseli.thoucylinder.dataclasses.entities.PlaylistTrack
-import us.huseli.thoucylinder.dataclasses.pojos.PlaylistPojo
-import us.huseli.thoucylinder.dataclasses.views.PlaylistTrackCombo
+import us.huseli.thoucylinder.dataclasses.playlist.Playlist
+import us.huseli.thoucylinder.dataclasses.playlist.PlaylistUiState
+import us.huseli.thoucylinder.dataclasses.track.PlaylistTrack
+import us.huseli.thoucylinder.dataclasses.track.PlaylistTrackCombo
 import java.time.Instant
 
 @Dao
@@ -25,8 +23,8 @@ abstract class PlaylistDao {
     @Update
     protected abstract suspend fun _updateTracks(vararg tracks: PlaylistTrack)
 
-    @Delete
-    abstract suspend fun deletePlaylist(playlist: Playlist)
+    @Query("DELETE FROM Playlist WHERE Playlist_playlistId = :playlistId")
+    abstract suspend fun deletePlaylist(playlistId: String)
 
     @Query(
         """
@@ -37,24 +35,22 @@ abstract class PlaylistDao {
     )
     abstract suspend fun deleteOrphanPlaylistTracks()
 
-    @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_id IN (:ids)")
-    abstract suspend fun deletePlaylistTracks(vararg ids: String)
+    @Query("DELETE FROM PlaylistTrack WHERE PlaylistTrack_id IN (:playlistTrackIds)")
+    abstract suspend fun deletePlaylistTracks(vararg playlistTrackIds: String)
 
     @Query(
         """
         SELECT Playlist_playlistId, Playlist_name, COUNT(PlaylistTrack_trackId) AS trackCount,
-            SUM(Track_metadata_durationMs) AS totalDurationMs
-        FROM Playlist 
-            LEFT JOIN PlaylistTrack ON Playlist_playlistId = PlaylistTrack_playlistId 
+            SUM(Track_metadata_durationMs) AS totalDurationMs,
+            GROUP_CONCAT(DISTINCT QUOTE(Album_albumArt_thumbnailUriString)) AS thumbnailUris
+        FROM Playlist
+            LEFT JOIN PlaylistTrack ON Playlist_playlistId = PlaylistTrack_playlistId
             LEFT JOIN Track ON PlaylistTrack_trackId = Track_trackId
+            LEFT JOIN Album ON Track_albumId = Album_albumId AND Album_albumArt_thumbnailUriString IS NOT NULL
         GROUP BY Playlist_playlistId
-        HAVING Playlist_playlistId IS NOT NULL
         """
     )
-    abstract fun flowPojos(): Flow<List<PlaylistPojo>>
-
-    @Query("SELECT * FROM Playlist WHERE Playlist_playlistId = :playlistId")
-    abstract fun flowPlaylist(playlistId: String): Flow<Playlist?>
+    abstract fun flowUiStates(): Flow<List<PlaylistUiState>>
 
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
@@ -72,17 +68,6 @@ abstract class PlaylistDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertPlaylistTracks(vararg playlistTracks: PlaylistTrack)
 
-    @Query(
-        """
-        SELECT DISTINCT Album.* 
-        FROM Album
-            JOIN Track ON Track_albumId = Album_albumId
-            JOIN PlaylistTrack ON PlaylistTrack_trackId = Track_trackId 
-        WHERE PlaylistTrack_playlistId = :playlistId
-        """
-    )
-    abstract suspend fun listAlbums(playlistId: String): List<Album>
-
     @Query("SELECT PlaylistTrack_trackId FROM PlaylistTrack WHERE PlaylistTrack_playlistId = :playlistId")
     abstract suspend fun listPlaylistTrackIds(playlistId: String): List<String>
 
@@ -92,10 +77,6 @@ abstract class PlaylistDao {
     @Transaction
     @Query("SELECT * FROM PlaylistTrackCombo WHERE Playlist_playlistId = :playlistId")
     abstract suspend fun listTrackCombosByPlaylistId(playlistId: String): List<PlaylistTrackCombo>
-
-    @Transaction
-    @Query("SELECT * FROM PlaylistTrackCombo WHERE PlaylistTrack_id IN (:ids)")
-    abstract suspend fun listTrackCombosByPlaylistTrackId(vararg ids: String): List<PlaylistTrackCombo>
 
     @Transaction
     open suspend fun moveTrack(playlistId: String, from: Int, to: Int) {

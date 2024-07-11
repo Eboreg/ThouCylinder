@@ -2,6 +2,8 @@ import dagger.hilt.android.plugin.util.capitalize
 import java.io.FileInputStream
 import java.util.Properties
 
+val currentVersionCode = 18
+val currentVersionName = "0.7.0"
 val keystoreProperties = Properties()
 val secretsProperties = Properties()
 
@@ -64,7 +66,6 @@ android {
 
     defaultConfig {
         manifestPlaceholders += mapOf("redirectSchemeName" to "klaatu")
-        val youtubeApiKey = secretsProperties["youtubeApiKey"] as String
         val discogsApiKey = secretsProperties["discogsApiKey"] as String
         val discogsApiSecret = secretsProperties["discogsApiSecret"] as String
         val spotifyClientId = secretsProperties["spotifyClientId"] as String
@@ -72,20 +73,19 @@ android {
         val lastFmApiKey = secretsProperties["lastFmApiKey"] as String
         val lastFmApiSecret = secretsProperties["lastFmApiSecret"] as String
 
-        applicationId = "us.huseli.thoucylinder"
+        applicationId = "us.huseli.fistopy"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "0.6.0"
+        versionCode = currentVersionCode
+        versionName = currentVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
 
-        setProperty("archivesBaseName", "thoucylinder_$versionName")
+        setProperty("archivesBaseName", "fistopy_$versionName")
 
-        buildConfigField("String", "youtubeApiKey", "\"$youtubeApiKey\"")
         buildConfigField("String", "discogsApiKey", "\"$discogsApiKey\"")
         buildConfigField("String", "discogsApiSecret", "\"$discogsApiSecret\"")
         buildConfigField("String", "spotifyClientId", "\"$spotifyClientId\"")
@@ -100,9 +100,9 @@ android {
             isDebuggable = true
             // isRenderscriptDebuggable = true
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["hostName"] = "thoucylinder.debug"
-            manifestPlaceholders["redirectHostName"] = "thoucylinder.debug"
-            buildConfigField("String", "hostName", "\"thoucylinder.debug\"")
+            manifestPlaceholders["hostName"] = "fistopy.debug"
+            manifestPlaceholders["redirectHostName"] = "fistopy.debug"
+            buildConfigField("String", "hostName", "\"fistopy.debug\"")
         }
         release {
             proguardFiles(
@@ -110,9 +110,9 @@ android {
                 "proguard-rules.pro"
             )
             isDebuggable = false
-            manifestPlaceholders["hostName"] = "thoucylinder"
-            manifestPlaceholders["redirectHostName"] = "thoucylinder"
-            buildConfigField("String", "hostName", "\"thoucylinder\"")
+            manifestPlaceholders["hostName"] = "fistopy"
+            manifestPlaceholders["redirectHostName"] = "fistopy"
+            buildConfigField("String", "hostName", "\"fistopy\"")
         }
     }
 
@@ -222,7 +222,7 @@ dependencies {
 
 sentry {
     org.set("huselius")
-    projectName.set("thoucylinder")
+    projectName.set("fistopy")
 
     // this will upload your source code to Sentry to show it as part of the stack traces
     // disable if you don't want to expose your sources

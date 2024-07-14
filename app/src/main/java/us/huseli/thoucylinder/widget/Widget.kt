@@ -60,7 +60,8 @@ fun Widget(manager: WidgetManager) {
     Logger.log("Widget", "size=$size")
 
     Box(
-        modifier = GlanceModifier.fillMaxSize()
+        modifier = GlanceModifier
+            .fillMaxSize()
             .appWidgetBackground()
             .cornerRadius(5.dp)
             .background(backgroundColor)
@@ -123,18 +124,15 @@ fun WidgetButtonRow(
     val isPlaying by manager.isPlaying.collectAsState()
 
     Row(modifier = modifier, verticalAlignment = verticalAlignment) {
+        val baseModifier = GlanceModifier.cornerRadius(10.dp).defaultWeight().height(buttonHeight)
+
         Image(
             provider = ImageProvider(R.drawable.media3_notification_seek_to_previous),
             contentDescription = null,
             colorFilter = ColorFilter.tint(
                 if (isPlaying || canGotoPrevious) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
             ),
-            modifier = GlanceModifier.defaultWeight()
-                .height(buttonHeight)
-                .then(
-                    if (isPlaying || canGotoPrevious) GlanceModifier.clickable { manager.skipToStartOrPrevious() }
-                    else GlanceModifier
-                )
+            modifier = if (isPlaying || canGotoPrevious) baseModifier.clickable { manager.skipToStartOrPrevious() } else baseModifier,
         )
         Image(
             provider = ImageProvider(R.drawable.media3_notification_seek_back),
@@ -142,21 +140,14 @@ fun WidgetButtonRow(
             colorFilter = ColorFilter.tint(
                 if (isPlaying) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
             ),
-            modifier = GlanceModifier.defaultWeight()
-                .height(buttonHeight)
-                .then(
-                    if (isPlaying) GlanceModifier.clickable { manager.seekBack() }
-                    else GlanceModifier
-                )
+            modifier = if (isPlaying) baseModifier.clickable { manager.seekBack() } else baseModifier,
         )
         if (isPlaying) {
             Image(
                 provider = ImageProvider(R.drawable.media3_notification_pause),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(GlanceTheme.colors.onBackground),
-                modifier = GlanceModifier.defaultWeight()
-                    .height(buttonHeight)
-                    .clickable { manager.playOrPauseCurrent() },
+                modifier = baseModifier.clickable { manager.playOrPauseCurrent() },
             )
         } else {
             Image(
@@ -165,12 +156,7 @@ fun WidgetButtonRow(
                 colorFilter = ColorFilter.tint(
                     if (canPlay) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
                 ),
-                modifier = GlanceModifier.defaultWeight()
-                    .height(buttonHeight)
-                    .then(
-                        if (canPlay) GlanceModifier.clickable { manager.playOrPauseCurrent() }
-                        else GlanceModifier
-                    )
+                modifier = if (canPlay) baseModifier.clickable { manager.playOrPauseCurrent() } else baseModifier,
             )
         }
         Image(
@@ -179,12 +165,7 @@ fun WidgetButtonRow(
             colorFilter = ColorFilter.tint(
                 if (isPlaying) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
             ),
-            modifier = GlanceModifier.defaultWeight()
-                .height(buttonHeight)
-                .then(
-                    if (isPlaying) GlanceModifier.clickable { manager.seekForward() }
-                    else GlanceModifier
-                )
+            modifier = if (isPlaying) baseModifier.clickable { manager.seekForward() } else baseModifier,
         )
         Image(
             provider = ImageProvider(R.drawable.media3_notification_seek_to_next),
@@ -192,12 +173,7 @@ fun WidgetButtonRow(
             colorFilter = ColorFilter.tint(
                 if (canGotoNext) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
             ),
-            modifier = GlanceModifier.defaultWeight()
-                .height(buttonHeight)
-                .then(
-                    if (canGotoNext) GlanceModifier.clickable { manager.skipToNext() }
-                    else GlanceModifier
-                )
+            modifier = if (canGotoNext) baseModifier.clickable { manager.skipToNext() } else baseModifier,
         )
     }
 }

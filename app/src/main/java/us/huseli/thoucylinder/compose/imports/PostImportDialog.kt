@@ -21,8 +21,6 @@ import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.FistopyTheme
 import us.huseli.thoucylinder.compose.utils.CancelButton
 import us.huseli.thoucylinder.compose.utils.SaveButton
-import us.huseli.thoucylinder.dataclasses.album.LocalAlbumCallbacks
-import us.huseli.thoucylinder.dataclasses.callbacks.LocalAppCallbacks
 import us.huseli.thoucylinder.managers.ExternalContentManager
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.umlautify
@@ -31,10 +29,10 @@ import us.huseli.thoucylinder.umlautify
 fun PostImportDialog(
     data: List<ExternalContentManager.AlbumImportData>,
     onDismissRequest: () -> Unit,
+    onGotoAlbumClick: (String) -> Unit,
+    onGotoLibraryClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val albumCallbacks = LocalAlbumCallbacks.current
-    val appCallbacks = LocalAppCallbacks.current
     val failedImports = remember(data) { data.filter { it.error != null } }
     val successfulImports = remember(data) { data.filter { it.error == null } }
 
@@ -47,7 +45,7 @@ fun PostImportDialog(
             SaveButton(
                 text = stringResource(R.string.go_to_library),
                 onClick = {
-                    appCallbacks.onGotoLibraryClick()
+                    onGotoLibraryClick()
                     onDismissRequest()
                 },
             )
@@ -72,7 +70,7 @@ fun PostImportDialog(
 
                             OutlinedButton(
                                 onClick = {
-                                    albumCallbacks.onGotoAlbumClick(importData.state.albumId)
+                                    onGotoAlbumClick(importData.id)
                                     onDismissRequest()
                                 },
                                 modifier = Modifier.fillMaxWidth(),

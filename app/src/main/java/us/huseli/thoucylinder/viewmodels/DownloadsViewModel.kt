@@ -26,7 +26,7 @@ open class DownloadsViewModel @Inject constructor(
     val trackDownloadTasks: StateFlow<ImmutableList<TrackDownloadTask>> = managers.library.trackDownloadTasks
         .map { tasks -> tasks.sortedByDescending { it.started }.toImmutableList() }
         .onEach { _isLoading.value = false }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
     val isLoading = _isLoading.asStateFlow()
     val localMusicUri: StateFlow<Uri?> = repos.settings.localMusicUri
 

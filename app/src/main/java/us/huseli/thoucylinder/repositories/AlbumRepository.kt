@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
@@ -61,7 +60,7 @@ class AlbumRepository @Inject constructor(
         searchTerm = searchTerm,
         tagNames = tagNames,
         availabilityFilter = availabilityFilter,
-    ).distinctUntilChanged()
+    )
 
     fun flowAlbumCombosByArtist(artistId: String): Flow<List<AlbumCombo>> = albumDao.flowAlbumCombosByArtist(artistId)
 
@@ -85,6 +84,9 @@ class AlbumRepository @Inject constructor(
 
     suspend fun getAlbumWithTracksByPlaylistId(playlistId: String) =
         onIOThread { albumDao.getAlbumWithTracksByPlaylistId(playlistId) }
+
+    suspend fun getOrCreateAlbumByMusicBrainzId(album: IAlbum, groupId: String, releaseId: String): Album =
+        onIOThread { albumDao.getOrCreateAlbumByMusicBrainzId(album, groupId, releaseId) }
 
     suspend fun getOrCreateAlbumBySpotifyId(album: IAlbum, spotifyId: String): Album =
         onIOThread { albumDao.getOrCreateAlbumBySpotifyId(album, spotifyId) }

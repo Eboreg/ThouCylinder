@@ -42,12 +42,12 @@ class ArtistListViewModel @Inject constructor(private val repos: Repositories) :
             .toImmutableList()
     }
         .onEach { _isLoading.value = false }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
     val isEmpty: StateFlow<Boolean> =
         combine(artistUiStates, _isLoading, repos.localMedia.isImportingLocalMedia) { combos, isLoading, isImporting ->
             combos.isEmpty() && !isLoading && !isImporting
-        }.distinctUntilChanged().stateLazily(false)
+        }.distinctUntilChanged().stateWhileSubscribed(false)
 
     val isLoading = _isLoading.asStateFlow()
     val searchTerm = repos.settings.artistSearchTerm

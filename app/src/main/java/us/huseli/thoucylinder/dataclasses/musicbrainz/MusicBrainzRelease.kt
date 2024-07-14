@@ -9,11 +9,12 @@ import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
 import us.huseli.thoucylinder.enums.AlbumType
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.interfaces.IExternalAlbumWithTracks
+import us.huseli.thoucylinder.interfaces.IHasMusicBrainzIds
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-@Suppress("unused")
+@Suppress("unused", "IncorrectFormatting")
 enum class MusicBrainzReleaseStatus {
     @SerializedName("Official") OFFICIAL,
     @SerializedName("Promotion") PROMOTION,
@@ -23,11 +24,12 @@ enum class MusicBrainzReleaseStatus {
     @SerializedName("Cancelled") CANCELLED,
 }
 
-abstract class AbstractMusicBrainzRelease : AbstractMusicBrainzItem(), IExternalAlbum {
+abstract class AbstractMusicBrainzRelease : AbstractMusicBrainzItem(), IExternalAlbum, IHasMusicBrainzIds {
     abstract val artistCredit: List<MusicBrainzArtistCredit>
     abstract val country: String?
     abstract val date: String?
     abstract val status: MusicBrainzReleaseStatus?
+    abstract val releaseGroupId: String?
 
     override val albumType: AlbumType?
         get() = if (artistCredit.map { it.name.lowercase() }.contains("various artists"))
@@ -48,6 +50,12 @@ abstract class AbstractMusicBrainzRelease : AbstractMusicBrainzItem(), IExternal
             ?.substringBefore('-')
             ?.takeIf { it.matches(Regex("^\\d{4}$")) }
             ?.toInt()
+
+    override val musicBrainzReleaseId: String?
+        get() = id
+
+    override val musicBrainzReleaseGroupId: String?
+        get() = releaseGroupId
 
     open fun toAlbum(
         isLocal: Boolean,
@@ -95,9 +103,14 @@ data class MusicBrainzSimplifiedRelease(
 ) : AbstractMusicBrainzRelease() {
     override val trackCount: Int?
         get() = null
+
     override val duration: Duration?
         get() = null
+
     override val year: Int?
+        get() = null
+
+    override val releaseGroupId: String?
         get() = null
 
     override fun toAlbumCombo(
@@ -121,27 +134,23 @@ data class MusicBrainzRelease(
     override val id: String,
     val media: List<MusicBrainzMedia>,
     val packaging: String?,
-    @SerializedName("packaging-id")
-    val packagingId: String?,
     val quality: String?,
     @SerializedName("release-group")
-    val releaseGroup: MusicBrainzSimplifiedReleaseGroup,
+    val releaseGroup: MusicBrainzSimplifiedReleaseGroup?,
     override val status: MusicBrainzReleaseStatus?,
-    @SerializedName("status-id")
-    val statusId: String?,
     override val title: String,
 ) : AbstractMusicBrainzRelease(), IExternalAlbumWithTracks {
     private val allGenres: List<MusicBrainzGenre>
         get() = genres
             .asSequence()
-            .plus(releaseGroup.genres)
+            .plus(releaseGroup?.genres ?: emptyList())
             .plus(media.flatMap { media -> media.tracks.flatMap { track -> track.recording.genres } })
             .groupBy { it }
             .map { (genre, instances) -> genre.copy(count = instances.sumOf { it.count }) }
             .sortedByDescending { it.count }
 
     override val albumType: AlbumType?
-        get() = super.albumType ?: releaseGroup.primaryType?.albumType
+        get() = super.albumType ?: releaseGroup?.albumType
 
     override val duration: Duration
         get() = media.sumOf { medium -> medium.tracks.sumOf { it.length } }.milliseconds
@@ -149,14 +158,17 @@ data class MusicBrainzRelease(
     override val trackCount: Int
         get() = media.sumOf { it.trackCount }
 
+    override val releaseGroupId: String?
+        get() = releaseGroup?.id
+
     override val year: Int?
-        get() = releaseGroup.year ?: date
+        get() = releaseGroup?.year ?: date
             ?.substringBefore('-')
             ?.takeIf { it.matches(Regex("^\\d{4}$")) }
             ?.toInt()
 
     override fun toAlbum(isLocal: Boolean, isInLibrary: Boolean, albumId: String?): UnsavedAlbum =
-        super.toAlbum(isLocal, isInLibrary, albumId).copy(musicBrainzReleaseGroupId = releaseGroup.id)
+        super.toAlbum(isLocal, isInLibrary, albumId).copy(musicBrainzReleaseGroupId = releaseGroup?.id)
 
     override fun toAlbumCombo(
         isLocal: Boolean,
@@ -180,8 +192,15 @@ data class MusicBrainzRelease(
         isLocal: Boolean,
         albumArt: MediaStoreImage? = null,
         albumId: String? = null,
+        releaseGroup: AbstractMusicBrainzReleaseGroup? = null,
     ): UnsavedAlbumWithTracksCombo {
-        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary, albumId = albumId).copy(albumArt = albumArt)
+        val album = toAlbum(isLocal = isLocal, isInLibrary = isInLibrary, albumId = albumId).let {
+            it.copy(
+                albumArt = albumArt,
+                year = releaseGroup?.year ?: it.year,
+                musicBrainzReleaseGroupId = releaseGroup?.id ?: it.musicBrainzReleaseGroupId,
+            )
+        }
         val albumArtists = artistCredit.toNativeAlbumArtists(albumId = album.albumId)
 
         return UnsavedAlbumWithTracksCombo(

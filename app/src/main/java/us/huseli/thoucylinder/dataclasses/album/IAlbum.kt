@@ -3,8 +3,10 @@ package us.huseli.thoucylinder.dataclasses.album
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
 import us.huseli.thoucylinder.enums.AlbumType
+import us.huseli.thoucylinder.interfaces.IAlbumArtOwner
+import us.huseli.thoucylinder.interfaces.IHasMusicBrainzIds
 
-interface IAlbum {
+interface IAlbum : IAlbumArtOwner, IHasMusicBrainzIds {
     val albumId: String
     val isHidden: Boolean
     val isInLibrary: Boolean
@@ -14,20 +16,20 @@ interface IAlbum {
     val year: Int?
     val albumArt: MediaStoreImage?
     val albumType: AlbumType?
-    val musicBrainzReleaseGroupId: String?
-    val musicBrainzReleaseId: String?
+    override val musicBrainzReleaseGroupId: String?
+    override val musicBrainzReleaseId: String?
     val spotifyId: String?
     val spotifyImage: MediaStoreImage?
     val trackCount: Int?
     val youtubePlaylist: YoutubePlaylist?
 
-    val fullImageUrl: String?
+    override val fullImageUrl: String?
         get() = albumArt?.fullUriString ?: spotifyImage?.fullUriString ?: youtubePlaylist?.fullImage?.url
 
     val spotifyWebUrl: String?
         get() = spotifyId?.let { "https://open.spotify.com/album/${it}" }
 
-    val thumbnailUrl: String?
+    override val thumbnailUrl: String?
         get() = albumArt?.thumbnailUriString ?: spotifyImage?.thumbnailUriString ?: youtubePlaylist?.thumbnailUrl
 
     val youtubeWebUrl: String?
@@ -36,7 +38,7 @@ interface IAlbum {
     fun toImportableUiState(playCount: Int? = null) = ImportableAlbumUiState(
         albumId = albumId,
         albumType = albumType,
-        fullImageUri = fullImageUrl,
+        fullImageUrl = fullImageUrl,
         isInLibrary = isInLibrary,
         isLocal = isLocal,
         isOnYoutube = youtubePlaylist != null,
@@ -45,7 +47,7 @@ interface IAlbum {
         musicBrainzReleaseId = musicBrainzReleaseId,
         playCount = playCount,
         spotifyWebUrl = spotifyWebUrl,
-        thumbnailUri = thumbnailUrl,
+        thumbnailUrl = thumbnailUrl,
         title = title,
         trackCount = trackCount,
         yearString = year?.toString(),
@@ -55,7 +57,7 @@ interface IAlbum {
     fun toUiState(isSelected: Boolean = false) = AlbumUiState(
         albumId = albumId,
         albumType = albumType,
-        fullImageUri = fullImageUrl,
+        fullImageUrl = fullImageUrl,
         isInLibrary = isInLibrary && !isHidden,
         isLocal = isLocal,
         isOnYoutube = youtubePlaylist != null,
@@ -65,7 +67,7 @@ interface IAlbum {
         musicBrainzReleaseId = musicBrainzReleaseId,
         spotifyId = spotifyId,
         spotifyWebUrl = spotifyWebUrl,
-        thumbnailUri = thumbnailUrl,
+        thumbnailUrl = thumbnailUrl,
         title = title,
         trackCount = trackCount,
         yearString = year?.toString(),
@@ -77,5 +79,4 @@ interface IAlbum {
     fun asUnsavedAlbum(): UnsavedAlbum
     fun mergeWith(other: IAlbum): IAlbum
     fun withAlbumArt(albumArt: MediaStoreImage?): IAlbum
-    fun withSpotifyId(spotifyId: String): IAlbum
 }

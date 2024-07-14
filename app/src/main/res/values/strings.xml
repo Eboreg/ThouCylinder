@@ -1,5 +1,7 @@
 <!--suppress IncorrectFormatting -->
 <resources>
+    <string name="activating_library_radio">Activating library radio.</string>
+    <string name="activating_x_radio">Activating \'%1$s\' radio.</string>
     <string name="add_all_to_playlist">Add all to playlist</string>
     <string name="add_anyway">Add anyway</string>
     <string name="add_new">Add new</string>
@@ -12,11 +14,10 @@
     <string name="album_count"># albums</string>
     <string name="album_order">Album order</string>
     <string name="album_title">Album title</string>
-    <string name="album_was_downloaded">%1$s was downloaded.</string>
-    <string name="album_was_downloaded_with_errors">%1$s was downloaded with errors.</string>
     <string name="albums">Albums</string>
+    <string name="albums_in_library">Albums in library</string>
     <string name="all">All</string>
-    <string name="all_local_albums_have_been_unhidden">All local albums have been unhidden.</string>
+    <string name="all_local_albums_have_been_unhidden">All local albums have been undeleted.</string>
     <string name="also_update_matching_track_artists">Also update matching track artists</string>
     <string name="app_name">Fistopy</string>
     <string name="artist">Artist</string>
@@ -26,10 +27,13 @@
     <string name="audio_attributes">Audio attributes</string>
     <string name="authorize">Authorize</string>
     <string name="auto_import_local_music">Auto import local music</string>
+    <string name="auto_import_local_music_description">When enabled, the app will check your local music directory for new music on each start. You can also trigger an import manually by pulling down in the library screen.</string>
     <string name="availability">Availability</string>
+    <string name="available_albums">Available albums</string>
     <string name="browse_artist_on_spotify">Browse artist on Spotify</string>
     <string name="cancel">Cancel</string>
     <string name="cancel_download">Cancel download</string>
+    <string name="cannot_delete_albums_while_auto_import">Cannot delete albums while auto import is in progress. Wait until it\'s done.</string>
     <string name="clear">Clear</string>
     <string name="close">Close</string>
     <string name="compilation">Compilation</string>
@@ -40,14 +44,13 @@
     <string name="could_not_save_playlist_for_some_reason">Could not save playlist for some reason.</string>
     <string name="could_not_start_radio">Could not start radio: Failed to get recommendations.</string>
     <string name="could_not_start_radio_for_x">Could not start radio: Failed to get recommendations for %1$s.</string>
+    <string name="courtesy_of_spotify">Courtesy of Spotify</string>
     <string name="create_new_playlist">Create new playlist</string>
     <string name="current_value">Current value: %1$s</string>
     <string name="deactivate">Deactivate</string>
     <string name="deactivate_radio">Deactivate radio</string>
     <string name="debug">Debug</string>
     <string name="delete">Delete</string>
-    <string name="delete_album">Delete album</string>
-    <string name="delete_playlist">Delete playlist</string>
     <string name="descending">Descending</string>
     <string name="description">Description</string>
     <string name="directory_for_music_downloads_from_youtube">Directory for music downloads from Youtube, and also for auto importing local music if this is enabled.</string>
@@ -56,26 +59,25 @@
     <string name="don_t_import">Don\'t import</string>
     <string name="download">Download</string>
     <string name="download_album">Download album</string>
-    <string name="download_track">Download track</string>
     <string name="downloading">Downloading</string>
     <string name="downloads">Downloads</string>
     <string name="duration">Duration</string>
     <string name="edit">Edit</string>
     <string name="edit_album">Edit album</string>
     <string name="edit_album_tracks">Edit album tracks</string>
-    <string name="edit_track">Edit track</string>
     <string name="edit_tracks">Edit tracks</string>
     <string name="enqueue">Enqueue</string>
-    <string name="enqueue_album">Enqueue album</string>
     <string name="enqueue_all">Enqueue all</string>
-    <string name="enqueue_track">Enqueue track</string>
     <string name="enter_username">Enter username</string>
     <string name="ep">EP</string>
+    <string name="error_on_downloading_x">Error on downloading %1$s: %2$s</string>
     <string name="export">Export</string>
     <string name="export_to_playlist_file">Export to playlist file</string>
     <string name="exporting">Exporting</string>
     <string name="file_size">File size</string>
     <string name="filters">Filters</string>
+    <string name="forget_spotify_profile">Forget Spotify user profile</string>
+    <string name="forget_spotify_profile_description">Your Spotify profile is used for importing your saved albums. Click here if you want this app to forget it for some reason.</string>
     <string name="free_text">Free text</string>
     <string name="genres">Genres</string>
     <string name="go_back">Go back</string>
@@ -86,6 +88,7 @@
     <string name="go_to_x">Go to %1$s</string>
     <string name="harvest_your_personal_data">Harvest your personal data</string>
     <string name="hi_this_is_a_music_player_app">Hi, this is a music player app.</string>
+    <string name="hide">Hide</string>
     <string name="identify_you_with_google">Identify you with Google</string>
     <string name="if_you_have_chosen_to_auto_import_local_music">Also, if you have chosen to auto import local music, this is where it will be looked for.</string>
     <string name="if_you_want_to_auto_import_local_music">If you want to auto import local music, select your local music directory here.</string>
@@ -101,6 +104,7 @@
     <string name="import_x">Import %1$d</string>
     <string name="imported">Imported</string>
     <string name="importing">Importing</string>
+    <string name="importing_albums">Importing albums</string>
     <string name="importing_new_local_media_scream">IMPORTING NEW LOCAL MEDIA!!</string>
     <string name="importing_x">Importing %1$s</string>
     <string name="is_downloaded">Is downloaded</string>
@@ -119,6 +123,7 @@
     <string name="local_file">Local file</string>
     <string name="local_import_help_1">This lets you select a local directory and do a one-time import of any albums found therein.</string>
     <string name="local_import_help_2">If you want to auto import local albums on every app start, you need to configure this in the settings instead.</string>
+    <string name="local_music">Local music</string>
     <string name="local_music_directory">Local music directory</string>
     <string name="major">Major</string>
     <string name="match">Match</string>
@@ -142,11 +147,16 @@
     <string name="no_tracks_could_be_matched">No tracks could be matched.</string>
     <string name="no_tracks_found">No tracks found.</string>
     <string name="not_configured">Not configured</string>
+    <string name="not_imported">Not imported</string>
+    <string name="notification_channel_description">Just some basic shit.</string>
+    <string name="notification_channel_name">Basic notifications</string>
     <string name="now_active_x">Now active: %1$s</string>
     <string name="ok">OK</string>
+    <string name="on_spotify">On Spotify</string>
     <string name="only_local">Only local</string>
     <string name="only_playable">Only playable</string>
-    <string name="show_artists_without_albums">Show artists without albums</string>
+    <string name="other_albums_by">Other albums by</string>
+    <string name="other_stuff">Other stuff</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
     <string name="play_album">Play album</string>
@@ -156,7 +166,6 @@
     <string name="play_local_music_files">Play local music files</string>
     <string name="play_on_spotify">Play on Spotify</string>
     <string name="play_on_youtube">Play on Youtube</string>
-    <string name="play_playlist">Play playlist</string>
     <string name="playlist_exported_to_x">Playlist exported to %1$s.</string>
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
@@ -166,15 +175,13 @@
     <string name="radio_dialog_help_1">Artist, album, and track radios are generated using Spotify\'s track recommendation API (but do not require you to have a Spotify account).</string>
     <string name="radio_dialog_help_2">The library radio will contain a mix of random tracks from your library, and Spotify recommendations based on your library. The ratio between them can be set using the \'library radio novelty\' slider.</string>
     <string name="radio_dialog_help_3" formatted="false">0\% = only library tracks, 100\% = only Spotify recommendations</string>
-    <string name="recommendations">Recommendations</string>
     <string name="region">Region</string>
-    <string name="related_to_x">Related to: %1$s</string>
+    <string name="related_artists">Related artists</string>
     <string name="remove">Remove</string>
     <string name="remove_from_queue">Remove from queue</string>
     <string name="rename">Rename</string>
     <string name="rename_playlist">Rename playlist</string>
     <string name="reset">Reset</string>
-    <string name="retry">Retry</string>
     <string name="save">Save</string>
     <string name="saving">Saving</string>
     <string name="scrobble_to_last_fm">Scrobble to Last.fm</string>
@@ -186,6 +193,8 @@
     <string name="select_directory">Select directory</string>
     <string name="select_region">Select region</string>
     <string name="settings">Settings</string>
+    <string name="show_all">Show all</string>
+    <string name="show_artists_without_albums">Show artists without albums</string>
     <string name="single">Single</string>
     <string name="skip">Skip</string>
     <string name="sort">Sort</string>
@@ -194,19 +203,16 @@
     <string name="spotify_authorization_failed">Spotify authorization failed: %1$s</string>
     <string name="spotify_import_help_1">Press the <i>Authorize</i> button below to authorize this application with Spotify and fetch your saved albums from there. After this, you will get to select which albums to import.</string>
     <string name="spotify_import_help_2">For each selected album, attempts will be made to match it with a Youtube playlist. If a sufficiently good match is found, it will be added to your library as an album. However, it will not be automatically downloaded.</string>
-    <string name="start_album_radio">Start album radio</string>
-    <string name="start_artist_radio">Start artist radio</string>
     <string name="start_library_radio">Start library radio</string>
     <string name="start_radio">Start radio</string>
-    <string name="start_track_radio">Start track radio</string>
     <string name="start_x_x_radio">Start %2$s radio for \'%1$s\'</string>
     <string name="successfully_imported">Successfully imported</string>
     <string name="tagging">Tagging</string>
     <string name="tags">Tags</string>
+    <string name="the_album_was_added_to_the_library">The album was added to the library.</string>
     <string name="the_playlist_was_deleted">The playlist was deleted.</string>
     <string name="the_playlist_was_restored">The playlist was restored.</string>
     <string name="the_queue_is_empty">The queue is empty.</string>
-    <string name="there_was_an_error_when_fetching_external_albums">There was an error when fetching external albums: %1$s</string>
     <string name="this_album_is_only_partially_downloaded">This album is only partially downloaded. Press the download button to download the rest.</string>
     <string name="this_is_where_downloaded_music_will_be_placed">This is where downloaded music will be placed.</string>
     <string name="title">Title</string>
@@ -219,8 +225,8 @@
     <string name="umlautify">Umlautify</string>
     <string name="undelete_album">Undelete album</string>
     <string name="undo">Undo</string>
-    <string name="unhide_all_local_albums">Unhide all local albums</string>
-    <string name="unhide_all_local_albums_description">Click here to unhide all local albums that have previously been hidden.</string>
+    <string name="unhide_all_local_albums">Undelete all local albums</string>
+    <string name="unhide_all_local_albums_description">Click here to undelete all local albums that have previously been removed.</string>
     <string name="unknown_album">Unknown album</string>
     <string name="unknown_artist">Unknown artist</string>
     <string name="unknown_title">Unknown title</string>
@@ -232,40 +238,14 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="what_it_can_do">What it can do:</string>
     <string name="what_it_will_not_do">What it will NOT do:</string>
+    <string name="x_albums_were_added_to_the_library">%1$s albums were added to the library.</string>
+    <string name="x_could_not_be_downloaded">%1$s could not be downloaded.</string>
     <string name="x_x_radio">%2$s radio for \'%1$s\'</string>
     <string name="year">Year</string>
     <string name="you_can_always_change_this_later_in_the_settings">You can always change this later in the settings.</string>
     <string name="you_need_to_configure_your_last_fm_username_in_the_settings">You need to configure your Last.fm username in the settings.</string>
     <string name="you_need_to_select_your_local_music_root_folder">You need to select your local music root folder.</string>
     <string name="youtube">Youtube</string>
-    <string name="the_album_was_added_to_the_library">The album was added to the library.</string>
-    <string name="error_on_downloading_x">Error on downloading %1$s: %2$s</string>
-    <string name="activating_library_radio">Activating library radio.</string>
-    <string name="activating_x_radio">Activating \'%1$s\' radio.</string>
-    <string name="cannot_delete_albums_while_auto_import">Cannot delete albums while auto import is in progress. Wait until it\'s done.</string>
-    <string name="x_albums_were_added_to_the_library">%1$s albums were added to the library.</string>
-    <string name="related_artists">Related artists</string>
-    <string name="available_albums">Available albums</string>
-    <string name="albums_in_library">Albums in library</string>
-    <string name="show_all">Show all</string>
-    <string name="hide">Hide</string>
-    <string name="other_albums_by_x">Other albums by %1$s</string>
-    <string name="x_could_not_be_downloaded">%1$s could not be downloaded.</string>
-    <string name="auto_import_local_music_description">When enabled, the app will check your local music directory for new music on each start. You can also trigger an import manually by pulling down in the library screen.</string>
-    <string name="local_music">Local music</string>
-    <string name="other_stuff">Other stuff</string>
-    <string name="forget_spotify_profile_description">Your Spotify profile is used for importing your saved albums. Click here if you want this app to forget it for some reason.</string>
-    <string name="forget_spotify_profile">Forget Spotify user profile</string>
-    <string name="other_albums_by">Other albums by</string>
-    <string name="not_imported">Not imported</string>
-    <plurals name="however_x_tracks_could_not_be_downloaded">
-        <item quantity="one">However, one track could not be downloaded.</item>
-        <item quantity="other">However, %1$s tracks could not be downloaded.</item>
-    </plurals>
-    <plurals name="x_tracks_were_successfully_downloaded">
-        <item quantity="one">One track was successfully downloaded.</item>
-        <item quantity="other">%1$s tracks were successfully downloaded.</item>
-    </plurals>
     <plurals name="deleted_local_album_files">
         <item quantity="one">Deleted the local files of %2$s.</item>
         <item quantity="other">Deleted the local files of %1$d albums.</item>
@@ -279,12 +259,16 @@
         <item quantity="other">Delete %1$d albums</item>
     </plurals>
     <plurals name="hid_x_albums_from_library">
-        <item quantity="one">Hid %2$s from the library.</item>
-        <item quantity="other">Hid %1$d albums from the library.</item>
+        <item quantity="one">Removed %2$s from the library.</item>
+        <item quantity="other">Removed %1$d albums from the library.</item>
     </plurals>
     <plurals name="hide_album_keep_local_files">
-        <item quantity="one">Hide album, keep local files</item>
-        <item quantity="other">Hide albums, keep local files</item>
+        <item quantity="one">Remove album, keep local files</item>
+        <item quantity="other">Remove albums, keep local files</item>
+    </plurals>
+    <plurals name="however_x_tracks_could_not_be_downloaded">
+        <item quantity="one">However, one track could not be downloaded.</item>
+        <item quantity="other">However, %1$s tracks could not be downloaded.</item>
     </plurals>
     <plurals name="remove_album_and_delete_files">
         <item quantity="one">Remove album and delete files</item>
@@ -322,6 +306,10 @@
     <plurals name="x_tracks_matched_and_updated">
         <item quantity="one">One track was matched and updated.</item>
         <item quantity="other">%1$d tracks were matched and updated.</item>
+    </plurals>
+    <plurals name="x_tracks_were_successfully_downloaded">
+        <item quantity="one">One track was successfully downloaded.</item>
+        <item quantity="other">%1$s tracks were successfully downloaded.</item>
     </plurals>
     <plurals name="x_tracks_will_be_exported_to_an_xspf_or_jspf_file">
         <item quantity="one">One track will be exported to an XSPF (XML) or JSPF (JSON) file.</item>

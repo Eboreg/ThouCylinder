@@ -40,6 +40,7 @@ fun QueueScreen(modifier: Modifier = Modifier, viewModel: QueueViewModel = hiltV
     val currentComboIndex by viewModel.currentComboIndex.collectAsStateWithLifecycle()
     val radioUiState by viewModel.radioUiState.collectAsStateWithLifecycle()
     val uiStates by viewModel.trackUiStates.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     val reorderableState = rememberReorderableLazyListState(
         onMove = { from, to -> viewModel.onMoveTrack(from.index, to.index) },
@@ -84,6 +85,7 @@ fun QueueScreen(modifier: Modifier = Modifier, viewModel: QueueViewModel = hiltV
                 scrollbarState = scrollbarState,
                 showAlbum = false,
                 showArtist = true,
+                isLoading = isLoading,
                 extraBottomSheetItems = { state ->
                     BottomSheetItem(
                         icon = Icons.Sharp.Delete,

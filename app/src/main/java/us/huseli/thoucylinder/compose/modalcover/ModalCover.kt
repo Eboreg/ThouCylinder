@@ -110,22 +110,6 @@ fun ModalCover(
     val backgroundColorDistance = remember(backgroundColor) { backgroundColor.distance(primaryContainerColor) }
     val trackCallbacks = LocalTrackCallbacks.current.copy(onPlayClick = null, onEnqueueClick = null)
 
-    /** BEGIN DEBUG LOG */
-    /*
-    LaunchedEffect(state.isCollapsed) {
-        state.log("ModalCover", "state.isCollapsed=${state.isCollapsed}")
-    }
-    LaunchedEffect(state.isCollapsing) { state.log("ModalCover", "state.isCollapsing=${state.isCollapsing}") }
-    LaunchedEffect(state.isExpanded) {
-        state.log("ModalCover", "state.isExpanded=${state.isExpanded}")
-    }
-    LaunchedEffect(state.isExpanding) { state.log("ModalCover", "state.isExpanding=${state.isExpanding}") }
-    LaunchedEffect(state.isAnimating) {
-        state.log("ModalCover", "state.isAnimating=${state.isAnimating}")
-    }
-     */
-    /** END DEBUG LOG */
-
     Surface(
         color = animatedBackgroundColor,
         tonalElevation = 3.dp,

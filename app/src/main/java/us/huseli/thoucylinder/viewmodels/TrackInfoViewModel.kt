@@ -30,7 +30,7 @@ class TrackInfoViewModel @Inject constructor(private val repos: Repositories) : 
             emit(null)
             _isFetchingAudioFeatures.value = false
         }
-    }.stateLazily()
+    }.stateWhileSubscribed()
 
     fun getLocalAbsolutePath(track: Track) = repos.track.getLocalAbsolutePath(track)
 }

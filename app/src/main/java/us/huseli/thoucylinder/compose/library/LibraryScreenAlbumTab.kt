@@ -43,7 +43,7 @@ fun LibraryScreenAlbumTab(
         onClick = remember { { viewModel.onAlbumClick(it, callbacks.onGotoAlbumClick) } },
         onLongClick = remember { { viewModel.onAlbumLongClick(it) } },
         selectedAlbumCount = { selectedAlbumCount.intValue },
-        selectionCallbacks = remember { viewModel.getAlbumSelectionCallbacks(dialogCallbacks) },
+        selectionCallbacks = viewModel.getAlbumSelectionCallbacks(dialogCallbacks),
         states = uiStates,
         downloadStateFlow = { viewModel.getAlbumDownloadUiStateFlow(it) },
         modifier = modifier,

@@ -41,13 +41,6 @@ fun SelectedAlbumsButtons(
             icon = Icons.AutoMirrored.Sharp.PlaylistAdd,
             description = R.string.add_to_playlist,
         ),
-        callbacks.onDeleteClick?.let {
-            SelectionAction(
-                onClick = it,
-                icon = Icons.Sharp.Delete,
-                description = R.string.delete,
-            )
-        },
         SelectionAction(
             onClick = callbacks.onExportClick,
             icon = Icons.Sharp.ImportExport,
@@ -63,6 +56,13 @@ fun SelectedAlbumsButtons(
             icon = Icons.Sharp.Deselect,
             description = R.string.unselect_all,
         ),
+        callbacks.onDeleteClick?.let {
+            SelectionAction(
+                onClick = it,
+                icon = Icons.Sharp.Delete,
+                description = R.string.delete,
+            )
+        },
     )
 
     SelectionButtons(

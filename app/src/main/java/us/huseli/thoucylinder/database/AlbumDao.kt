@@ -42,17 +42,29 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_spotifyId = :spotifyId")
     protected abstract suspend fun _getAlbumBySpotifyId(spotifyId: String): Album?
 
+    @Query("SELECT * FROM Album WHERE Album_musicBrainzReleaseId = :releaseId OR Album_musicBrainzReleaseGroupId = :groupId")
+    protected abstract suspend fun _getAlbumByMusicBrainzId(groupId: String, releaseId: String): Album?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun _insertAlbumTags(vararg albumTags: AlbumTag)
+
+    @Transaction
     @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_musicBrainzReleaseGroupId IS NOT NULL")
     protected abstract suspend fun _listMusicBrainzReleaseGroupAlbumCombos(): List<AlbumCombo>
 
+    @Transaction
     @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_spotifyId IS NOT NULL")
-    abstract suspend fun _listSpotifyAlbumCombos(): List<AlbumCombo>
+    protected abstract suspend fun _listSpotifyAlbumCombos(): List<AlbumCombo>
 
+    @Transaction
     @Query("SELECT * FROM AlbumCombo WHERE Album_isInLibrary = 1 AND Album_youtubePlaylist_id IS NOT NULL")
-    abstract suspend fun _listYoutubeAlbumCombos(): List<AlbumCombo>
+    protected abstract suspend fun _listYoutubeAlbumCombos(): List<AlbumCombo>
 
     @Query("UPDATE Album SET Album_spotifyId = :spotifyId WHERE Album_albumId = :albumId")
     protected abstract suspend fun _setAlbumSpotifyId(albumId: String, spotifyId: String)
+
+    @Query("UPDATE Album SET Album_musicBrainzReleaseId = :releaseId, Album_musicBrainzReleaseGroupId = :groupId WHERE Album_albumId = :albumId")
+    protected abstract suspend fun _setAlbumMusicBrainzIds(albumId: String, groupId: String, releaseId: String)
 
     @Query(
         """
@@ -206,6 +218,28 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_youtubePlaylist_id = :playlistId")
     abstract suspend fun getAlbumWithTracksByPlaylistId(playlistId: String): AlbumWithTracksCombo?
 
+
+    @Transaction
+    open suspend fun getOrCreateAlbumByMusicBrainzId(album: IAlbum, groupId: String, releaseId: String): Album {
+        /**
+         * If album is already in DB: update its MBID's if needed and return it.
+         * Else if another album with this MBID exists in DB: return that one.
+         * Else save as new album and return.
+         */
+        val existingAlbum = album as? Album ?: _getAlbumByMusicBrainzId(groupId, releaseId)
+
+        return if (existingAlbum != null) {
+            if (existingAlbum.musicBrainzReleaseId != releaseId || existingAlbum.musicBrainzReleaseGroupId != groupId) {
+                _setAlbumMusicBrainzIds(existingAlbum.albumId, groupId, releaseId)
+                existingAlbum.copy(musicBrainzReleaseId = releaseId, musicBrainzReleaseGroupId = groupId)
+            } else existingAlbum
+        } else {
+            album.asSavedAlbum().copy(musicBrainzReleaseId = releaseId, musicBrainzReleaseGroupId = groupId).also {
+                _upsertAlbums(it)
+            }
+        }
+    }
+
     @Transaction
     open suspend fun getOrCreateAlbumBySpotifyId(album: IAlbum, spotifyId: String): Album {
         /**
@@ -215,7 +249,7 @@ abstract class AlbumDao {
          */
         val existingAlbum = album as? Album ?: _getAlbumBySpotifyId(spotifyId)
 
-        val savedAlbum = if (existingAlbum != null) {
+        return if (existingAlbum != null) {
             if (existingAlbum.spotifyId != spotifyId) {
                 _setAlbumSpotifyId(existingAlbum.albumId, spotifyId)
                 existingAlbum.copy(spotifyId = spotifyId)
@@ -223,12 +257,7 @@ abstract class AlbumDao {
         } else {
             album.asSavedAlbum().copy(spotifyId = spotifyId).also { _upsertAlbums(it) }
         }
-
-        return savedAlbum
     }
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertAlbumTags(vararg albumTags: AlbumTag)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertTags(vararg tags: Tag)
@@ -287,7 +316,7 @@ abstract class AlbumDao {
         _deleteAlbumTags(albumId)
         if (tags.isNotEmpty()) {
             insertTags(*tags.toTypedArray())
-            insertAlbumTags(*tags.toAlbumTags(albumId).toTypedArray())
+            _insertAlbumTags(*tags.toAlbumTags(albumId).toTypedArray())
         }
     }
 

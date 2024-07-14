@@ -4,10 +4,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import us.huseli.retaintheme.extensions.launchOnIOThread
+import us.huseli.retaintheme.extensions.launchOnMainThread
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
 import us.huseli.thoucylinder.dataclasses.radio.RadioUiState
 import us.huseli.thoucylinder.dataclasses.track.AbstractTrackUiState
@@ -24,29 +26,34 @@ class QueueViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
 ) : AbstractTrackListViewModel<TrackUiState>("QueueViewModel", repos, managers) {
+    private val _isLoading = MutableStateFlow(true)
     private val _queue = MutableStateFlow<List<QueueTrackCombo>>(emptyList())
 
     private val areAllTracksSelected: Boolean
         get() = selectedTrackStateIds.value.containsAll(baseTrackUiStates.value.map { it.id })
 
-    override val baseTrackUiStates = _queue.map { it.toUiStates() }.stateEagerly(persistentListOf())
+    override val baseTrackUiStates = _queue.map { it.toUiStates() }.stateWhileSubscribed(persistentListOf())
 
+    val isLoading = _isLoading.asStateFlow()
     val currentComboId: StateFlow<String?> =
-        repos.player.currentCombo.map { it?.queueTrackId }.distinctUntilChanged().stateLazily()
+        repos.player.currentCombo.map { it?.queueTrackId }.distinctUntilChanged().stateWhileSubscribed()
     val currentComboIndex: StateFlow<Int?> = combine(repos.player.queue, repos.player.currentCombo) { queue, combo ->
         queue.indexOf(combo).takeIf { it > -1 }
-    }.stateLazily()
-    val isLoading: StateFlow<Boolean> = repos.player.isLoading
-    val radioUiState: StateFlow<RadioUiState?> = managers.radio.radioUiState.distinctUntilChanged().stateLazily()
+    }.stateWhileSubscribed()
+    val radioUiState: StateFlow<RadioUiState?> =
+        managers.radio.radioUiState.distinctUntilChanged().stateWhileSubscribed()
 
     init {
         launchOnIOThread {
-            repos.player.queue.collect { queue -> _queue.value = queue }
+            repos.player.queue.collect { queue ->
+                _queue.value = queue
+                _isLoading.value = false
+            }
         }
     }
 
     override fun enqueueSelectedTracks() {
-        managers.player.moveTracksNext(queueTrackIds = getSortedSelectedTrackStates().map { it.id })
+        launchOnMainThread { managers.player.moveTracksNext(queueTrackIds = getSortedSelectedTrackStates().map { it.id }) }
     }
 
     override fun getTrackSelectionCallbacks(dialogCallbacks: AppDialogCallbacks): TrackSelectionCallbacks {
@@ -58,7 +65,7 @@ class QueueViewModel @Inject constructor(
     }
 
     override fun playSelectedTracks() {
-        repos.player.moveNextAndPlay(queueTrackIds = getSortedSelectedTrackStates().map { it.id })
+        launchOnMainThread { repos.player.moveNextAndPlay(queueTrackIds = getSortedSelectedTrackStates().map { it.id }) }
     }
 
     override fun playTrack(state: AbstractTrackUiState) {
@@ -78,7 +85,7 @@ class QueueViewModel @Inject constructor(
     }
 
     fun getTrackDownloadUiStateFlow(trackId: String) =
-        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateWhileSubscribed()
 
     fun onMoveTrack(from: Int, to: Int) {
         /**

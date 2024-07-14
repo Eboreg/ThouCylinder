@@ -15,23 +15,23 @@ data class MusicBrainzReleaseGroupSearch(
     data class ReleaseGroup(
         override val id: String,
         override val title: String,
-        @SerializedName("type-id") val typeId: String?,
-        @SerializedName("primary-type-id") override val primaryTypeId: String?,
         val count: Int,
-        @SerializedName("first-release-date") override val firstReleaseDate: String?,
-        @SerializedName("primary-type") override val primaryType: MusicBrainzReleaseGroupPrimaryType?,
-        @SerializedName("artist-credit") override val artistCredit: List<MusicBrainzArtistCredit>,
+        @SerializedName("first-release-date")
+        override val firstReleaseDate: String?,
+        @SerializedName("primary-type")
+        override val primaryType: MusicBrainzReleaseGroupPrimaryType?,
+        @SerializedName("artist-credit")
+        override val artistCredit: List<MusicBrainzArtistCredit>,
         val releases: List<Release>,
+        @SerializedName("secondary-types")
+        override val secondaryTypes: List<MusicBrainzReleaseGroupSecondaryType>?,
     ) : AbstractMusicBrainzReleaseGroup(), IExternalAlbum {
         data class Release(
             override val id: String,
             val title: String,
-            @SerializedName("status-id") val statusId: String? = null,
             val status: MusicBrainzReleaseStatus? = null,
         ) : AbstractMusicBrainzItem()
 
-        override val genres: List<MusicBrainzGenre>
-            get() = emptyList()
         override val artistName: String
             get() = artistCredit.joined()
         override val thumbnailUrl: String?
@@ -60,7 +60,7 @@ data class MusicBrainzReleaseGroupSearch(
                 year = year,
                 musicBrainzReleaseGroupId = id,
                 albumId = albumId ?: UUID.randomUUID().toString(),
-                albumType = primaryType?.albumType,
+                albumType = albumType,
             )
             val albumArtists = artistCredit.toNativeAlbumArtists(albumId = album.albumId)
 

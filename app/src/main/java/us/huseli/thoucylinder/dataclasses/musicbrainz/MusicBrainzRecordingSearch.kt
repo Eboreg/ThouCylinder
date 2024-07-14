@@ -82,6 +82,9 @@ data class MusicBrainzRecordingSearch(
 
             override val duration: Duration?
                 get() = null
+
+            override val releaseGroupId: String
+                get() = releaseGroup.id
         }
 
         val year: Int?

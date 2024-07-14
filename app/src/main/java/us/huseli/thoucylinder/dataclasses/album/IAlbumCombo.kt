@@ -1,14 +1,7 @@
 package us.huseli.thoucylinder.dataclasses.album
 
-import android.content.Context
-import androidx.annotation.WorkerThread
-import androidx.documentfile.provider.DocumentFile
-import com.anggrayudi.storage.file.CreateMode
-import com.anggrayudi.storage.file.makeFolder
 import kotlinx.collections.immutable.toImmutableList
 import org.apache.commons.text.similarity.LevenshteinDistance
-import us.huseli.retaintheme.extensions.sanitizeFilename
-import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.dataclasses.artist.AlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.IAlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.joined
@@ -47,10 +40,6 @@ interface IAlbumCombo<out A : IAlbum> : IStringIdItem {
     override val id: String
         get() = album.albumId
 
-    @WorkerThread
-    fun createDirectory(downloadRoot: DocumentFile, context: Context): DocumentFile? =
-        downloadRoot.makeFolder(context, getSubDirs(context).joinToString("/"), CreateMode.REUSE)
-
     fun getLevenshteinDistance(albumTitle: String, artistString: String?): Int {
         val levenshtein = LevenshteinDistance()
         val distances = mutableListOf<Int>()
@@ -82,16 +71,6 @@ interface IAlbumCombo<out A : IAlbum> : IStringIdItem {
         return distances.min()
     }
 
-    fun matchesSearchTerm(term: String): Boolean {
-        val words = term.lowercase().split(Regex(" +"))
-
-        return words.all {
-            artists.joined()?.lowercase()?.contains(it) == true ||
-                album.title.lowercase().contains(it) ||
-                yearString?.contains(it) == true
-        }
-    }
-
     fun toImportableUiState(playCount: Int? = null) =
         album.toImportableUiState(playCount = playCount).copy(
             artistString = artists.joined(),
@@ -107,11 +86,6 @@ interface IAlbumCombo<out A : IAlbum> : IStringIdItem {
         isSelected = isSelected,
         unplayableTrackCount = unplayableTrackCount,
         yearString = yearString,
-    )
-
-    private fun getSubDirs(context: Context): List<String> = listOf(
-        artists.joined()?.sanitizeFilename() ?: context.getString(R.string.unknown_artist),
-        album.title.sanitizeFilename(),
     )
 }
 

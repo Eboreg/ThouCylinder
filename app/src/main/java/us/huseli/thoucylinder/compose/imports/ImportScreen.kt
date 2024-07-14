@@ -156,6 +156,7 @@ fun ImportScreen(
             onLongClick = { viewModel.onAlbumLongClick(it) },
             modifier = Modifier.nestedScroll(nestedScrollConnection),
             scrollbarState = scrollbarState,
+            backend = backend,
         )
     }
 }

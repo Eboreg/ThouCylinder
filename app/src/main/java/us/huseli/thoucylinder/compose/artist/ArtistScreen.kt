@@ -52,9 +52,9 @@ fun ArtistScreen(modifier: Modifier = Modifier, viewModel: ArtistViewModel = hil
                 val albumSelectionCallbacks = viewModel.getAlbumSelectionCallbacks(dialogCallbacks)
                 val isLoadingAlbums by viewModel.isLoadingAlbums.collectAsStateWithLifecycle()
                 val albumCallbacks = LocalAlbumCallbacks.current
-                val spotifyAlbums by viewModel.spotifyAlbums.collectAsStateWithLifecycle()
-                val spotifyAlbumsPreview by viewModel.spotifyAlbumsPreview.collectAsStateWithLifecycle()
-                val spotifyAlbumTypes by viewModel.spotifyAlbumTypes.collectAsStateWithLifecycle()
+                val otherAlbums by viewModel.otherAlbums.collectAsStateWithLifecycle()
+                val otherAlbumsPreview by viewModel.otherAlbumsPreview.collectAsStateWithLifecycle()
+                val otherAlbumTypes by viewModel.otherAlbumTypes.collectAsStateWithLifecycle()
 
                 ArtistAlbumCollection(
                     uiStates = uiStates,
@@ -64,16 +64,16 @@ fun ArtistScreen(modifier: Modifier = Modifier, viewModel: ArtistViewModel = hil
                     selectedAlbumCount = { selectedAlbumCount.intValue },
                     downloadStateFlow = { viewModel.getAlbumDownloadUiStateFlow(it) },
                     relatedArtists = relatedArtists,
-                    spotifyAlbums = spotifyAlbums,
-                    spotifyAlbumsPreview = spotifyAlbumsPreview,
-                    spotifyAlbumTypes = spotifyAlbumTypes,
                     onClick = remember {
                         { viewModel.onAlbumClick(it.albumId, albumCallbacks.onGotoAlbumClick) }
                     },
                     onLongClick = remember { { viewModel.onAlbumLongClick(it.albumId) } },
-                    onSpotifyAlbumClick = { viewModel.onSpotifyAlbumClick(it, albumCallbacks.onGotoAlbumClick) },
-                    onSpotifyAlbumTypeClick = { viewModel.toggleSpotifyAlbumType(it) },
                     onRelatedArtistClick = { viewModel.onRelatedArtistClick(it, artistCallbacks.onGotoArtistClick) },
+                    otherAlbums = otherAlbums,
+                    otherAlbumsPreview = otherAlbumsPreview,
+                    otherAlbumTypes = otherAlbumTypes,
+                    onOtherAlbumClick = { viewModel.onOtherAlbumClick(it, albumCallbacks.onGotoAlbumClick) },
+                    onOtherAlbumTypeClick = { viewModel.toggleOtherAlbumsType(it) },
                 )
             }
             ListType.TRACKS -> {

@@ -21,7 +21,6 @@ import us.huseli.retaintheme.extensions.nullIfEmpty
 import us.huseli.retaintheme.extensions.sanitizeFilename
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.album.Album
-import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeVideo
 import us.huseli.thoucylinder.getParentDirectory
 import us.huseli.thoucylinder.matchFiles
@@ -128,22 +127,6 @@ data class Track(
     fun getLocalAbsolutePath(context: Context): String? =
         getDocumentFile(context)?.getAbsolutePath(context)?.nullIfEmpty()
 
-    fun toString(
-        showAlbumPosition: Boolean = true,
-        showYear: Boolean = false,
-        albumCombo: AlbumWithTracksCombo? = null,
-    ): String {
-        var string = ""
-        if (showAlbumPosition) {
-            if (albumCombo != null) string += getPositionString(albumCombo.discCount) + ". "
-            else if (albumPosition != null) string += "$albumPosition. "
-        }
-        string += title
-        if (year != null && showYear) string += " ($year)"
-
-        return string
-    }
-
     fun toUiState(isSelected: Boolean = false) = TrackUiState(
         albumId = albumId,
         albumPosition = albumPosition,
@@ -179,7 +162,7 @@ data class Track(
         return title.compareTo(other.title)
     }
 
-    override fun toString(): String = toString(showAlbumPosition = true, showYear = false)
+    override fun toString(): String = if (albumPosition != null) "$albumPosition. $title" else title
 }
 
 @WorkerThread
@@ -197,5 +180,3 @@ fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean
         .flatten()
         .distinctBy { it.uri.path }
 }
-
-fun Iterable<Track>.withAlbumId(albumId: String): List<Track> = map { it.copy(albumId = albumId) }

@@ -2,8 +2,8 @@ import dagger.hilt.android.plugin.util.capitalize
 import java.io.FileInputStream
 import java.util.Properties
 
-val currentVersionCode = 18
-val currentVersionName = "0.7.0"
+val currentVersionCode = 19
+val currentVersionName = "0.8.0"
 val keystoreProperties = Properties()
 val secretsProperties = Properties()
 

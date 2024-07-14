@@ -3,14 +3,16 @@ package us.huseli.thoucylinder.dataclasses.album
 import kotlinx.collections.immutable.ImmutableList
 import us.huseli.thoucylinder.dataclasses.artist.IAlbumArtistCredit
 import us.huseli.thoucylinder.enums.AlbumType
+import us.huseli.thoucylinder.interfaces.IAlbumArtOwner
+import us.huseli.thoucylinder.interfaces.IHasMusicBrainzIds
 import us.huseli.thoucylinder.interfaces.IStringIdItem
 
-interface IAlbumUiState : IStringIdItem {
+interface IAlbumUiState : IStringIdItem, IAlbumArtOwner, IHasMusicBrainzIds {
     val albumId: String
     val artists: ImmutableList<IAlbumArtistCredit>
     val artistString: String?
     val albumType: AlbumType?
-    val fullImageUri: String?
+    override val fullImageUrl: String?
     val isDownloadable: Boolean
     val isInLibrary: Boolean
     val isLocal: Boolean
@@ -18,10 +20,10 @@ interface IAlbumUiState : IStringIdItem {
     val isPlayable: Boolean
     val isSaved: Boolean
     val isSelected: Boolean
-    val musicBrainzReleaseGroupId: String?
-    val musicBrainzReleaseId: String?
+    override val musicBrainzReleaseGroupId: String?
+    override val musicBrainzReleaseId: String?
     val spotifyWebUrl: String?
-    val thumbnailUri: String?
+    override val thumbnailUrl: String?
     val title: String
     val trackCount: Int?
     val yearString: String?

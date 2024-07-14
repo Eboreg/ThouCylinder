@@ -11,7 +11,6 @@ interface IAlbumArtistCredit : IArtistCredit {
     val albumId: String
 
     fun withAlbumId(albumId: String): IAlbumArtistCredit
-    override fun withSpotifyId(spotifyId: String): IAlbumArtistCredit
 
     fun withArtistId(artistId: String) = AlbumArtistCredit(
         albumId = albumId,
@@ -36,7 +35,6 @@ data class UnsavedAlbumArtistCredit(
     override val position: Int = 0,
 ) : IAlbumArtistCredit {
     override fun withAlbumId(albumId: String): UnsavedAlbumArtistCredit = copy(albumId = albumId)
-    override fun withSpotifyId(spotifyId: String): UnsavedAlbumArtistCredit = copy(spotifyId = spotifyId)
 }
 
 @DatabaseView(
@@ -63,7 +61,6 @@ data class AlbumArtistCredit(
     @ColumnInfo("AlbumArtist_position") override val position: Int = 0,
 ) : IAlbumArtistCredit, ISavedArtistCredit {
     override fun withAlbumId(albumId: String): AlbumArtistCredit = copy(albumId = albumId)
-    override fun withSpotifyId(spotifyId: String): AlbumArtistCredit = copy(spotifyId = spotifyId)
 }
 
 fun Iterable<AlbumArtistCredit>.toAlbumArtists(): List<AlbumArtist> = map {

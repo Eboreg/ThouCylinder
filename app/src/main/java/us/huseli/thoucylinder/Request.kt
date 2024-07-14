@@ -64,6 +64,8 @@ data class Request(
         private set
     var contentLength: Int? = null
         private set
+    var responseCode: Int? = null
+        private set
 
     private suspend fun connect(): HttpURLConnection = withContext(Dispatchers.IO) {
         requestStart = System.currentTimeMillis()
@@ -91,11 +93,12 @@ data class Request(
             } catch (e: Throwable) {
                 throw HTTPResponseError(this@Request.url, method, null, e.message)
             }
+            this@Request.responseCode = responseCode
             if (responseCode >= 400) throw HTTPResponseError(
-                this@Request.url,
-                method,
-                responseCode,
-                conn.responseMessage,
+                url = this@Request.url,
+                method = method,
+                code = responseCode,
+                message = conn.responseMessage,
             )
             contentRange = conn.getHeaderField("Content-Range")?.parseContentRange()
             contentLength = contentRange?.size ?: conn.getHeaderField("Content-Length")?.toInt()

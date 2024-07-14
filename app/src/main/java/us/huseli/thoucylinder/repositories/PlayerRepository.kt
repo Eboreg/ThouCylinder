@@ -38,7 +38,6 @@ import us.huseli.thoucylinder.dataclasses.track.containsWithPosition
 import us.huseli.thoucylinder.dataclasses.track.reindexed
 import us.huseli.thoucylinder.enums.PlaybackState
 import us.huseli.thoucylinder.interfaces.ILogger
-import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.widget.AppWidget
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -51,9 +50,22 @@ class PlayerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueDao: QueueDao,
 ) : Player.Listener, ILogger, AbstractScopeHolder() {
+    interface Listener {
+        fun onPlayerError(
+            error: PlaybackException,
+            currentCombo: QueueTrackCombo?,
+            lastAction: LastAction,
+        ) {
+        }
+
+        fun onPlaybackChange(combo: QueueTrackCombo?, state: PlaybackState) {}
+
+        fun onHalfTrackPlayed(combo: QueueTrackCombo, startTimestamp: Long) {}
+    }
+
     enum class LastAction { PLAY, STOP, PAUSE }
 
-    private val listeners = mutableListOf<PlayerRepositoryListener>()
+    private val listeners = mutableListOf<Listener>()
     private val queueMutex = Mutex()
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
 
@@ -233,7 +245,7 @@ class PlayerRepository @Inject constructor(
         }
     }
 
-    fun addListener(listener: PlayerRepositoryListener) = listeners.add(listener)
+    fun addListener(listener: Listener) = listeners.add(listener)
 
     fun clearQueue() {
         player?.clearMediaItems()

@@ -29,9 +29,7 @@ class RadioTrackChannel(val radio: RadioCombo, private val repos: Repositories) 
         usedSpotifyTrackIds.addAll(radio.usedSpotifyTrackIds)
         usedLocalTrackIds.addAll(radio.usedLocalTrackIds.filterNotNull())
 
-        launchOnIOThread {
-            startLoop()
-        }
+        fetchLoopJob = launchOnIOThread { startLoop() }
     }
 
     fun cancel() {
@@ -86,15 +84,16 @@ class RadioTrackChannel(val radio: RadioCombo, private val repos: Repositories) 
 
     private suspend fun getRandomLibraryQueueTrackCombo(): QueueTrackCombo? {
         // Does a Youtube match if necessary.
-        val trackCount = repos.track.getLibraryTrackCount()
-        var triedTracks = 0
+        val usedTrackIds = usedLocalTrackIds.toMutableSet()
 
-        while (triedTracks < trackCount) {
+        while (true) {
             val combos = repos.track.listRandomLibraryTrackCombos(
                 limit = 10,
-                exceptTrackIds = usedLocalTrackIds.toList(),
+                exceptTrackIds = usedTrackIds.toList(),
                 exceptSpotifyTrackIds = usedSpotifyTrackIds.toList(),
             )
+
+            if (combos.isEmpty()) return null
 
             for (combo in combos) {
                 getQueueTrackCombo(
@@ -103,11 +102,10 @@ class RadioTrackChannel(val radio: RadioCombo, private val repos: Repositories) 
                     albumArtists = combo.albumArtists,
                     trackArtists = combo.trackArtists,
                 )?.also { return it }
-                triedTracks++
+
+                usedTrackIds.add(combo.track.trackId)
             }
         }
-
-        return null
     }
 
     private suspend fun listRandomLibrarySpotifyTrackIds(limit: Int): List<String> {
@@ -169,39 +167,35 @@ class RadioTrackChannel(val radio: RadioCombo, private val repos: Repositories) 
         return null
     }
 
-    private fun startLoop() {
-        fetchLoopJob?.cancel()
-
-        fetchLoopJob = launchOnIOThread {
-            try {
-                val recommendationsChannel = if (!radio.isInitialized || usedSpotifyTrackIds.size < 5) {
-                    when (radio.type) {
-                        RadioType.LIBRARY -> repos.spotify.trackRecommendationsChannel(
-                            listRandomLibrarySpotifyTrackIds(5)
-                        )
-                        RadioType.ARTIST -> radio.artist?.let { repos.spotify.trackRecommendationsChannelByArtist(it) }
-                        RadioType.ALBUM -> radio.album?.let { album ->
-                            repos.album.getAlbumWithTracks(album.albumId)
-                                ?.let { repos.spotify.trackRecommendationsChannelByAlbumCombo(it) }
-                        }
-                        RadioType.TRACK -> radio.track?.let { track ->
-                            val albumCombo = track.albumId?.let { repos.album.getAlbumCombo(it) }
-                            val artists = repos.artist.listArtistsByTrackId(track.trackId)
-                                .plus(albumCombo?.artists ?: emptyList())
-
-                            repos.spotify.trackRecommendationsChannelByTrack(track, radio.album, artists)
-                        }
+    private suspend fun startLoop() {
+        try {
+            val recommendationsChannel = if (!radio.isInitialized || usedSpotifyTrackIds.size < 5) {
+                when (radio.type) {
+                    RadioType.LIBRARY -> repos.spotify.trackRecommendationsChannel(
+                        listRandomLibrarySpotifyTrackIds(5)
+                    )
+                    RadioType.ARTIST -> radio.artist?.let { repos.spotify.trackRecommendationsChannelByArtist(it) }
+                    RadioType.ALBUM -> radio.album?.let { album ->
+                        repos.album.getAlbumWithTracks(album.albumId)
+                            ?.let { repos.spotify.trackRecommendationsChannelByAlbumCombo(it) }
                     }
-                } else repos.spotify.trackRecommendationsChannel(usedSpotifyTrackIds)
+                    RadioType.TRACK -> radio.track?.let { track ->
+                        val albumCombo = track.albumId?.let { repos.album.getAlbumCombo(it) }
+                        val artists = repos.artist.listArtistsByTrackId(track.trackId)
+                            .plus(albumCombo?.artists ?: emptyList())
 
-                while (recommendationsChannel != null) {
-                    enqueueNext { recommendationsChannel.receive() }
+                        repos.spotify.trackRecommendationsChannelByTrack(track, radio.album, artists)
+                    }
                 }
-            } catch (e: ClosedReceiveChannelException) {
-                channel.close()
-            } catch (e: Throwable) {
-                logError(e)
+            } else repos.spotify.trackRecommendationsChannel(usedSpotifyTrackIds)
+
+            while (recommendationsChannel != null) {
+                enqueueNext { recommendationsChannel.receive() }
             }
+        } catch (e: ClosedReceiveChannelException) {
+            channel.close()
+        } catch (e: Throwable) {
+            logError(e)
         }
     }
 }

@@ -45,10 +45,12 @@ fun SmallOutlinedButton(
 fun SmallOutlinedButton(
     onClick: () -> Unit,
     text: String,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     textStyle: TextStyle = FistopyTheme.typography.labelLarge,
 ) {
     SmallOutlinedButton(
+        modifier = modifier,
         onClick = onClick,
         enabled = enabled,
         content = { Text(text = text, style = textStyle) },

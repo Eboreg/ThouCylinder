@@ -1,18 +1,14 @@
 package us.huseli.thoucylinder
 
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaFormat
 import android.net.Uri
 import androidx.annotation.WorkerThread
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -211,13 +207,6 @@ inline fun <T, K> Iterable<T>.sortedLike(other: Iterable<T>, crossinline key: (T
 
 fun <T> Iterable<T>.sortedLike(other: Iterable<T>) = sortedLike(other, key = { it })
 
-@Composable
-fun isInLandscapeMode(): Boolean {
-    val configuration = LocalConfiguration.current
-
-    return remember { configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
-}
-
 inline fun <T> List<T>.listItemsBetween(item1: T, item2: T, key: (T) -> Any?): List<T> {
     /** from & to are both exclusive */
     val keyList = map { key(it) }
@@ -265,6 +254,10 @@ fun Collection<String>.stripCommonFixes(): Collection<String> {
 }
 
 fun <K, V> Map<out K, V>.take(limit: Int): Map<K, V> = toList().take(limit).toMap()
+
+fun Iterable<Boolean>.all(): Boolean = all { it }
+
+fun Array<Boolean>.all(): Boolean = all { it }
 
 
 /** STRING ************************************************************************************************************/

@@ -32,7 +32,7 @@ import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-open class LibraryViewModel @Inject constructor(
+class LibraryViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
 ) : AbstractAlbumListViewModel<AlbumUiState>("LibraryViewModel", repos, managers) {
@@ -67,14 +67,14 @@ open class LibraryViewModel @Inject constructor(
     }.flattenMerge().onEach { _isLoadingAlbums.value = false }
 
     override val baseAlbumUiStates: StateFlow<ImmutableList<AlbumUiState>> =
-        _albumUiStates.stateLazily(persistentListOf())
+        _albumUiStates.stateWhileSubscribed(persistentListOf())
 
     val albumSearchTerm = repos.settings.albumSearchTerm
     val albumSortOrder = repos.settings.albumSortOrder
     val albumSortParameter = repos.settings.albumSortParameter
     val albumTagPojos = repos.settings.libraryAvailabilityFilter.flatMapLatest { repos.album.flowTagPojos(it) }
         .map { it.toImmutableList() }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
     val availabilityFilter = repos.settings.libraryAvailabilityFilter
     val displayType = repos.settings.libraryDisplayType
     val isAlbumsEmpty: StateFlow<Boolean> = combine(
@@ -83,19 +83,19 @@ open class LibraryViewModel @Inject constructor(
         repos.localMedia.isImportingLocalMedia,
     ) { states, isLoading, isImporting ->
         states.isEmpty() && !isLoading && !isImporting
-    }.stateLazily(false)
+    }.stateWhileSubscribed(false)
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
     val isLoadingAlbums = _isLoadingAlbums.asStateFlow()
     val isLoadingTracks = _isLoadingTracks.asStateFlow()
     val isLocalMediaDirConfigured: StateFlow<Boolean> =
-        repos.settings.localMusicUri.map { it != null }.stateLazily(false)
+        repos.settings.localMusicUri.map { it != null }.stateWhileSubscribed(false)
     val isTracksEmpty: StateFlow<Boolean> = combine(
         _trackCombos,
         _isLoadingTracks,
         repos.localMedia.isImportingLocalMedia,
     ) { combos, isLoading, isImporting ->
         combos.isEmpty() && !isLoading && !isImporting
-    }.stateLazily(false)
+    }.stateWhileSubscribed(false)
     val listType = repos.settings.libraryListType
     val selectedAlbumTagPojos = repos.settings.libraryAlbumTagFilter
     val selectedTrackTagPojos = repos.settings.libraryTrackTagFilter
@@ -104,15 +104,15 @@ open class LibraryViewModel @Inject constructor(
     val trackSortParameter = repos.settings.trackSortParameter
     val trackTagPojos = repos.settings.libraryAvailabilityFilter.flatMapLatest { repos.track.flowTagPojos(it) }
         .map { it.toImmutableList() }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
-    override val baseTrackUiStates = _trackCombos.map { it.toUiStates() }.stateEagerly(persistentListOf())
+    override val baseTrackUiStates = _trackCombos.map { it.toUiStates() }.stateWhileSubscribed(persistentListOf())
 
     fun getAlbumDownloadUiStateFlow(albumId: String) =
-        managers.library.getAlbumDownloadUiStateFlow(albumId).stateLazily()
+        managers.library.getAlbumDownloadUiStateFlow(albumId).stateWhileSubscribed()
 
     fun getTrackDownloadUiStateFlow(trackId: String) =
-        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateWhileSubscribed()
 
     fun importNewLocalAlbums() {
         launchOnIOThread { managers.library.importNewLocalAlbums() }

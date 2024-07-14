@@ -4,10 +4,12 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.R
@@ -27,6 +29,7 @@ import us.huseli.thoucylinder.externalcontent.SearchBackend
 import us.huseli.thoucylinder.externalcontent.SpotifyBackend
 import us.huseli.thoucylinder.externalcontent.YoutubeBackend
 import us.huseli.thoucylinder.externalcontent.holders.AbstractAlbumImportHolder
+import us.huseli.thoucylinder.getUmlautifiedString
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.interfaces.ILogger
 import us.huseli.thoucylinder.repositories.Repositories
@@ -34,19 +37,24 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class ExternalContentManager @Inject constructor(
     private val repos: Repositories,
     @ApplicationContext private val context: Context,
     private val database: Database,
+    private val notificationManager: NotificationManager,
 ) : AbstractScopeHolder(), ILogger {
     data class AlbumImportData(
         val state: ImportableAlbumUiState,
         val matchYoutube: Boolean,
         val isFinished: Boolean = false,
         val holder: AbstractAlbumImportHolder<out IExternalAlbum>,
+        var id: String = state.id,
         val error: String? = null,
-    )
+    ) {
+        val progress = MutableStateFlow(if (isFinished) 1.0 else 0.0)
+    }
 
     inner class Backends {
         val spotify = SpotifyBackend(repos)
@@ -67,14 +75,14 @@ class ExternalContentManager @Inject constructor(
         .map { dataList -> dataList.firstOrNull { !it.isFinished } }
         .filterNotNull()
         .distinctUntilChanged()
-    private val currentAlbumImportProgress = MutableStateFlow<Double>(0.0)
     private val isAlbumImportActive = MutableStateFlow(false)
     private val albumImportProgressText = MutableStateFlow("")
-    private val totalAlbumImportProgress =
-        combine(albumImportQueue, currentAlbumImportProgress) { queue, currentProgress ->
-            if (queue.isEmpty()) 0.0
-            else (queue.filter { it.isFinished }.size.toDouble() / queue.size) + (currentProgress / queue.size)
+    private val totalAlbumImportProgress = albumImportQueue.flatMapLatest { queue ->
+        combine(queue.map { it.progress }) { progresses ->
+            if (progresses.isEmpty()) 0.0
+            else progresses.average()
         }
+    }
 
     val albumImportProgress =
         combine(isAlbumImportActive, albumImportProgressText, totalAlbumImportProgress) { isActive, text, progress ->
@@ -84,48 +92,37 @@ class ExternalContentManager @Inject constructor(
     init {
         launchOnIOThread {
             nextAlbumImport.collect { data ->
-                var error: String? = null
+                importAlbum(data)
+                data.progress.value = 1.0
+            }
+        }
 
-                isAlbumImportActive.value = true
-                albumImportProgressText.value = context.getString(
-                    if (data.matchYoutube) R.string.matching_x else R.string.importing_x,
-                    data.state.title,
-                )
-
-                val combo = try {
-                    convertStateToAlbumWithTracks(data = data)
-                } catch (e: Throwable) {
-                    error = e.toString()
-                    null
-                }?.let {
-                    albumImportProgressText.value = context.getString(R.string.importing_x, it.album.title)
-                    currentAlbumImportProgress.value = 0.9
-                    upsertAlbumWithTracks(it)
-                }
-
-                if (combo != null) {
-                    data.holder.onItemImportFinished(data.state.id)
-                    updateAlbumComboFromRemotes(combo)
-                } else {
-                    error = error ?: context.getString(R.string.no_match_found)
-                    data.holder.onItemImportError(itemId = data.state.id, error = error)
-                }
-
-                albumImportQueue.value = albumImportQueue.value.toMutableList().apply {
-                    val index = indexOfFirst { it.state.id == data.state.id }
-                    if (index > -1) this[index] = data.copy(isFinished = true, error = error)
-                }
+        launchOnIOThread {
+            albumImportProgress.collect { progress ->
+                if (progress.isActive) {
+                    notificationManager.showNotification(
+                        id = NotificationManager.ID_IMPORT_ALBUMS,
+                        title = context.getUmlautifiedString(R.string.importing_albums),
+                        text = progress.text,
+                        ongoing = true,
+                        progress = progress.progress,
+                    )
+                } else notificationManager.cancelNotification(NotificationManager.ID_IMPORT_ALBUMS)
             }
         }
 
         launchOnIOThread {
             albumImportQueue.collect { queue ->
-                if (queue.isNotEmpty() && queue.all { it.isFinished }) {
+                if (queue.all { it.isFinished }) {
                     isAlbumImportActive.value = false
-                    for (callback in callbacks) {
-                        callback.onAlbumImportFinished(queue)
+                    notificationManager.cancelNotification(NotificationManager.ID_IMPORT_ALBUMS)
+
+                    if (queue.isNotEmpty()) {
+                        for (callback in callbacks) {
+                            callback.onAlbumImportFinished(queue)
+                        }
+                        albumImportQueue.value = emptyList()
                     }
-                    albumImportQueue.value = emptyList()
                 }
             }
         }
@@ -140,8 +137,9 @@ class ExternalContentManager @Inject constructor(
         holder: AbstractAlbumImportHolder<out IExternalAlbum>,
         matchYoutube: Boolean = true,
     ) {
-        val data = AlbumImportData(state = state, holder = holder, matchYoutube = matchYoutube)
-        albumImportQueue.value = albumImportQueue.value.plus(data)
+        albumImportQueue.value = albumImportQueue.value.plus(
+            AlbumImportData(state = state, holder = holder, matchYoutube = matchYoutube)
+        )
     }
 
     fun getImportBackend(key: ImportBackend) = when (key) {
@@ -167,24 +165,61 @@ class ExternalContentManager @Inject constructor(
         if (!data.matchYoutube) return matchedCombo
         if (matchedCombo == null) return null
 
-        currentAlbumImportProgress.value = 0.0
-
         val youtubeMatch = repos.youtube.getBestAlbumMatch(
             combo = matchedCombo,
-            progressCallback = { currentAlbumImportProgress.value = it * 0.8 },
+            progressCallback = { data.progress.value = it * 0.9 },
         ) ?: return null
 
         // If imported & converted album already exists, use that instead:
-        repos.album.getAlbumWithTracksByPlaylistId(youtubeMatch.playlistCombo.playlist.id)?.let { combo ->
+        repos.album.getAlbumWithTracksByPlaylistId(youtubeMatch.playlistId)?.let { combo ->
             combo.copy(
                 album = combo.album.copy(isInLibrary = true, isHidden = false),
                 trackCombos = combo.trackCombos.map { trackCombo ->
                     trackCombo.copy(track = trackCombo.track.copy(isInLibrary = true))
                 },
             )
-        }?.also { return it }
+        }?.also {
+            data.holder.updateItemId(data.id, it.id)
+            data.id = it.id
+            return it
+        }
 
         return youtubeMatch.albumCombo
+    }
+
+    private suspend fun importAlbum(data: AlbumImportData) {
+        var error: String? = null
+
+        isAlbumImportActive.value = true
+        albumImportProgressText.value = context.getUmlautifiedString(
+            if (data.matchYoutube) R.string.matching_x else R.string.importing_x,
+            data.state.title,
+        )
+
+        val combo = try {
+            convertStateToAlbumWithTracks(data = data)
+        } catch (e: Throwable) {
+            error = e.toString()
+            null
+        }?.let {
+            albumImportProgressText.value = context.getUmlautifiedString(R.string.importing_x, it.album.title)
+            data.progress.value = 0.9
+            upsertAlbumWithTracks(it)
+        }
+
+        if (combo != null) {
+            data.holder.onItemImportFinished(data.id)
+            updateAlbumComboFromRemotes(combo)
+        } else {
+            error = error ?: context.getString(R.string.no_match_found)
+            data.holder.onItemImportError(itemId = data.id, error = error)
+        }
+
+        albumImportQueue.value.indexOfFirst { it.id == data.id }.takeIf { it >= 0 }?.also { index ->
+            albumImportQueue.value = albumImportQueue.value.toMutableList().apply {
+                this[index] = data.copy(isFinished = true, error = error)
+            }
+        }
     }
 
     private fun updateAlbumComboFromRemotes(combo: IAlbumWithTracksCombo<IAlbum>) = launchOnIOThread {

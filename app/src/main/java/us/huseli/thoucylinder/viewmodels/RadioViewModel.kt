@@ -54,7 +54,7 @@ class RadioViewModel @Inject constructor(
             },
             libraryRadioNovelty = novelty,
         )
-    }.stateLazily(RadioDialogUiState(libraryRadioNovelty = repos.settings.libraryRadioNovelty.value))
+    }.stateWhileSubscribed(RadioDialogUiState(libraryRadioNovelty = repos.settings.libraryRadioNovelty.value))
 
     fun deactivate() = managers.radio.deactivateRadio()
 

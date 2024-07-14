@@ -15,15 +15,17 @@ abstract class AbstractHolder<T : IStringIdItem> : AbstractScopeHolder() {
     private var _isStarted = false
 
     protected val _items = MutableStateFlow<List<T>>(emptyList())
-    protected val _isLoading = MutableStateFlow(true)
+    protected open val _isLoading = MutableStateFlow(true)
     protected val _selectedItemIds = MutableStateFlow<List<String>>(emptyList())
     protected val _currentPage = MutableStateFlow(0)
+    protected val _allItemsFetched = MutableStateFlow(false)
 
     val currentPage = _currentPage.asStateFlow()
     val selectedItemIds = _selectedItemIds.asStateFlow()
 
     protected abstract val _filteredItems: Flow<List<T>>
     abstract val isTotalCountExact: Flow<Boolean>
+    abstract val isLoadingCurrentPage: Flow<Boolean>
 
     abstract suspend fun doStart()
 

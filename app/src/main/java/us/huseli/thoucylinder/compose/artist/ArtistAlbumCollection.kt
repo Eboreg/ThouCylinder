@@ -37,9 +37,9 @@ import us.huseli.thoucylinder.compose.utils.IsLoadingProgressIndicator
 import us.huseli.thoucylinder.dataclasses.album.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.album.AlbumUiState
 import us.huseli.thoucylinder.dataclasses.artist.UnsavedArtist
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbumType
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifySimplifiedAlbum
+import us.huseli.thoucylinder.enums.AlbumType
 import us.huseli.thoucylinder.getUmlautifiedString
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.stringResource
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -52,17 +52,17 @@ fun ArtistAlbumCollection(
     selectedAlbumCount: () -> Int,
     downloadStateFlow: (String) -> StateFlow<AlbumDownloadTask.UiState?>,
     relatedArtists: ImmutableList<UnsavedArtist>,
-    spotifyAlbums: ImmutableList<SpotifySimplifiedAlbum>,
-    spotifyAlbumsPreview: ImmutableList<SpotifySimplifiedAlbum>,
-    spotifyAlbumTypes: ImmutableList<SpotifyAlbumType>,
+    otherAlbums: ImmutableList<IExternalAlbum>,
+    otherAlbumsPreview: ImmutableList<IExternalAlbum>,
+    otherAlbumTypes: ImmutableList<AlbumType>,
     onClick: (AlbumUiState) -> Unit,
     onLongClick: (AlbumUiState) -> Unit,
-    onSpotifyAlbumClick: (SpotifySimplifiedAlbum) -> Unit,
-    onSpotifyAlbumTypeClick: (SpotifyAlbumType) -> Unit,
+    onOtherAlbumClick: (String) -> Unit,
+    onOtherAlbumTypeClick: (AlbumType) -> Unit,
     onRelatedArtistClick: (UnsavedArtist) -> Unit,
 ) {
     val context = LocalContext.current
-    var expandSpotifyAlbums by rememberSaveable { mutableStateOf(false) }
+    var expandOtherAlbums by rememberSaveable { mutableStateOf(false) }
 
     SelectedAlbumsButtons(albumCount = selectedAlbumCount, callbacks = selectionCallbacks)
     if (isLoading) IsLoadingProgressIndicator()
@@ -70,7 +70,6 @@ fun ArtistAlbumCollection(
     when (displayType) {
         DisplayType.LIST -> {
             ScrollbarList(
-                // verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(10.dp),
                 contentType = "AlbumUiState",
             ) {
@@ -94,19 +93,22 @@ fun ArtistAlbumCollection(
                     }
                 }
 
-                if (uiStates.isNotEmpty() && (spotifyAlbumsPreview.isNotEmpty() || relatedArtists.isNotEmpty())) item {
+                if (uiStates.isNotEmpty() && (otherAlbumsPreview.isNotEmpty() || relatedArtists.isNotEmpty())) item {
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
-                if (spotifyAlbumsPreview.isNotEmpty()) {
-                    ArtistSpotifyAlbumList(
-                        albumTypes = spotifyAlbumTypes,
-                        albums = spotifyAlbums,
-                        expand = expandSpotifyAlbums,
+                if (otherAlbumsPreview.isNotEmpty()) {
+                    OtherArtistAlbumsList(
+                        isExpanded = expandOtherAlbums,
+                        albumTypes = otherAlbumTypes,
+                        albums = otherAlbums,
+                        preview = otherAlbumsPreview,
+                        onAlbumTypeClick = onOtherAlbumTypeClick,
+                        onClick = onOtherAlbumClick,
                         header = {
-                            ArtistSpotifyAlbumsHeader(
-                                expand = expandSpotifyAlbums,
-                                onExpandToggleClick = { expandSpotifyAlbums = !expandSpotifyAlbums },
+                            OtherArtistAlbumsHeader(
+                                expand = expandOtherAlbums,
+                                onExpandToggleClick = { expandOtherAlbums = !expandOtherAlbums },
                                 text = {
                                     Text(
                                         text = context.getUmlautifiedString(R.string.available_albums),
@@ -116,13 +118,10 @@ fun ArtistAlbumCollection(
                                 },
                             )
                         },
-                        onAlbumTypeClick = onSpotifyAlbumTypeClick,
-                        onClick = onSpotifyAlbumClick,
-                        previewAlbums = spotifyAlbumsPreview,
                     )
                 }
 
-                if (spotifyAlbumsPreview.isNotEmpty() && relatedArtists.isNotEmpty()) item {
+                if (otherAlbumsPreview.isNotEmpty() && relatedArtists.isNotEmpty()) item {
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
@@ -163,23 +162,23 @@ fun ArtistAlbumCollection(
                     }
                 }
 
-                if (uiStates.isNotEmpty() && (spotifyAlbumsPreview.isNotEmpty() || relatedArtists.isNotEmpty())) {
+                if (uiStates.isNotEmpty() && (otherAlbumsPreview.isNotEmpty() || relatedArtists.isNotEmpty())) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Spacer(modifier = Modifier.height(20.dp))
                     }
                 }
 
-                if (spotifyAlbumsPreview.isNotEmpty()) ArtistSpotifyAlbumGrid(
-                    albums = spotifyAlbums,
-                    previewAlbums = spotifyAlbumsPreview,
-                    expand = expandSpotifyAlbums,
-                    albumTypes = spotifyAlbumTypes,
-                    onClick = onSpotifyAlbumClick,
-                    onAlbumTypeClick = onSpotifyAlbumTypeClick,
-                    onExpandToggleClick = { expandSpotifyAlbums = !expandSpotifyAlbums },
+                if (otherAlbumsPreview.isNotEmpty()) OtherArtistAlbumsGrid(
+                    isExpanded = expandOtherAlbums,
+                    albums = otherAlbums,
+                    preview = otherAlbumsPreview,
+                    albumTypes = otherAlbumTypes,
+                    onClick = onOtherAlbumClick,
+                    onAlbumTypeClick = onOtherAlbumTypeClick,
+                    onExpandToggleClick = { expandOtherAlbums = !expandOtherAlbums },
                 )
 
-                if (spotifyAlbumsPreview.isNotEmpty() && relatedArtists.isNotEmpty()) {
+                if (otherAlbumsPreview.isNotEmpty() && relatedArtists.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Spacer(modifier = Modifier.height(20.dp))
                     }

@@ -9,8 +9,11 @@ class Application : android.app.Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .components {
-                add(ThumbnailInterceptor())
+                add(CoverArtArchiveFetcher.Factory())
+                add(AlbumArtMapper())
+                add(MediaStoreImageMapper())
             }
+            .respectCacheHeaders(false)
             .build()
     }
 }

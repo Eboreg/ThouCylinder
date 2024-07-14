@@ -3,11 +3,8 @@ package us.huseli.thoucylinder.compose
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisallowComposableCalls
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.collections.immutable.persistentListOf
@@ -23,7 +20,6 @@ import us.huseli.thoucylinder.compose.settings.LocalMusicUriDialog
 import us.huseli.thoucylinder.compose.track.EditTrackDialog
 import us.huseli.thoucylinder.compose.track.TrackInfoDialog
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
-import us.huseli.thoucylinder.managers.ExternalContentManager
 import us.huseli.thoucylinder.stringResource
 import us.huseli.thoucylinder.viewmodels.RootStateViewModel
 
@@ -31,9 +27,11 @@ import us.huseli.thoucylinder.viewmodels.RootStateViewModel
 inline fun rememberDialogCallbacks(
     crossinline onGotoAlbumClick: @DisallowComposableCalls (String) -> Unit,
     crossinline onGotoPlaylistClick: @DisallowComposableCalls (String) -> Unit,
+    crossinline onGotoLibraryClick: () -> Unit,
     viewModel: RootStateViewModel = hiltViewModel(),
 ): AppDialogCallbacks {
     val addToPlaylistTrackIds by viewModel.addToPlaylistTrackIds.collectAsStateWithLifecycle()
+    val albumImportData by viewModel.albumImportData.collectAsStateWithLifecycle()
     val albumToDownload by viewModel.albumToDownload.collectAsStateWithLifecycle()
     val deleteAlbumIds by viewModel.deleteAlbums.collectAsStateWithLifecycle()
     val editAlbumId by viewModel.editAlbumId.collectAsStateWithLifecycle()
@@ -45,20 +43,14 @@ inline fun rememberDialogCallbacks(
     val showCreatePlaylistDialog by viewModel.showCreatePlaylistDialog.collectAsStateWithLifecycle()
     val showInfoTrackCombo by viewModel.showInfoTrackCombo.collectAsStateWithLifecycle()
     val showLibraryRadioDialog by viewModel.showLibraryRadioDialog.collectAsStateWithLifecycle()
-    var albumImportData by remember { mutableStateOf<List<ExternalContentManager.AlbumImportData>?>(null) }
-
-    LaunchedEffect(Unit) {
-        viewModel.addExternalContentCallback(
-            object : ExternalContentManager.Callback {
-                override fun onAlbumImportFinished(data: List<ExternalContentManager.AlbumImportData>) {
-                    albumImportData = data
-                }
-            }
-        )
-    }
 
     albumImportData?.also { data ->
-        PostImportDialog(data = data, onDismissRequest = { albumImportData = null })
+        PostImportDialog(
+            data = data,
+            onDismissRequest = { viewModel.albumImportData.value = null },
+            onGotoAlbumClick = { onGotoAlbumClick(it) },
+            onGotoLibraryClick = { onGotoLibraryClick() },
+        )
     }
 
     if (exportTrackIds.isNotEmpty() || exportAlbumIds.isNotEmpty() || exportPlaylistId != null) {

@@ -1,8 +1,8 @@
 package us.huseli.thoucylinder.repositories
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import org.apache.commons.text.similarity.LevenshteinDistance
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.database.Database
@@ -25,8 +25,7 @@ class ArtistRepository @Inject constructor(database: Database) : AbstractScopeHo
     private val artistDao = database.artistDao()
     private val levenshtein = LevenshteinDistance()
 
-    private val allArtists: StateFlow<List<Artist>> =
-        artistDao.flowArtists().distinctUntilChanged().stateEagerly(emptyList())
+    private val allArtists: Flow<List<Artist>> = artistDao.flowArtists().distinctUntilChanged()
 
     val artistsWithTracksOrAlbums: Flow<List<Artist>> = artistDao.flowArtistsWithTracksOrAlbums().distinctUntilChanged()
     val artistCombos: Flow<List<ArtistCombo>> = artistDao.flowArtistCombos()
@@ -41,7 +40,7 @@ class ArtistRepository @Inject constructor(database: Database) : AbstractScopeHo
 
     suspend fun getArtist(id: String) = artistDao.getArtist(id)
 
-    fun getArtistNameSuggestions(name: String, limit: Int = 10) = allArtists.value
+    suspend fun getArtistNameSuggestions(name: String, limit: Int = 10) = allArtists.first()
         .filter { it.name.contains(name, true) }
         .map { it.name }
         .sortedBy { levenshtein.apply(name.lowercase(), it.lowercase()) }

@@ -10,6 +10,7 @@ import us.huseli.thoucylinder.compose.scrollbar.ScrollbarListState
 import us.huseli.thoucylinder.compose.scrollbar.rememberScrollbarListState
 import us.huseli.thoucylinder.compose.utils.ItemList
 import us.huseli.thoucylinder.dataclasses.album.ImportableAlbumUiState
+import us.huseli.thoucylinder.externalcontent.ImportBackend
 import us.huseli.thoucylinder.stringResource
 
 @Composable
@@ -17,6 +18,7 @@ fun ImportableAlbumList(
     uiStates: ImmutableList<ImportableAlbumUiState>,
     isLoadingCurrentPage: Boolean,
     isEmpty: Boolean,
+    backend: ImportBackend,
     onGotoAlbumClick: (String) -> Unit,
     toggleSelected: (String) -> Unit,
     onLongClick: (String) -> Unit,
@@ -33,6 +35,7 @@ fun ImportableAlbumList(
         modifier = modifier,
         scrollbarState = scrollbarState,
         isLoading = isLoadingCurrentPage,
+        loadingText = stringResource(R.string.loading),
         onEmpty = { if (isEmpty) Text(stringResource(R.string.no_albums_found)) },
         contentType = "IExternalAlbumWithTracks",
     ) { state ->
@@ -43,6 +46,7 @@ fun ImportableAlbumList(
                 else toggleSelected(state.id)
             },
             onLongClick = { onLongClick(state.id) },
+            backend = backend,
         )
     }
 }

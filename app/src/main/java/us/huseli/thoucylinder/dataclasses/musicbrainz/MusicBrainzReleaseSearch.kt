@@ -44,6 +44,9 @@ data class MusicBrainzReleaseSearch(
         override val albumType: AlbumType?
             get() = super.albumType ?: releaseGroup.primaryType?.albumType
 
+        override val releaseGroupId: String
+            get() = releaseGroup.id
+
         fun matches(artist: String?, album: String): Boolean {
             val artistCredits = artistCredit.joined()
             val albumMatch = album.contains(title, true) || title.contains(album, true)

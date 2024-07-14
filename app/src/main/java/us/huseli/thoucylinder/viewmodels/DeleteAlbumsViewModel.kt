@@ -23,7 +23,7 @@ class DeleteAlbumsViewModel @Inject constructor(
 
     val albumUiStates: StateFlow<ImmutableList<AlbumUiState>> = _albumIds.map { albumIds ->
         repos.album.listAlbumCombos(albumIds).map { it.toUiState() }.toImmutableList()
-    }.distinctUntilChanged().stateLazily(persistentListOf())
+    }.distinctUntilChanged().stateWhileSubscribed(persistentListOf())
     val isImportingLocalMedia = repos.localMedia.isImportingLocalMedia
 
     fun deleteLocalAlbumFiles() {

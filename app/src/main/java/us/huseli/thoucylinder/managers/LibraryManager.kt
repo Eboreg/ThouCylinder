@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.AlbumDownloadTask
@@ -35,7 +34,6 @@ import us.huseli.thoucylinder.dataclasses.artist.IArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.UnsavedTrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.joined
 import us.huseli.thoucylinder.dataclasses.musicbrainz.capitalizeGenreName
-import us.huseli.thoucylinder.dataclasses.spotify.AbstractSpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.tag.Tag
 import us.huseli.thoucylinder.dataclasses.toMediaStoreImage
 import us.huseli.thoucylinder.dataclasses.track.ITrackCombo
@@ -97,14 +95,19 @@ class LibraryManager @Inject constructor(
         repos.message.onAddAlbumsToLibrary(albumIds, onGotoLibraryClick, onGotoAlbumClick)
     }
 
-    fun addTemporarySpotifyAlbum(spotifyAlbum: AbstractSpotifyAlbum, onFinish: (String) -> Unit) {
+    fun addTemporaryMusicBrainzAlbum(releaseGroupId: String, onFinish: (String) -> Unit) {
         launchOnIOThread {
-            val albumCombo = spotifyAlbum.toAlbumCombo(isLocal = false, isInLibrary = false)
-            val album = repos.album.getOrCreateAlbumBySpotifyId(albumCombo.album, spotifyAlbum.id)
-            val albumArtists = albumCombo.artists.map { it.withAlbumId(album.albumId) }
+            val releaseGroup = repos.musicBrainz.getReleaseGroup(releaseGroupId)
 
-            repos.artist.insertAlbumArtists(albumArtists)
-            onMainThread { onFinish(album.albumId) }
+            repos.musicBrainz.listReleasesByReleaseGroupId(releaseGroupId).firstOrNull()?.also { release ->
+                val albumCombo =
+                    release.toAlbumWithTracks(isLocal = false, isInLibrary = false, releaseGroup = releaseGroup)
+                val album = repos.album.getOrCreateAlbumByMusicBrainzId(albumCombo.album, releaseGroupId, release.id)
+                val albumArtists = albumCombo.artists.map { it.withAlbumId(album.albumId) }
+
+                repos.artist.insertAlbumArtists(albumArtists)
+                onMainThread { onFinish(album.albumId) }
+            }
         }
     }
 
@@ -238,29 +241,29 @@ class LibraryManager @Inject constructor(
                 val existingAlbumCombos = repos.album.listAlbumCombos()
                 val existingTrackUris = repos.track.listTrackLocalUris()
 
-                repos.localMedia.flowImportableAlbums(localMusicDirectory, existingTrackUris)
-                    .onCompletion { repos.localMedia.setIsImporting(false) }
-                    .collect { localAlbum ->
-                        val existingCombo = existingAlbumCombos.find {
-                            (it.album.title == localAlbum.title && it.artists.joined() == localAlbum.artistName) ||
-                                (it.album.musicBrainzReleaseId != null && it.album.musicBrainzReleaseId == localAlbum.musicBrainzReleaseId)
-                        }
-                        val combo = localAlbum.toAlbumWithTracks(base = existingCombo).let { combo ->
-                            val albumArt = getBestNewLocalAlbumArt(combo.trackCombos)
-                                ?: repos.musicBrainz.getCoverArtArchiveImage(
-                                    combo.album.musicBrainzReleaseId,
-                                    combo.album.musicBrainzReleaseGroupId
-                                )?.toMediaStoreImage()
-
-                            if (albumArt != null) combo.withAlbum(album = combo.album.withAlbumArt(albumArt = albumArt))
-                            else combo
-                        }
-                        val savedCombo =
-                            if (existingCombo != null) upsertAlbumWithTracks(combo)
-                            else insertAlbumWithTracks(combo)
-
-                        savedCombo?.also { updateAlbumFromRemotes(it) }
+                for (localAlbum in repos.localMedia.importableAlbumsChannel(localMusicDirectory, existingTrackUris)) {
+                    val existingCombo = existingAlbumCombos.find {
+                        (it.album.title == localAlbum.title && it.artists.joined() == localAlbum.artistName) ||
+                            (it.album.musicBrainzReleaseId != null && it.album.musicBrainzReleaseId == localAlbum.musicBrainzReleaseId)
                     }
+                    val combo = localAlbum.toAlbumWithTracks(base = existingCombo).let { combo ->
+                        val albumArt = getBestNewLocalAlbumArt(combo.trackCombos)
+                            ?: repos.musicBrainz.getCoverArtArchiveImage(
+                                combo.album.musicBrainzReleaseId,
+                                combo.album.musicBrainzReleaseGroupId
+                            )?.toMediaStoreImage()
+
+                        if (albumArt != null) combo.withAlbum(album = combo.album.withAlbumArt(albumArt = albumArt))
+                        else combo
+                    }
+                    val savedCombo =
+                        if (existingCombo != null) upsertAlbumWithTracks(combo)
+                        else insertAlbumWithTracks(combo)
+
+                    savedCombo?.also { updateAlbumFromRemotes(it) }
+                }
+
+                repos.localMedia.setIsImporting(false)
             }
         }
     }
@@ -287,15 +290,6 @@ class LibraryManager @Inject constructor(
         matchedCombo?.album?.also { repos.album.upsertAlbum(it) }
         repos.message.onMatchUnplayableTracks(updatedTracks.size)
         send(ProgressData())
-    }
-
-    fun updateAlbumFromRemotes(combo: IAlbumWithTracksCombo<IAlbum>) {
-        launchOnIOThread {
-            val spotifyCombo = updateAlbumFromSpotify(combo)
-            val mbCombo = updateAlbumFromMusicBrainz(spotifyCombo ?: combo)
-
-            upsertAlbumWithTracks(mbCombo ?: spotifyCombo ?: combo)
-        }
     }
 
     suspend fun updateTrack(
@@ -437,6 +431,15 @@ class LibraryManager @Inject constructor(
                 tagUpdateStrategy = tagUpdateStrategy,
             )
         } else null
+    }
+
+    private fun updateAlbumFromRemotes(combo: IAlbumWithTracksCombo<IAlbum>) {
+        launchOnIOThread {
+            val spotifyCombo = updateAlbumFromSpotify(combo)
+            val mbCombo = updateAlbumFromMusicBrainz(spotifyCombo ?: combo)
+
+            upsertAlbumWithTracks(mbCombo ?: spotifyCombo ?: combo)
+        }
     }
 
     private suspend fun updateAlbumFromSpotify(

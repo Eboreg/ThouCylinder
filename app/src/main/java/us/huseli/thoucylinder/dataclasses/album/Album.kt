@@ -36,7 +36,6 @@ data class Album(
         get() = true
 
     override fun withAlbumArt(albumArt: MediaStoreImage?) = copy(albumArt = albumArt)
-    override fun withSpotifyId(spotifyId: String) = copy(spotifyId = spotifyId)
 
     override fun mergeWith(other: IAlbum) = copy(
         albumArt = other.albumArt ?: albumArt,
@@ -90,7 +89,6 @@ data class UnsavedAlbum(
         get() = false
 
     override fun withAlbumArt(albumArt: MediaStoreImage?) = copy(albumArt = albumArt)
-    override fun withSpotifyId(spotifyId: String) = copy(spotifyId = spotifyId)
 
     override fun mergeWith(other: IAlbum) = copy(
         albumArt = other.albumArt ?: albumArt,

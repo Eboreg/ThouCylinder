@@ -23,7 +23,7 @@ import javax.inject.Inject
 class RootStateViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
-) : DownloadsViewModel(repos, managers) {
+) : DownloadsViewModel(repos, managers), ExternalContentManager.Callback {
     private val _addToPlaylistTrackIds = MutableStateFlow<ImmutableList<String>>(persistentListOf())
     private val _albumToDownload = MutableStateFlow<Album?>(null)
     private val _editTrackState = MutableStateFlow<TrackUiState?>(null)
@@ -33,6 +33,7 @@ class RootStateViewModel @Inject constructor(
     private val _showInfoTrackId = MutableStateFlow<String?>(null)
 
     val addToPlaylistTrackIds = _addToPlaylistTrackIds.asStateFlow()
+    val albumImportData = MutableStateFlow<List<ExternalContentManager.AlbumImportData>?>(null)
     val albumToDownload = _albumToDownload.asStateFlow()
     val deleteAlbums = MutableStateFlow<ImmutableList<String>>(persistentListOf())
     val editAlbumId = MutableStateFlow<String?>(null)
@@ -49,10 +50,11 @@ class RootStateViewModel @Inject constructor(
                 combo.copy(track = managers.library.ensureTrackMetadata(combo.track))
             }
         }
-    }.stateLazily()
+    }.stateWhileSubscribed()
 
-    fun addExternalContentCallback(callback: ExternalContentManager.Callback) =
-        managers.external.addCallback(callback)
+    init {
+        managers.external.addCallback(this)
+    }
 
     fun createPlaylist(name: String, onFinish: (String) -> Unit) {
         launchOnIOThread {
@@ -112,5 +114,9 @@ class RootStateViewModel @Inject constructor(
 
     fun setShowInfoTrackId(trackId: String?) {
         _showInfoTrackId.value = trackId
+    }
+
+    override fun onAlbumImportFinished(data: List<ExternalContentManager.AlbumImportData>) {
+        albumImportData.value = data
     }
 }

@@ -77,12 +77,13 @@ fun App(
     val density = LocalDensity.current
 
     val currentTrackExists by viewModel.currentTrackExists.collectAsStateWithLifecycle()
-    val isWelcomeDialogShown by viewModel.isWelcomeDialogShown.collectAsStateWithLifecycle()
+    val appStartCount by viewModel.appStartCount.collectAsStateWithLifecycle()
     val contentSize by viewModel.contentSize.collectAsStateWithLifecycle()
 
     var activeMenuItemId by rememberSaveable { mutableStateOf<MenuItemId?>(MenuItemId.LIBRARY) }
     val modalCoverState = rememberModalCoverState(contentSize = contentSize)
     val snackbarBottomPadding = remember(currentTrackExists) { if (currentTrackExists) 80.dp else 0.dp }
+    var showWelcomeDialog by rememberSaveable { mutableStateOf(appStartCount <= 1) }
 
     /** Weird onBackPressedCallback shit begins */
     val onBackPressedCallback = remember {
@@ -138,6 +139,7 @@ fun App(
     val dialogCallbacks = rememberDialogCallbacks(
         onGotoAlbumClick = onGotoAlbumClick,
         onGotoPlaylistClick = onGotoPlaylistClick,
+        onGotoLibraryClick = { navController.navigate(LibraryDestination.route) },
     )
 
     val appCallbacks = remember {
@@ -203,8 +205,8 @@ fun App(
 
     AskMusicImportPermissions()
 
-    if (!isWelcomeDialogShown) {
-        WelcomeDialog(onCancel = { viewModel.setWelcomeDialogShown(true) })
+    if (showWelcomeDialog) {
+        WelcomeDialog(onCancel = { showWelcomeDialog = false })
     }
 
     CompositionLocalProvider(

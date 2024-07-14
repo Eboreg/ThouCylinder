@@ -3,9 +3,12 @@ package us.huseli.thoucylinder.viewmodels
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.dataclasses.album.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.album.IAlbumUiState
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
@@ -21,7 +24,11 @@ abstract class AbstractAlbumListViewModel<T : IAlbumUiState>(
     private val managers: Managers,
 ) : AbstractTrackListViewModel<TrackUiState>(selectionKey, repos, managers) {
     protected abstract val baseAlbumUiStates: StateFlow<ImmutableList<T>>
-    open val selectedAlbumIds: StateFlow<List<String>> = repos.album.flowSelectedAlbumIds(selectionKey)
+    open val selectedAlbumIds: Flow<List<String>>
+        get() = combine(baseAlbumUiStates, repos.album.flowSelectedAlbumIds(selectionKey)) { states, selectedIds ->
+            val allIds = states.map { it.id }
+            selectedIds.filter { allIds.contains(it) }
+        }
 
     @Suppress("UNCHECKED_CAST")
     val albumUiStates: StateFlow<ImmutableList<T>>
@@ -29,42 +36,40 @@ abstract class AbstractAlbumListViewModel<T : IAlbumUiState>(
             states
                 .map { state -> state.withIsSelected(selectedIds.contains(state.albumId)) as T }
                 .toImmutableList()
-        }.stateLazily(persistentListOf())
+        }.stateWhileSubscribed(persistentListOf())
 
-    private val filteredSelectedAlbumIds: StateFlow<ImmutableList<String>>
+    private val filteredSelectedAlbumIds: Flow<ImmutableList<String>>
         get() = combine(baseAlbumUiStates, selectedAlbumIds) { states, selectedIds ->
             selectedIds.filter { albumId -> states.map { it.albumId }.contains(albumId) }
                 .sortedLike(states.map { it.albumId })
                 .toImmutableList()
-        }.stateEagerly(persistentListOf())
+        }
 
     val selectedAlbumCount: StateFlow<Int>
-        get() = filteredSelectedAlbumIds.map { it.size }.stateLazily(0)
+        get() = filteredSelectedAlbumIds.map { it.size }.stateWhileSubscribed(0)
 
     open fun getAlbumSelectionCallbacks(dialogCallbacks: AppDialogCallbacks) = AlbumSelectionCallbacks(
-        onAddToPlaylistClick = { dialogCallbacks.onAddAlbumsToPlaylistClick(filteredSelectedAlbumIds.value) },
-        onDeleteClick = { dialogCallbacks.onDeleteAlbumsClick(filteredSelectedAlbumIds.value) },
-        onEnqueueClick = { managers.player.enqueueAlbums(filteredSelectedAlbumIds.value) },
-        onExportClick = { dialogCallbacks.onExportAlbumsClick(filteredSelectedAlbumIds.value) },
-        onPlayClick = { managers.player.playAlbums(filteredSelectedAlbumIds.value) },
+        onAddToPlaylistClick = { withSelectedAlbumIds(dialogCallbacks.onAddAlbumsToPlaylistClick) },
+        onDeleteClick = { withSelectedAlbumIds(dialogCallbacks.onDeleteAlbumsClick) },
+        onEnqueueClick = { withSelectedAlbumIds { managers.player.enqueueAlbums(it) } },
+        onExportClick = { withSelectedAlbumIds(dialogCallbacks.onExportAlbumsClick) },
+        onPlayClick = { withSelectedAlbumIds { managers.player.playAlbums(it) } },
         onSelectAllClick = { repos.album.selectAlbumIds(selectionKey, baseAlbumUiStates.value.map { it.albumId }) },
         onUnselectAllClick = { repos.album.unselectAllAlbumIds(selectionKey) },
     )
 
-    open fun isAlbumSelectEnabled(): Boolean {
-        return filteredSelectedAlbumIds.value.isNotEmpty()
-    }
-
     open fun onAlbumLongClick(albumId: String) {
-        val albumIds = filteredSelectedAlbumIds.value.lastOrNull()
-            ?.let { id ->
-                baseAlbumUiStates.value
-                    .map { it.albumId }
-                    .listItemsBetween(item1 = id, item2 = albumId, key = { it })
-                    .plus(albumId)
-            } ?: listOf(albumId)
+        launchOnIOThread {
+            val albumIds = filteredSelectedAlbumIds.first().lastOrNull()
+                ?.let { id ->
+                    baseAlbumUiStates.value
+                        .map { it.albumId }
+                        .listItemsBetween(item1 = id, item2 = albumId, key = { it })
+                        .plus(albumId)
+                } ?: listOf(albumId)
 
-        repos.album.selectAlbumIds(selectionKey, albumIds)
+            repos.album.selectAlbumIds(selectionKey, albumIds)
+        }
     }
 
     open fun toggleAlbumSelected(albumId: String) {
@@ -74,7 +79,17 @@ abstract class AbstractAlbumListViewModel<T : IAlbumUiState>(
     override fun setTrackStateIsSelected(state: TrackUiState, isSelected: Boolean) = state.copy(isSelected = isSelected)
 
     fun onAlbumClick(albumId: String, default: (String) -> Unit) {
-        if (isAlbumSelectEnabled()) toggleAlbumSelected(albumId)
-        else default(albumId)
+        launchOnIOThread {
+            if (isAlbumSelectEnabled()) toggleAlbumSelected(albumId)
+            else default(albumId)
+        }
+    }
+
+    private suspend fun isAlbumSelectEnabled(): Boolean {
+        return filteredSelectedAlbumIds.first().isNotEmpty()
+    }
+
+    private fun withSelectedAlbumIds(callback: (List<String>) -> Unit) {
+        launchOnIOThread { callback(filteredSelectedAlbumIds.first()) }
     }
 }

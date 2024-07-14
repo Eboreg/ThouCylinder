@@ -14,15 +14,30 @@ abstract class AbstractAlbumImportHolder<T : IExternalAlbum> : AbstractImportHol
     suspend fun convertToAlbumWithTracks(state: ImportableAlbumUiState): UnsavedAlbumWithTracksCombo? =
         _externalAlbums[state.id]?.let { convertToAlbumWithTracks(it, state.id) }
 
+    fun updateItemId(oldId: String, newId: String) {
+        if (_selectedItemIds.value.contains(oldId)) {
+            _selectedItemIds.value = _selectedItemIds.value.toMutableList().apply {
+                remove(oldId)
+                add(newId)
+            }
+        }
+        _items.value.indexOfFirst { it.id == oldId }.takeIf { it >= 0 }?.also { index ->
+            _items.value = _items.value.toMutableList().apply {
+                set(index, get(index).copy(albumId = newId))
+            }
+        }
+    }
+
     override fun getResultChannel() = Channel<ImportableAlbumUiState>().also { channel ->
         launchOnIOThread {
             for (externalAlbum in getExternalAlbumChannel()) {
-                val combo = externalAlbum.toAlbumCombo(isLocal = false, isInLibrary = false)
+                val state = externalAlbum
+                    .toAlbumCombo(isLocal = false, isInLibrary = false)
+                    .toImportableUiState(playCount = externalAlbum.playCount)
 
-                _externalAlbums[combo.id] = externalAlbum
-                channel.send(combo.toImportableUiState(playCount = externalAlbum.playCount))
+                _externalAlbums[state.id] = externalAlbum
+                channel.send(state)
             }
-            channel.close()
         }
     }
 

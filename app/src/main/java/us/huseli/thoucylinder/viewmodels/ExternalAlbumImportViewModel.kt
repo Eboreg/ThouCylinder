@@ -43,29 +43,29 @@ class ExternalAlbumImportViewModel @Inject constructor(
 
     override val baseAlbumUiStates: StateFlow<ImmutableList<ImportableAlbumUiState>> = _holder
         .flatMapLatest { it.currentPageItems.map { states -> states.toImmutableList() } }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
     override val baseTrackUiStates: StateFlow<ImmutableList<TrackUiState>> = MutableStateFlow(persistentListOf())
-    override val selectedAlbumIds: StateFlow<List<String>> = _holder
-        .flatMapLatest { it.selectedItemIds }
-        .stateLazily(emptyList())
+    override val selectedAlbumIds: Flow<List<String>> = _holder.flatMapLatest { it.selectedItemIds }
 
     val backendKey = _backendKey.asStateFlow()
-    val canImport = _backend.flatMapLatest { it.canImport }.stateLazily(false)
-    val currentAlbumCount = baseAlbumUiStates.map { it.size }.stateLazily(0)
-    val displayOffset = _holder.flatMapLatest { it.displayOffset }.stateLazily(0)
-    val hasNextPage = _holder.flatMapLatest { it.hasNextPage }.stateLazily(false)
-    val hasPreviousPage = _holder.flatMapLatest { holder -> holder.currentPage.map { it > 0 } }.stateLazily(false)
-    val isAllSelected = _holder.flatMapLatest { it.isWholeCurrentPageSelected }.stateLazily(false)
-    val isEmpty = _holder.flatMapLatest { it.isEmpty }.stateLazily(false)
-    val isLoadingCurrentPage = _holder.flatMapLatest { it.isLoadingCurrentPage }.stateLazily(false)
-    val isSelectAllEnabled: StateFlow<Boolean> = _holder.flatMapLatest { it.canSelectAll }.stateLazily(false)
-    val isTotalAlbumCountExact: StateFlow<Boolean> = _holder.flatMapLatest { it.isTotalCountExact }.stateLazily(false)
-    val progress = managers.external.albumImportProgress.stateLazily(ProgressData())
-    val searchTerm = _holder.flatMapLatest { it.searchTerm }.stateLazily("")
-    val totalItemCount = _holder.flatMapLatest { it.totalItemCount }.stateLazily(0)
+    val canImport = _holder.flatMapLatest { it.canImport }.stateWhileSubscribed(false)
+    val currentAlbumCount = baseAlbumUiStates.map { it.size }.stateWhileSubscribed(0)
+    val displayOffset = _holder.flatMapLatest { it.displayOffset }.stateWhileSubscribed(0)
+    val hasNextPage = _holder.flatMapLatest { it.hasNextPage }.stateWhileSubscribed(false)
+    val hasPreviousPage =
+        _holder.flatMapLatest { holder -> holder.currentPage.map { it > 0 } }.stateWhileSubscribed(false)
+    val isAllSelected = _holder.flatMapLatest { it.isWholeCurrentPageSelected }.stateWhileSubscribed(false)
+    val isEmpty = _holder.flatMapLatest { it.isEmpty }.stateWhileSubscribed(false)
+    val isLoadingCurrentPage = _holder.flatMapLatest { it.isLoadingCurrentPage }.stateWhileSubscribed(false)
+    val isSelectAllEnabled: StateFlow<Boolean> = _holder.flatMapLatest { it.canSelectAll }.stateWhileSubscribed(false)
+    val isTotalAlbumCountExact: StateFlow<Boolean> =
+        _holder.flatMapLatest { it.isTotalCountExact }.stateWhileSubscribed(false)
+    val progress = managers.external.albumImportProgress.stateWhileSubscribed(ProgressData())
+    val searchTerm = _holder.flatMapLatest { it.searchTerm }.stateWhileSubscribed("")
+    val totalItemCount = _holder.flatMapLatest { it.totalItemCount }.stateWhileSubscribed(0)
 
     val isImportButtonEnabled =
-        _holder.flatMapLatest { it.selectedItemIds.map { ids -> ids.isNotEmpty() } }.stateLazily(false)
+        _holder.flatMapLatest { it.selectedItemIds.map { ids -> ids.isNotEmpty() } }.stateWhileSubscribed(false)
 
     fun getSpotifyAuthUrl() = repos.spotify.oauth2PKCE.getAuthUrl()
 

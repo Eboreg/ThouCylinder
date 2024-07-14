@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -39,7 +38,6 @@ import us.huseli.thoucylinder.dataclasses.artist.joined
 import us.huseli.thoucylinder.dataclasses.artist.names
 import us.huseli.thoucylinder.dataclasses.spotify.AbstractSpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbumType
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbumsResponse
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtistsResponse
@@ -162,32 +160,6 @@ class SpotifyRepository @Inject constructor(
         }
     }
 
-    fun flowArtistAlbums(
-        artistId: String,
-        albumTypes: Collection<SpotifyAlbumType> = SpotifyAlbumType.entries,
-        limit: Int? = null,
-    ) = channelFlow<SpotifySimplifiedAlbum> {
-        val includeGroups = albumTypes.joinToString(",") { it.name.lowercase() }
-        val requestLimit = limit?.coerceAtMost(50) ?: 50
-        var url: String? = Request.getUrl(
-            url = "${API_ROOT}/artists/$artistId/albums",
-            params = mapOf("include_groups" to includeGroups, "limit" to requestLimit.toString()),
-        )
-        var added = 0
-
-        while (url != null && (limit == null || added < limit)) {
-            val job = RequestJob(url = url, oauth2 = oauth2CC)
-
-            apiResponseCache.getOrNull(job, retryOnNull = true)
-                ?.fromJson(object : TypeToken<SpotifyResponse<SpotifySimplifiedAlbum>>() {})
-                ?.also { response ->
-                    url = response.next
-                    response.items.forEach { send(it) }
-                    added += response.items.size
-                }
-        }
-    }
-
     fun flowTrackAudioFeatures(spotifyTrackId: String): Flow<SpotifyTrackAudioFeatures?> = flow {
         emit(null)
         spotifyDao.flowAudioFeatures(spotifyTrackId).collect { features ->
@@ -196,12 +168,11 @@ class SpotifyRepository @Inject constructor(
         }
     }
 
-    suspend fun getRelatedArtists(artistId: String, limit: Int = 10): List<SpotifyArtist>? =
+    suspend fun getRelatedArtists(artistId: String): List<SpotifyArtist>? =
         apiResponseCache.getOrNull(RequestJob(url = "$API_ROOT/artists/$artistId/related-artists", oauth2 = oauth2CC))
             ?.fromJson<SpotifyArtistsResponse>()
             ?.artists
             ?.sortedByDescending { it.popularity }
-            ?.take(limit)
 
     suspend fun getAlbum(albumId: String): SpotifyAlbum? = getAlbums(listOf(albumId))?.firstOrNull()
 

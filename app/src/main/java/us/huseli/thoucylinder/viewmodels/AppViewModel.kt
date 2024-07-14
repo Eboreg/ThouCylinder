@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.Umlautify
-import us.huseli.thoucylinder.managers.ExternalContentManager
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -19,13 +18,14 @@ class AppViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
 ) : DownloadsViewModel(repos, managers) {
-    val currentTrackExists = repos.player.currentCombo.map { it != null }.distinctUntilChanged().stateLazily(false)
-    val isWelcomeDialogShown: StateFlow<Boolean> = repos.settings.isWelcomeDialogShown
+    val appStartCount = repos.settings.appStartCount
+    val currentTrackExists =
+        repos.player.currentCombo.map { it != null }.distinctUntilChanged().stateWhileSubscribed(false)
     val contentSize: StateFlow<Size> = repos.settings.contentSize
-    val umlautifier = Umlautify.umlautifier.stateLazily(Umlautify.disabledUmlautifier)
+    val umlautifier = Umlautify.umlautifier.stateWhileSubscribed(Umlautify.disabledUmlautifier)
     val albumImportProgress = managers.external.albumImportProgress
         .map { if (it.isActive) it.progress else null }
-        .stateLazily()
+        .stateWhileSubscribed()
 
     fun addAlbumToLibrary(
         albumId: String,
@@ -81,8 +81,6 @@ class AppViewModel @Inject constructor(
     fun setContentSize(size: Size) = repos.settings.setContentSize(size)
 
     fun setScreenSize(dpSize: DpSize, size: Size) = repos.settings.setScreenSize(dpSize, size)
-
-    fun setWelcomeDialogShown(value: Boolean) = repos.settings.setWelcomeDialogShown(value)
 
     fun startAlbumRadio(albumId: String) = managers.radio.startAlbumRadio(albumId)
 

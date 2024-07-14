@@ -54,28 +54,6 @@ data class YoutubeVideo(
         video = this,
     )
 
-    fun toTrack(
-        isInLibrary: Boolean = false,
-        artistName: String? = null,
-        albumId: String? = null,
-        albumPosition: Int? = null,
-    ) = Track(
-        title = artistName
-            ?.let { title.replace(Regex("^$it (- )?", RegexOption.IGNORE_CASE), "") }
-            ?: title,
-        isInLibrary = isInLibrary,
-        albumId = albumId,
-        albumPosition = albumPosition,
-        youtubeVideo = this,
-        durationMs = metadata?.durationMs ?: durationMs,
-        image = fullImage?.let {
-            MediaStoreImage(
-                fullUriString = it.url,
-                thumbnailUriString = thumbnail?.url ?: it.url,
-            )
-        },
-    )
-
     fun toTrackCombo(
         isInLibrary: Boolean,
         albumArtist: IArtist? = null,
@@ -128,6 +106,28 @@ data class YoutubeVideo(
 
         return distance
     }
+
+    private fun toTrack(
+        isInLibrary: Boolean = false,
+        artistName: String? = null,
+        albumId: String? = null,
+        albumPosition: Int? = null,
+    ) = Track(
+        title = artistName
+            ?.let { title.replace(Regex("^$it (- )?", RegexOption.IGNORE_CASE), "") }
+            ?: title,
+        isInLibrary = isInLibrary,
+        albumId = albumId,
+        albumPosition = albumPosition,
+        youtubeVideo = this,
+        durationMs = metadata?.durationMs ?: durationMs,
+        image = fullImage?.let {
+            MediaStoreImage(
+                fullUriString = it.url,
+                thumbnailUriString = thumbnail?.url ?: it.url,
+            )
+        },
+    )
 
     override fun toTrackCombo(isInLibrary: Boolean, album: IAlbum?): UnsavedTrackCombo {
         return toTrackCombo(

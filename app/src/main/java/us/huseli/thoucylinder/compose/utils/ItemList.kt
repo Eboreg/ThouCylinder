@@ -24,12 +24,11 @@ fun <T> ItemList(
     contentType: String? = null,
     scrollbarState: ScrollbarListState = rememberScrollbarListState(),
     isLoading: Boolean = false,
+    loadingText: String? = null,
     onEmpty: @Composable () -> Unit = {},
     trailingContent: @Composable (() -> Unit)? = null,
     itemContent: @Composable LazyItemScope.(T) -> Unit,
 ) {
-    if (isLoading) IsLoadingProgressIndicator()
-
     ScrollbarList(
         state = scrollbarState,
         modifier = modifier,
@@ -37,6 +36,7 @@ fun <T> ItemList(
         contentPadding = PaddingValues(10.dp),
         contentType = contentType,
     ) {
+        if (isLoading) item { IsLoadingProgressIndicator(text = loadingText) }
         if (things().isEmpty() && !isLoading) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = { onEmpty() })
         }

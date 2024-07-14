@@ -12,6 +12,7 @@ object Constants {
     const val NAV_ARG_ALBUM = "album"
     const val NAV_ARG_ARTIST = "artist"
     const val NAV_ARG_PLAYLIST = "playlist"
+    const val PREF_APP_START_COUNT = "appStartCount"
     const val PREF_AUTO_IMPORT_LOCAL_MUSIC = "autoImportLocalMusic"
     const val PREF_CURRENT_TRACK_POSITION = "currentTrackPosition"
     const val PREF_LASTFM_SCROBBLE = "lastFmScrobble"
@@ -25,5 +26,4 @@ object Constants {
     const val PREF_SPOTIFY_OAUTH2_TOKEN_CC = "spotifyOAuth2TokenCC"
     const val PREF_SPOTIFY_OAUTH2_TOKEN_PKCE = "spotifyOAuth2Token"
     const val PREF_UMLAUTIFY = "umlautify"
-    const val PREF_WELCOME_DIALOG_SHOWN = "welcomeDialogShown"
 }

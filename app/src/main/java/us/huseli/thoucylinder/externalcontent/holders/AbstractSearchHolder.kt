@@ -24,17 +24,22 @@ abstract class AbstractSearchHolder<T : IStringIdItem> : AbstractHolder<T>() {
     private var _searchJob: Job? = null
 
     override val _filteredItems: Flow<List<T>> = _items
-    override val isEmpty: Flow<Boolean> = combine(_isLoading, _items, _searchParams) { isSearching, items, params ->
-        // Actual meaning: "a search was attempted and the result was empty".
-        !isSearching && items.isEmpty() && params != null && params.isNotEmpty()
-    }
-
-    val isLoadingCurrentPage: Flow<Boolean>
-        get() = combine(_isLoading, _items, _currentPage, _searchParams) { isLoading, items, page, params ->
-            isLoading && params != null && items.size < ((page + 1) * ITEMS_PER_PAGE)
+    override val isEmpty: Flow<Boolean>
+        get() = combine(_isLoading, _items, _searchParams) { isSearching, items, params ->
+            // Actual meaning: "a search was attempted and the result was empty".
+            !isSearching && items.isEmpty() && params != null && params.isNotEmpty()
+        }
+    override val isLoadingCurrentPage: Flow<Boolean>
+        get() = combine(
+            _isLoading,
+            _items,
+            _currentPage,
+            _searchParams,
+            _allItemsFetched,
+        ) { isLoading, items, page, params, allFetched ->
+            isLoading && !allFetched && params != null && items.size < ((page + 1) * ITEMS_PER_PAGE)
         }
 
-    val isSearching = _isLoading.asStateFlow()
     val searchParams = _searchParams.asStateFlow()
 
     protected abstract fun getResultChannel(searchParams: SearchParams): Channel<T>
@@ -53,6 +58,7 @@ abstract class AbstractSearchHolder<T : IStringIdItem> : AbstractHolder<T>() {
                         _items.value += item
                     }
                 } catch (_: ClosedReceiveChannelException) {
+                    _allItemsFetched.value = true
                 }
                 _isLoading.value = false
             }

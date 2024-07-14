@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.transformWhile
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.retaintheme.extensions.launchOnMainThread
-import us.huseli.retaintheme.extensions.slice
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.Constants.NAV_ARG_ALBUM
 import us.huseli.thoucylinder.dataclasses.ProgressData
@@ -25,14 +24,13 @@ import us.huseli.thoucylinder.dataclasses.album.AlbumUiState
 import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.TrackMergeStrategy
 import us.huseli.thoucylinder.dataclasses.artist.Artist
-import us.huseli.thoucylinder.dataclasses.spotify.AbstractSpotifyAlbum
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbumType
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifySimplifiedAlbum
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroupBrowse
 import us.huseli.thoucylinder.dataclasses.track.AbstractTrackUiState
 import us.huseli.thoucylinder.dataclasses.track.AlbumTrackUiState
 import us.huseli.thoucylinder.dataclasses.track.TrackCombo
 import us.huseli.thoucylinder.enums.AlbumType
 import us.huseli.thoucylinder.enums.ListUpdateStrategy
+import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.managers.Managers
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -43,16 +41,16 @@ class AlbumViewModel @Inject constructor(
     private val managers: Managers,
     savedStateHandle: SavedStateHandle,
 ) : AbstractTrackListViewModel<AlbumTrackUiState>("AlbumViewModel", repos, managers) {
-    data class SpotifyArtist(val native: Artist, val order: Int, val spotifyId: String)
+    data class MusicBrainzArtistAssociation(val native: Artist, val order: Int, val musicBrainzId: String)
 
-    data class SpotifyAlbums(
-        val albumTypes: ImmutableList<SpotifyAlbumType>,
-        val albums: ImmutableList<SpotifySimplifiedAlbum>,
+    data class OtherArtistAlbums(
+        val albumTypes: ImmutableList<AlbumType>,
+        val albums: ImmutableList<IExternalAlbum>,
         val artist: Artist,
         val isExpanded: Boolean = false,
         val order: Int,
-        val preview: ImmutableList<SpotifySimplifiedAlbum>,
-        val spotifyArtistId: String,
+        val preview: ImmutableList<IExternalAlbum>,
+        val musicBrainzArtistId: String,
     )
 
     private val _albumId = savedStateHandle.get<String>(NAV_ARG_ALBUM)!!
@@ -63,37 +61,35 @@ class AlbumViewModel @Inject constructor(
     private val _albumCombo: StateFlow<AlbumWithTracksCombo?> = repos.album.flowAlbumWithTracks(_albumId)
         .onEach { _albumNotFound.value = it == null }
         .filterNotNull()
-        .stateLazily()
+        .stateWhileSubscribed()
 
     private val _trackCombos: StateFlow<List<TrackCombo>> =
-        repos.track.flowTrackCombosByAlbumId(_albumId).stateLazily(emptyList())
+        repos.track.flowTrackCombosByAlbumId(_albumId).stateWhileSubscribed(emptyList())
 
-    private val _primarySpotifyArtists: StateFlow<ImmutableList<SpotifyArtist>> =
-        combine(_albumCombo, _artists) { combo, artists ->
-            if (combo != null && combo.album.albumType != AlbumType.COMPILATION) {
-                artists
-                    .associate { it.artist to it.artist.spotifyId }
-                    .filterValuesNotNull()
-                    .filterValues { it.isNotEmpty() }
-                    .toList()
-                    .mapIndexed { index, (artist, spotifyId) ->
-                        SpotifyArtist(
-                            native = artist,
-                            spotifyId = spotifyId,
-                            order = index,
-                        )
-                    }
-                    // .slice(0, 5)
-                    .toImmutableList()
-            } else persistentListOf()
-        }.stateLazily(persistentListOf())
+    private val _primaryMusicBrainzArtists = combine(_albumCombo.filterNotNull(), _artists) { combo, artists ->
+        if (combo.album.albumType != AlbumType.COMPILATION) {
+            artists
+                .associate { it.artist to it.artist.musicBrainzId }
+                .filterValuesNotNull()
+                .filterValues { it.isNotEmpty() }
+                .toList()
+                .mapIndexed { index, (artist, musicBrainzId) ->
+                    MusicBrainzArtistAssociation(
+                        native = artist,
+                        musicBrainzId = musicBrainzId,
+                        order = index,
+                    )
+                }
+        } else emptyList()
+    }
 
-    private val _spotifyAlbumsMap = _primarySpotifyArtists.map { artists ->
-        val result = mutableMapOf<SpotifyArtist, List<SpotifySimplifiedAlbum>>()
+    private val _otherArtistAlbumsMap = _primaryMusicBrainzArtists.map { artists ->
+        val result = mutableMapOf<MusicBrainzArtistAssociation, List<IExternalAlbum>>()
 
         for (artist in artists) {
             if (result.size < 3) {
-                repos.spotify.flowArtistAlbums(artistId = artist.spotifyId).toList()
+                repos.musicBrainz.flowArtistReleaseGroups(artistId = artist.musicBrainzId).toList()
+                    .sortedWith(MusicBrainzReleaseGroupBrowse.ReleaseGroup.comparator)
                     .takeIf { it.isNotEmpty() }
                     ?.also { result[artist] = it }
             }
@@ -101,37 +97,42 @@ class AlbumViewModel @Inject constructor(
         result
     }
 
-    private val _spotifyAlbumTypes = MutableStateFlow<Map<String, List<SpotifyAlbumType>>>(emptyMap())
-    private val _spotifyAlbumsExpanded = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val _otherArtistAlbumsAlbumTypes = MutableStateFlow<Map<String, List<AlbumType>>>(emptyMap())
+    private val _otherArtistAlbumsExpanded = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
-    val relatedAlbums: StateFlow<ImmutableList<SpotifyAlbums>> =
-        combine(_spotifyAlbumsMap, _spotifyAlbumTypes, _spotifyAlbumsExpanded) { albumsMap, albumTypes, expanded ->
-            albumsMap.map { (artist, artistAlbums) ->
-                val artistAlbumTypes = albumTypes[artist.spotifyId] ?: SpotifyAlbumType.entries
-                val filteredAlbums = artistAlbums
-                    .filter { artistAlbumTypes.contains(it.spotifyAlbumType) }
-                    .filter { it.id != _albumCombo.value?.album?.spotifyId }
+    val otherArtistAlbums: StateFlow<ImmutableList<OtherArtistAlbums>> = combine(
+        _otherArtistAlbumsMap,
+        _otherArtistAlbumsAlbumTypes,
+        _otherArtistAlbumsExpanded,
+    ) { albumsMap, albumTypes, expanded ->
+        albumsMap.map { (artist, artistAlbums) ->
+            val artistAlbumTypes = albumTypes[artist.musicBrainzId] ?: AlbumType.entries
+            val filtered = artistAlbums
+                .filter { artistAlbumTypes.contains(it.albumType) }
+                .filter { it.id != _albumCombo.value?.album?.musicBrainzReleaseGroupId }
+                .toImmutableList()
+            val filteredAlbums = filtered.filter { it.albumType == AlbumType.ALBUM }.toImmutableList()
 
-                SpotifyAlbums(
-                    albumTypes = artistAlbumTypes.toImmutableList(),
-                    albums = filteredAlbums.toImmutableList(),
-                    artist = artist.native,
-                    isExpanded = expanded[artist.spotifyId] ?: false,
-                    order = artist.order,
-                    preview = filteredAlbums.slice(0, 10).toImmutableList(),
-                    spotifyArtistId = artist.spotifyId,
-                )
-            }.sortedBy { it.order }.toImmutableList()
-        }.stateLazily(persistentListOf())
+            OtherArtistAlbums(
+                albumTypes = artistAlbumTypes.toImmutableList(),
+                albums = filtered,
+                artist = artist.native,
+                isExpanded = expanded[artist.musicBrainzId] ?: false,
+                order = artist.order,
+                preview = if (filteredAlbums.size >= 10) filteredAlbums else filtered,
+                musicBrainzArtistId = artist.musicBrainzId,
+            )
+        }.sortedBy { it.order }.toImmutableList()
+    }.stateWhileSubscribed(persistentListOf())
 
     val albumNotFound = _albumNotFound.asStateFlow()
     val importProgress: StateFlow<ProgressData> = _importProgress.asStateFlow()
     val downloadState: StateFlow<AlbumDownloadTask.UiState?> =
-        managers.library.getAlbumDownloadUiStateFlow(_albumId).stateLazily()
+        managers.library.getAlbumDownloadUiStateFlow(_albumId).stateWhileSubscribed()
 
     val tagNames: StateFlow<ImmutableList<String>> = repos.album.flowTagsByAlbumId(_albumId)
         .map { tags -> tags.map { it.name }.toImmutableList() }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
     override val baseTrackUiStates: StateFlow<ImmutableList<AlbumTrackUiState>> =
         combine(_albumCombo, _trackCombos) { albumCombo, trackCombos ->
@@ -160,14 +161,14 @@ class AlbumViewModel @Inject constructor(
                     thumbnailUrl = combo.thumbnailUrl,
                 )
             }.toImmutableList()
-        }.stateLazily(persistentListOf())
+        }.stateWhileSubscribed(persistentListOf())
 
     val positionColumnWidthDp: StateFlow<Int> = baseTrackUiStates.map { states ->
         val trackPositions = states.map { it.positionString }
         trackPositions.maxOfOrNull { it.length * 10 }?.plus(10) ?: 40
-    }.stateLazily(40)
+    }.stateWhileSubscribed(40)
 
-    val uiState: StateFlow<AlbumUiState?> = _albumCombo.map { it?.toUiState() }.stateLazily()
+    val uiState: StateFlow<AlbumUiState?> = _albumCombo.map { it?.toUiState() }.stateWhileSubscribed()
 
     init {
         unselectAllTracks()
@@ -180,12 +181,13 @@ class AlbumViewModel @Inject constructor(
         if (trackIdx > -1) managers.player.playAlbum(_albumId, trackIdx)
     }
 
-    override fun setTrackStateIsSelected(state: AlbumTrackUiState, isSelected: Boolean) = state.copy(isSelected = isSelected)
+    override fun setTrackStateIsSelected(state: AlbumTrackUiState, isSelected: Boolean) =
+        state.copy(isSelected = isSelected)
 
     fun ensureTrackMetadataAsync(trackId: String) = managers.library.ensureTrackMetadataAsync(trackId)
 
     fun getTrackDownloadUiStateFlow(trackId: String) =
-        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateWhileSubscribed()
 
     fun matchUnplayableTracks() {
         launchOnMainThread {
@@ -195,19 +197,19 @@ class AlbumViewModel @Inject constructor(
         }
     }
 
-    fun onSpotifyAlbumClick(spotifyAlbum: AbstractSpotifyAlbum, onGotoAlbumClick: (String) -> Unit) =
-        managers.library.addTemporarySpotifyAlbum(spotifyAlbum, onGotoAlbumClick)
+    fun onOtherArtistAlbumClick(externalId: String, onGotoAlbumClick: (String) -> Unit) =
+        managers.library.addTemporaryMusicBrainzAlbum(externalId, onGotoAlbumClick)
 
-    fun toggleSpotifyAlbumsExpanded(obj: SpotifyAlbums) {
-        _spotifyAlbumsExpanded.value += obj.spotifyArtistId to !obj.isExpanded
+    fun toggleOtherArtistAlbumsExpanded(obj: OtherArtistAlbums) {
+        _otherArtistAlbumsExpanded.value += obj.musicBrainzArtistId to !obj.isExpanded
     }
 
-    fun toggleSpotifyAlbumType(obj: SpotifyAlbums, albumType: SpotifyAlbumType) {
+    fun toggleOtherArtistAlbumsAlbumType(obj: OtherArtistAlbums, albumType: AlbumType) {
         val current = obj.albumTypes.toMutableList()
 
         if (current.contains(albumType)) current -= albumType
         else current += albumType
-        _spotifyAlbumTypes.value += obj.spotifyArtistId to current
+        _otherArtistAlbumsAlbumTypes.value += obj.musicBrainzArtistId to current
     }
 
     private fun refetchIfNeeded() {

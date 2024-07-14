@@ -1,6 +1,5 @@
 package us.huseli.thoucylinder.compose.album
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Album
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -27,8 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,14 +34,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.compose.FistopyTheme
 import us.huseli.thoucylinder.compose.ProgressSection
-import us.huseli.thoucylinder.compose.artist.ArtistSpotifyAlbumList
-import us.huseli.thoucylinder.compose.artist.ArtistSpotifyAlbumsHeader
+import us.huseli.thoucylinder.compose.artist.OtherArtistAlbumsHeader
+import us.huseli.thoucylinder.compose.artist.OtherArtistAlbumsList
 import us.huseli.thoucylinder.compose.track.SelectedTracksButtons
 import us.huseli.thoucylinder.compose.utils.BasicHeader
 import us.huseli.thoucylinder.compose.utils.DownloadStateProgressIndicator
-import us.huseli.thoucylinder.compose.utils.LargeIconBadge
 import us.huseli.thoucylinder.compose.utils.Thumbnail
-import us.huseli.thoucylinder.dataclasses.album.AlbumUiState
 import us.huseli.thoucylinder.dataclasses.album.LocalAlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.LocalAppCallbacks
 import us.huseli.thoucylinder.dataclasses.callbacks.LocalAppDialogCallbacks
@@ -70,7 +64,7 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
     val tagNames by viewModel.tagNames.collectAsStateWithLifecycle()
     val trackUiStates by viewModel.trackUiStates.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val relatedAlbums by viewModel.relatedAlbums.collectAsStateWithLifecycle()
+    val otherArtistAlbums by viewModel.otherArtistAlbums.collectAsStateWithLifecycle()
 
     if (albumNotFound) {
         appCallbacks.onBackClick()
@@ -91,14 +85,7 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
 
             LazyColumn(contentPadding = PaddingValues(10.dp)) {
                 // Youtube / Spotify / Local badges:
-                item {
-                    Row(
-                        modifier = Modifier.padding(bottom = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        AlbumSourceBadges(state = state, small = true)
-                    }
-                }
+                item { AlbumSourceBadges(state = state) }
 
                 // Album cover, artists, tags, buttons, etc:
                 item {
@@ -215,24 +202,23 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
                     )
                 }
 
-                // Related albums:
-                for (obj in relatedAlbums) {
+                for (data in otherArtistAlbums) {
                     item { Spacer(modifier = Modifier.height(40.dp)) }
 
-                    ArtistSpotifyAlbumList(
-                        albums = obj.albums,
-                        previewAlbums = obj.preview,
-                        expand = obj.isExpanded,
-                        onClick = { viewModel.onSpotifyAlbumClick(it, albumCallbacks.onGotoAlbumClick) },
-                        onAlbumTypeClick = { viewModel.toggleSpotifyAlbumType(obj, it) },
-                        albumTypes = obj.albumTypes,
+                    OtherArtistAlbumsList(
+                        isExpanded = data.isExpanded,
+                        albums = data.albums,
+                        preview = data.preview,
+                        albumTypes = data.albumTypes,
+                        onClick = { viewModel.onOtherArtistAlbumClick(it, albumCallbacks.onGotoAlbumClick) },
+                        onAlbumTypeClick = { viewModel.toggleOtherArtistAlbumsAlbumType(data, it) },
                         header = {
-                            ArtistSpotifyAlbumsHeader(
-                                expand = obj.isExpanded,
+                            OtherArtistAlbumsHeader(
+                                expand = data.isExpanded,
                                 text = {
                                     Text(
                                         text = getClickableArtist(
-                                            artist = obj.artist,
+                                            artist = data.artist,
                                             onArtistClick = appCallbacks.onGotoArtistClick,
                                             prefix = context.getString(R.string.other_albums_by) + " ",
                                             spanStyle = SpanStyle(fontWeight = FontWeight.Bold),
@@ -241,37 +227,12 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
                                         maxLines = 2,
                                     )
                                 },
-                                onExpandToggleClick = { viewModel.toggleSpotifyAlbumsExpanded(obj) },
+                                onExpandToggleClick = { viewModel.toggleOtherArtistAlbumsExpanded(data) },
                             )
-                        }
+                        },
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun AlbumSourceBadges(state: AlbumUiState, small: Boolean = false) {
-    val uriHandler = LocalUriHandler.current
-    val textStyle = if (small) FistopyTheme.typography.bodySmall else FistopyTheme.typography.bodyMedium
-
-    state.youtubeWebUrl?.also { youtubeUrl ->
-        LargeIconBadge(modifier = Modifier.clickable { uriHandler.openUri(youtubeUrl) }) {
-            Icon(painterResource(R.drawable.youtube), null, modifier = Modifier.height(if (small) 15.dp else 20.dp))
-            Text(text = stringResource(R.string.youtube), style = textStyle)
-        }
-    }
-    state.spotifyWebUrl?.also { spotifyUrl ->
-        LargeIconBadge(modifier = Modifier.clickable { uriHandler.openUri(spotifyUrl) }) {
-            Icon(painterResource(R.drawable.spotify), null, modifier = Modifier.height(if (small) 12.dp else 16.dp))
-            Text(text = stringResource(R.string.spotify), style = textStyle)
-        }
-    }
-    if (state.isLocal) {
-        LargeIconBadge {
-            Icon(painterResource(R.drawable.hard_drive_filled), null, Modifier.height(if (small) 15.dp else 20.dp))
-            Text(text = stringResource(R.string.local), style = textStyle)
         }
     }
 }

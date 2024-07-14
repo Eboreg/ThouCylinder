@@ -2,7 +2,7 @@ package us.huseli.thoucylinder.dataclasses
 
 import com.google.gson.annotations.SerializedName
 
-@Suppress("unused")
+@Suppress("unused", "IncorrectFormatting")
 enum class CoverArtArchiveImageType {
     @SerializedName("Back") BACK,
     @SerializedName("Booklet") BOOKLET,

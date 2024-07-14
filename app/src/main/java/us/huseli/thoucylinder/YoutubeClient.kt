@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 import us.huseli.retaintheme.extensions.mergeWith
 import us.huseli.retaintheme.extensions.toDuration
 import us.huseli.thoucylinder.Constants.IMAGE_THUMBNAIL_MAX_WIDTH_PX
-import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeImage
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubeMetadata
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
@@ -28,46 +27,31 @@ fun playlistSearchChannel(
     params: SearchParams,
     client: AbstractYoutubeClient,
     scope: CoroutineScope,
-) = Channel<YoutubePlaylist>().also { channel ->
+) = Channel<YoutubePlaylist>().apply {
     scope.launch {
         params.freeText?.takeIf { it.isNotEmpty() }?.also { freeText ->
-            for (playlist in playlistSearchChannel(query = freeText, client = client, scope = scope)) {
-                if (playlist != null) channel.send(playlist)
-            }
-        }
-        channel.close()
-    }
-}
+            var nextToken: String?
+            val usedPlaylistIds: MutableList<String> = mutableListOf()
 
-fun playlistSearchChannel(
-    query: String,
-    client: AbstractYoutubeClient,
-    scope: CoroutineScope,
-) = Channel<YoutubePlaylist?>().apply {
-    var nextToken: String?
-    val usedPlaylistIds: MutableList<String> = mutableListOf()
+            val primaryResult = client.getPlaylistSearchResult(query = freeText, playlistSpecificSearch = true)
 
-    scope.launch {
-        val primaryResult = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = true)
-
-        for (playlist in primaryResult.playlists) {
-            usedPlaylistIds.add(playlist.id)
-            send(playlist)
-        }
-
-        val secondaryResult = client.getPlaylistSearchResult(query = query, playlistSpecificSearch = false)
-
-        nextToken = secondaryResult.nextToken
-        for (playlist in secondaryResult.playlists) {
-            if (!usedPlaylistIds.contains(playlist.id)) {
+            for (playlist in primaryResult.playlists) {
                 usedPlaylistIds.add(playlist.id)
                 send(playlist)
             }
-        }
 
-        while (nextToken != null) {
-            nextToken?.also { token ->
-                val result = client.getNextPlaylistSearchResult(token)
+            val secondaryResult = client.getPlaylistSearchResult(query = freeText, playlistSpecificSearch = false)
+
+            nextToken = secondaryResult.nextToken
+            for (playlist in secondaryResult.playlists) {
+                if (!usedPlaylistIds.contains(playlist.id)) {
+                    usedPlaylistIds.add(playlist.id)
+                    send(playlist)
+                }
+            }
+
+            while (nextToken != null) {
+                val result = client.getNextPlaylistSearchResult(nextToken)
 
                 nextToken = result.nextToken
                 for (playlist in result.playlists) {
@@ -78,46 +62,33 @@ fun playlistSearchChannel(
                 }
             }
         }
+        close()
     }
 }
+
 
 fun videoSearchChannel(
     params: SearchParams,
     client: AbstractYoutubeClient,
     scope: CoroutineScope,
-) = Channel<YoutubeVideo>().also { channel ->
+) = Channel<YoutubeVideo>().apply {
     scope.launch {
         params.freeText?.takeIf { it.isNotEmpty() }?.also { freeText ->
-            for (video in videoSearchChannel(query = freeText, client = client, scope = scope)) {
-                if (video != null) channel.send(video)
-            }
+            var nextToken: String? = null
+
+            do {
+                val result = client.getVideoSearchResult(query = freeText, continuationToken = nextToken)
+
+                nextToken = result.nextToken
+                for (video in result.videos) {
+                    send(video)
+                }
+            } while (nextToken != null)
         }
-        channel.close()
+        close()
     }
 }
 
-fun videoSearchChannel(
-    query: String,
-    client: AbstractYoutubeClient,
-    scope: CoroutineScope,
-) = Channel<YoutubeVideo?>().apply {
-    var firstDone = false
-    var nextToken: String? = null
-
-    scope.launch {
-        while (nextToken != null || !firstDone) {
-            val result = client.getVideoSearchResult(query = query, continuationToken = nextToken)
-
-            firstDone = true
-            nextToken = result.nextToken
-
-            for (video in result.videos) {
-                send(video)
-            }
-        }
-        send(null)
-    }
-}
 
 abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
     abstract val clientName: String
@@ -137,10 +108,7 @@ abstract class AbstractYoutubeClient(val region: Region = Region.SE) : ILogger {
         val videos: ImmutableList<YoutubeVideo>,
         val token: String? = null,
         val nextToken: String? = null,
-    ) {
-        val tracks: List<Track>
-            get() = videos.map { it.toTrack() }
-    }
+    )
 
     data class ImageData(
         val fullImage: YoutubeImage?,

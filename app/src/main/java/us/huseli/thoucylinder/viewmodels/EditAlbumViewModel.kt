@@ -48,7 +48,7 @@ class EditAlbumViewModel @Inject constructor(
     private val _isLoadingAlbumArt = MutableStateFlow(false)
     private val albumArtFetchJobs = mutableMapOf<String, List<Job>>()
 
-    val allTags = repos.album.flowTags().stateLazily(emptyList())
+    val allTags = repos.album.flowTags().stateWhileSubscribed(emptyList())
     val isLoadingAlbumArt = _isLoadingAlbumArt.asStateFlow()
 
     val uiState2: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().flatMapMerge { albumId ->
@@ -61,7 +61,7 @@ class EditAlbumViewModel @Inject constructor(
             year = combo.album.year,
             artistString = combo.artists.joined(),
         )
-    }.stateLazily()
+    }.stateWhileSubscribed()
 
     val uiState: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().map { albumId ->
         repos.album.getAlbumCombo(albumId)?.let { combo ->
@@ -73,11 +73,11 @@ class EditAlbumViewModel @Inject constructor(
                 artistString = combo.artists.joined(),
             )
         }
-    }.stateLazily()
+    }.stateWhileSubscribed()
 
     val trackUiStates: StateFlow<ImmutableList<TrackUiState>> = _albumId.filterNotNull().map { albumId ->
         repos.track.listTrackCombosByAlbumId(albumId).map { it.toUiState() }.toImmutableList()
-    }.stateLazily(persistentListOf())
+    }.stateWhileSubscribed(persistentListOf())
 
     fun cancelAlbumArtFetch(albumId: String) {
         albumArtFetchJobs.remove(albumId)?.forEach { it.cancel() }
@@ -141,9 +141,9 @@ class EditAlbumViewModel @Inject constructor(
                     albumArtFetchJobs.remove(combo.album.albumId)
                 }
             }
-        }.map { it.filterNotNull() }.stateLazily(emptyList())
+        }.map { it.filterNotNull() }.stateWhileSubscribed(emptyList())
 
-    fun getArtistNameSuggestions(name: String, limit: Int = 10) =
+    suspend fun getArtistNameSuggestions(name: String, limit: Int = 10) =
         repos.artist.getArtistNameSuggestions(name, limit)
 
     suspend fun listTags(albumId: String): ImmutableList<Tag> = repos.album.listTags(albumId).toImmutableList()

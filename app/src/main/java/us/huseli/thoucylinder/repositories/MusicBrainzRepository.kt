@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.map
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.Constants.CUSTOM_USER_AGENT
@@ -21,11 +22,14 @@ import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.TrackMergeStrategy
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.artist.Artist
+import us.huseli.thoucylinder.dataclasses.artist.IArtist
 import us.huseli.thoucylinder.dataclasses.artist.joined
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzArtistSearch
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzRecordingSearch
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzRelease
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseBrowse
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroup
+import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroupBrowse
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseGroupSearch
 import us.huseli.thoucylinder.dataclasses.musicbrainz.MusicBrainzReleaseSearch
 import us.huseli.thoucylinder.enums.ListUpdateStrategy
@@ -65,10 +69,37 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     )
     private var matchArtistsJob: Job? = null
 
+    fun flowArtistReleaseGroups(artistId: String) = channelFlow<MusicBrainzReleaseGroupBrowse.ReleaseGroup> {
+        var offset: Int? = 0
+
+        while (offset != null) {
+            val params = mapOf(
+                "artist" to artistId,
+                "release-group-status" to "website-default",
+                "limit" to "100",
+                "offset" to offset.toString(),
+            )
+            val response = gson.fromJson(
+                request("release-group", params),
+                MusicBrainzReleaseGroupBrowse::class.java,
+            )
+
+            for (releaseGroup in response.releaseGroups) {
+                send(releaseGroup)
+            }
+            offset = (offset + response.releaseGroups.size).takeIf { it < response.releaseGroupCount }
+        }
+    }
+
     suspend fun getRelease(id: String): MusicBrainzRelease? = gson.fromJson(
         request("release/$id", mapOf("inc" to "recordings artist-credits genres release-groups")),
         MusicBrainzRelease::class.java,
-    )?.copy(id = id)
+    )
+
+    suspend fun getReleaseGroup(id: String): MusicBrainzReleaseGroup? = gson.fromJson(
+        request("release-group/$id", mapOf("inc" to "artist-credits genres releases")),
+        MusicBrainzReleaseGroup::class.java,
+    )
 
     suspend fun getReleaseId(combo: AlbumWithTracksCombo): String? = combo.album.musicBrainzReleaseId
         ?: getReleaseId(artist = combo.artists.joined(), album = combo.album.title, trackCount = combo.tracks.size)
@@ -87,6 +118,19 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
         url = "https://coverartarchive.org/release/$releaseId",
         headers = mapOf("User-Agent" to CUSTOM_USER_AGENT),
     ).getObjectOrNull<CoverArtArchiveResponse>()?.images?.filter { it.front }
+
+    suspend fun listReleasesByReleaseGroupId(releaseGroupId: String): List<MusicBrainzRelease> {
+        val params = mapOf(
+            "release-group" to releaseGroupId,
+            "inc" to "recordings artist-credits genres",
+            "status" to "official",
+        )
+
+        return gson.fromJson(
+            request("release", params),
+            MusicBrainzReleaseBrowse::class.java,
+        ).releases
+    }
 
     suspend fun matchAlbumWithTracks(
         combo: IAlbumWithTracksCombo<IAlbum>,
@@ -199,6 +243,13 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
             }
         }
 
+    suspend fun matchArtist(artist: IArtist, lowPrio: Boolean = false): MusicBrainzArtistSearch.Artist? {
+        return search(resource = "artist", query = artist.name, lowPrio = lowPrio)
+            ?.let { gson.fromJson(it, MusicBrainzArtistSearch::class.java) }
+            ?.artists
+            ?.firstOrNull { it.matches(artist.name) }
+    }
+
     fun startMatchingArtists(flow: Flow<List<Artist>>, save: suspend (String, String) -> Unit) {
         if (matchArtistsJob == null) matchArtistsJob = launchOnIOThread {
             val previousIds = mutableSetOf<String>()
@@ -207,13 +258,9 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
                 .map { artists -> artists.filter { it.musicBrainzId == null && !previousIds.contains(it.artistId) } }
                 .collect { artists ->
                     for (artist in artists) {
-                        val matchedId = search(resource = "artist", query = artist.name, lowPrio = true)
-                            ?.let { gson.fromJson(it, MusicBrainzArtistSearch::class.java) }
-                            ?.artists
-                            ?.firstOrNull { it.matches(artist.name) }
-                            ?.id
+                        val match = matchArtist(artist = artist, lowPrio = true)
 
-                        save(artist.artistId, matchedId ?: "")
+                        save(artist.artistId, match?.id ?: "")
                         previousIds.add(artist.artistId)
                     }
                 }
@@ -235,11 +282,6 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     suspend fun getCoverArtArchiveImage(releaseId: String?, releaseGroupId: String?): CoverArtArchiveImage? =
         releaseId?.let { listAllReleaseCoverArt(it)?.firstOrNull() }
             ?: releaseGroupId?.let { getAllReleaseGroupCoverArt(it)?.firstOrNull() }
-
-    private suspend fun getReleaseGroup(id: String): MusicBrainzReleaseGroup? = gson.fromJson(
-        request("release-group/$id", mapOf("inc" to "artist-credits genres releases")),
-        MusicBrainzReleaseGroup::class.java,
-    )?.copy(id = id)
 
     private suspend fun getReleaseId(artist: String?, album: String, trackCount: Int): String? {
         val params = mutableMapOf(
@@ -273,7 +315,7 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     ): String? {
         val query = queryParams
             .map { (key, value) -> "$key:${escapeString(value)}" }
-            .let { if (freeText != null) it.plus(escapeString(freeText)) else it }
+            .let { if (freeText != null) it.plus(freeText.split(' ')) else it }
             .joinToString(" AND ")
 
         return request(

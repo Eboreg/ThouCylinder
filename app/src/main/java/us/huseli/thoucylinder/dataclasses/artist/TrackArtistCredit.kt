@@ -10,7 +10,6 @@ import java.util.UUID
 interface ITrackArtistCredit : IArtistCredit {
     val trackId: String
 
-    override fun withSpotifyId(spotifyId: String): ITrackArtistCredit
     fun withTrackId(trackId: String): ITrackArtistCredit
 
     fun withArtistId(artistId: String) = TrackArtistCredit(
@@ -35,7 +34,6 @@ data class UnsavedTrackArtistCredit(
     override val position: Int = 0,
     override val trackId: String,
 ) : ITrackArtistCredit {
-    override fun withSpotifyId(spotifyId: String): UnsavedTrackArtistCredit = copy(spotifyId = spotifyId)
     override fun withTrackId(trackId: String): UnsavedTrackArtistCredit = copy(trackId = trackId)
 }
 
@@ -62,7 +60,6 @@ data class TrackArtistCredit(
     @Embedded("TrackArtist_image_") override val image: MediaStoreImage? = null,
     @ColumnInfo("TrackArtist_position") override val position: Int = 0,
 ) : ITrackArtistCredit, ISavedArtistCredit {
-    override fun withSpotifyId(spotifyId: String): TrackArtistCredit = copy(spotifyId = spotifyId)
     override fun withTrackId(trackId: String): TrackArtistCredit = copy(trackId = trackId)
 }
 

@@ -62,39 +62,31 @@ class ExternalSearchViewModel @Inject constructor(
 
     override val baseAlbumUiStates: StateFlow<ImmutableList<ImportableAlbumUiState>> = _backend
         .flatMapLatest { it.albumSearchHolder.currentPageItems.map { states -> states.toImmutableList() } }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
     override val baseTrackUiStates: StateFlow<ImmutableList<TrackUiState>> = _trackSearchHolder
         .flatMapLatest { it.currentPageItems.map { states -> states.toImmutableList() } }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
-    override val selectedAlbumIds: StateFlow<List<String>> =
-        _albumSearchHolder.flatMapLatest { it.selectedItemIds }.stateLazily(emptyList())
+    override val selectedAlbumIds: Flow<List<String>> = _albumSearchHolder.flatMapLatest { it.selectedItemIds }
 
     override val selectedTrackStateIds: StateFlow<Collection<String>> =
-        _trackSearchHolder.flatMapLatest { it.selectedItemIds }.stateLazily(emptyList())
+        _trackSearchHolder.flatMapLatest { it.selectedItemIds }.stateWhileSubscribed(emptyList())
 
     val backendKey = _backendKey.asStateFlow()
-
-    val currentPage = _holder.flatMapLatest { it.currentPage }.stateLazily(0)
-    val hasNextPage = _holder.flatMapLatest { it.hasNextPage }.stateLazily(false)
-    val isEmpty = _holder.flatMapLatest { it.isEmpty }.stateLazily(false)
-    val isSearching = _holder.flatMapLatest { it.isLoadingCurrentPage }.stateLazily(false)
-    val searchCapabilities = _holder.mapLatest { it.searchCapabilities }.stateLazily(emptyList())
-
-    /*
-    val isAlbumsEmpty = _albumSearchHolder.flatMapLatest { it.isEmpty }.stateLazily(false)
-    val isSearchingAlbums = _albumSearchHolder.flatMapLatest { it.isLoadingCurrentPage }.stateLazily(false)
-    val isSearchingTracks = _trackSearchHolder.flatMapLatest { it.isLoadingCurrentPage }.stateLazily(false)
-    val isTracksEmpty = _trackSearchHolder.flatMapLatest { it.isEmpty }.stateLazily(false)
-     */
+    val currentPage = _holder.flatMapLatest { it.currentPage }.stateWhileSubscribed(0)
+    val hasNextPage = _holder.flatMapLatest { it.hasNextPage }.stateWhileSubscribed(false)
+    val isEmpty = _holder.flatMapLatest { it.isEmpty }.stateWhileSubscribed(false)
+    val isSearching = _holder.flatMapLatest { it.isLoadingCurrentPage }.stateWhileSubscribed(false)
     val listType = _listType.asStateFlow()
+    val searchCapabilities = _holder.mapLatest { it.searchCapabilities }.stateWhileSubscribed(emptyList())
+
     val searchParams = _listType.flatMapLatest {
         when (it) {
             ExternalListType.ALBUMS -> _albumSearchParams
             ExternalListType.TRACKS -> _trackSearchParams
         }
-    }.stateLazily(SearchParams())
+    }.stateWhileSubscribed(SearchParams())
 
     override fun getAlbumSelectionCallbacks(dialogCallbacks: AppDialogCallbacks): AlbumSelectionCallbacks =
         super.getAlbumSelectionCallbacks(dialogCallbacks).copy(onDeleteClick = null)
@@ -119,10 +111,10 @@ class ExternalSearchViewModel @Inject constructor(
         }
 
     fun getAlbumDownloadUiStateFlow(albumId: String): StateFlow<AlbumDownloadTask.UiState?> =
-        managers.library.getAlbumDownloadUiStateFlow(albumId).stateLazily()
+        managers.library.getAlbumDownloadUiStateFlow(albumId).stateWhileSubscribed()
 
     fun getTrackDownloadUiStateFlow(trackId: String): StateFlow<TrackDownloadTask.UiState?> =
-        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateWhileSubscribed()
 
     fun gotoNextPage() = _currentHolder.gotoNextPage()
     fun gotoPreviousPage() = _currentHolder.gotoPreviousPage()

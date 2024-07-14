@@ -28,6 +28,7 @@ fun <T> ItemGrid(
     modifier: Modifier = Modifier,
     scrollbarState: ScrollbarGridState = rememberScrollbarGridState(),
     isLoading: Boolean = false,
+    loadingText: String? = null,
     contentType: String? = null,
     onLongClick: ((T) -> Unit)? = null,
     isSelected: (T) -> Boolean = { false },
@@ -35,14 +36,13 @@ fun <T> ItemGrid(
     onEmpty: @Composable () -> Unit = {},
     cardContent: @Composable (ColumnScope.(T) -> Unit),
 ) {
-    if (isLoading) IsLoadingProgressIndicator()
-
     ScrollbarGrid(
         state = scrollbarState,
         modifier = modifier,
         contentPadding = PaddingValues(10.dp),
         contentType = contentType,
     ) {
+        if (isLoading) item(span = { GridItemSpan(maxLineSpan) }) { IsLoadingProgressIndicator(text = loadingText) }
         if (things().isEmpty() && !isLoading) item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = { onEmpty() })
         }

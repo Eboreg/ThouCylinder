@@ -44,11 +44,7 @@ fun SearchScreen(modifier: Modifier = Modifier, viewModel: ExternalSearchViewMod
     val dialogCallbacks = LocalAppDialogCallbacks.current
     val hasNextPage by viewModel.hasNextPage.collectAsStateWithLifecycle()
     val isEmpty by viewModel.isEmpty.collectAsStateWithLifecycle()
-    // val isAlbumsEmpty by viewModel.isAlbumsEmpty.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
-    // val isSearchingAlbums by viewModel.isSearchingAlbums.collectAsStateWithLifecycle()
-    // val isSearchingTracks by viewModel.isSearchingTracks.collectAsStateWithLifecycle()
-    // val isTracksEmpty by viewModel.isTracksEmpty.collectAsStateWithLifecycle()
     val listType: ExternalListType by viewModel.listType.collectAsStateWithLifecycle()
     val searchCapabilities: List<SearchCapability> by viewModel.searchCapabilities.collectAsStateWithLifecycle()
     val searchParams by viewModel.searchParams.collectAsStateWithLifecycle()

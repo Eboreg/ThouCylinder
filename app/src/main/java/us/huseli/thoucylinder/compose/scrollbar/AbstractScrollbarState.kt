@@ -129,7 +129,7 @@ abstract class AbstractScrollbarState(progress: Float = 0f, contentType: String?
     }
 
     companion object {
-        const val LOGGING_ENABLED = true
+        const val LOGGING_ENABLED = false
 
         fun calculateListToBarRatio(viewportHeight: Float, handleHeight: Float, listHeight: Float): Float {
             val maxHandleOffset = viewportHeight - handleHeight

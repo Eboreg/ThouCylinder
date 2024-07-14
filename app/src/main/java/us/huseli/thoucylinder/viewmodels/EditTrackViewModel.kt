@@ -11,7 +11,7 @@ class EditTrackViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
 ) : AbstractBaseViewModel() {
-    fun getArtistNameSuggestions(name: String, limit: Int = 10) =
+    suspend fun getArtistNameSuggestions(name: String, limit: Int = 10) =
         repos.artist.getArtistNameSuggestions(name, limit)
 
     fun updateTrack(

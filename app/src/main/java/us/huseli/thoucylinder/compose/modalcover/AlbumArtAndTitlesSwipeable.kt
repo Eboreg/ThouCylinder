@@ -62,8 +62,9 @@ fun AlbumArtAndTitlesSwipeable(
             } else {
                 Logger.log(
                     "ModalCover",
-                    "previousTrackUiState=null = not setting HorizontalDragValue.Previous"
+                    "previousTrackUiState=null = setting HorizontalDragValue.Previous at 0f"
                 )
+                HorizontalDragValue.Previous at 0f
             }
             HorizontalDragValue.Current at 0f
             if (nextTrackUiState != null) {
@@ -75,8 +76,9 @@ fun AlbumArtAndTitlesSwipeable(
             } else {
                 Logger.log(
                     "ModalCover",
-                    "nextTrackUiState=null = not setting HorizontalDragValue.Next"
+                    "nextTrackUiState=null = setting HorizontalDragValue.Next at 0f"
                 )
+                HorizontalDragValue.Next at 0f
             }
         }
     }
@@ -120,8 +122,7 @@ fun AlbumArtAndTitlesSwipeable(
         }
     }
 
-    LaunchedEffect(anchors) {
-        Logger.log("ModalCover", "LaunchedEffect(anchors): anchors=$anchors")
+    LaunchedEffect(previousTrackUiState == null, nextTrackUiState == null) {
         draggableState.updateAnchors(anchors, HorizontalDragValue.Current)
     }
 

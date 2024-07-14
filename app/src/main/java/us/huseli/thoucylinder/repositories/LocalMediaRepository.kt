@@ -12,15 +12,14 @@ import com.anggrayudi.storage.file.isWritable
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import us.huseli.retaintheme.extensions.combineEquals
 import us.huseli.retaintheme.extensions.filterValuesNotNull
 import us.huseli.retaintheme.extensions.mostCommonValue
 import us.huseli.retaintheme.extensions.nullIfEmpty
+import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.copyFrom
 import us.huseli.thoucylinder.copyTo
@@ -42,7 +41,7 @@ import javax.inject.Singleton
 import kotlin.time.Duration.Companion.milliseconds
 
 @Singleton
-class LocalMediaRepository @Inject constructor(@ApplicationContext private val context: Context) : ILogger {
+class LocalMediaRepository @Inject constructor(@ApplicationContext private val context: Context) : ILogger, AbstractScopeHolder() {
     private val _isImportingLocalMedia = MutableStateFlow(false)
 
     val isImportingLocalMedia = _isImportingLocalMedia.asStateFlow()
@@ -101,10 +100,11 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         return documentFile
     }
 
-    fun flowImportableAlbums(
+    private suspend fun getImportableAlbums(
         treeDocumentFile: DocumentFile,
         existingTrackUris: Collection<Uri>,
-    ): Flow<LocalImportableAlbum> = flow {
+        channel: Channel<LocalImportableAlbum>,
+    ) {
         val tracks = mutableListOf<LocalImportableAlbum.LocalImportableTrack>()
         val pathData = ArtistTitlePair.fromDirectory(treeDocumentFile)
         val imageFiles = mutableListOf<DocumentFile>()
@@ -112,21 +112,16 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
         treeDocumentFile.listFiles().forEach { documentFile ->
             if (documentFile.isDirectory) {
                 // Go through subdirectories recursively:
-                emitAll(
-                    flowImportableAlbums(
-                        treeDocumentFile = documentFile,
-                        existingTrackUris = existingTrackUris,
-                    )
-                )
+                getImportableAlbums(documentFile, existingTrackUris, channel)
             } else if (documentFile.isFile && !existingTrackUris.contains(documentFile.uri)) {
                 // Just to avoid copying lots of irrelevant files:
                 val mimeTypeGuess = MimeTypeMap.getSingleton().getMimeTypeFromExtension(documentFile.extension)
 
                 if (mimeTypeGuess?.startsWith("image/") == true) imageFiles.add(documentFile)
                 if (mimeTypeGuess?.startsWith("audio/") == true) {
-                    // Seems like FFprobeKit doesn't get permission to access the file even though we have read/write
-                    // permissions through the DocumentFile API. So we do this stupid copy to temp file shit until we
-                    // have a better solution.
+                    // Seems like FFprobeKit doesn't get permission to access the file even though we have
+                    // read/write permissions through the DocumentFile API. So we do this stupid copy to temp file
+                    // shit until we have a better solution.
                     val tempFile = documentFile.copyTo(context, context.cacheDir)
                     val mediaInfo = FFprobeKit.getMediaInformation(tempFile.path)?.mediaInformation
                     val metadata = tempFile.extractTrackMetadata(mediaInfo)
@@ -134,8 +129,8 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
                     tempFile.delete()
 
                     if (metadata?.mimeType?.startsWith("audio/") == true) {
-                        // Make an educated guess on artist/album names from path. Segment 1 is most likely a standard
-                        // directory like "Music", so drop it:
+                        // Make an educated guess on artist/album names from path. Segment 1 is most likely a
+                        // standard directory like "Music", so drop it:
                         val id3 = mediaInfo?.extractID3Data() ?: ID3Data()
                         val (filenameAlbumPosition, filenameTitle) =
                             Regex("^(\\d+)?[ -.]*(.*)$").find(documentFile.baseName)
@@ -158,8 +153,8 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
             }
         }
 
-        // Group the tracks by distinct musicBrainzReleaseId tags and treat each group as an album. In the absence of
-        // such tags, we will work under the assumption "1 directory == 1 album" for now.
+        // Group the tracks by distinct musicBrainzReleaseId tags and treat each group as an album. In the absence
+        // of such tags, we will work under the assumption "1 directory == 1 album" for now.
         val coverImage = imageFiles
             .sortedByDescending { it.length() }
             .maxByOrNull { it.name?.startsWith("cover.") == true }
@@ -181,7 +176,7 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
                 ?: albumTracks.mapNotNull { it.id3.artist }.mostCommonValue()
                 ?: pathData.artist
 
-            emit(
+            channel.send(
                 LocalImportableAlbum(
                     title = albumTitle,
                     artistName = albumArtist,
@@ -193,6 +188,20 @@ class LocalMediaRepository @Inject constructor(@ApplicationContext private val c
                     thumbnailUrl = coverImage?.uri?.toString(),
                 )
             )
+        }
+    }
+
+    fun importableAlbumsChannel(
+        treeDocumentFile: DocumentFile,
+        existingTrackUris: Collection<Uri>,
+    ): Channel<LocalImportableAlbum> = Channel<LocalImportableAlbum>().also { channel ->
+        launchOnIOThread {
+            getImportableAlbums(
+                treeDocumentFile = treeDocumentFile,
+                existingTrackUris = existingTrackUris,
+                channel = channel,
+            )
+            channel.close()
         }
     }
 

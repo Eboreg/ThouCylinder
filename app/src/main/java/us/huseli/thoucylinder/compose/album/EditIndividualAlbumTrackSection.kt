@@ -32,7 +32,7 @@ fun EditIndividualAlbumTrackSection(
     uiState: TrackUiState,
     trackString: String,
     enabled: Boolean,
-    getArtistNameSuggestions: (String) -> List<String>,
+    getArtistNameSuggestions: suspend (String) -> List<String>,
     onSaveClick: (AlbumTrackSaveData) -> Unit,
     modifier: Modifier = Modifier,
 ) {

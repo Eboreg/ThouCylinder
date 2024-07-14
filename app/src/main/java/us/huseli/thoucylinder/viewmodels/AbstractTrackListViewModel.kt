@@ -6,7 +6,10 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import us.huseli.retaintheme.extensions.launchOnIOThread
+import us.huseli.retaintheme.extensions.launchOnMainThread
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
 import us.huseli.thoucylinder.dataclasses.track.AbstractTrackUiState
 import us.huseli.thoucylinder.dataclasses.track.TrackSelectionCallbacks
@@ -27,28 +30,28 @@ abstract class AbstractTrackListViewModel<T : AbstractTrackUiState>(
     private val selectedTrackStates: StateFlow<List<T>>
         get() = combine(baseTrackUiStates, selectedTrackStateIds) { states, selected ->
             states.filter { selected.contains(it.id) }
-        }.stateEagerly(emptyList())
+        }.stateWhileSubscribed(emptyList())
 
     val selectedTrackCount: StateFlow<Int>
-        get() = selectedTrackStateIds.map { it.size }.distinctUntilChanged().stateLazily(0)
+        get() = selectedTrackStateIds.map { it.size }.distinctUntilChanged().stateWhileSubscribed(0)
 
     val trackUiStates: StateFlow<ImmutableList<T>>
         get() = combine(baseTrackUiStates, selectedTrackStateIds) { states, selected ->
             states
                 .map { state -> setTrackStateIsSelected(state, selected.contains(state.id)) }
                 .toImmutableList()
-        }.stateLazily(persistentListOf())
+        }.stateWhileSubscribed(persistentListOf())
 
     abstract fun setTrackStateIsSelected(state: T, isSelected: Boolean): T
 
     open fun enqueueSelectedTracks() {
-        managers.player.enqueueTracks(getSortedSelectedTrackStates().map { it.trackId })
+        launchOnMainThread { managers.player.enqueueTracks(getSortedSelectedTrackStates().map { it.trackId }) }
     }
 
     open fun getTrackSelectionCallbacks(dialogCallbacks: AppDialogCallbacks) = TrackSelectionCallbacks(
-        onAddToPlaylistClick = { dialogCallbacks.onAddTracksToPlaylistClick(getSortedSelectedTrackStates().map { it.trackId }) },
+        onAddToPlaylistClick = { withSelectedTrackIds(dialogCallbacks.onAddTracksToPlaylistClick) },
         onEnqueueClick = { enqueueSelectedTracks() },
-        onExportClick = { dialogCallbacks.onExportTracksClick(getSortedSelectedTrackStates().map { it.trackId }) },
+        onExportClick = { withSelectedTrackIds(dialogCallbacks.onExportTracksClick) },
         onPlayClick = { playSelectedTracks() },
         onSelectAllClick = { repos.track.selectTracks(selectionKey, baseTrackUiStates.value.map { it.id }) },
         onUnselectAllClick = { unselectAllTracks() },
@@ -63,7 +66,7 @@ abstract class AbstractTrackListViewModel<T : AbstractTrackUiState>(
     }
 
     open fun playSelectedTracks() {
-        managers.player.playTracks(getSortedSelectedTrackStates().map { it.trackId })
+        launchOnMainThread { managers.player.playTracks(getSortedSelectedTrackStates().map { it.trackId }) }
     }
 
     open fun playTrack(state: AbstractTrackUiState) {
@@ -74,8 +77,8 @@ abstract class AbstractTrackListViewModel<T : AbstractTrackUiState>(
         repos.track.toggleTrackSelected(selectionKey, trackId)
     }
 
-    fun getSortedSelectedTrackStates(): List<T> = selectedTrackStates.value
-        .sortedLike(baseTrackUiStates.value, key = { it.id })
+    suspend fun getSortedSelectedTrackStates(): List<T> =
+        selectedTrackStates.first().sortedLike(baseTrackUiStates.value, key = { it.id })
 
     fun onTrackClick(state: AbstractTrackUiState) {
         if (isTrackSelectEnabled()) toggleTrackSelected(state.id)
@@ -95,5 +98,9 @@ abstract class AbstractTrackListViewModel<T : AbstractTrackUiState>(
             ?: listOf(to)
 
         repos.track.selectTracks(selectionKey, stateIds)
+    }
+
+    private fun withSelectedTrackIds(callback: (List<String>) -> Unit) {
+        launchOnIOThread { callback(getSortedSelectedTrackStates().map { it.trackId }) }
     }
 }

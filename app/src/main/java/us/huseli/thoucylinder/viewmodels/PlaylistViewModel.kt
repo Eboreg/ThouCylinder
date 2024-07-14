@@ -30,12 +30,12 @@ class PlaylistViewModel @Inject constructor(
     private val _trackUiStates = MutableStateFlow<List<TrackUiState>>(emptyList())
 
     override val baseTrackUiStates: StateFlow<ImmutableList<TrackUiState>> =
-        _trackUiStates.map { it.toImmutableList() }.stateEagerly(persistentListOf())
+        _trackUiStates.map { it.toImmutableList() }.stateWhileSubscribed(persistentListOf())
 
     val playlistState: StateFlow<PlaylistUiState?> =
         combine(_playlistId, repos.playlist.playlistUiStates) { playlistId, states ->
             states.find { it.id == playlistId }
-        }.stateLazily()
+        }.stateWhileSubscribed()
     val isLoadingTracks = _isLoadingTracks.asStateFlow()
 
     init {
@@ -58,7 +58,7 @@ class PlaylistViewModel @Inject constructor(
         managers.playlist.deletePlaylist(playlistId = _playlistId.value, onGotoPlaylistClick = onGotoPlaylistClick)
 
     fun getTrackDownloadUiStateFlow(trackId: String) =
-        managers.library.getTrackDownloadUiStateFlow(trackId).stateLazily()
+        managers.library.getTrackDownloadUiStateFlow(trackId).stateWhileSubscribed()
 
     fun onMoveTrack(from: Int, to: Int) {
         _trackUiStates.value = _trackUiStates.value.toMutableList().apply { add(to, removeAt(from)) }

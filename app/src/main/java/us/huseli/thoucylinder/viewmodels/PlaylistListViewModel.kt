@@ -24,12 +24,12 @@ class PlaylistListViewModel @Inject constructor(
 
     val isEmpty: StateFlow<Boolean> = combine(_isLoading, repos.playlist.playlistUiStates) { isLoading, states ->
         states.isEmpty() && !isLoading
-    }.stateLazily(false)
+    }.stateWhileSubscribed(false)
     val isLoading = _isLoading.asStateFlow()
     val playlistUiStates: StateFlow<ImmutableList<PlaylistUiState>> = repos.playlist.playlistUiStates
         .onStart { _isLoading.value = true }
         .onEach { _isLoading.value = false }
-        .stateLazily(persistentListOf())
+        .stateWhileSubscribed(persistentListOf())
 
     fun addTracksToPlaylist(
         playlistId: String,

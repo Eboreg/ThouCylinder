@@ -3,18 +3,14 @@ package us.huseli.thoucylinder.managers
 import androidx.core.net.toUri
 import androidx.media3.common.PlaybackException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import us.huseli.thoucylinder.AbstractScopeHolder
-import us.huseli.thoucylinder.dataclasses.album.Album
-import us.huseli.thoucylinder.dataclasses.artist.AlbumArtistCredit
-import us.huseli.thoucylinder.dataclasses.artist.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.track.ISavedTrackCombo
 import us.huseli.thoucylinder.dataclasses.track.QueueTrackCombo
-import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.enums.PlaybackState
 import us.huseli.thoucylinder.interfaces.ILogger
-import us.huseli.thoucylinder.interfaces.PlayerRepositoryListener
 import us.huseli.thoucylinder.repositories.PlayerRepository
 import us.huseli.thoucylinder.repositories.Repositories
 import javax.inject.Inject
@@ -23,13 +19,13 @@ import javax.inject.Singleton
 @Singleton
 class PlayerManager @Inject constructor(
     private val repos: Repositories,
-) : AbstractScopeHolder(), PlayerRepositoryListener, ILogger {
+) : AbstractScopeHolder(), PlayerRepository.Listener, ILogger {
     init {
         repos.player.addListener(this)
     }
 
     fun enqueueAlbums(albumIds: Collection<String>) {
-        launchOnMainThread { enqueueQueueTrackCombos(flowQueueTrackCombosByAlbumId(albumIds)) }
+        launchOnMainThread { enqueueQueueTrackCombos(flowQueueTrackCombosByAlbumIds(albumIds)) }
     }
 
     fun enqueueArtist(artistId: String) {
@@ -51,16 +47,22 @@ class PlayerManager @Inject constructor(
 
     fun playAlbum(albumId: String, startIndex: Int = 0) {
         launchOnMainThread {
-            playQueueTrackCombos(flowQueueTrackCombosByAlbumId(listOf(albumId)), startIndex)
+            playQueueTrackCombos(
+                combos = flowQueueTrackCombos(
+                    trackCombos = repos.track.listTrackCombosByAlbumId(albumId),
+                    startIndex = startIndex,
+                ),
+                firstTrackPos = startIndex,
+            )
         }
     }
 
     fun playAlbums(albumIds: Collection<String>) {
-        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByAlbumId(albumIds), 0) }
+        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByAlbumIds(albumIds)) }
     }
 
     fun playArtist(artistId: String) {
-        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByArtistId(artistId), 0) }
+        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByArtistId(artistId)) }
     }
 
     fun playPlaylist(playlistId: String, startTrackId: String? = null) {
@@ -91,7 +93,7 @@ class PlayerManager @Inject constructor(
     }
 
     fun playTracks(trackIds: Collection<String>) {
-        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByTrackId(trackIds), 0) }
+        launchOnMainThread { playQueueTrackCombos(flowQueueTrackCombosByTrackId(trackIds)) }
     }
 
     private suspend fun enqueueQueueTrackCombos(combos: Flow<QueueTrackCombo>) {
@@ -106,13 +108,16 @@ class PlayerManager @Inject constructor(
         }
     }
 
-    private fun flowQueueTrackCombos(trackCombos: Collection<ISavedTrackCombo>) = flow {
-        for (combo in trackCombos) {
-            getQueueTrackComboByTrackCombo(combo)?.also { emit(it) }
+    private fun flowQueueTrackCombos(trackCombos: List<ISavedTrackCombo>, startIndex: Int = 0) = flow {
+        if (trackCombos.size > startIndex) {
+            getQueueTrackComboByTrackCombo(trackCombos[startIndex])?.also { emit(it) }
+        }
+        for ((index, combo) in trackCombos.withIndex()) {
+            if (index != startIndex) getQueueTrackComboByTrackCombo(combo)?.also { emit(it) }
         }
     }
 
-    private suspend fun flowQueueTrackCombosByAlbumId(albumIds: Collection<String>) =
+    private suspend fun flowQueueTrackCombosByAlbumIds(albumIds: Collection<String>) =
         flowQueueTrackCombos(albumIds.flatMap { repos.track.listTrackCombosByAlbumId(it) })
 
     private suspend fun flowQueueTrackCombosByArtistId(artistId: String) =
@@ -124,53 +129,55 @@ class PlayerManager @Inject constructor(
     private suspend fun flowQueueTrackCombosByTrackId(trackIds: Collection<String>): Flow<QueueTrackCombo> =
         flowQueueTrackCombos(repos.track.listTrackCombosById(trackIds))
 
-    private suspend fun getQueueTrackComboByTrackCombo(combo: ISavedTrackCombo) = getQueueTrackCombo(
-        track = combo.track,
-        album = combo.album,
-        albumArtists = combo.albumArtists,
-        trackArtists = combo.trackArtists,
-    )
-
-    private suspend fun getQueueTrackComboByTrackId(trackId: String): QueueTrackCombo? =
-        repos.track.getTrackComboById(trackId)?.let { combo ->
-            getQueueTrackComboByTrackCombo(combo)
-        }
-
-    private suspend fun getQueueTrackCombo(
-        track: Track,
-        album: Album? = null,
-        albumArtists: List<AlbumArtistCredit>? = null,
-        trackArtists: List<TrackArtistCredit>? = null,
-    ): QueueTrackCombo? {
+    private suspend fun getQueueTrackComboByTrackCombo(combo: ISavedTrackCombo): QueueTrackCombo? {
         val updatedTrack = repos.youtube.ensureTrackPlayUri(
-            track = track,
-            albumArtists = albumArtists,
-            trackArtists = trackArtists,
+            track = combo.track,
+            albumArtists = combo.albumArtists,
+            trackArtists = combo.trackArtists,
         ) { repos.track.upsertTrack(it) }
 
         return updatedTrack.playUri?.let { uri ->
             QueueTrackCombo(
                 track = updatedTrack,
                 uri = uri,
-                album = album,
-                albumArtists = albumArtists ?: emptyList(),
-                trackArtists = trackArtists ?: emptyList(),
+                album = combo.album,
+                albumArtists = combo.albumArtists,
+                trackArtists = combo.trackArtists,
             )
         }
     }
 
-    private suspend fun playQueueTrackCombos(combos: Flow<QueueTrackCombo>, startIndex: Int) {
-        var index = 0
+    private suspend fun getQueueTrackComboByTrackId(trackId: String): QueueTrackCombo? =
+        repos.track.getTrackComboById(trackId)?.let { combo ->
+            getQueueTrackComboByTrackCombo(combo)
+        }
 
-        combos.collect { combo ->
+    private suspend fun playQueueTrackCombos(combos: Flow<QueueTrackCombo>) {
+        combos.collectIndexed { index, combo ->
+            if (index == 0) repos.player.replaceAndPlay(combo)
+            else repos.player.insertLast(combo)
+        }
+    }
+
+    private suspend fun playQueueTrackCombos(combos: Flow<QueueTrackCombo>, firstTrackPos: Int) {
+        /** firstTrackPos = position in the queue where we will put the first track received from the flow. */
+        combos.collectIndexed { index, combo ->
             if (index == 0) {
-                if (startIndex == 0) repos.player.replaceAndPlay(combo)
+                repos.player.replaceAndPlay(combo)
+            } else if (index <= firstTrackPos) {
+                repos.player.insert(combo, index - 1)
+            } else {
+                repos.player.insertLast(combo)
+            }
+            /*
+            if (index == 0) {
+                if (firstTrackPos == 0) repos.player.replaceAndPlay(combo)
                 else repos.player.replace(combo)
             } else {
-                if (index == startIndex) repos.player.insertLastAndPlay(combo)
+                if (index == firstTrackPos) repos.player.insertLastAndPlay(combo)
                 else repos.player.insertLast(combo)
             }
-            index++
+             */
         }
     }
 

@@ -5,7 +5,6 @@ interface IArtistCredit : IArtist, Comparable<IArtistCredit> {
     val position: Int
 
     override fun compareTo(other: IArtistCredit): Int = position - other.position
-    fun withSpotifyId(spotifyId: String): IArtistCredit
 }
 
 fun Collection<IArtistCredit>.joined(): String? = takeIf { it.isNotEmpty() }

@@ -2,7 +2,6 @@ package us.huseli.thoucylinder.externalcontent
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -19,12 +18,9 @@ import us.huseli.thoucylinder.externalcontent.holders.AbstractSearchHolder
 import us.huseli.thoucylinder.repositories.Repositories
 
 class SpotifyBackend(private val repos: Repositories) : IExternalSearchBackend<SpotifySimplifiedAlbum>, IExternalImportBackend<SpotifyAlbum> {
-    override val canImport = MutableStateFlow(false)
-
     override val albumImportHolder: AbstractAlbumImportHolder<SpotifyAlbum> =
         object : AbstractAlbumImportHolder<SpotifyAlbum>() {
-            private val _previouslyImportedIds = mutableListOf<String>()
-
+            override val canImport = repos.spotify.oauth2PKCE.isAuthorized
             override val totalItemCount: Flow<Int> = combine(
                 searchTerm,
                 repos.spotify.totalUserAlbumCount,
@@ -47,25 +43,22 @@ class SpotifyBackend(private val repos: Repositories) : IExternalSearchBackend<S
                 albumId = albumId,
             )
 
-            override suspend fun doStart() {
-                _previouslyImportedIds.addAll(repos.spotify.listSpotifyAlbumIds())
-                super.doStart()
-            }
-
             override fun getExternalAlbumChannel(): Channel<SpotifyAlbum> = Channel<SpotifyAlbum>().also { channel ->
                 launchOnIOThread {
                     repos.spotify.oauth2PKCE.isAuthorized.collectLatest { authorized ->
+                        _items.value = emptyList()
+                        _allItemsFetched.value = false
                         if (authorized) {
-                            canImport.value = true
                             for (spotifyAlbum in repos.spotify.userAlbumsChannel()) {
                                 channel.send(spotifyAlbum)
                             }
-                        } else {
-                            canImport.value = false
                         }
+                        _allItemsFetched.value = true
                     }
                 }
             }
+
+            override suspend fun getPreviouslyImportedIds(): List<String> = repos.spotify.listSpotifyAlbumIds()
         }
 
     override val albumSearchHolder = object : AbstractAlbumSearchHolder<SpotifySimplifiedAlbum>() {

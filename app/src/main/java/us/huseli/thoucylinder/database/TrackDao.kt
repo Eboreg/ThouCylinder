@@ -156,7 +156,12 @@ abstract class TrackDao {
     @Query("SELECT * FROM TrackCombo WHERE Track_trackId = :trackId")
     abstract suspend fun getTrackComboById(trackId: String): TrackCombo?
 
-    @Query("SELECT Track_localUri FROM Track WHERE Track_localUri IS NOT NULL")
+    @Query(
+        """
+        SELECT Track_localUri FROM TrackCombo
+        WHERE Track_localUri IS NOT NULL AND (Album_isHidden IS NULL OR Album_isHidden != 1)
+        """
+    )
     abstract suspend fun listLocalUris(): List<String>
 
     @Query("SELECT * FROM Track WHERE Track_albumId IS NULL")
@@ -166,7 +171,7 @@ abstract class TrackDao {
     @Query(
         """
         SELECT * FROM TrackCombo WHERE Track_isInLibrary = 1 AND Track_trackId NOT IN (:exceptTrackIds)
-            AND Track_spotifyId NOT IN (:exceptSpotifyTrackIds)
+            AND (Track_spotifyId IS NULL OR Track_spotifyId NOT IN (:exceptSpotifyTrackIds))
         ORDER BY RANDOM() LIMIT :limit
         """
     )

@@ -4,6 +4,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -13,8 +14,8 @@ import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.RadioTrackChannel
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.radio.Radio
-import us.huseli.thoucylinder.dataclasses.radio.RadioUiState
 import us.huseli.thoucylinder.dataclasses.radio.RadioCombo
+import us.huseli.thoucylinder.dataclasses.radio.RadioUiState
 import us.huseli.thoucylinder.enums.RadioStatus
 import us.huseli.thoucylinder.enums.RadioType
 import us.huseli.thoucylinder.interfaces.ILogger
@@ -95,6 +96,7 @@ class RadioManager @Inject constructor(
 
     private suspend fun startRadio(radio: RadioCombo) {
         val worker = RadioTrackChannel(radio = radio, repos = repos)
+        var firstTrack = true
 
         this.worker = worker
         radioStatus.value = RadioStatus.LOADING
@@ -103,6 +105,7 @@ class RadioManager @Inject constructor(
             if (!radio.isInitialized) {
                 handleNextRadioTrack(worker = worker, clearAndPlay = true)
                 radioDao.setIsInitialized(worker.radio.id)
+                firstTrack = false
             }
 
             combineTransform(repos.player.trackCount, repos.player.tracksLeft) { trackCount, tracksLeft ->
@@ -110,11 +113,13 @@ class RadioManager @Inject constructor(
                     if (radioStatus.value == RadioStatus.LOADED) radioStatus.value = RadioStatus.LOADING_MORE
                     emit(true)
                 } else radioStatus.value = RadioStatus.LOADED
-            }.collect {
+            }.collectLatest {
                 handleNextRadioTrack(worker = worker)
+                firstTrack = false
             }
         } catch (e: ClosedReceiveChannelException) {
             deactivateRadio()
+            if (firstTrack) repos.message.onRadioRecommendationsNotFound(radio.title)
         } catch (e: Throwable) {
             logError(e)
         }

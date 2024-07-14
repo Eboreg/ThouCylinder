@@ -8,7 +8,7 @@ import us.huseli.thoucylinder.enums.AlbumType
 data class ImportableAlbumUiState(
     override val albumId: String,
     override val albumType: AlbumType?,
-    override val fullImageUri: String?,
+    override val fullImageUrl: String?,
     override val isInLibrary: Boolean,
     override val isLocal: Boolean,
     override val isOnYoutube: Boolean,
@@ -16,7 +16,7 @@ data class ImportableAlbumUiState(
     override val musicBrainzReleaseGroupId: String?,
     override val musicBrainzReleaseId: String?,
     override val spotifyWebUrl: String?,
-    override val thumbnailUri: String?,
+    override val thumbnailUrl: String?,
     override val title: String,
     override val trackCount: Int?,
     override val yearString: String?,

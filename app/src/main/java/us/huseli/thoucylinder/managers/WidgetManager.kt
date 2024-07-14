@@ -21,22 +21,22 @@ class WidgetManager @Inject constructor(
 ) : AbstractScopeHolder() {
     val albumArtAverageColor: StateFlow<Color?> = repos.player.currentCombo.map { combo ->
         combo?.let { repos.image.getTrackComboFullImageBitmap(it) }?.getAverageColor()?.copy(alpha = 0.3f)
-    }.stateLazily()
+    }.stateWhileSubscribed()
     val canGotoNext = repos.player.canGotoNext
     val canGotoPrevious = repos.player.canGotoPrevious
-    val canPlay = repos.player.canPlay.stateLazily(false)
+    val canPlay = repos.player.canPlay.stateWhileSubscribed(false)
     val currentBitmap: StateFlow<Bitmap?> = repos.player.currentCombo
         .map { combo ->
             combo?.album?.albumArt?.fullUri?.getFullBitmap(context, saveToCache = true)
                 ?: combo?.track?.image?.fullUri?.getFullBitmap(context, saveToCache = true)
         }
         .distinctUntilChanged()
-        .stateLazily()
+        .stateWhileSubscribed()
     val currentTrackString: StateFlow<String?> = repos.player.currentCombo
         .map { combo -> combo?.let { listOfNotNull(it.artistString, it.track.title) }?.joinToString(" • ") }
         .distinctUntilChanged()
-        .stateLazily()
-    val isPlaying = repos.player.isPlaying.stateLazily(false)
+        .stateWhileSubscribed()
+    val isPlaying = repos.player.isPlaying.stateWhileSubscribed(false)
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 

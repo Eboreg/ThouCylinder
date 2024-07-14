@@ -1,6 +1,7 @@
 package us.huseli.thoucylinder.repositories
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.DpSize
@@ -17,12 +18,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import us.huseli.retaintheme.extensions.sanitizeFilename
+import us.huseli.thoucylinder.Constants.PREF_APP_START_COUNT
 import us.huseli.thoucylinder.Constants.PREF_AUTO_IMPORT_LOCAL_MUSIC
 import us.huseli.thoucylinder.Constants.PREF_LIBRARY_RADIO_NOVELTY
 import us.huseli.thoucylinder.Constants.PREF_LOCAL_MUSIC_URI
 import us.huseli.thoucylinder.Constants.PREF_REGION
 import us.huseli.thoucylinder.Constants.PREF_UMLAUTIFY
-import us.huseli.thoucylinder.Constants.PREF_WELCOME_DIALOG_SHOWN
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.Umlautify
 import us.huseli.thoucylinder.compose.DisplayType
@@ -38,12 +39,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SettingsRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class SettingsRepository @Inject constructor(@ApplicationContext private val context: Context) : SharedPreferences.OnSharedPreferenceChangeListener {
     private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
 
     private val _albumSearchTerm = MutableStateFlow("")
     private val _albumSortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _albumSortParameter = MutableStateFlow(AlbumSortParameter.ARTIST)
+    private val _appStartCount = MutableStateFlow(preferences.getInt(PREF_APP_START_COUNT, 1))
     private val _artistSearchTerm = MutableStateFlow("")
     private val _artistSortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _artistSortParameter = MutableStateFlow(ArtistSortParameter.NAME)
@@ -53,7 +55,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         else null
     )
     private val _contentSize = MutableStateFlow(Size.Zero)
-    private val _isWelcomeDialogShown = MutableStateFlow(preferences.getBoolean(PREF_WELCOME_DIALOG_SHOWN, false))
     private val _libraryAlbumTagFilter = MutableStateFlow<ImmutableList<TagPojo>>(persistentListOf())
     private val _libraryAvailabilityFilter = MutableStateFlow(AvailabilityFilter.ALL)
     private val _libraryDisplayType = MutableStateFlow(DisplayType.LIST)
@@ -73,12 +74,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     val albumSearchTerm = _albumSearchTerm.asStateFlow()
     val albumSortOrder = _albumSortOrder.asStateFlow()
     val albumSortParameter = _albumSortParameter.asStateFlow()
+    val appStartCount = _appStartCount.asStateFlow()
     val artistSearchTerm = _artistSearchTerm.asStateFlow()
     val artistSortOrder = _artistSortOrder.asStateFlow()
     val artistSortParameter = _artistSortParameter.asStateFlow()
     val autoImportLocalMusic: StateFlow<Boolean?> = _autoImportLocalMusic.asStateFlow()
     val contentSize: StateFlow<Size> = _contentSize.asStateFlow()
-    val isWelcomeDialogShown: StateFlow<Boolean> = _isWelcomeDialogShown.asStateFlow()
     val libraryAlbumTagFilter = _libraryAlbumTagFilter.asStateFlow()
     val libraryAvailabilityFilter = _libraryAvailabilityFilter.asStateFlow()
     val libraryDisplayType = _libraryDisplayType.asStateFlow()
@@ -94,6 +95,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     init {
         Umlautify.setEnabled(preferences.getBoolean(PREF_UMLAUTIFY, false))
+        preferences.registerOnSharedPreferenceChangeListener(this)
     }
 
     fun createAlbumDirectory(albumTitle: String, artistString: String?): DocumentFile? {
@@ -130,7 +132,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     fun setAutoImportLocalMusic(value: Boolean) {
-        _autoImportLocalMusic.value = value
         preferences.edit().putBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, value).apply()
     }
 
@@ -151,7 +152,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     fun setLibraryRadioNovelty(value: Float) {
-        _libraryRadioNovelty.value = value
         preferences.edit().putFloat(PREF_LIBRARY_RADIO_NOVELTY, value).apply()
     }
 
@@ -160,12 +160,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     fun setLocalMusicUri(value: Uri?) {
-        _localMusicUri.value = value
         preferences.edit().putString(PREF_LOCAL_MUSIC_URI, value?.toString()).apply()
     }
 
     fun setRegion(value: Region) {
-        _region.value = value
         preferences.edit().putString(PREF_REGION, value.name).apply()
     }
 
@@ -188,12 +186,21 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     fun setUmlautify(value: Boolean) {
-        Umlautify.setEnabled(value)
         preferences.edit().putBoolean(PREF_UMLAUTIFY, value).apply()
     }
 
-    fun setWelcomeDialogShown(value: Boolean) {
-        preferences.edit().putBoolean(PREF_WELCOME_DIALOG_SHOWN, value).apply()
-        _isWelcomeDialogShown.value = value
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        when (key) {
+            PREF_APP_START_COUNT -> _appStartCount.value = preferences.getInt(PREF_APP_START_COUNT, 1)
+            PREF_UMLAUTIFY -> Umlautify.setEnabled(preferences.getBoolean(PREF_UMLAUTIFY, false))
+            PREF_LOCAL_MUSIC_URI -> _localMusicUri.value = preferences.getString(PREF_LOCAL_MUSIC_URI, null)?.toUri()
+            PREF_LIBRARY_RADIO_NOVELTY -> _libraryRadioNovelty.value =
+                preferences.getFloat(PREF_LIBRARY_RADIO_NOVELTY, 0.5f)
+            PREF_AUTO_IMPORT_LOCAL_MUSIC -> _autoImportLocalMusic.value =
+                preferences.getBoolean(PREF_AUTO_IMPORT_LOCAL_MUSIC, false)
+            PREF_REGION -> preferences.getString(PREF_REGION, null)
+                ?.let { Region.valueOf(it) }
+                ?.also { _region.value = it }
+        }
     }
 }

@@ -25,13 +25,13 @@ import kotlin.time.DurationUnit
 class ModalCoverViewModel @Inject constructor(private val repos: Repositories) : AbstractBaseViewModel() {
     val albumArtAverageColor: StateFlow<Color?> = repos.player.currentCombo.map { combo ->
         combo?.let { repos.image.getTrackComboFullImageBitmap(it) }?.getAverageColor()?.copy(alpha = 0.3f)
-    }.stateLazily()
+    }.stateWhileSubscribed()
     val isLoading: StateFlow<Boolean> = repos.player.isLoading
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val currentAmplitudes: StateFlow<ImmutableList<Int>> = repos.player.currentCombo.flatMapLatest { combo ->
         combo?.track?.let { repos.track.flowAmplitudes(it.trackId) } ?: emptyFlow()
-    }.stateLazily(waveList(100, 0, 12, 3).toImmutableList())
+    }.stateWhileSubscribed(waveList(100, 0, 12, 3).toImmutableList())
 
     val booleans = combine(
         repos.player.canGotoNext,
@@ -49,7 +49,7 @@ class ModalCoverViewModel @Inject constructor(private val repos: Repositories) :
             isRepeatEnabled = booleans[4],
             isShuffleEnabled = booleans[5],
         )
-    }.distinctUntilChanged().stateLazily(ModalCoverBooleans())
+    }.distinctUntilChanged().stateWhileSubscribed(ModalCoverBooleans())
 
     val currentProgress: StateFlow<Float> =
         combine(repos.player.currentPositionMs, repos.player.currentCombo) { position, combo ->
@@ -57,7 +57,7 @@ class ModalCoverViewModel @Inject constructor(private val repos: Repositories) :
                 ?.takeIf { it > 0 }
                 ?.let { position / it.toFloat() }
                 ?: 0f
-        }.distinctUntilChanged().stateLazily(0f)
+        }.distinctUntilChanged().stateWhileSubscribed(0f)
 
     val nextTrackUiState: StateFlow<ModalCoverTrackUiStateLight?> = repos.player.nextCombo.map { combo ->
         combo?.let {
@@ -67,7 +67,7 @@ class ModalCoverViewModel @Inject constructor(private val repos: Repositories) :
                 title = it.track.title,
             )
         }
-    }.distinctUntilChanged().stateLazily()
+    }.distinctUntilChanged().stateWhileSubscribed()
 
     val previousTrackUiState: StateFlow<ModalCoverTrackUiStateLight?> = repos.player.previousCombo.map { combo ->
         combo?.let {
@@ -77,7 +77,7 @@ class ModalCoverViewModel @Inject constructor(private val repos: Repositories) :
                 title = it.track.title,
             )
         }
-    }.distinctUntilChanged().stateLazily()
+    }.distinctUntilChanged().stateWhileSubscribed()
 
     val trackUiState: StateFlow<ModalCoverTrackUiState?> = repos.player.currentCombo.map { combo ->
         if (combo != null) {
@@ -103,7 +103,7 @@ class ModalCoverViewModel @Inject constructor(private val repos: Repositories) :
                 youtubeWebUrl = combo.track.youtubeWebUrl,
             )
         } else null
-    }.distinctUntilChanged().stateLazily()
+    }.distinctUntilChanged().stateWhileSubscribed()
 
     fun playOrPauseCurrent() = repos.player.playOrPauseCurrent()
 

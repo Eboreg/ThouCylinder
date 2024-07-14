@@ -20,7 +20,7 @@ data class YoutubePlaylistCombo(val playlist: YoutubePlaylist, val videos: Immut
     data class AlbumMatch(
         val distance: Double,
         val albumCombo: UnsavedAlbumWithTracksCombo,
-        val playlistCombo: YoutubePlaylistCombo,
+        val playlistId: String,
     )
 
     override val albumType: AlbumType?
@@ -73,8 +73,11 @@ data class YoutubePlaylistCombo(val playlist: YoutubePlaylist, val videos: Immut
         )
     }
 
-    fun <T : IAlbumWithTracksCombo<IAlbum>> matchAlbumWithTracks(combo: T): AlbumMatch =
-        AlbumMatch(distance = getAlbumDistance(combo), albumCombo = mergeWithAlbumCombo(combo), playlistCombo = this)
+    fun <T : IAlbumWithTracksCombo<IAlbum>> matchAlbumWithTracks(combo: T): AlbumMatch = AlbumMatch(
+        distance = getAlbumDistance(combo),
+        albumCombo = mergeWithAlbumCombo(combo),
+        playlistId = playlist.id,
+    )
 
     private fun getAlbumDistance(combo: IAlbumWithTracksCombo<*>): Double {
         /**

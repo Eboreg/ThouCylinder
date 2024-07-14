@@ -1,6 +1,8 @@
 package us.huseli.thoucylinder
 
+import android.Manifest
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import androidx.activity.ComponentActivity
@@ -11,7 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.preference.PreferenceManager
 import dagger.hilt.android.AndroidEntryPoint
+import us.huseli.thoucylinder.Constants.PREF_APP_START_COUNT
 import us.huseli.thoucylinder.compose.App
 import us.huseli.thoucylinder.compose.FistopyTheme
 import us.huseli.thoucylinder.viewmodels.AppViewModel
@@ -34,7 +38,15 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
+        val preferences = PreferenceManager.getDefaultSharedPreferences(this)
+        val appStartCount = (preferences.getInt(PREF_APP_START_COUNT, 0) + 1).also {
+            preferences.edit().putInt(PREF_APP_START_COUNT, it).apply()
+        }
         val startDestination: String = intent?.let { handleIntent(it) } ?: LibraryDestination.route
+
+        if (appStartCount <= 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 666)
+        }
 
         /**
          * Recomposition of the below happens at app start for unknown reasons ... hopefully, it only happens when run

@@ -6,8 +6,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import us.huseli.thoucylinder.dataclasses.album.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.album.IAlbum
-import us.huseli.thoucylinder.dataclasses.album.IAlbumCombo
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifyAlbum
 import us.huseli.thoucylinder.dataclasses.spotify.SpotifySimplifiedAlbum
@@ -62,14 +60,9 @@ class SpotifyBackend(private val repos: Repositories) : IExternalSearchBackend<S
         }
 
     override val albumSearchHolder = object : AbstractAlbumSearchHolder<SpotifySimplifiedAlbum>() {
-        private var _existingAlbumCombos: Map<String, AlbumCombo>? = null
-
         override val isTotalCountExact: Flow<Boolean> = flowOf(true)
         override val searchCapabilities: List<SearchCapability> =
             listOf(SearchCapability.ALBUM, SearchCapability.ARTIST, SearchCapability.FREE_TEXT)
-
-        private suspend fun getExistingAlbumCombos(): Map<String, AlbumCombo> =
-            _existingAlbumCombos ?: repos.album.listSpotifyAlbumCombos().also { _existingAlbumCombos = it }
 
         override suspend fun convertToAlbumWithTracks(
             externalAlbum: SpotifySimplifiedAlbum,
@@ -80,11 +73,11 @@ class SpotifyBackend(private val repos: Repositories) : IExternalSearchBackend<S
             albumId = albumId,
         )
 
-        override suspend fun externalAlbumToAlbumCombo(externalAlbum: SpotifySimplifiedAlbum): IAlbumCombo<IAlbum> =
-            getExistingAlbumCombos()[externalAlbum.id] ?: super.externalAlbumToAlbumCombo(externalAlbum)
-
         override fun getExternalAlbumChannel(searchParams: SearchParams): Channel<SpotifySimplifiedAlbum> =
             repos.spotify.albumSearchChannel(searchParams)
+
+        override suspend fun loadExistingAlbumCombos(): Map<String, AlbumCombo> =
+            repos.album.mapAlbumCombosBySearchBackend(SearchBackend.SPOTIFY)
     }
 
     override val trackSearchHolder = object : AbstractSearchHolder<TrackUiState>() {

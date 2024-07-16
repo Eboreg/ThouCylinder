@@ -7,8 +7,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.Flow
 import us.huseli.thoucylinder.dataclasses.radio.Radio
 import us.huseli.thoucylinder.dataclasses.radio.RadioCombo
@@ -54,8 +52,4 @@ abstract class RadioDao {
 
     @Query("UPDATE Radio SET Radio_isInitialized = 1 WHERE Radio_id = :radioId")
     abstract suspend fun setIsInitialized(radioId: String)
-
-    companion object {
-        val gson: Gson = GsonBuilder().create()
-    }
 }

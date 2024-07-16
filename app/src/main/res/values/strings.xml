@@ -31,6 +31,7 @@
     <string name="availability">Availability</string>
     <string name="available_albums">Available albums</string>
     <string name="browse_artist_on_spotify">Browse artist on Spotify</string>
+    <string name="buttons">Buttons</string>
     <string name="cancel">Cancel</string>
     <string name="cancel_download">Cancel download</string>
     <string name="cannot_delete_albums_while_auto_import">Cannot delete albums while auto import is in progress. Wait until it\'s done.</string>
@@ -78,6 +79,7 @@
     <string name="filters">Filters</string>
     <string name="forget_spotify_profile">Forget Spotify user profile</string>
     <string name="forget_spotify_profile_description">Your Spotify profile is used for importing your saved albums. Click here if you want this app to forget it for some reason.</string>
+    <string name="forward_10s">Forward 10s</string>
     <string name="free_text">Free text</string>
     <string name="genres">Genres</string>
     <string name="go_back">Go back</string>
@@ -138,6 +140,7 @@
     <string name="musicbrainz">Musicbrainz</string>
     <string name="name">Name</string>
     <string name="next">Next</string>
+    <string name="next_track">Next track</string>
     <string name="no_albums_found">No albums found.</string>
     <string name="no_artists_found">No artists found.</string>
     <string name="no_downloads_found">No downloads found.</string>
@@ -166,9 +169,11 @@
     <string name="play_local_music_files">Play local music files</string>
     <string name="play_on_spotify">Play on Spotify</string>
     <string name="play_on_youtube">Play on Youtube</string>
+    <string name="play_pause">Play/pause</string>
     <string name="playlist_exported_to_x">Playlist exported to %1$s.</string>
     <string name="playlists">Playlists</string>
     <string name="previous">Previous</string>
+    <string name="previous_track">Previous track</string>
     <string name="puts_metal_umlauts_above_random_letters_because_its_cool">Puts metal umlauts above random letters, because it\'s cool.</string>
     <string name="queue">Queue</string>
     <string name="radio">Radio</string>
@@ -182,6 +187,7 @@
     <string name="rename">Rename</string>
     <string name="rename_playlist">Rename playlist</string>
     <string name="reset">Reset</string>
+    <string name="rewind_10s">Rewind 10s</string>
     <string name="save">Save</string>
     <string name="saving">Saving</string>
     <string name="scrobble_to_last_fm">Scrobble to Last.fm</string>
@@ -216,6 +222,8 @@
     <string name="this_album_is_only_partially_downloaded">This album is only partially downloaded. Press the download button to download the rest.</string>
     <string name="this_is_where_downloaded_music_will_be_placed">This is where downloaded music will be placed.</string>
     <string name="title">Title</string>
+    <string name="toggle_repeat">Toggle repeat</string>
+    <string name="toggle_shuffle">Toggle shuffle</string>
     <string name="track">Track</string>
     <string name="track_count"># tracks</string>
     <string name="track_information">Track information</string>
@@ -238,6 +246,7 @@
     <string name="what_do_you_want_to_do">What do you want to do?</string>
     <string name="what_it_can_do">What it can do:</string>
     <string name="what_it_will_not_do">What it will NOT do:</string>
+    <string name="widget_configuration">Widget configuration</string>
     <string name="x_albums_were_added_to_the_library">%1$s albums were added to the library.</string>
     <string name="x_could_not_be_downloaded">%1$s could not be downloaded.</string>
     <string name="x_x_radio">%2$s radio for \'%1$s\'</string>

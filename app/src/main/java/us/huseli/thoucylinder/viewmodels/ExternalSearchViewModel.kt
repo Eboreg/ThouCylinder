@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.plus
+import us.huseli.retaintheme.extensions.launchOnIOThread
 import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.album.AlbumCallbacks
@@ -41,7 +42,7 @@ class ExternalSearchViewModel @Inject constructor(
     repos: Repositories,
     private val managers: Managers,
 ) : AbstractAlbumListViewModel<ImportableAlbumUiState>("ExternalSearchViewModel", repos, managers) {
-    private val _albumIdsInDb = mutableListOf<String>()
+    private val _albumIdsInDb = mutableSetOf<String>()
     private val _backendKey = MutableStateFlow(SearchBackend.YOUTUBE)
     private val _currentBackend: IExternalSearchBackend<out IExternalAlbum>
         get() = managers.external.getSearchBackend(_backendKey.value)
@@ -87,6 +88,12 @@ class ExternalSearchViewModel @Inject constructor(
             ExternalListType.TRACKS -> _trackSearchParams
         }
     }.stateWhileSubscribed(SearchParams())
+
+    init {
+        launchOnIOThread {
+            _albumIdsInDb.addAll(repos.album.listAlbumIds())
+        }
+    }
 
     override fun getAlbumSelectionCallbacks(dialogCallbacks: AppDialogCallbacks): AlbumSelectionCallbacks =
         super.getAlbumSelectionCallbacks(dialogCallbacks).copy(onDeleteClick = null)

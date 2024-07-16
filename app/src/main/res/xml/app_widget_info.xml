@@ -2,7 +2,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="UnusedAttribute"
-    android:configure="us.huseli.thoucylinder.MainActivity"
+    android:configure="us.huseli.thoucylinder.WidgetConfigActivity"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="349dp"
     android:minHeight="51dp"

@@ -4,16 +4,16 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "us.huseli.thoucylinder",
+  "applicationId": "us.huseli.fistopy",
   "variantName": "release",
   "elements": [
     {
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 6,
-      "versionName": "0.4.0",
-      "outputFile": "thoucylinder_0.4.0-release.apk"
+      "versionCode": 19,
+      "versionName": "0.8.0",
+      "outputFile": "fistopy_0.8.0-release.apk"
     }
   ],
   "elementType": "File",
@@ -22,14 +22,14 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/thoucylinder_0.4.0-release.dm"
+        "baselineProfiles/1/fistopy_0.8.0-release.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/thoucylinder_0.4.0-release.dm"
+        "baselineProfiles/0/fistopy_0.8.0-release.dm"
       ]
     }
   ],

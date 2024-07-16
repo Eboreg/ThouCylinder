@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -51,7 +51,7 @@ class EditAlbumViewModel @Inject constructor(
     val allTags = repos.album.flowTags().stateWhileSubscribed(emptyList())
     val isLoadingAlbumArt = _isLoadingAlbumArt.asStateFlow()
 
-    val uiState2: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().flatMapMerge { albumId ->
+    val uiState: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().flatMapLatest { albumId ->
         repos.album.flowAlbumCombo(albumId)
     }.filterNotNull().map { combo ->
         EditAlbumUiState(
@@ -61,18 +61,6 @@ class EditAlbumViewModel @Inject constructor(
             year = combo.album.year,
             artistString = combo.artists.joined(),
         )
-    }.stateWhileSubscribed()
-
-    val uiState: StateFlow<EditAlbumUiState?> = _albumId.filterNotNull().map { albumId ->
-        repos.album.getAlbumCombo(albumId)?.let { combo ->
-            EditAlbumUiState(
-                albumId = combo.album.albumId,
-                title = combo.album.title,
-                artistNames = combo.artists.map { it.name }.toImmutableList(),
-                year = combo.album.year,
-                artistString = combo.artists.joined(),
-            )
-        }
     }.stateWhileSubscribed()
 
     val trackUiStates: StateFlow<ImmutableList<TrackUiState>> = _albumId.filterNotNull().map { albumId ->

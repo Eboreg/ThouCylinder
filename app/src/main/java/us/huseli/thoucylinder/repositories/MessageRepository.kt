@@ -124,22 +124,13 @@ class MessageRepository @Inject constructor(@ApplicationContext private val cont
         else showErrorSnackbar(context.getUmlautifiedString(R.string.could_not_save_playlist_for_some_reason))
     }
 
-    fun onHideAlbums(albumCount: Int, firstTitle: String, onUndoClick: () -> Unit) {
-        SnackbarEngine.addInfo(
-            message = context.resources
-                .getQuantityString(R.plurals.hid_x_albums_from_library, albumCount, albumCount, firstTitle)
-                .umlautify(),
-            actionLabel = context.getUmlautifiedString(R.string.undo),
-            onActionPerformed = onUndoClick,
-        )
-    }
+    fun onHideAlbums(albumCount: Int, firstTitle: String, deleteFiles: Boolean = false, onUndoClick: () -> Unit) {
+        val messageId =
+            if (deleteFiles) R.plurals.removed_x_albums_and_local_files else R.plurals.hid_x_albums_from_library
 
-    fun onHideAlbumsAndDeleteFiles(albumCount: Int, firstTitle: String, onUndoClick: () -> Unit) {
         SnackbarEngine.addInfo(
-            message = context.resources
-                .getQuantityString(R.plurals.removed_x_albums_and_local_files, albumCount, albumCount, firstTitle)
-                .umlautify(),
-            actionLabel = context.getUmlautifiedString(R.string.undelete_album),
+            message = context.resources.getQuantityString(messageId, albumCount, albumCount, firstTitle).umlautify(),
+            actionLabel = context.getUmlautifiedString(R.string.undo),
             onActionPerformed = onUndoClick,
         )
     }

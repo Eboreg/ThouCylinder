@@ -14,11 +14,11 @@ import us.huseli.thoucylinder.dataclasses.album.Album
 import us.huseli.thoucylinder.dataclasses.album.AlbumCombo
 import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.IAlbum
-import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.tag.Tag
 import us.huseli.thoucylinder.enums.AlbumSortParameter
 import us.huseli.thoucylinder.enums.AvailabilityFilter
 import us.huseli.thoucylinder.enums.SortOrder
+import us.huseli.thoucylinder.externalcontent.SearchBackend
 import us.huseli.thoucylinder.imageCacheDir
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -82,8 +82,8 @@ class AlbumRepository @Inject constructor(
     suspend fun getAlbumWithTracks(albumId: String): AlbumWithTracksCombo? =
         onIOThread { albumDao.getAlbumWithTracks(albumId) }
 
-    suspend fun getAlbumWithTracksByPlaylistId(playlistId: String) =
-        onIOThread { albumDao.getAlbumWithTracksByPlaylistId(playlistId) }
+    suspend fun getAlbumWithTracksByYoutubePlaylistId(playlistId: String) =
+        onIOThread { albumDao.getAlbumWithTracksByYoutubePlaylistId(playlistId) }
 
     suspend fun getOrCreateAlbumByMusicBrainzId(album: IAlbum, groupId: String, releaseId: String): Album =
         onIOThread { albumDao.getOrCreateAlbumByMusicBrainzId(album, groupId, releaseId) }
@@ -101,7 +101,7 @@ class AlbumRepository @Inject constructor(
         if (albumIds.isNotEmpty()) onIOThread { albumDao.listAlbumCombos(*albumIds.toTypedArray()) }
         else emptyList()
 
-    suspend fun listAlbums(): List<Album> = onIOThread { albumDao.listAlbums() }
+    suspend fun listAlbumIds(): List<String> = onIOThread { albumDao.listAlbumIds() }
 
     suspend fun listAlbumsWithTracks(): List<AlbumWithTracksCombo> = onIOThread { albumDao.listAlbumsWithTracks() }
 
@@ -109,16 +109,17 @@ class AlbumRepository @Inject constructor(
         if (albumIds.isNotEmpty()) onIOThread { albumDao.listAlbumsWithTracks(*albumIds.toTypedArray()) }
         else emptyList()
 
-    suspend fun listMusicBrainzReleaseGroupAlbumCombos(): Map<String, AlbumCombo> =
-        albumDao.listMusicBrainzReleaseGroupAlbumCombos()
-
-    suspend fun listSpotifyAlbumCombos(): Map<String, AlbumCombo> = albumDao.listSpotifyAlbumCombos()
-
     suspend fun listTags(): List<Tag> = onIOThread { albumDao.listTags() }
 
     suspend fun listTags(albumId: String): List<Tag> = onIOThread { albumDao.listTags(albumId) }
 
-    suspend fun listYoutubeAlbumCombos(): Map<String, AlbumCombo> = albumDao.listYoutubeAlbumCombos()
+    suspend fun mapAlbumCombosBySearchBackend(backend: SearchBackend): Map<String, AlbumCombo> {
+        return when (backend) {
+            SearchBackend.YOUTUBE -> albumDao.mapYoutubeAlbumCombos()
+            SearchBackend.SPOTIFY -> albumDao.mapSpotifyAlbumCombos()
+            SearchBackend.MUSICBRAINZ -> albumDao.mapMusicBrainzReleaseGroupAlbumCombos()
+        }
+    }
 
     fun selectAlbumIds(selectionKey: String, albumIds: Iterable<String>) {
         mutableFlowSelectedAlbumIds(selectionKey).also { flow ->
@@ -158,11 +159,6 @@ class AlbumRepository @Inject constructor(
     }
 
     suspend fun upsertAlbum(album: IAlbum) = onIOThread { albumDao.upsertAlbum(album) }
-
-    suspend fun upsertAlbumCombo(combo: IAlbumWithTracksCombo<IAlbum>) = onIOThread {
-        albumDao.upsertAlbum(combo.album)
-        albumDao.setAlbumTags(combo.album.albumId, combo.tags)
-    }
 
     private suspend fun cleanImageCache() {
         // Get filenames the same way we do when we save images to cache:

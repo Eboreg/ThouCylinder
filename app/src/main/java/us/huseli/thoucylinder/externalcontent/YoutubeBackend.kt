@@ -9,8 +9,6 @@ import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.YoutubeAndroidClient
 import us.huseli.thoucylinder.YoutubeWebClient
 import us.huseli.thoucylinder.dataclasses.album.AlbumCombo
-import us.huseli.thoucylinder.dataclasses.album.IAlbum
-import us.huseli.thoucylinder.dataclasses.album.IAlbumCombo
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.track.TrackUiState
 import us.huseli.thoucylinder.dataclasses.youtube.YoutubePlaylist
@@ -29,13 +27,8 @@ class YoutubeBackend(repos: Repositories) : IExternalSearchBackend<YoutubePlayli
         .stateEagerly(YoutubeAndroidClient(region = repos.youtube.region.value))
 
     override val albumSearchHolder = object : AbstractAlbumSearchHolder<YoutubePlaylist>() {
-        private var _existingAlbumCombos: Map<String, AlbumCombo>? = null
-
         override val isTotalCountExact: Flow<Boolean> = flowOf(false)
         override val searchCapabilities: List<SearchCapability> = listOf(SearchCapability.FREE_TEXT)
-
-        private suspend fun getExistingAlbumCombos(): Map<String, AlbumCombo> =
-            _existingAlbumCombos ?: repos.album.listYoutubeAlbumCombos().also { _existingAlbumCombos = it }
 
         override suspend fun convertToAlbumWithTracks(
             externalAlbum: YoutubePlaylist,
@@ -44,11 +37,11 @@ class YoutubeBackend(repos: Repositories) : IExternalSearchBackend<YoutubePlayli
             .getPlaylistComboFromPlaylistId(playlistId = externalAlbum.id, artist = externalAlbum.artist)
             ?.toAlbumWithTracks(isLocal = false, isInLibrary = false, albumId = albumId)
 
-        override suspend fun externalAlbumToAlbumCombo(externalAlbum: YoutubePlaylist): IAlbumCombo<IAlbum> =
-            getExistingAlbumCombos()[externalAlbum.id] ?: super.externalAlbumToAlbumCombo(externalAlbum)
-
         override fun getExternalAlbumChannel(searchParams: SearchParams): Channel<YoutubePlaylist> =
             playlistSearchChannel(params = searchParams, client = _playlistClient.value, scope = scope)
+
+        override suspend fun loadExistingAlbumCombos(): Map<String, AlbumCombo> =
+            repos.album.mapAlbumCombosBySearchBackend(SearchBackend.YOUTUBE)
     }
 
     override val trackSearchHolder = object : AbstractSearchHolder<TrackUiState>() {

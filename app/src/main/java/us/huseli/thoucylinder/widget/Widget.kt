@@ -35,7 +35,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import us.huseli.thoucylinder.Logger
 import us.huseli.thoucylinder.MainActivity
 import us.huseli.thoucylinder.R
@@ -63,23 +62,23 @@ fun Widget(manager: WidgetManager) {
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
-            .cornerRadius(5.dp)
             .background(backgroundColor)
+            .cornerRadius(5.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
         Row(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
             Box(
                 modifier = GlanceModifier
                     .size(size.height - 16.dp)
-                    .background(ColorProvider(R.color.splash_background))
-                    .padding(3.dp)
-                    .cornerRadius(5.dp)
+                    .background(GlanceTheme.colors.onPrimary)
+                    .padding(2.dp)
+                    .cornerRadius(4.dp)
             ) {
                 Image(
                     provider = currentBitmap?.let { ImageProvider(it) } ?: ImageProvider(R.drawable.splashscreen_icon),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = GlanceModifier.size(size.height - 22.dp).cornerRadius(3.dp),
+                    modifier = GlanceModifier.size(size.height - 20.dp).cornerRadius(2.dp),
                 )
             }
 
@@ -118,23 +117,25 @@ fun WidgetButtonRow(
     buttonHeight: Dp = 36.dp,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
 ) {
-    val canGotoNext by manager.canGotoNext.collectAsState()
-    val canGotoPrevious by manager.canGotoPrevious.collectAsState()
-    val canPlay by manager.canPlay.collectAsState()
+    val buttons by manager.buttons.collectAsState()
     val isPlaying by manager.isPlaying.collectAsState()
 
     Row(modifier = modifier, verticalAlignment = verticalAlignment) {
         val baseModifier = GlanceModifier.cornerRadius(10.dp).defaultWeight().height(buttonHeight)
 
-        Image(
-            provider = ImageProvider(R.drawable.media3_notification_seek_to_previous),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(
-                if (isPlaying || canGotoPrevious) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
-            ),
-            modifier = if (isPlaying || canGotoPrevious) baseModifier.clickable { manager.skipToStartOrPrevious() } else baseModifier,
-        )
-        Image(
+        if (buttons.contains(WidgetButton.PREVIOUS)) {
+            val canGotoPrevious by manager.canGotoPrevious.collectAsState()
+
+            Image(
+                provider = ImageProvider(R.drawable.media3_notification_seek_to_previous),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(
+                    if (isPlaying || canGotoPrevious) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
+                ),
+                modifier = if (isPlaying || canGotoPrevious) baseModifier.clickable { manager.skipToStartOrPrevious() } else baseModifier,
+            )
+        }
+        if (buttons.contains(WidgetButton.REWIND)) Image(
             provider = ImageProvider(R.drawable.media3_notification_seek_back),
             contentDescription = null,
             colorFilter = ColorFilter.tint(
@@ -142,24 +143,28 @@ fun WidgetButtonRow(
             ),
             modifier = if (isPlaying) baseModifier.clickable { manager.seekBack() } else baseModifier,
         )
-        if (isPlaying) {
-            Image(
-                provider = ImageProvider(R.drawable.media3_notification_pause),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.onBackground),
-                modifier = baseModifier.clickable { manager.playOrPauseCurrent() },
-            )
-        } else {
-            Image(
-                provider = ImageProvider(R.drawable.media3_notification_play),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(
-                    if (canPlay) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
-                ),
-                modifier = if (canPlay) baseModifier.clickable { manager.playOrPauseCurrent() } else baseModifier,
-            )
+        if (buttons.contains(WidgetButton.PLAY_OR_PAUSE)) {
+            val canPlay by manager.canPlay.collectAsState()
+
+            if (isPlaying) {
+                Image(
+                    provider = ImageProvider(R.drawable.media3_notification_pause),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(GlanceTheme.colors.onBackground),
+                    modifier = baseModifier.clickable { manager.playOrPauseCurrent() },
+                )
+            } else {
+                Image(
+                    provider = ImageProvider(R.drawable.media3_notification_play),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(
+                        if (canPlay) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
+                    ),
+                    modifier = if (canPlay) baseModifier.clickable { manager.playOrPauseCurrent() } else baseModifier,
+                )
+            }
         }
-        Image(
+        if (buttons.contains(WidgetButton.FORWARD)) Image(
             provider = ImageProvider(R.drawable.media3_notification_seek_forward),
             contentDescription = null,
             colorFilter = ColorFilter.tint(
@@ -167,13 +172,41 @@ fun WidgetButtonRow(
             ),
             modifier = if (isPlaying) baseModifier.clickable { manager.seekForward() } else baseModifier,
         )
-        Image(
-            provider = ImageProvider(R.drawable.media3_notification_seek_to_next),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(
-                if (canGotoNext) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
-            ),
-            modifier = if (canGotoNext) baseModifier.clickable { manager.skipToNext() } else baseModifier,
-        )
+        if (buttons.contains(WidgetButton.REPEAT)) {
+            val isRepeatEnabled by manager.isRepeatEnabled.collectAsState()
+
+            Image(
+                provider = ImageProvider(R.drawable.repeat),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(
+                    if (isRepeatEnabled) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
+                ),
+                modifier = baseModifier.clickable { manager.toggleRepeat() },
+            )
+        }
+        if (buttons.contains(WidgetButton.SHUFFLE)) {
+            val isShuffleEnabled by manager.isShuffleEnabled.collectAsState()
+
+            Image(
+                provider = ImageProvider(R.drawable.shuffle),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(
+                    if (isShuffleEnabled) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
+                ),
+                modifier = baseModifier.clickable { manager.toggleShuffle() },
+            )
+        }
+        if (buttons.contains(WidgetButton.NEXT)) {
+            val canGotoNext by manager.canGotoNext.collectAsState()
+
+            Image(
+                provider = ImageProvider(R.drawable.media3_notification_seek_to_next),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(
+                    if (canGotoNext) GlanceTheme.colors.onBackground else GlanceTheme.colors.onSurfaceVariant
+                ),
+                modifier = if (canGotoNext) baseModifier.clickable { manager.skipToNext() } else baseModifier,
+            )
+        }
     }
 }

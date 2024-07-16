@@ -216,7 +216,7 @@ abstract class AlbumDao {
 
     @Transaction
     @Query("SELECT * FROM Album WHERE Album_youtubePlaylist_id = :playlistId")
-    abstract suspend fun getAlbumWithTracksByPlaylistId(playlistId: String): AlbumWithTracksCombo?
+    abstract suspend fun getAlbumWithTracksByYoutubePlaylistId(playlistId: String): AlbumWithTracksCombo?
 
 
     @Transaction
@@ -276,8 +276,8 @@ abstract class AlbumDao {
     @Query("SELECT * FROM AlbumCombo WHERE Album_albumId IN(:albumIds)")
     abstract suspend fun listAlbumCombos(vararg albumIds: String): List<AlbumCombo>
 
-    @Query("SELECT * FROM Album WHERE Album_isInLibrary = 1")
-    abstract suspend fun listAlbums(): List<Album>
+    @Query("SELECT Album_albumId FROM Album")
+    abstract suspend fun listAlbumIds(): List<String>
 
     @Transaction
     @Query("SELECT * FROM Album")
@@ -287,16 +287,8 @@ abstract class AlbumDao {
     @Query("SELECT * FROM Album WHERE Album_albumId IN(:albumIds)")
     abstract suspend fun listAlbumsWithTracks(vararg albumIds: String): List<AlbumWithTracksCombo>
 
-    suspend fun listMusicBrainzReleaseGroupAlbumCombos(): Map<String, AlbumCombo> {
-        return _listMusicBrainzReleaseGroupAlbumCombos().associateBy { it.album.musicBrainzReleaseGroupId!! }
-    }
-
     @Query("SELECT Album_musicBrainzReleaseId FROM Album WHERE Album_isInLibrary = 1 AND Album_musicBrainzReleaseId IS NOT NULL")
     abstract suspend fun listMusicBrainzReleaseIds(): List<String>
-
-    suspend fun listSpotifyAlbumCombos(): Map<String, AlbumCombo> {
-        return _listSpotifyAlbumCombos().associateBy { it.album.spotifyId!! }
-    }
 
     @Query("SELECT Album_spotifyId FROM Album WHERE Album_isInLibrary = 1 AND Album_spotifyId IS NOT NULL")
     abstract suspend fun listSpotifyAlbumIds(): List<String>
@@ -307,7 +299,15 @@ abstract class AlbumDao {
     @Query("SELECT DISTINCT Tag.* FROM Tag JOIN AlbumTag ON Tag_name = AlbumTag_tagName WHERE AlbumTag_albumId = :albumId")
     abstract suspend fun listTags(albumId: String): List<Tag>
 
-    suspend fun listYoutubeAlbumCombos(): Map<String, AlbumCombo> {
+    suspend fun mapMusicBrainzReleaseGroupAlbumCombos(): Map<String, AlbumCombo> {
+        return _listMusicBrainzReleaseGroupAlbumCombos().associateBy { it.album.musicBrainzReleaseGroupId!! }
+    }
+
+    suspend fun mapSpotifyAlbumCombos(): Map<String, AlbumCombo> {
+        return _listSpotifyAlbumCombos().associateBy { it.album.spotifyId!! }
+    }
+
+    suspend fun mapYoutubeAlbumCombos(): Map<String, AlbumCombo> {
         return _listYoutubeAlbumCombos().associateBy { it.album.youtubePlaylist!!.id }
     }
 

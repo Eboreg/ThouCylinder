@@ -17,23 +17,10 @@ class DebugViewModel @Inject constructor(
     private val repos: Repositories,
     private val managers: Managers,
 ) : AbstractBaseViewModel(), ILogger {
-    private val _spotifyArtistIds = MutableStateFlow<List<String>>(emptyList())
     private val _continuationTokens = MutableStateFlow<Map<String, String>>(emptyMap())
 
     val continuationTokens = _continuationTokens.asStateFlow()
     val region = repos.settings.region
-
-    init {
-        launchOnIOThread {
-            val albums = repos.album.listAlbums()
-            val spotifyAlbumIds = albums.mapNotNull { it.spotifyId }.take(20)
-            val spotifyAlbums = repos.spotify.getAlbums(spotifyAlbumIds)
-
-            spotifyAlbums
-                ?.flatMap { album -> album.artists.map { it.id } }
-                ?.also { _spotifyArtistIds.value = it }
-        }
-    }
 
     fun clearDatabase() {
         launchOnIOThread {

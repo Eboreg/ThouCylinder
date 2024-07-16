@@ -22,16 +22,11 @@ import us.huseli.thoucylinder.dataclasses.artist.TrackArtist
 import us.huseli.thoucylinder.dataclasses.artist.TrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.toAlbumArtists
 import us.huseli.thoucylinder.dataclasses.artist.toTrackArtists
-import us.huseli.thoucylinder.dataclasses.spotify.SpotifyArtist
-import us.huseli.thoucylinder.dataclasses.spotify.toMediaStoreImage
 
 @Dao
 abstract class ArtistDao {
     @Query("DELETE FROM AlbumArtist WHERE AlbumArtist_albumId = :albumId")
     protected abstract suspend fun _clearAlbumArtists(albumId: String)
-
-    @Query("DELETE FROM TrackArtist WHERE TrackArtist_trackId = :trackId")
-    protected abstract suspend fun _clearTrackArtists(trackId: String)
 
     @Query("SELECT * FROM Artist WHERE LOWER(Artist_name) = LOWER(:name) LIMIT 1")
     protected abstract suspend fun _getArtistByLowerCaseName(name: String): Artist?
@@ -199,7 +194,7 @@ abstract class ArtistDao {
 
     @Transaction
     open suspend fun setTrackArtists(trackId: String, trackArtists: Collection<ITrackArtistCredit>) {
-        _clearTrackArtists(trackId)
+        clearTrackArtists(trackId)
         insertTrackArtists(trackArtists)
     }
 
@@ -215,19 +210,5 @@ abstract class ArtistDao {
             musicBrainzId = artist.musicBrainzId ?: existingArtist.musicBrainzId,
             image = artist.image ?: existingArtist.image,
         )?.also { _updateArtists(it) } ?: artist.toSaveableArtist().also { _insertArtists(it) }
-    }
-
-    @Transaction
-    open suspend fun upsertSpotifyArtist(spotifyArtist: SpotifyArtist) {
-        val artist = _getArtistByLowerCaseName(spotifyArtist.name.lowercase())
-        val image = spotifyArtist.images.toMediaStoreImage()
-
-        if (artist != null) setSpotifyData(
-            artistId = artist.artistId,
-            spotifyId = spotifyArtist.id,
-            imageUri = image?.fullUriString,
-            imageThumbnailUri = image?.thumbnailUriString,
-        )
-        else _insertArtists(Artist(name = spotifyArtist.name, spotifyId = spotifyArtist.id, image = image))
     }
 }

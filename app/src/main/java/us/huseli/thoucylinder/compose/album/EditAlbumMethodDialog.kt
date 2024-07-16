@@ -59,7 +59,7 @@ fun EditAlbumMethodDialog(
     viewModel: EditAlbumViewModel = hiltViewModel(),
 ) {
     var openDialogType by rememberSaveable { mutableStateOf<EditAlbumDialogType?>(null) }
-    val uiState by viewModel.uiState2.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(albumId) {
         viewModel.setAlbumId(albumId)

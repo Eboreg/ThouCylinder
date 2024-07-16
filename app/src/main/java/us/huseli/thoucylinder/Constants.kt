@@ -26,4 +26,5 @@ object Constants {
     const val PREF_SPOTIFY_OAUTH2_TOKEN_CC = "spotifyOAuth2TokenCC"
     const val PREF_SPOTIFY_OAUTH2_TOKEN_PKCE = "spotifyOAuth2Token"
     const val PREF_UMLAUTIFY = "umlautify"
+    const val PREF_WIDGET_BUTTONS = "widgetButtons"
 }

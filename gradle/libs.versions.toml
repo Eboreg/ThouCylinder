@@ -25,10 +25,10 @@ reorderable = "0.9.6"
 retaintheme = "4.4.0"
 room = "2.6.1"
 runtimeTracing = "1.0.0-beta01"
-sentry = "7.10.0"
+sentry = "7.11.0"
 sentryPlugin = "4.7.1"
 smartExceptionJava = "0.2.1"
-storage = "1.5.6"
+storage = "2.0.0"
 xstream = "1.4.20"
 
 [libraries]

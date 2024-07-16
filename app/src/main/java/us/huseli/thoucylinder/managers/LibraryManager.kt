@@ -256,9 +256,10 @@ class LibraryManager @Inject constructor(
                         if (albumArt != null) combo.withAlbum(album = combo.album.withAlbumArt(albumArt = albumArt))
                         else combo
                     }
-                    val savedCombo =
-                        if (existingCombo != null) upsertAlbumWithTracks(combo)
-                        else insertAlbumWithTracks(combo)
+
+                    upsertAlbumWithTracks(combo)
+
+                    val savedCombo = repos.album.getAlbumWithTracks(combo.album.albumId)
 
                     savedCombo?.also { updateAlbumFromRemotes(it) }
                 }
@@ -315,13 +316,12 @@ class LibraryManager @Inject constructor(
         )
     }
 
-    suspend fun upsertAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>): AlbumWithTracksCombo? {
-        return database.withTransaction {
-            repos.album.upsertAlbumCombo(combo)
+    suspend fun upsertAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>) {
+        database.withTransaction {
+            repos.album.upsertAlbum(combo.album)
+            repos.album.setAlbumTags(combo.album.albumId, combo.tags)
             repos.track.setAlbumComboTracks(combo)
             repos.artist.setAlbumComboArtists(combo)
-
-            return@withTransaction repos.album.getAlbumWithTracks(combo.album.albumId)
         }
     }
 
@@ -402,18 +402,6 @@ class LibraryManager @Inject constructor(
             .listCoverImages(context)
             .map { it.uri.toMediaStoreImage() }
             .maxByOrNull { albumArt -> albumArt.fullUri.getBitmap(context)?.getSquareSize() ?: 0 }
-
-    private suspend fun insertAlbumWithTracks(combo: UnsavedAlbumWithTracksCombo): AlbumWithTracksCombo? {
-        return database.withTransaction {
-            repos.album.upsertAlbum(combo.album)
-            repos.album.setAlbumTags(combo.album.albumId, combo.tags)
-            repos.artist.insertAlbumArtists(combo.artists)
-            repos.track.upsertTracks(combo.trackCombos.map { trackCombo -> trackCombo.track })
-            repos.artist.insertTrackArtists(combo.trackCombos.flatMap { it.trackArtists })
-
-            return@withTransaction repos.album.getAlbumWithTracks(combo.album.albumId)
-        }
-    }
 
     private suspend fun updateAlbumFromMusicBrainz(
         combo: IAlbumWithTracksCombo<IAlbum>,

@@ -63,16 +63,14 @@ fun DeleteAlbumsDialog(
                 count = states.size,
                 onCancel = onClose,
                 onDeleteClick = { action ->
-                    when (action) {
-                        HIDE_ALBUMS_KEEP_FILES -> viewModel.hideAlbums(
+                    if (action == HIDE_ALBUMS_KEEP_FILES || action == DELETE_ALBUMS_AND_FILES) {
+                        viewModel.hideAlbums(
+                            deleteFiles = action == DELETE_ALBUMS_AND_FILES,
                             onGotoLibraryClick = appCallbacks.onGotoLibraryClick,
                             onGotoAlbumClick = callbacks.onGotoAlbumClick,
                         )
-                        DELETE_ALBUMS_AND_FILES -> viewModel.hideAlbumsAndDeleteFiles(
-                            onGotoLibraryClick = appCallbacks.onGotoLibraryClick,
-                            onGotoAlbumClick = callbacks.onGotoAlbumClick,
-                        )
-                        DELETE_FILES_KEEP_ALBUM -> viewModel.deleteLocalAlbumFiles()
+                    } else if (action == DELETE_FILES_KEEP_ALBUM) {
+                        viewModel.deleteLocalAlbumFiles()
                     }
                     onClose()
                 },

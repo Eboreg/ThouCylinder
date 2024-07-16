@@ -32,6 +32,7 @@ class ArtistRepository @Inject constructor(database: Database) : AbstractScopeHo
 
     suspend fun clearArtists() = onIOThread { artistDao.clearArtists() }
 
+    @Suppress("unused")
     suspend fun deleteOrphanArtists() = artistDao.deleteOrphanArtists()
 
     fun flowArtistComboById(artistId: String): Flow<ArtistCombo?> = artistDao.flowArtistComboById(artistId)

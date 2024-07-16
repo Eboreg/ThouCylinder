@@ -15,7 +15,6 @@ import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.R
 import us.huseli.thoucylinder.database.Database
 import us.huseli.thoucylinder.dataclasses.ProgressData
-import us.huseli.thoucylinder.dataclasses.album.AlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.IAlbum
 import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.ImportableAlbumUiState
@@ -171,7 +170,7 @@ class ExternalContentManager @Inject constructor(
         ) ?: return null
 
         // If imported & converted album already exists, use that instead:
-        repos.album.getAlbumWithTracksByPlaylistId(youtubeMatch.playlistId)?.let { combo ->
+        repos.album.getAlbumWithTracksByYoutubePlaylistId(youtubeMatch.playlistId)?.let { combo ->
             combo.copy(
                 album = combo.album.copy(isInLibrary = true, isHidden = false),
                 trackCombos = combo.trackCombos.map { trackCombo ->
@@ -205,6 +204,7 @@ class ExternalContentManager @Inject constructor(
             albumImportProgressText.value = context.getUmlautifiedString(R.string.importing_x, it.album.title)
             data.progress.value = 0.9
             upsertAlbumWithTracks(it)
+            repos.album.getAlbumWithTracks(it.album.albumId)
         }
 
         if (combo != null) {
@@ -237,13 +237,12 @@ class ExternalContentManager @Inject constructor(
         upsertAlbumWithTracks(mbCombo ?: spotifyCombo ?: combo)
     }
 
-    private suspend fun upsertAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>): AlbumWithTracksCombo? {
-        return database.withTransaction {
-            repos.album.upsertAlbumCombo(combo)
+    private suspend fun upsertAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>) {
+        database.withTransaction {
+            repos.album.upsertAlbum(combo.album)
+            repos.album.setAlbumTags(combo.album.albumId, combo.tags)
             repos.track.setAlbumComboTracks(combo)
             repos.artist.setAlbumComboArtists(combo)
-
-            return@withTransaction repos.album.getAlbumWithTracks(combo.album.albumId)
         }
     }
 }

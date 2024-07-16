@@ -169,15 +169,6 @@ class PlayerManager @Inject constructor(
             } else {
                 repos.player.insertLast(combo)
             }
-            /*
-            if (index == 0) {
-                if (firstTrackPos == 0) repos.player.replaceAndPlay(combo)
-                else repos.player.replace(combo)
-            } else {
-                if (index == firstTrackPos) repos.player.insertLastAndPlay(combo)
-                else repos.player.insertLast(combo)
-            }
-             */
         }
     }
 

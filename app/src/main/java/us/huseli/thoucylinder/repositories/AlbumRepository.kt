@@ -35,9 +35,6 @@ class AlbumRepository @Inject constructor(
         launchOnIOThread { cleanImageCache() }
     }
 
-    suspend fun addAlbumsToLibrary(albumIds: Collection<String>) =
-        onIOThread { albumDao.addToLibrary(*albumIds.toTypedArray()) }
-
     suspend fun clearAlbumArt(albumId: String) = onIOThread { albumDao.clearAlbumArt(albumId) }
 
     suspend fun clearAlbums() = onIOThread { albumDao.clearAlbums() }

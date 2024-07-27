@@ -80,9 +80,6 @@ abstract class AlbumDao {
 
     /** PUBLIC METHODS ************************************************************************************************/
 
-    @Query("UPDATE Album SET Album_isInLibrary = 1, Album_isHidden = 0 WHERE Album_albumId IN (:albumIds)")
-    abstract suspend fun addToLibrary(vararg albumIds: String)
-
     @Query(
         """
         UPDATE Album SET Album_albumArt_fullUriString = NULL, Album_albumArt_thumbnailUriString = NULL

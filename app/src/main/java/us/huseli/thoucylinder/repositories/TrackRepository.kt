@@ -19,8 +19,6 @@ import linc.com.amplituda.Compress
 import us.huseli.retaintheme.extensions.pruneOrPad
 import us.huseli.thoucylinder.AbstractScopeHolder
 import us.huseli.thoucylinder.database.Database
-import us.huseli.thoucylinder.dataclasses.album.IAlbum
-import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.tag.TagPojo
 import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.dataclasses.track.TrackCombo
@@ -45,9 +43,6 @@ class TrackRepository @Inject constructor(
 
     suspend fun addToLibrary(trackIds: Collection<String>) =
         onIOThread { trackDao.setIsInLibrary(true, *trackIds.toTypedArray()) }
-
-    suspend fun addToLibraryByAlbumId(albumIds: Collection<String>) =
-        onIOThread { trackDao.setIsInLibraryByAlbumId(true, *albumIds.toTypedArray()) }
 
     suspend fun clearLocalUris(trackIds: Collection<String>) {
         if (trackIds.isNotEmpty()) onIOThread { trackDao.clearLocalUris(trackIds) }
@@ -180,8 +175,8 @@ class TrackRepository @Inject constructor(
         }
     }
 
-    suspend fun setAlbumComboTracks(combo: IAlbumWithTracksCombo<IAlbum>) = onIOThread {
-        trackDao.setAlbumTracks(combo.album.albumId, combo.tracks)
+    suspend fun setAlbumTracks(albumId: String, tracks: Collection<Track>) = onIOThread {
+        trackDao.setAlbumTracks(albumId = albumId, tracks = tracks)
     }
 
     suspend fun setPlayCounts(trackId: String, localPlayCount: Int, lastFmPlayCount: Int?) =

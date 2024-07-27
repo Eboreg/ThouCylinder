@@ -92,7 +92,7 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     }
 
     suspend fun getRelease(id: String): MusicBrainzRelease? = gson.fromJson(
-        request("release/$id", mapOf("inc" to "recordings artist-credits genres release-groups")),
+        request("release/$id", mapOf("inc" to "recordings artist-credits genres release-groups labels")),
         MusicBrainzRelease::class.java,
     )
 
@@ -122,7 +122,7 @@ class MusicBrainzRepository @Inject constructor() : AbstractScopeHolder() {
     suspend fun listReleasesByReleaseGroupId(releaseGroupId: String): List<MusicBrainzRelease> {
         val params = mapOf(
             "release-group" to releaseGroupId,
-            "inc" to "recordings artist-credits genres",
+            "inc" to "recordings artist-credits genres labels",
             "status" to "official",
         )
 

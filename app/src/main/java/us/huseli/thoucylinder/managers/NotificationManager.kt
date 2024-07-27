@@ -19,8 +19,11 @@ class NotificationManager @Inject constructor(@ApplicationContext private val co
     private val channel = NotificationChannel(
         CHANNEL_ID,
         context.getString(R.string.notification_channel_name),
-        NotificationManager.IMPORTANCE_DEFAULT,
-    ).apply { description = context.getString(R.string.notification_channel_description) }
+        NotificationManager.IMPORTANCE_LOW,
+    ).apply {
+        description = context.getString(R.string.notification_channel_description)
+        enableVibration(false)
+    }
     private val notificationManager: NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

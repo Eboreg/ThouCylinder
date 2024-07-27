@@ -236,9 +236,6 @@ abstract class TrackDao {
     @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_trackId IN (:trackIds)")
     abstract suspend fun setIsInLibrary(isInLibrary: Boolean, vararg trackIds: String)
 
-    @Query("UPDATE Track SET Track_isInLibrary = :isInLibrary WHERE Track_albumId IN (:albumIds)")
-    abstract suspend fun setIsInLibraryByAlbumId(isInLibrary: Boolean, vararg albumIds: String)
-
     @Query("UPDATE Track SET Track_localPlayCount = :localPlayCount, Track_lastFmPlayCount = :lastFmPlayCount WHERE Track_trackId = :trackId")
     abstract suspend fun setPlayCounts(trackId: String, localPlayCount: Int, lastFmPlayCount: Int?)
 

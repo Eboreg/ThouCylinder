@@ -5,7 +5,6 @@ import us.huseli.thoucylinder.dataclasses.tag.Tag
 
 data class MusicBrainzGenre(
     val count: Int,
-    val disambiguation: String?,
     override val id: String,
     val name: String,
 ) : AbstractMusicBrainzItem()

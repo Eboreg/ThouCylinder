@@ -30,6 +30,7 @@ import us.huseli.thoucylinder.dataclasses.album.IAlbum
 import us.huseli.thoucylinder.dataclasses.album.IAlbumWithTracksCombo
 import us.huseli.thoucylinder.dataclasses.album.TrackMergeStrategy
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
+import us.huseli.thoucylinder.dataclasses.album.withUpdates
 import us.huseli.thoucylinder.dataclasses.artist.IArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.UnsavedTrackArtistCredit
 import us.huseli.thoucylinder.dataclasses.artist.joined
@@ -90,8 +91,9 @@ class LibraryManager @Inject constructor(
         onGotoLibraryClick: (() -> Unit)? = null,
         onGotoAlbumClick: ((String) -> Unit)? = null,
     ) {
-        repos.album.addAlbumsToLibrary(albumIds)
-        repos.track.addToLibraryByAlbumId(albumIds)
+        for (combo in repos.album.listAlbumsWithTracks(albumIds)) {
+            upsertAlbumWithTracks(combo.withUpdates { setIsInLibrary(true) })
+        }
         repos.message.onAddAlbumsToLibrary(albumIds, onGotoLibraryClick, onGotoAlbumClick)
     }
 
@@ -137,33 +139,34 @@ class LibraryManager @Inject constructor(
         onTrackError: (TrackCombo, Throwable) -> Unit,
     ) {
         launchOnIOThread {
-            repos.album.getAlbumWithTracks(albumId)?.also { albumCombo ->
-                repos.settings
-                    .createAlbumDirectory(albumCombo.album.title, albumCombo.artists.joined())
-                    ?.also { directory ->
-                        val trackCombos = albumCombo.trackCombos
-                            .filter { !it.track.isDownloaded && it.track.isOnYoutube }
-                        val trackTasks = trackCombos.map { trackCombo ->
-                            createTrackDownloadTask(
-                                combo = trackCombo,
-                                directory = directory,
-                                onError = { onTrackError(trackCombo, it) },
+            repos.album.getAlbumWithTracks(albumId)
+                ?.let { it.copy(album = it.album.copy(isLocal = true, isInLibrary = true)) }
+                ?.also { albumCombo ->
+                    repos.settings
+                        .createAlbumDirectory(albumCombo.album.title, albumCombo.artists.joined())
+                        ?.also { directory ->
+                            val trackCombos = albumCombo.trackCombos
+                                .filter { !it.track.isDownloaded && it.track.isOnYoutube }
+                            val trackTasks = trackCombos.map { trackCombo ->
+                                createTrackDownloadTask(
+                                    combo = trackCombo,
+                                    directory = directory,
+                                    onError = { onTrackError(trackCombo, it) },
+                                )
+                            }
+
+                            _albumDownloadTasks.value += AlbumDownloadTask(
+                                album = albumCombo.album,
+                                trackTasks = trackTasks,
+                                onFinish = { result ->
+                                    if (result.succeededTracks.isNotEmpty()) launchOnIOThread {
+                                        upsertAlbumWithTracks(albumCombo.withUpdates { setIsInLibrary(true) })
+                                    }
+                                    onFinish(result)
+                                },
                             )
                         }
-                        val album = albumCombo.album.copy(isLocal = true, isInLibrary = true)
-
-                        _albumDownloadTasks.value += AlbumDownloadTask(
-                            album = album,
-                            trackTasks = trackTasks,
-                            onFinish = { result ->
-                                if (result.succeededTracks.isNotEmpty()) launchOnIOThread {
-                                    repos.album.upsertAlbum(album)
-                                }
-                                onFinish(result)
-                            },
-                        )
-                    }
-            }
+                }
         }
     }
 
@@ -246,22 +249,14 @@ class LibraryManager @Inject constructor(
                         (it.album.title == localAlbum.title && it.artists.joined() == localAlbum.artistName) ||
                             (it.album.musicBrainzReleaseId != null && it.album.musicBrainzReleaseId == localAlbum.musicBrainzReleaseId)
                     }
-                    val combo = localAlbum.toAlbumWithTracks(base = existingCombo).let { combo ->
-                        val albumArt = getBestNewLocalAlbumArt(combo.trackCombos)
-                            ?: repos.musicBrainz.getCoverArtArchiveImage(
-                                combo.album.musicBrainzReleaseId,
-                                combo.album.musicBrainzReleaseGroupId
-                            )?.toMediaStoreImage()
+                    val combo = localAlbum.toAlbumWithTracks(base = existingCombo)
+                    val albumArt = getBestNewLocalAlbumArt(combo.trackCombos)
+                        ?: repos.musicBrainz.getCoverArtArchiveImage(
+                            combo.album.musicBrainzReleaseId,
+                            combo.album.musicBrainzReleaseGroupId
+                        )?.toMediaStoreImage()
 
-                        if (albumArt != null) combo.withAlbum(album = combo.album.withAlbumArt(albumArt = albumArt))
-                        else combo
-                    }
-
-                    upsertAlbumWithTracks(combo)
-
-                    val savedCombo = repos.album.getAlbumWithTracks(combo.album.albumId)
-
-                    savedCombo?.also { updateAlbumFromRemotes(it) }
+                    upsertAlbumWithTracks(combo.withUpdates { setAlbumArt(albumArt) })
                 }
 
                 repos.localMedia.setIsImporting(false)
@@ -318,10 +313,12 @@ class LibraryManager @Inject constructor(
 
     suspend fun upsertAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>) {
         database.withTransaction {
-            repos.album.upsertAlbum(combo.album)
-            repos.album.setAlbumTags(combo.album.albumId, combo.tags)
-            repos.track.setAlbumComboTracks(combo)
-            repos.artist.setAlbumComboArtists(combo)
+            val finalCombo = getRemoteAlbumWithTracks(combo) ?: combo
+
+            repos.album.upsertAlbum(finalCombo.album)
+            repos.album.setAlbumTags(finalCombo.album.albumId, combo.tags)
+            repos.track.setAlbumTracks(finalCombo.album.albumId, finalCombo.tracks)
+            repos.artist.setAlbumComboArtists(finalCombo)
         }
     }
 
@@ -368,6 +365,13 @@ class LibraryManager @Inject constructor(
             combos.filter { it.album.albumArt?.isLocal == true }.forEach { repos.album.clearAlbumArt(it.album.albumId) }
             if (tracks.isNotEmpty()) repos.track.clearLocalUris(tracks.map { it.trackId })
         }
+    }
+
+    private suspend fun getRemoteAlbumWithTracks(combo: IAlbumWithTracksCombo<IAlbum>): UnsavedAlbumWithTracksCombo? {
+        val spotifyCombo = updateAlbumFromSpotify(combo)
+        val mbCombo = updateAlbumFromMusicBrainz(spotifyCombo ?: combo)
+
+        return mbCombo ?: spotifyCombo
     }
 
     private suspend fun handleOrphansAndDuplicates() {
@@ -419,15 +423,6 @@ class LibraryManager @Inject constructor(
                 tagUpdateStrategy = tagUpdateStrategy,
             )
         } else null
-    }
-
-    private fun updateAlbumFromRemotes(combo: IAlbumWithTracksCombo<IAlbum>) {
-        launchOnIOThread {
-            val spotifyCombo = updateAlbumFromSpotify(combo)
-            val mbCombo = updateAlbumFromMusicBrainz(spotifyCombo ?: combo)
-
-            upsertAlbumWithTracks(mbCombo ?: spotifyCombo ?: combo)
-        }
     }
 
     private suspend fun updateAlbumFromSpotify(

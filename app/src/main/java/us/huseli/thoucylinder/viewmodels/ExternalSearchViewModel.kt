@@ -21,6 +21,7 @@ import us.huseli.thoucylinder.AlbumDownloadTask
 import us.huseli.thoucylinder.TrackDownloadTask
 import us.huseli.thoucylinder.dataclasses.album.AlbumCallbacks
 import us.huseli.thoucylinder.dataclasses.album.AlbumSelectionCallbacks
+import us.huseli.thoucylinder.dataclasses.album.IUnsavedAlbumCombo
 import us.huseli.thoucylinder.dataclasses.album.ImportableAlbumUiState
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
 import us.huseli.thoucylinder.dataclasses.track.TrackUiState
@@ -109,7 +110,7 @@ class ExternalSearchViewModel @Inject constructor(
             if (!_albumIdsInDb.contains(albumId)) {
                 val albumCombo = _currentBackend.albumSearchHolder.convertToAlbumWithTracks(albumId)
 
-                if (albumCombo?.isSaved == false) {
+                if (albumCombo is IUnsavedAlbumCombo) {
                     managers.library.upsertAlbumWithTracks(albumCombo)
                     _albumIdsInDb.add(albumCombo.album.albumId)
                 }

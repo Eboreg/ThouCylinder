@@ -57,14 +57,13 @@ class AlbumViewModel @Inject constructor(
     private val _albumNotFound = MutableStateFlow(false)
     private val _artists = repos.artist.flowArtistsByAlbumId(_albumId)
     private val _importProgress = MutableStateFlow(ProgressData())
+    private val _otherArtistAlbumsAlbumTypes = MutableStateFlow<Map<String, List<AlbumType>>>(emptyMap())
+    private val _otherArtistAlbumsExpanded = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
     private val _albumCombo: StateFlow<AlbumWithTracksCombo?> = repos.album.flowAlbumWithTracks(_albumId)
         .onEach { _albumNotFound.value = it == null }
         .filterNotNull()
         .stateWhileSubscribed()
-
-    private val _trackCombos: StateFlow<List<TrackCombo>> =
-        repos.track.flowTrackCombosByAlbumId(_albumId).stateWhileSubscribed(emptyList())
 
     private val _primaryMusicBrainzArtists = combine(_albumCombo.filterNotNull(), _artists) { combo, artists ->
         if (combo.album.albumType != AlbumType.COMPILATION) {
@@ -97,8 +96,8 @@ class AlbumViewModel @Inject constructor(
         result
     }
 
-    private val _otherArtistAlbumsAlbumTypes = MutableStateFlow<Map<String, List<AlbumType>>>(emptyMap())
-    private val _otherArtistAlbumsExpanded = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val _trackCombos: StateFlow<List<TrackCombo>> =
+        repos.track.flowTrackCombosByAlbumId(_albumId).stateWhileSubscribed(emptyList())
 
     val otherArtistAlbums: StateFlow<ImmutableList<OtherArtistAlbums>> = combine(
         _otherArtistAlbumsMap,
@@ -169,6 +168,12 @@ class AlbumViewModel @Inject constructor(
     }.stateWhileSubscribed(40)
 
     val uiState: StateFlow<AlbumUiState?> = _albumCombo.map { it?.toUiState() }.stateWhileSubscribed()
+
+    val musicBrainzReleases = uiState.filterNotNull().map { state ->
+        state.musicBrainzReleaseGroupId?.let { groupId ->
+            repos.musicBrainz.listReleasesByReleaseGroupId(groupId).sortedBy { it.date }.toImmutableList()
+        } ?: persistentListOf()
+    }.stateWhileSubscribed(persistentListOf())
 
     init {
         unselectAllTracks()

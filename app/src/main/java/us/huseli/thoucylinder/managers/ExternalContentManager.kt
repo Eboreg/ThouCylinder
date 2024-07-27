@@ -241,7 +241,7 @@ class ExternalContentManager @Inject constructor(
         database.withTransaction {
             repos.album.upsertAlbum(combo.album)
             repos.album.setAlbumTags(combo.album.albumId, combo.tags)
-            repos.track.setAlbumComboTracks(combo)
+            repos.track.setAlbumTracks(combo.album.albumId, combo.tracks)
             repos.artist.setAlbumComboArtists(combo)
         }
     }

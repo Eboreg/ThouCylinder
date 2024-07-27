@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import us.huseli.retaintheme.extensions.launchOnIOThread
+import us.huseli.retaintheme.extensions.launchOnMainThread
 import us.huseli.thoucylinder.dataclasses.album.AlbumSelectionCallbacks
 import us.huseli.thoucylinder.dataclasses.album.IAlbumUiState
 import us.huseli.thoucylinder.dataclasses.callbacks.AppDialogCallbacks
@@ -79,7 +80,7 @@ abstract class AbstractAlbumListViewModel<T : IAlbumUiState>(
     override fun setTrackStateIsSelected(state: TrackUiState, isSelected: Boolean) = state.copy(isSelected = isSelected)
 
     fun onAlbumClick(albumId: String, default: (String) -> Unit) {
-        launchOnIOThread {
+        launchOnMainThread {
             if (isAlbumSelectEnabled()) toggleAlbumSelected(albumId)
             else default(albumId)
         }

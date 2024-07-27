@@ -89,9 +89,16 @@ interface ITrackCombo : Comparable<ITrackCombo> {
         else track.albumPosition?.toString() ?: ""
 }
 
+
 fun Iterable<ITrackCombo>.tracks(): List<Track> = map { it.track }
 
 fun Iterable<ITrackCombo>.toUiStates(): ImmutableList<TrackUiState> = map { it.toUiState() }.toImmutableList()
+
+
+@Suppress("UNCHECKED_CAST")
+fun <T : ITrackCombo> Iterable<T>.withTracks(tracks: Iterable<Track>): List<T> =
+    zip(tracks).map { (trackCombo, track) -> trackCombo.withTrack(track) as T }
+
 
 interface ISavedTrackCombo : ITrackCombo {
     override val trackArtists: List<TrackArtistCredit>

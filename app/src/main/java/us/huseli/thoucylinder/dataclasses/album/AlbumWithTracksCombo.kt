@@ -11,9 +11,11 @@ import us.huseli.thoucylinder.dataclasses.tag.Tag
 import us.huseli.thoucylinder.dataclasses.track.ITrackCombo
 import us.huseli.thoucylinder.dataclasses.track.Track
 import us.huseli.thoucylinder.dataclasses.track.TrackCombo
+import us.huseli.thoucylinder.dataclasses.track.withTracks
 import kotlin.math.abs
 
 enum class TrackMergeStrategy { KEEP_LEAST, KEEP_MOST, KEEP_SELF, KEEP_OTHER }
+
 
 data class UnsavedAlbumWithTracksCombo(
     override val album: UnsavedAlbum,
@@ -29,7 +31,10 @@ data class UnsavedAlbumWithTracksCombo(
     fun match(other: IAlbumWithTracksCombo<IAlbum>) =
         AlbumMatch(distance = getDistance(other), albumCombo = this)
 
-    fun withAlbum(album: IAlbum) = copy(album = album.asUnsavedAlbum())
+    override fun updateWith(album: IAlbum?, tracks: List<Track>?) = copy(
+        album = album?.asUnsavedAlbum() ?: this.album,
+        trackCombos = tracks?.let { trackCombos.withTracks(it) } ?: trackCombos,
+    )
 
     private fun getDistance(other: IAlbumWithTracksCombo<*>): Double {
         var result = 0.0
@@ -51,6 +56,7 @@ data class UnsavedAlbumWithTracksCombo(
         .size.toDouble() + abs(trackCombos.size - otherTracks.size)
 }
 
+
 data class AlbumWithTracksCombo(
     @Embedded override val album: Album,
     @Relation(
@@ -70,4 +76,9 @@ data class AlbumWithTracksCombo(
     override val trackCombos: List<TrackCombo> = emptyList<TrackCombo>().let { combos ->
         combos.map { it.copy(albumArtists = artists) }
     },
-) : IAlbumWithTracksCombo<Album>, ISavedAlbumCombo
+) : IAlbumWithTracksCombo<Album>, ISavedAlbumCombo {
+    override fun updateWith(album: IAlbum?, tracks: List<Track>?) = copy(
+        album = album?.asSavedAlbum() ?: this.album,
+        trackCombos = tracks?.let { trackCombos.withTracks(it) } ?: trackCombos,
+    )
+}

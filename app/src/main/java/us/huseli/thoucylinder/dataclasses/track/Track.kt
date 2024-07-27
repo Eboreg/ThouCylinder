@@ -165,9 +165,11 @@ data class Track(
     override fun toString(): String = if (albumPosition != null) "$albumPosition. $title" else title
 }
 
+
 @WorkerThread
 fun Iterable<Track>.listParentDirectories(context: Context): List<DocumentFile> =
     mapNotNull { it.getDocumentFile(context)?.getParentDirectory(context) }.distinctBy { it.uri.path }
+
 
 @WorkerThread
 fun Iterable<Track>.listCoverImages(context: Context, includeThumbnails: Boolean = false): List<DocumentFile> {

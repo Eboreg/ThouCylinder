@@ -45,11 +45,11 @@ enum class MusicBrainzReleaseGroupSecondaryType {
 abstract class AbstractMusicBrainzReleaseGroup : AbstractMusicBrainzItem(), IHasMusicBrainzIds, IExternalAlbum {
     abstract val firstReleaseDate: String?
     abstract val primaryType: MusicBrainzReleaseGroupPrimaryType?
-    abstract override val title: String
     abstract val secondaryTypes: List<MusicBrainzReleaseGroupSecondaryType>?
     abstract val artistCredit: List<MusicBrainzArtistCredit>?
 
     abstract override val id: String
+    abstract override val title: String
 
     override val musicBrainzReleaseGroupId: String?
         get() = id

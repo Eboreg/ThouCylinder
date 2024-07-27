@@ -18,14 +18,9 @@ data class MusicBrainzReleaseSearch(
         override val id: String,
         val media: List<MusicBrainzSimplifiedMedia>,
         val packaging: String?,
-        @SerializedName("packaging-id")
-        val packagingId: String?,
-        val quality: String?,
         @SerializedName("release-group")
         val releaseGroup: ReleaseGroup,
         override val status: MusicBrainzReleaseStatus?,
-        @SerializedName("status-id")
-        val statusId: String?,
         override val title: String,
         @SerializedName("track-count")
         override val trackCount: Int,

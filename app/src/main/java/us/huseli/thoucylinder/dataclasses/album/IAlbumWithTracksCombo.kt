@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.album
 
+import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.artist.IAlbumArtistCredit
 import us.huseli.thoucylinder.dataclasses.tag.AlbumTag
 import us.huseli.thoucylinder.dataclasses.tag.Tag
@@ -67,6 +68,8 @@ interface IAlbumWithTracksCombo<out A : IAlbum> : IAlbumCombo<A> {
             artists = mergeAlbumArtists(other = other.artists, updateStrategy = albumArtistUpdateStrategy),
         )
     }
+
+    fun updateWith(album: IAlbum? = null, tracks: List<Track>? = null): IAlbumWithTracksCombo<A>
 
     private fun mergeAlbumArtists(
         other: List<IAlbumArtistCredit>,
@@ -140,4 +143,24 @@ interface IAlbumWithTracksCombo<out A : IAlbum> : IAlbumCombo<A> {
 
         return mergedTrackCombos.toList()
     }
+
+    class Builder(private var combo: IAlbumWithTracksCombo<IAlbum>) {
+        fun build(): IAlbumWithTracksCombo<IAlbum> = combo
+
+        fun setAlbumArt(value: MediaStoreImage?) {
+            combo = combo.updateWith(album = combo.album.withAlbumArt(value))
+        }
+
+        fun setIsInLibrary(value: Boolean) {
+            combo = combo.updateWith(
+                album = combo.album.withIsinLibrary(value),
+                tracks = combo.tracks.map { it.copy(isInLibrary = value) },
+            )
+        }
+    }
+}
+
+
+inline fun IAlbumWithTracksCombo<IAlbum>.withUpdates(builder: IAlbumWithTracksCombo.Builder.() -> Unit): IAlbumWithTracksCombo<IAlbum> {
+    return IAlbumWithTracksCombo.Builder(this).apply(builder).build()
 }

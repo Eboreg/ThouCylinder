@@ -79,4 +79,5 @@ interface IAlbum : IAlbumArtOwner, IHasMusicBrainzIds {
     fun asUnsavedAlbum(): UnsavedAlbum
     fun mergeWith(other: IAlbum): IAlbum
     fun withAlbumArt(albumArt: MediaStoreImage?): IAlbum
+    fun withIsinLibrary(isInLibrary: Boolean): IAlbum
 }

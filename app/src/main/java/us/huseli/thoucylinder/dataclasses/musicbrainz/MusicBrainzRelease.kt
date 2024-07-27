@@ -1,5 +1,6 @@
 package us.huseli.thoucylinder.dataclasses.musicbrainz
 
+import android.content.Context
 import com.google.gson.annotations.SerializedName
 import us.huseli.thoucylinder.dataclasses.MediaStoreImage
 import us.huseli.thoucylinder.dataclasses.album.IUnsavedAlbumCombo
@@ -7,6 +8,7 @@ import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbum
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumCombo
 import us.huseli.thoucylinder.dataclasses.album.UnsavedAlbumWithTracksCombo
 import us.huseli.thoucylinder.enums.AlbumType
+import us.huseli.thoucylinder.enums.getRegionName
 import us.huseli.thoucylinder.interfaces.IExternalAlbum
 import us.huseli.thoucylinder.interfaces.IExternalAlbumWithTracks
 import us.huseli.thoucylinder.interfaces.IHasMusicBrainzIds
@@ -57,6 +59,8 @@ abstract class AbstractMusicBrainzRelease : AbstractMusicBrainzItem(), IExternal
     override val musicBrainzReleaseGroupId: String?
         get() = releaseGroupId
 
+    fun getCountryName(context: Context): String? = country?.let { context.getRegionName(it) }
+
     open fun toAlbum(
         isLocal: Boolean,
         isInLibrary: Boolean,
@@ -89,16 +93,11 @@ data class MusicBrainzSimplifiedRelease(
     override val artistCredit: List<MusicBrainzArtistCredit>,
     override val country: String?,
     override val date: String?,
-    val disambiguation: String?,
+    val disambiguation: String,
     val genres: List<MusicBrainzGenre>,
     override val id: String,
     val packaging: String?,
-    @SerializedName("packaging-id")
-    val packagingId: String?,
-    val quality: String?,
     override val status: MusicBrainzReleaseStatus?,
-    @SerializedName("status-id")
-    val statusId: String?,
     override val title: String,
 ) : AbstractMusicBrainzRelease() {
     override val trackCount: Int?
@@ -134,11 +133,12 @@ data class MusicBrainzRelease(
     override val id: String,
     val media: List<MusicBrainzMedia>,
     val packaging: String?,
-    val quality: String?,
     @SerializedName("release-group")
     val releaseGroup: MusicBrainzSimplifiedReleaseGroup?,
     override val status: MusicBrainzReleaseStatus?,
     override val title: String,
+    @SerializedName("label-info")
+    val labelInfo: List<MusicBrainzLabelInfo>?,
 ) : AbstractMusicBrainzRelease(), IExternalAlbumWithTracks {
     private val allGenres: List<MusicBrainzGenre>
         get() = genres

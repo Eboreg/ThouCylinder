@@ -174,17 +174,10 @@ class SpotifyRepository @Inject constructor(
             ?.artists
             ?.sortedByDescending { it.popularity }
 
-    suspend fun getAlbum(albumId: String): SpotifyAlbum? = getAlbums(listOf(albumId))?.firstOrNull()
+    suspend fun getAlbum(albumId: String): SpotifyAlbum? {
+        val job = RequestJob(url = "$API_ROOT/albums/$albumId", oauth2 = oauth2CC)
 
-    suspend fun getAlbums(albumIds: List<String>): List<SpotifyAlbum>? {
-        val job = RequestJob(
-            url = Request.getUrl(
-                url = "$API_ROOT/albums",
-                params = mapOf("ids" to albumIds.joinToString(",")),
-            ),
-            oauth2 = oauth2CC,
-        )
-        return apiResponseCache.getOrNull(job)?.fromJson<SpotifyAlbumsResponse>()?.albums
+        return apiResponseCache.getOrNull(job)?.fromJson<SpotifyAlbumsResponse>()?.albums?.firstOrNull()
     }
 
     suspend fun getUserProfile(): SpotifyUserProfile? {
